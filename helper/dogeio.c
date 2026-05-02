@@ -7,7 +7,7 @@
 int cursor_x = 0;
 int cursor_y = 0;
 uint8_t such_color = 0x0E;
-volatile char* video_buffer = (volatile char*) VRAM_ADRESS;
+volatile char* video_buffer = (volatile char*) VRAM_ADDRESS;
 
 // .basic functions that are needed for other useful functions.
 // set color of text
@@ -19,7 +19,7 @@ void dogeio_setcolor(uint8_t color) {
 void dogeio_scroll() {
     for (size_t y = 0; y < MAX_COLS - 1; y++) {
         for (size_t x = 0; x < MAX_ROWS; x++) {
-      	    video_buffer[y * MAX_ROWS + x] = video_buffer[(y + 1) * VGA_ROWS + x];
+      	    video_buffer[y * MAX_ROWS + x] = video_buffer[(y + 1) * MAX_COLS + x];
       }
    }
    
@@ -56,13 +56,17 @@ void dogeio_print(char* string) {
             cursor_y = 0;
         }
    }
+}
 
 // to print a string but with a newline
-
+void dogeio_println(char* string) {
+    dogeio_print(string);
+	dogeio_print("\n");
+}
 
 void dogeio_clearscreen() {
-	for (int y = 0; x < MAX_COLS; y++) {
-    	for (int x = 0, y < MAX_ROWS, x++) {
+	for (int x = 0; x < MAX_COLS; x++) {
+    	for (int y = 0; y < MAX_ROWS; y++) {
 			putchar(' ', x, y);
       }
    }
