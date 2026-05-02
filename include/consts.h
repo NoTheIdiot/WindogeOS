@@ -22,6 +22,6 @@ enum such_terminal_color {
     LIGHT_MAGENTA = 0x0D,
     LIGHT_BROWN = 0x0E,
     WHITE = 0x0F
-}
+};
 
 #endif
