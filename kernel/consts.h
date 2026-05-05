@@ -5,6 +5,9 @@
 #define MAX_ROWS 25
 #define VRAM_ADDRESS 0xB8000
 
+#define DOGE_COLOR 0x0E
+#define HUMAN_COLOR 0x0F
+
 enum such_terminal_color {
 	BLACK = 0x00,
     BLUE = 0x01,
