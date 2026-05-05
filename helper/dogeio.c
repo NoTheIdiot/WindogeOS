@@ -1,8 +1,17 @@
+/*
+Make sure for a optional VBE and VGA text mode in the future
+settings command soon
+*/
+
 // include files
 #include <stdint.h>
 #include <stddef.h>
 #include "../kernel/consts.h"
 #include "../helper/ports.h"
+#include "../helper/dogeio_graphics.h"
+#include "../helper/vbe.h"
+
+extern uint8_t vbe_initialized;
 
 // cursor variables
 int cursor_x = 0;
@@ -54,6 +63,11 @@ void dogeio_scroll() {
 
 // places a char in the screen
 void dogeio_putchar(char input) {
+    if (vbe_initialized) {
+        dogeio_putchar_graphics(input);
+        return;
+    }
+
 	volatile char* video_address = (volatile char*) VRAM_ADDRESS;
 	int offset = (cursor_y * 80 + cursor_x) * 2;
 	video_address[offset] = input;
@@ -62,6 +76,11 @@ void dogeio_putchar(char input) {
 
 // prints a string by looping dogeio_putchar
 void dogeio_print(char* string) {
+    if (vbe_initialized) {
+        dogeio_print_graphics(string);
+        return;
+    }
+
 	for (int i = 0; string[i] != '\0'; i++) {
 		if (string[i] == '\n') {
 			cursor_x = 0;
@@ -87,12 +106,22 @@ void dogeio_print(char* string) {
 
 // print a string with a newline
 void dogeio_println(char* string) {
+    if (vbe_initialized) {
+        dogeio_println_graphics(string);
+        return;
+    }
+
     dogeio_print(string);
     dogeio_print("\n");
 }
 
 // clears the screen, without scrolling
 void dogeio_clear_screen() {
+    if (vbe_initialized) {
+        dogeio_clear_screen_graphics();
+        return;
+    }
+
 	for (int y = 0; y < MAX_ROWS; y++) {
 		for (int x = 0; x < MAX_COLS; x++) {
 			cursor_x = x;
@@ -108,6 +137,11 @@ void dogeio_clear_screen() {
 
 // get inputs
 void dogeio_input(char* buffer, int max_len, uint8_t color) {
+    if (vbe_initialized) {
+        dogeio_input_graphics(buffer, max_len, color);
+        return;
+    }
+
     int i = 0;
     int shift = 0;
     volatile uint16_t* vga = (volatile uint16_t*)0xB8000;
