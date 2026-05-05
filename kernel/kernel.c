@@ -34,6 +34,7 @@ static void serial_write_hex(uint32_t value) {
 extern int such_check_multiboot(uint32_t magic, multiboot_info_t* mbi);
 extern void record_boot_time();
 extern char* such_windoge_version;
+extern char* such_windoge_version_short;
 
 void kernel_main(uint32_t magic, multiboot_info_t* mbi) {
 
@@ -58,12 +59,10 @@ void kernel_main(uint32_t magic, multiboot_info_t* mbi) {
     char print_input[64];
     char cpu_buffer[64];
     
-    // If graphics mode is available, use it; otherwise fall back to text mode
     if (vbe_initialized) {
-        dogeio_println_graphics("Welcome to WindogeOS - Graphics Mode!");
-        dogeio_println_graphics(such_windoge_version);
+        dogeio_print("Welcome to WindogeOS! ");
+        dogeio_println(such_windoge_version_short);
     } else {
-        // Fall back to text mode
         dogeio_clear_screen();
         such_check_multiboot(magic, mbi);
         record_boot_time(uptime_buffer);
