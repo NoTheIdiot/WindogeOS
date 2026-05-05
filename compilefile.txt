@@ -2,6 +2,9 @@
 nasm -f elf32 boot/boot.asm -o boot.o
 
 # helper/
+dogec -c helper/dogeio_graphics.c -o dogeio_graphics.o
+dogec -c helper/vbe.c -o vbe.o
+dogec -c helper/font.c -o font.o
 dogec -c helper/dogeio.c -o dogeio.o
 dogec -c helper/time.c -o time.o
 dogec -c helper/string.c -o string.o
@@ -11,10 +14,11 @@ dogec -c helper/ports.c -o ports.o
 dogec -c kernel/suchboot.c -o suchboot.o
 dogec -c kernel/data.c -o data.o
 dogec -c kernel/info.c -o info.o
+dogec -c kernel/file.c -o file.o
 dogec -c kernel/kernel.c -o kernel.o
 
 # link
-ld -m elf_i386 -T linker/linker.ld -o windoge.bin boot.o kernel.o data.o info.o dogeio.o ports.o string.o suchboot.o time.o
+ld -m elf_i386 -T linker/linker.ld -o windoge.bin boot.o kernel.o data.o info.o dogeio.o ports.o string.o suchboot.o time.o vbe.o dogeio_graphics.o font.o file.o
 
 # delete
 rm boot.o
@@ -23,6 +27,10 @@ rm dogeio.o
 rm time.o
 rm string.o
 rm ports.o
+rm vbe.o
+rm dogeio_graphics.o
+rm font.o
+rm file.o
 
 rm suchboot.o
 rm data.o

@@ -2,6 +2,8 @@
 #include <stdint.h>
 #include <stddef.h>
 #include "../helper/dogeio.h"
+#include "../helper/dogeio_graphics.h"
+#include "../helper/vbe.h"
 #include "../helper/string.h"
 #include "../helper/ports.h"
 #include "../helper/time.h"
@@ -9,27 +11,69 @@
 #include "multiboot.h"
 #include "info.h"
 
+static inline void serial_write_char(char c) {
+    while ((ports_inb(0x3F8 + 5) & 0x20) == 0);
+    ports_outb(0x3F8, (uint8_t)c);
+}
+
+static void serial_write_string(const char* str) {
+    for (size_t i = 0; str[i] != '\0'; i++) {
+        serial_write_char(str[i]);
+    }
+}
+
+static void serial_write_hex(uint32_t value) {
+    const char* hex = "0123456789ABCDEF";
+    serial_write_string("0x");
+    for (int shift = 28; shift >= 0; shift -= 4) {
+        uint8_t digit = (value >> shift) & 0xF;
+        serial_write_char(hex[digit]);
+    }
+}
+
 extern int such_check_multiboot(uint32_t magic, multiboot_info_t* mbi);
 extern void record_boot_time();
 extern char* such_windoge_version;
 
 void kernel_main(uint32_t magic, multiboot_info_t* mbi) {
 
-    // check everything about the multiboot header
-    dogeio_clear_screen();
-    such_check_multiboot(magic, mbi);
+    dogeio_init_graphics_from_multiboot(mbi);
+
+    serial_write_string("[DEBUG] mbi.flags=");
+    serial_write_hex(mbi->flags);
+    serial_write_string(" framebuf=");
+    serial_write_hex((uint32_t)(mbi->framebuffer_addr & 0xFFFFFFFF));
+    serial_write_string(" width=");
+    serial_write_hex(mbi->framebuffer_width);
+    serial_write_string(" height=");
+    serial_write_hex(mbi->framebuffer_height);
+    serial_write_string(" bpp=");
+    serial_write_hex(mbi->framebuffer_bpp);
+    serial_write_string(" vbe=");
+    serial_write_hex(vbe_initialized);
+    serial_write_string("\n");
+    
     char uptime_buffer[64];
-    record_boot_time(uptime_buffer);
-    dogeio_print("[Note] Such time is ");
-    dogeio_print(uptime_buffer);
-    dogeio_print("\n");
-
-	dogeio_print("Welcome to WindogeOS! ");
-    dogeio_println(such_windoge_version);
-
     char command[64];
     char print_input[64];
     char cpu_buffer[64];
+    
+    // If graphics mode is available, use it; otherwise fall back to text mode
+    if (vbe_initialized) {
+        dogeio_println_graphics("Welcome to WindogeOS - Graphics Mode!");
+        dogeio_println_graphics(such_windoge_version);
+    } else {
+        // Fall back to text mode
+        dogeio_clear_screen();
+        such_check_multiboot(magic, mbi);
+        record_boot_time(uptime_buffer);
+        dogeio_print("[Note] Such time is ");
+        dogeio_print(uptime_buffer);
+        dogeio_print("\n");
+
+        dogeio_print("Welcome to WindogeOS! ");
+        dogeio_println(such_windoge_version);
+    }
 
     while (1) {
         dogeio_print("windoge~# ");

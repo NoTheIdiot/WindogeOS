@@ -3,6 +3,10 @@
 
 #include "../kernel/multiboot.h"
 
+// scancode
+extern char scan_to_ascii[];
+extern char scan_to_ascii_shift[];
+
 void dogeio_putchar(char input);
 void dogeio_print(char* string);
 void dogeio_println(char* string); 
