@@ -55,3 +55,26 @@ void string_itoa(int n, char* string) {
         end--;
     }
 }
+
+int string_strncmp(const char *string1, const char *string2, size_t n) {
+    while (n > 0 && *string1 && (*string1 == *string2)) {
+        string1++;
+        string2++;
+        n--;
+    }
+    if (n == 0) {
+        return 0;
+    }
+    return *(const unsigned char*)string1 - *(const unsigned char*)string2;
+}
+
+int string_startswith(const char *string, const char *prefix) {
+    while (*prefix) {
+        if (*string != *prefix) {
+            return 0;
+        }
+        string++;
+        prefix++;
+    }
+    return 1;
+}
