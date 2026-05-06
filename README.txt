@@ -6,8 +6,7 @@ but it's hard to use for new users, while Windows is easy to use
 but paid for all features, and macOS is just idk.
 
 = Updates
-Finally actually got my mind in check and finally finished an actual 
-first build.
+It now has a virtual file system, and now using graphics VBE mode (768p tho)
 
 = How to such compile and run?
 - Install git, gcc, nasm, and qemu-system
