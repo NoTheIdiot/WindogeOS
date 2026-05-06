@@ -78,3 +78,22 @@ int string_startswith(const char *string, const char *prefix) {
     }
     return 1;
 }
+
+int string_atoi(char* s) {
+    int res = 0;
+    while (*s >= '0' && *s <= '9') {
+        res = res * 10 + (*s - '0');
+        s++;
+    }
+    return res;
+}
+
+void string_copy(char *dest, const char *src) {
+    int i = 0;
+    while (src[i] != '\0') {
+        dest[i] = src[i];
+        i++;
+    }
+    dest[i] = '\0';
+}
+

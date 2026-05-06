@@ -37,5 +37,7 @@ void kernel_main(uint32_t magic, multiboot_info_t* mbi) {
     serial_write_string("\n");
     
     such_check_multiboot(magic, mbi);
+    dogeio_print("Welcome to WindogeOS! ");
+    dogeio_println(such_windoge_version_short);
     doge_shell(magic, mbi);
 }
