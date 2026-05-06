@@ -11,22 +11,20 @@ char* file1[] = {
     "This is a virtual file system demo.",
     "Files are stored as arrays of strings.",
     "This file system cannot be saved.",
-    "This file system also is read only.",
+    "This file system is now finally able to be writen!",
     "Enjor your stay!",
     NULL
 };
 
 char* file2[] = {
     "config.sys",
-    "kernel=windoge",
     "shell=dogeshell",
-    "graphics=vbe",
     NULL
 };
 
 char* file3[] = {
     "hello.doge",
-    "PRINT \"HELLO WORLD\"",
+    "PRINT HELLO WORLD",
     NULL
 };
 
@@ -70,4 +68,49 @@ char** file_find_by_name(char* filename) {
         }
     }
     return NULL;
+}
+
+void file_rename_file(char* file[], char* new_name) {
+    if (file == NULL || file[0] == NULL) {
+        dogeio_print("Error: Invalid file that doesn't exist.\n");
+        return;
+    }
+
+    file[0] = new_name;
+}
+
+void file_write_file(char* file[], char* string) {
+    if (file == NULL || file[0] == NULL) {
+        dogeio_print("Error: Invalid file\n");
+        return;
+    }
+
+    int num_lines = 0;
+    for (int i = 1; file[i] != NULL; i++) {
+        num_lines++;
+    }
+
+    file[num_lines + 1] = string;
+}
+
+void file_delete_line(char* file[], int line) {
+    if (file == NULL || file[0] == NULL) {
+        dogeio_print("Error: Invalid file\n");
+        return;
+    }
+
+    int num_lines = 0;
+    for (int i = 1; file[i] != NULL; i++) {
+        num_lines++;
+    }
+
+    if (line == 0 || line > num_lines) {
+        dogeio_print("Error: Invalid line number\n");
+        return;
+    }
+
+    for (int i = line; i < num_lines; i++) {
+        file[i] = file[i + 1];
+    }
+    file[num_lines] = NULL;
 }

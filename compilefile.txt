@@ -16,11 +16,12 @@ dogec -c kernel/data.c -o data.o
 dogec -c kernel/info.c -o info.o
 dogec -c kernel/serial.c -o serial.o
 dogec -c kernel/dogeshell.c -o dogeshell.o
+dogec -c kernel/dogescript.c -o dogescript.o
 dogec -c kernel/file.c -o file.o
 dogec -c kernel/kernel.c -o kernel.o
 
 # link
-ld -m elf_i386 -T linker/linker.ld -o windoge.bin boot.o kernel.o data.o info.o serial.o dogeshell.o dogeio.o ports.o string.o suchboot.o time.o vbe.o dogeio_graphics.o font.o file.o
+ld -m elf_i386 -T linker/linker.ld -o windoge.bin boot.o kernel.o data.o info.o serial.o dogescript.o dogeshell.o dogeio.o ports.o string.o suchboot.o time.o vbe.o dogeio_graphics.o font.o file.o
 
 # delete
 rm boot.o
@@ -39,4 +40,5 @@ rm data.o
 rm info.o
 rm serial.o
 rm dogeshell.o
+rm dogescript.o
 rm kernel.o
