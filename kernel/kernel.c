@@ -13,7 +13,7 @@
 #include "serial.h"
 
 extern int such_check_multiboot(uint32_t magic, multiboot_info_t* mbi);
-extern void doge_shell(uint32_t magic, multiboot_info_t* mbi);
+extern void doge_shell();
 extern void record_boot_time();
 extern char* such_windoge_version;
 extern char* such_windoge_version_short;
@@ -39,5 +39,5 @@ void kernel_main(uint32_t magic, multiboot_info_t* mbi) {
     such_check_multiboot(magic, mbi);
     dogeio_print("Welcome to WindogeOS! ");
     dogeio_println(such_windoge_version_short);
-    doge_shell(magic, mbi);
+    doge_shell();
 }
