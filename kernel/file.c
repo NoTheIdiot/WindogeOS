@@ -16,12 +16,6 @@ char* file1[] = {
     NULL
 };
 
-char* file2[] = {
-    "config.sys",
-    "shell=dogeshell",
-    NULL
-};
-
 char* file3[] = {
     "hello.doge",
     "PRINT HELLO WORLD",
@@ -31,7 +25,6 @@ char* file3[] = {
 // array of all files in the virtual file system
 char** virtual_filesystem[] = {
     file1,
-    file2,
     file3,
     NULL
 };

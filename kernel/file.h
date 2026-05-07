@@ -5,7 +5,6 @@
 // First element is filename, rest are data lines, ended with NULL
 
 extern char* file1[];
-extern char* file2[];
 extern char* file3[];
 
 void file_read_file(char* file[]);
