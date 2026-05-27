@@ -8,7 +8,7 @@ settings command soon
 #include <stddef.h>
 #include "consts.h"
 #include "ports.h"
-#include "dogeio_graphics.h"
+#include "dogeio_vbe.h"
 #include "vbe.h"
 
 extern uint8_t vbe_initialized;

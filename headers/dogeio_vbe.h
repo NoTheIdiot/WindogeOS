@@ -2,7 +2,7 @@
 #define DOGEIO_GRAPHICS_H
 
 #include <stdint.h>
-#include "../kernel/multiboot.h"
+#include "multiboot.h"
 
 void dogeio_init_graphics_from_multiboot(multiboot_info_t* mbi);
 void dogeio_init_graphics();

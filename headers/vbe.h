@@ -2,7 +2,7 @@
 #define VBE_H
 
 #include <stdint.h>
-#include "../kernel/multiboot.h"
+#include "multiboot.h"
 
 // VBE info structures
 typedef struct {
