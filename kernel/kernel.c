@@ -1,8 +1,8 @@
 // include files
 #include <stdint.h>
 #include <stddef.h>
-#include "ddogeio.h"
-#include "dogeio_graphics.h"
+#include "dogeio.h"
+#include "dogeio_vbe.h"
 #include "vbe.h"
 #include "string.h"
 #include "ports.h"

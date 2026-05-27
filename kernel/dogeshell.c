@@ -1,11 +1,11 @@
 // include files
 #include <stddef.h>
 #include <stdint.h>
-#include "../helper/string.h"
-#include "../helper/dogeio.h"
-#include "../helper/dogeio_graphics.h"
-#include "../helper/time.h"
-#include "../helper/bool.h"
+#include "string.h"
+#include "dogeio.h"
+#include "dogeio_vbe.h"
+#include "time.h"
+#include "bool.h"
 #include "consts.h"
 #include "file.h"
 #include "info.h"

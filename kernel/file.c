@@ -69,7 +69,10 @@ void file_list_files() {
     dogeio_println("-----------");
     for (int i = 0; i < 16; i++) {
         if (file_system[i] != NULL) {
-            dogeio_print_number(i);
+            // i keep forgeting that i don't have this function
+            char* numvar = "";
+            string_itoa(i, numvar);
+            dogeio_print(numvar);
             dogeio_print("    ");
             dogeio_println(file_system[i]->name);
         }
@@ -131,4 +134,8 @@ void file_delete_line(vfs_file* file, int line) {
     }
     
     file->content[num_lines - 1][0] = '\0';
+}
+
+void file_create_file(char* filename) {
+    
 }

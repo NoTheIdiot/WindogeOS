@@ -1,7 +1,7 @@
 #ifndef DOGEIO_H
 #define DOGEIO_H
 
-#include "../kernel/multiboot.h"
+#include "multiboot.h"
 
 // scancode
 extern char scan_to_ascii[];
