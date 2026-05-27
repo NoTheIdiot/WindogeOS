@@ -1,8 +1,8 @@
 // include files
 #include <stdint.h>
 #include <stddef.h>
-#include "../helper/string.h"
-#include "../helper/dogeio.h"
+#include "string.h"
+#include "dogeio.h"
 
 // trying to make a file system
 typedef struct {
@@ -36,66 +36,60 @@ vfs_file dogescript_example = {
 };
 
 // array of all files in the virtual file system
-vfs_file file_system[16];
+vfs_file file_system[16] {NULL};
 
 // initialize file system
 void file_init_filesystem() {
-    file_system[0] = readme,
-    file_system[1] = dogescript_example,
+    file_system[0] = &readme,
+    file_system[1] = &dogescript_example,
     NULL
 }
 
-// functions
-void file_read_file(char* file[]) {
-    if (file == NULL || file[0] == NULL) {
-        dogeio_print("Error: Invalid file\n");
-        return;
+// find a file by it's name
+vfs_file* file_find_by_name(const char* filename) {
+    for (int i = 0; i < 16; i++) {
+        if (file_system[i] == NULL) continue; 
+        
+        if (string_strcmp(file_system[i]->name, filename) == 0) {
+            return file_system[i];
+        }
     }
+    return NULL; 
+}
 
-    for (int i = 1; file[i] != NULL; i++) {
-        dogeio_print(file[i]);
-        dogeio_print("\n");
+// functions
+void file_read_file(const char* file) {
+    vfs_file file_var = file_find_by_name(file);
+    if (file_var == NULL) {
+        dogeio_println("File isn't found. Pls try using much [dir]?");
+    } else {
+        for (int i = 0; file_var->content[i] != NULL; i++) {
+            dogeio_println(file_var->content[i]);
+        }
     }
 }
 
 void file_list_files() {
-    for (int i = 0; file_system[i].name != NULL; i++) {
+    dogeio_print("ID");
+    dogeio_println("    FILES");
+    dogeio_println("-----------");
+    for (int i = 0; file_system[i]->name != NULL; i++) {
         dogeio_print(i); // id of a file
-        dogeio_println(file_system[i].name);
+        dogeio_print("    ");
+        dogeio_println(file_system[i]->name);
     }
 }
 
-char** file_find_by_name(char* filename) {
-    for (int i = 0; virtual_filesystem[i] != NULL; i++) {
-        char** file = virtual_filesystem[i];
-        if (file[0] != NULL && string_strcmp(file[0], filename) == 0) {
-            return file;
-        }
-    }
-    return NULL;
+void file_rename_file(char* filename, char* new_name) {
+    vfs_file file_var = file_find_by_name(filename);
+    if (file_var == NULL) { dogeio_println("File not found, not wow. Try using many [dir]?"); return; }
+    file_var -> name = new_name;
 }
 
-void file_rename_file(char* file[], char* new_name) {
-    if (file == NULL || file[0] == NULL) {
-        dogeio_print("Error: Invalid file that doesn't exist.\n");
-        return;
-    }
-
-    file[0] = new_name;
-}
-
-void file_write_file(char* file[], char* string) {
-    if (file == NULL || file[0] == NULL) {
-        dogeio_print("Error: Invalid file\n");
-        return;
-    }
-
-    int num_lines = 0;
-    for (int i = 1; file[i] != NULL; i++) {
-        num_lines++;
-    }
-
-    file[num_lines + 1] = string;
+void file_write_file(char* filename, char* string) {
+    vfs_file file_var = file_find_by_name(filename);
+    if (file_var == NULL) { dogeio_println("File not found, not wow. Try using many [dir]?"); return; }
+    file_var -> content[]
 }
 
 void file_delete_line(char* file[], int line) {
