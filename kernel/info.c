@@ -1,7 +1,7 @@
 // include files
 #include <stddef.h>
 #include <stdint.h>
-#include "../helper/dogeio.h"
+#include "dogeio.h"
 #include "multiboot.h"
 
 // get the CPU name

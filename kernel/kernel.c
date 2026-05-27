@@ -1,12 +1,12 @@
 // include files
 #include <stdint.h>
 #include <stddef.h>
-#include "../helper/dogeio.h"
-#include "../helper/dogeio_graphics.h"
-#include "../helper/vbe.h"
-#include "../helper/string.h"
-#include "../helper/ports.h"
-#include "../helper/time.h"
+#include "ddogeio.h"
+#include "dogeio_graphics.h"
+#include "vbe.h"
+#include "string.h"
+#include "ports.h"
+#include "time.h"
 #include "consts.h"
 #include "multiboot.h"
 #include "info.h"

@@ -6,10 +6,10 @@ settings command soon
 // include files
 #include <stdint.h>
 #include <stddef.h>
-#include "../kernel/consts.h"
-#include "../helper/ports.h"
-#include "../helper/dogeio_graphics.h"
-#include "../helper/vbe.h"
+#include "consts.h"
+#include "ports.h"
+#include "dogeio_graphics.h"
+#include "vbe.h"
 
 extern uint8_t vbe_initialized;
 

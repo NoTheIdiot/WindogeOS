@@ -1,11 +1,11 @@
 #include <stdint.h>
 #include <stddef.h>
-#include "dogeio_graphics.h"
+#include "dogeio_vbe.h"
 #include "dogeio.h"
 #include "vbe.h"
 #include "font.h"
 #include "ports.h"
-#include "../kernel/multiboot.h"
+#include "multiboot.h"
 
 extern char scan_to_ascii[];
 extern char scan_to_ascii_shift[];

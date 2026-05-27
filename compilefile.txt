@@ -2,7 +2,7 @@
 nasm -f elf32 boot/boot.asm -o boot.o
 
 # helper/
-dogec -c helper/dogeio_graphics.c -o dogeio_graphics.o
+dogec -c helper/dogeio_vbe.c -o dogeio_graphics.o
 dogec -c helper/vbe.c -o vbe.o
 dogec -c helper/font.c -o font.o
 dogec -c helper/dogeio.c -o dogeio.o
