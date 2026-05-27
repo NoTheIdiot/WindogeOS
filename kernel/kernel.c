@@ -11,6 +11,7 @@
 #include "multiboot.h"
 #include "info.h"
 #include "serial.h"
+#include "file.h"
 
 extern int such_check_multiboot(uint32_t magic, multiboot_info_t* mbi);
 extern void doge_shell();
@@ -36,6 +37,7 @@ void kernel_main(uint32_t magic, multiboot_info_t* mbi) {
     serial_write_hex(vbe_initialized);
     serial_write_string("\n");
     
+    file_init_filesystem();
     such_check_multiboot(magic, mbi);
     dogeio_print("Welcome to WindogeOS! ");
     dogeio_println(such_windoge_version_short);
