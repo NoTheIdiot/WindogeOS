@@ -1,6 +1,6 @@
 #include "multiboot.h"
-#include "../helper/dogeio.h"
-#include "../helper/time.h"
+#include "dogeio.h"
+#include "time.h"
 #include <stdint.h>
 
 int such_check_multiboot(uint32_t magic, multiboot_info_t* mbi) {

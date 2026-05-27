@@ -1,6 +1,6 @@
 #include <stddef.h>
 #include <stdint.h>
-#include "../helper/ports.h"
+#include "ports.h"
 
 void serial_write_char(char c) {
     while ((ports_inb(0x3F8 + 5) & 0x20) == 0);

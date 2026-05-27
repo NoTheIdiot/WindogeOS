@@ -4,30 +4,46 @@
 #include "../helper/string.h"
 #include "../helper/dogeio.h"
 
-// Virtual file definitions
-char* file1[] = {
-    "readme.txt",
-    "Welcome to WindogeOS!",
-    "This is a virtual file system demo.",
-    "Files are stored as arrays of strings.",
-    "This file system cannot be saved.",
-    "This file system is now finally able to be writen!",
-    "Enjor your stay!",
-    NULL
+// trying to make a file system
+typedef struct {
+    char name[32];
+    char file_extension[4];
+    char content[64][1024];
+} vfs_file;
+
+vfs_file readme = {
+    .name = "readme",
+    .file_extension = "txt",
+    .content = {
+        "readme.txt",
+        "Welcome to WindogeOS!",
+        "This is a virtual file system demo.",
+        "Files are stored as arrays of strings.",
+        "This file system cannot be saved.",
+        "This file system is now finally able to be writen!",
+        "Enjoy your stay!",
+        NULL
+    }
 };
 
-char* file3[] = {
-    "hello.doge",
-    "PRINT HELLO WORLD",
-    NULL
+vfs_file dogescript_example = {
+    .name = "dogescript_example",
+    .file_extension = "dsc",
+    .content = {
+        "PRINT HELLO WORLD",
+        NULL
+    }
 };
 
 // array of all files in the virtual file system
-char** virtual_filesystem[] = {
-    file1,
-    file3,
+vfs_file file_system[16];
+
+// initialize file system
+void file_init_filesystem() {
+    file_system[0] = readme,
+    file_system[1] = dogescript_example,
     NULL
-};
+}
 
 // functions
 void file_read_file(char* file[]) {
@@ -43,13 +59,9 @@ void file_read_file(char* file[]) {
 }
 
 void file_list_files() {
-    for (int i = 0; virtual_filesystem[i] != NULL; i++) {
-        char** file = virtual_filesystem[i];
-        if (file[0] != NULL) {
-            dogeio_print("- ");
-            dogeio_print(file[0]);
-            dogeio_print("\n");
-        }
+    for (int i = 0; file_system[i].name != NULL; i++) {
+        dogeio_print(i); // id of a file
+        dogeio_println(file_system[i].name);
     }
 }
 

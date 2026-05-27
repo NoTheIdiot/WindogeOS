@@ -5,7 +5,7 @@ import shutil
 # main
 with open("compilefile.txt", "r") as file:
     n = 1
-    gcc = "gcc -m32 -ffreestanding -nostdlib -Wall -Wextra -Werror -O2"
+    gcc = "gcc -m32 -ffreestanding -nostdlib -Wall -Wextra -Werror -O2 -Iheaders/"
     for doge in file:
         doge = doge.strip()
         if doge.startswith("#") or not doge:

@@ -2,7 +2,7 @@
 #include <stddef.h>
 #include "vbe.h"
 #include "ports.h"
-#include "../kernel/multiboot.h"
+#include "multiboot.h"
 
 // Global VBE variables
 vbe_mode_info_t vbe_info;

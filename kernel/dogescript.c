@@ -1,7 +1,7 @@
 #include <stddef.h>
 #include <stdint.h>
-#include "../helper/dogeio.h"
-#include "../helper/string.h"
+#include "dogeio.h"
+#include "string.h"
 #include "file.h"
 
 
