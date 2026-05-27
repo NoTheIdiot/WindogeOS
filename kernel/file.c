@@ -1,4 +1,3 @@
-// please fucking help me
 #include <stdint.h>
 #include <stddef.h>
 #include "string.h"
@@ -52,14 +51,13 @@ vfs_file* file_find_by_name(const char* filename) {
     return NULL; 
 }
 
-void file_read_file(const char* file) {
-    vfs_file* file_var = file_find_by_name(file);
-    if (file_var == NULL) {
-        dogeio_println("File isn't found. Pls try using much [dir]?");
-    } else {
-        for (int i = 0; i < 64 && file_var->content[i][0] != '\0'; i++) {
-            dogeio_println(file_var->content[i]);
-        }
+void file_read_file(char* file_content[]) {
+    if (file_content == NULL) {
+        dogeio_println("File contents missing. Pls try using much [dir]?");
+        return;
+    }
+    for (int i = 0; i < 64 && file_content[i][0] != '\0'; i++) {
+        dogeio_println(file_content[i]);
     }
 }
 
@@ -69,58 +67,52 @@ void file_list_files() {
     dogeio_println("-----------");
     for (int i = 0; i < 16; i++) {
         if (file_system[i] != NULL) {
-            // i keep forgeting that i don't have this function
-            char* numvar = "";
+            char numvar[8]; 
             string_itoa(i, numvar);
             dogeio_print(numvar);
             dogeio_print("    ");
-            dogeio_println(file_system[i]->name);
+            dogeio_print(file_system[i]->name);
+            dogeio_print(".");
+            dogeio_println(file_system[i]->file_extension);
         }
     }
 }
 
-void file_rename_file(const char* filename, const char* new_name) {
-    vfs_file* file_var = file_find_by_name(filename);
-    if (file_var == NULL) { 
-        dogeio_println("File not found, not wow. Try using many [dir]?"); 
-        return; 
-    }
+void file_rename_file(char* file_content[], const char* new_name) {
+    if (file_content == NULL) return;
+    vfs_file* file_var = (vfs_file*)((uint8_t*)file_content - offsetof(vfs_file, content));
     string_strncpy(file_var->name, new_name, sizeof(file_var->name) - 1);
     file_var->name[sizeof(file_var->name) - 1] = '\0';
 }
 
-void file_write_file(const char* filename, const char* string) {
-    vfs_file* file_var = file_find_by_name(filename);
-    if (file_var == NULL) { 
-        dogeio_println("File not found, not wow. Try using many [dir]?"); 
-        return; 
-    }
+void file_write_file(char* file_content[], const char* string) {
+    if (file_content == NULL) return;
     
     int i = 0;
-    while (i < 64 && file_var->content[i][0] != '\0') {
+    while (i < 64 && file_content[i][0] != '\0') {
         i++;
     }
     
     if (i < 64) {
-        string_strncpy(file_var->content[i], string, sizeof(file_var->content[i]) - 1);
-        file_var->content[i][sizeof(file_var->content[i]) - 1] = '\0';
+        string_strncpy(file_content[i], string, 1023);
+        file_content[i][1023] = '\0';
         
         if (i + 1 < 64) {
-            file_var->content[i + 1][0] = '\0';
+            file_content[i + 1][0] = '\0';
         }
     } else {
         dogeio_println("File full, much error!");
     }
 }
 
-void file_delete_line(vfs_file* file, int line) {
-    if (file == NULL) {
+void file_delete_line(char* file_content[], int line) {
+    if (file_content == NULL) {
         dogeio_print("Error: Invalid file\n");
         return;
     }
 
     int num_lines = 0;
-    while (num_lines < 64 && file->content[num_lines][0] != '\0') {
+    while (num_lines < 64 && file_content[num_lines][0] != '\0') {
         num_lines++;
     }
 
@@ -130,12 +122,16 @@ void file_delete_line(vfs_file* file, int line) {
     }
 
     for (int i = line; i < num_lines - 1; i++) {
-        string_strcpy(file->content[i], file->content[i + 1]);
+        string_strcpy(file_content[i], file_content[i + 1]);
     }
     
-    file->content[num_lines - 1][0] = '\0';
+    file_content[num_lines - 1][0] = '\0';
 }
 
 void file_create_file(char* filename) {
-    
+    (void)filename;
+}
+
+void file_delete_file(char* filename) {
+    (void)filename;
 }
