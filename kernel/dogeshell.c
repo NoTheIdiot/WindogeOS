@@ -14,18 +14,6 @@
 extern char* such_windoge_version;
 extern char* such_windoge_version_short;
 
-vfs_file* shell_get_file_ptr(const char* name) {
-    if (name == NULL || string_strlen(name) == 0) {
-        return NULL;
-    }
-    for (int i = 0; i < 16; i++) {
-        if (file_system[i] != NULL && string_strcmp(file_system[i]->name, name) == 0) {
-            return file_system[i];
-        }
-    }
-    return NULL;
-}
-
 char* shell_get_arg(char* buffer, int command_len) {
     char* arg = buffer + command_len;
     while (*arg == ' ' && *arg != '\0') {
@@ -76,15 +64,9 @@ void doge_shell() {
             time_show();
             handled = 1;
         }
+
+        // not for now
         else if (string_startswith(command_buffer, "info")) {
-            char* arg = shell_get_arg(command_buffer, 4);
-            if (arg != NULL && string_strcmp(arg, "os") == 0) {
-                dogeio_println("WindogeOS Info: ");
-                dogeio_print("Version: ");
-                dogeio_println(such_windoge_version);
-            } else {
-                dogeio_println("info: info os");
-            }
             handled = 1;
         }
 
@@ -94,7 +76,7 @@ void doge_shell() {
         } 
         else if (string_startswith(command_buffer, "read")) {
             char* file = shell_get_arg(command_buffer, 4);
-            vfs_file* target = shell_get_file_ptr(file);
+            vfs_file* target = file_find_by_name(file);
             
             if (target == NULL) {
                 dogeio_println("file not found, try refering to dir");
@@ -107,7 +89,7 @@ void doge_shell() {
         } 
         else if (string_startswith(command_buffer, "rename")) {
             char* file = shell_get_arg(command_buffer, 6);
-            vfs_file* target = shell_get_file_ptr(file);
+            vfs_file* target = file_find_by_name(file);
             
             if (target == NULL) {
                 dogeio_println("file not found, try refering to dir");
@@ -128,7 +110,7 @@ void doge_shell() {
         } 
         else if (string_startswith(command_buffer, "write")) {
             char* file = shell_get_arg(command_buffer, 5);
-            vfs_file* target = shell_get_file_ptr(file);
+            vfs_file* target = file_find_by_name(file);
             
             if (target == NULL) {
                 dogeio_println("file not found, try refering to dir");
@@ -155,10 +137,9 @@ void doge_shell() {
                 }
             }
             handled = 1;
-        } 
-        else if (string_startswith(command_buffer, "multiwrite")) {
+        } else if (string_startswith(command_buffer, "multiwrite")) {
             char* file = shell_get_arg(command_buffer, 10);
-            vfs_file* target = shell_get_file_ptr(file);
+            vfs_file* target = file_find_by_name(file);
 
             if (target == NULL) {
                 dogeio_println("file not found, try refering to dir");
@@ -196,52 +177,73 @@ void doge_shell() {
                 }
             }
             handled = 1;
-        } 
-        else if (string_startswith(command_buffer, "deleteline")) {
-            char* file = shell_get_arg(command_buffer, 10);
-            vfs_file* target = shell_get_file_ptr(file);
-            
+        } else if (string_startswith(command_buffer, "deleteline")) {
+            char* filename = shell_get_arg(command_buffer, 10);
+            vfs_file* target = file_find_by_name(filename);
+
             if (target == NULL) {
                 dogeio_println("file not found, try refering to dir");
             } else {
-                char line_str[8];
-                dogeio_println("Enter the line number to delete:");
-                dogeio_input(line_str, 8, LIGHT_BROWN);
-                
-                int ls_len = string_strlen(line_str);
-                while (ls_len > 0 && (line_str[ls_len - 1] == '\n' || line_str[ls_len - 1] == '\r')) {
-                    line_str[ls_len - 1] = '\0';
-                    ls_len--;
+                char line_num_buf[16];
+                dogeio_println("Enter line number to delete:");
+                dogeio_input(line_num_buf, 16, LIGHT_BROWN);
+
+                int l_len = string_strlen(line_num_buf);
+                while (l_len > 0 && (line_num_buf[l_len - 1] == '\n' || line_num_buf[l_len - 1] == '\r')) {
+                    line_num_buf[l_len - 1] = '\0';
+                    l_len--;
                 }
-                
-                int line_num = string_atoi(line_str);
-                int num_lines = 0;
-                while (num_lines < 64 && target->content[num_lines][0] != '\0') {
-                    num_lines++;
+
+                int line_to_delete = string_atoi(line_num_buf);
+                line_to_delete--;
+                int total_lines = 0;
+                while (total_lines < 64 && target->content[total_lines][0] != '\0') {
+                    total_lines++;
                 }
-                
-                if (line_num >= 0 && line_num < num_lines) {
-                    for (int i = line_num; i < num_lines - 1; i++) {
+
+                if (line_to_delete >= 0 && line_to_delete < total_lines) {
+                    for (int i = line_to_delete; i < total_lines - 1; i++) {
                         string_strcpy(target->content[i], target->content[i + 1]);
                     }
-                    target->content[num_lines - 1][0] = '\0';
+                    target->content[total_lines - 1][0] = '\0';
+                } else {
+                    dogeio_println("The line number you such tried to delete has the existance level of my dad, try again :(");
                 }
             }
             handled = 1;
         } 
         else if (string_startswith(command_buffer, "dogescript")) {
             char* file = shell_get_arg(command_buffer, 10);
-            vfs_file* target = shell_get_file_ptr(file);
+            vfs_file* target = file_find_by_name(file);
             
             if (target == NULL) {
                 dogeio_println("file not found, try refering to dir");
             } else {
+                int loop_start_line = -1;
+                int loop_iterations = 0;
+
                 for (int k = 0; k < 64 && target->content[k][0] != '\0'; k++) {
                     char* line = target->content[k];
                     if (string_startswith(line, "PRINT")) {
                         dogeio_println(line + 6);
                     } else if (string_startswith(line, "BARK")) {
                         dogeio_println(line + 5);
+                    } else if (string_startswith(line, "SHELL")) {
+                        // make a shell command?
+                    } else if (string_strcmp(line, "LOOP") == 0) {
+                        if (loop_start_line == -1) {
+                            loop_start_line = k;
+                            loop_iterations = 0;
+                        }
+                    } else if (string_strcmp(line, "END") == 0) {
+                        if (loop_start_line != -1) {
+                            loop_iterations++;
+                            if (loop_iterations < 5) {
+                                k = loop_start_line;
+                            } else {
+                                loop_start_line = -1;
+                            }
+                        }
                     } else {
                         dogeio_print("Unknown command in script: ");
                         dogeio_println(line);
