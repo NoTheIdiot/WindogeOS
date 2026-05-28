@@ -89,30 +89,33 @@ void file_list_files() {
     }
 }
 
-void file_rename_file(char* file_content[], const char* new_name) {
-    if (file_content == NULL) return;
-    vfs_file* file_var = (vfs_file*)((uint8_t*)file_content - offsetof(vfs_file, content));
-    string_strncpy(file_var->name, new_name, sizeof(file_var->name) - 1);
-    file_var->name[sizeof(file_var->name) - 1] = '\0';
+// do not let someone else to write your code while you have a break
+void file_rename_file(char* filename, const char* new_name) {
+    vfs_file* target = file_find_by_name(filename);
+    if (target == NULL) {
+        dogeio_println("File not found, try using [dir]?");
+        return;
+    }
+    string_strncpy(target->name, new_name, sizeof(target->name) - 1);
+    target->name[sizeof(target->name) - 1] = '\0';
 }
 
-void file_write_file(char* file_content[], const char* string) {
-    if (file_content == NULL) return;
-    
-    int i = 0;
-    while (i < 64 && file_content[i][0] != '\0') {
-        i++;
+void file_write_file(char* filename, const char* string) {
+    vfs_file* target = file_find_by_name(filename);
+    if (target == NULL) {
+        dogeio_println("File not found, try using [dir]?");
+        return;
     }
-    
-    if (i < 64) {
-        string_strncpy(file_content[i], string, 1023);
-        file_content[i][1023] = '\0';
-        
-        if (i + 1 < 64) {
-            file_content[i + 1][0] = '\0';
-        }
+    int line = 0;
+    while (line < 64 && target->content[line][0] != '\0') {
+        line++;
+    }
+
+    if (line < 64) {
+        string_strncpy(target->content[line], string, 1023);
+        target->content[line][1023] = '\0';
     } else {
-        dogeio_println("File full, much error!");
+        dogeio_println("File is full, maybe creating a new one?");
     }
 }
 

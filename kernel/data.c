@@ -3,5 +3,5 @@
 #include <stdint.h>
 
 // variables
-char* such_windoge_version = "WindogeOS Build 0004";
-char* such_windoge_version_short = "Build 0004";
+char* such_windoge_version = "WindogeOS V0.0.1 Beta 0001";
+char* such_windoge_version_short = "V0.0.1 Beta 0001";
