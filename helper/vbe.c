@@ -51,7 +51,6 @@ uint16_t vbe_width = 1024;
 uint16_t vbe_height = 768;
 uint8_t vbe_bits_per_pixel = 32;
 uint8_t vbe_initialized = 0;
-uint32_t vbe_color = brown;
 
 // Initialize VBE graphics from multiboot info
 void vbe_init_from_multiboot(multiboot_info_t* mbi) {

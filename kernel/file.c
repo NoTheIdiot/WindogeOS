@@ -3,6 +3,8 @@
 #include "string.h"
 #include "dogeio.h"
 
+size_t file_amount;
+
 typedef struct {
     char name[32];
     char file_extension[4];
@@ -34,10 +36,13 @@ vfs_file dogescript_example = {
 };
 
 vfs_file* file_system[16] = {NULL};
+vfs_file file_pool[14];
+size_t pool_index = 0;
 
 void file_init_filesystem() {
     file_system[0] = &readme;
     file_system[1] = &dogescript_example;
+    file_amount = 2;
 }
 
 vfs_file* file_find_by_name(const char* filename) {
@@ -51,17 +56,23 @@ vfs_file* file_find_by_name(const char* filename) {
     return NULL; 
 }
 
-void file_read_file(char* file_content[]) {
-    if (file_content == NULL) {
-        dogeio_println("File contents missing. Pls try using much [dir]?");
+void file_read_file(char* filename) {
+    vfs_file* file = file_find_by_name(filename);
+    if (file == NULL) {
+        dogeio_println("File not such found. Use [dir]?");
         return;
     }
-    for (int i = 0; i < 64 && file_content[i][0] != '\0'; i++) {
-        dogeio_println(file_content[i]);
+
+    for (int i = 0; i < 64 && file->content[i][0] != '\0'; i++) {
+        dogeio_println(file->content[i]);
     }
 }
 
 void file_list_files() {
+    dogeio_print("Objects in such folder: ");
+    dogeio_println("/");
+    dogeio_println("");
+
     dogeio_print("ID");
     dogeio_println("    FILES");
     dogeio_println("-----------");
@@ -128,10 +139,37 @@ void file_delete_line(char* file_content[], int line) {
     file_content[num_lines - 1][0] = '\0';
 }
 
-void file_create_file(char* filename) {
-    (void)filename;
+void file_create_file(char* filename, char* extension) {
+    if (file_amount >= 16 || pool_index >= 14) {
+        dogeio_println("Disk is full, try clearing some files?");
+        return;
+    }
+
+    vfs_file* new_file = &file_pool[pool_index++];
+    string_strncpy(new_file->name, filename, sizeof(new_file->name) - 1);
+    new_file->name[sizeof(new_file->name) - 1] = '\0';
+    string_strncpy(new_file->file_extension, extension, sizeof(new_file->file_extension) - 1);
+    new_file->file_extension[sizeof(new_file->file_extension) - 1] = '\0';
+    new_file->content[0][0] = '\0';
+
+    for (int i = 0; i < 16; i++) {
+        if (file_system[i] == NULL) {
+            file_system[i] = new_file;
+            file_amount++;
+            return;
+        }
+    }
 }
 
 void file_delete_file(char* filename) {
-    (void)filename;
+    for (int i = 0; i < 16; i++) {
+        if (file_system[i] == NULL) continue;
+
+        if (string_strcmp(file_system[i]->name, filename) == 0) {
+            file_system[i] = NULL;
+            if (file_amount > 0) file_amount--;
+            return;
+        }
+    }
+    dogeio_println("File not found, try using [dir]?");
 }
