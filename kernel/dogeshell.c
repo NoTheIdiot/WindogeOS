@@ -13,6 +13,7 @@
 
 extern char* such_windoge_version;
 extern char* such_windoge_version_short;
+extern char* boot_time;
 
 char* shell_get_arg(char* buffer, int command_len) {
     char* arg = buffer + command_len;
@@ -268,8 +269,8 @@ void doge_shell() {
             (void)create_buffer;
             
             handled = 1;
-        } else if (string_strcmp(command_buffer, "sysinfo") == 0) {
-            dogeio_println("Feature not set.");
+        } else if (string_startswith(command_buffer, "sysinfo")) {
+            system_systeminfo();
             handled = 1;
         }
 
