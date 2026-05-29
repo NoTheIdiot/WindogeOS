@@ -7,7 +7,7 @@ size_t file_amount;
 
 typedef struct {
     char name[32];
-    char file_extension[4];
+    char file_extension[8];
     char content[64][1024];
 } vfs_file;
 
@@ -119,7 +119,7 @@ void file_write_file(char* filename, const char* string) {
     }
 }
 
-void file_delete_line(char* file_content[], int line) {
+void file_delete_line(char file_content[64][1024], int line) {
     if (file_content == NULL) {
         dogeio_print("Error: Invalid file\n");
         return;

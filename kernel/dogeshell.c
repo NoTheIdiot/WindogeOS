@@ -24,6 +24,7 @@ char* shell_get_arg(char* buffer, int command_len) {
 
 void doge_shell() {
     char command_buffer[128];
+    char create_buffer[4];
 
     while (true) {
         int handled = 0;
@@ -81,9 +82,7 @@ void doge_shell() {
             if (target == NULL) {
                 dogeio_println("file not found, try refering to dir");
             } else {
-                for (int i = 0; i < 64 && target->content[i][0] != '\0'; i++) {
-                    dogeio_println(target->content[i]);
-                }
+                file_read_file(file);
             }
             handled = 1;
         } 
@@ -211,8 +210,7 @@ void doge_shell() {
                 }
             }
             handled = 1;
-        } 
-        else if (string_startswith(command_buffer, "dogescript")) {
+        } else if (string_startswith(command_buffer, "dogescript")) {
             char* file = shell_get_arg(command_buffer, 10);
             vfs_file* target = file_find_by_name(file);
             
@@ -230,12 +228,12 @@ void doge_shell() {
                         dogeio_println(line + 5);
                     } else if (string_startswith(line, "SHELL")) {
                         // make a shell command?
-                    } else if (string_strcmp(line, "LOOP") == 0) {
+                    } else if (string_strcmp(line, "LOOP")) {
                         if (loop_start_line == -1) {
                             loop_start_line = k;
                             loop_iterations = 0;
                         }
-                    } else if (string_strcmp(line, "END") == 0) {
+                    } else if (string_strcmp(line, "END")) {
                         if (loop_start_line != -1) {
                             loop_iterations++;
                             if (loop_iterations < 5) {
@@ -250,6 +248,28 @@ void doge_shell() {
                     }
                 }
             }
+            handled = 1;
+        } else if (string_startswith(command_buffer, "deletefile")) {
+            char* file = shell_get_arg(command_buffer, 10);
+            vfs_file* target = file_find_by_name(file);
+
+            if (target == NULL) {
+                dogeio_println("File not found, try refering to [dir]");
+            } else {
+                file_delete_file(file);
+            }
+            handled = 1;
+        
+        } else if (string_startswith(command_buffer, "createfile")) {
+            char* filename = shell_get_arg(command_buffer, 10);
+            dogeio_println("File extension?");
+            dogeio_input(create_buffer, 8, LIGHT_BROWN);
+            file_create_file(filename, create_buffer);
+            (void)create_buffer;
+            
+            handled = 1;
+        } else if (string_strcmp(command_buffer, "sysinfo") == 0) {
+            dogeio_println("Feature not set.");
             handled = 1;
         }
 

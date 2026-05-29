@@ -4,6 +4,11 @@
 #include "dogeio.h"
 #include "multiboot.h"
 
+#define PAGE_SIZE 4096
+size_t total_pages = 0;
+size_t used_pages = 0;
+uint8_t* mem_bitmap = NULL;
+
 // get the CPU name
 void info_get_cpu_name(char *buffer) {
     uint32_t eax, ebx, ecx, edx;
@@ -40,4 +45,47 @@ uint32_t info_get_ram_amount(multiboot_info_t* mbi) {
     }
 
     return (uint32_t)(total_bytes / 1024 / 1024);
+}
+
+
+int bitmap_is_bit_set(size_t page_index) {
+    if (page_index >= total_pages) {
+        return 0; // out of bounds, you don't have more ram.
+    }
+
+    size_t byte_index = page_index / 8;
+    size_t bit_index = page_index % 8;
+
+    return (mem_bitmap[byte_index] & (1 << bit_index)) != 0;
+}
+
+void bitmap_set_bit(size_t page_index) {
+    size_t byte_index = page_index / 8;
+    size_t bit_index = page_index % 8;
+    
+    mem_bitmap[byte_index] |= (1 << bit_index);
+}
+
+void bitmap_clear_bit(size_t page_index) {
+    size_t byte_index = page_index / 8;
+    size_t bit_index = page_index % 8;
+    
+    mem_bitmap[byte_index] &= ~(1 << bit_index);
+}
+
+void mem_calculate_usage() {
+    used_pages = 0;
+    for (size_t i = 0; i < total_pages; i++) {
+        if (bitmap_is_bit_set(i)) {
+            used_pages++;
+        }
+    }
+}
+
+size_t mem_get_used_bytes() {
+    return used_pages * PAGE_SIZE;
+}
+
+size_t mem_get_total_bytes() {
+    return total_pages * PAGE_SIZE;
 }
