@@ -2,12 +2,28 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "dogeio.h"
+#include "string.h"
 #include "multiboot.h"
 
 #define PAGE_SIZE 4096
 size_t total_pages = 0;
 size_t used_pages = 0;
 uint8_t* mem_bitmap = NULL;
+#define BITMAP_MAX_SIZE 1024*1024
+uint8_t bitmap_storage[BITMAP_MAX_SIZE];
+
+extern char* such_windoge_version;
+extern char* such_windoge_version_short;
+extern char* boot_time;
+
+// im sure im going to use this alot
+void *memset(void *ptr, int value, size_t num) {
+    unsigned char *p = ptr;
+    while (num--) {
+        *p++ = (unsigned char)value;
+    }
+    return ptr;
+}
 
 // get the CPU name
 void info_get_cpu_name(char *buffer) {
@@ -82,10 +98,53 @@ void mem_calculate_usage() {
     }
 }
 
-size_t mem_get_used_bytes() {
+int mem_get_used_bytes() {
     return used_pages * PAGE_SIZE;
 }
 
-size_t mem_get_total_bytes() {
+int mem_get_total_bytes() {
     return total_pages * PAGE_SIZE;
+}
+
+void mem_init(multiboot_info_t* mbi) {
+    uint32_t total_mb = info_get_ram_amount(mbi);
+    uint64_t total_bytes = (uint64_t)total_mb * 1024 * 1024;
+
+    total_pages = total_bytes / PAGE_SIZE;
+
+    size_t bitmap_size = (total_pages + 7) / 8;
+    if (bitmap_size > BITMAP_MAX_SIZE) bitmap_size = BITMAP_MAX_SIZE;
+
+    mem_bitmap = bitmap_storage;
+    memset(mem_bitmap, 0, bitmap_size);
+    (void)mbi;
+}
+
+
+
+void system_systeminfo() {
+    mem_calculate_usage();
+
+    char cpu_name[64];
+    info_get_cpu_name(cpu_name);
+
+    int used_mb = mem_get_used_bytes() / (1024 * 1024);
+    int total_mb = mem_get_total_bytes() / (1024 * 1024);
+
+    char used_str[32], total_str[32];
+    string_itoa(used_mb, used_str);
+    string_itoa(total_mb, total_str);
+
+    dogeio_println("System information of your wow system:\n");
+    dogeio_print("WindogeOS Version: ");
+    dogeio_println(such_windoge_version);
+    dogeio_print("CPU: ");
+    dogeio_println(cpu_name);
+    dogeio_print("RAM: ");
+    dogeio_print(used_str);
+    dogeio_print(" MB / ");
+    dogeio_print(total_str);
+    dogeio_println(" MB");
+    dogeio_print("Boot Time: ");
+    dogeio_println(boot_time);
 }

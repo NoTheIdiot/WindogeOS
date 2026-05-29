@@ -15,9 +15,10 @@
 
 extern int such_check_multiboot(uint32_t magic, multiboot_info_t* mbi);
 extern void doge_shell();
-extern void record_boot_time();
+extern void record_boot_time(char* boot_buffer);
 extern char* such_windoge_version;
 extern char* such_windoge_version_short;
+char* boot_time = "";
 
 void kernel_main(uint32_t magic, multiboot_info_t* mbi) {
 
@@ -37,6 +38,8 @@ void kernel_main(uint32_t magic, multiboot_info_t* mbi) {
     serial_write_hex(vbe_initialized);
     serial_write_string("\n");
     
+    record_boot_time(boot_time);
+    mem_init(mbi);
     file_init_filesystem();
     such_check_multiboot(magic, mbi);
     dogeio_print("Welcome to WindogeOS! ");
