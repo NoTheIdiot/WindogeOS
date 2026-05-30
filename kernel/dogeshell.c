@@ -264,8 +264,9 @@ void doge_shell() {
         } else if (string_startswith(command_buffer, "sysinfo")) {
             system_systeminfo();
             handled = 1;
+            
         }
-
+        
         if (!handled) {
             dogeio_print(command_buffer);
             dogeio_println(": command not such found :(");
