@@ -65,18 +65,10 @@ void doge_shell() {
             time_update_time();
             time_show();
             handled = 1;
-        }
-
-        // not for now
-        else if (string_startswith(command_buffer, "info")) {
-            handled = 1;
-        }
-
-        else if (string_strcmp(command_buffer, "dir") == 0) {
+        } else if (string_strcmp(command_buffer, "dir") == 0) {
             file_list_files();
             handled = 1;
-        } 
-        else if (string_startswith(command_buffer, "read")) {
+        } else if (string_startswith(command_buffer, "read")) {
             char* file = shell_get_arg(command_buffer, 4);
             vfs_file* target = file_find_by_name(file);
             
@@ -86,8 +78,7 @@ void doge_shell() {
                 file_read_file(file);
             }
             handled = 1;
-        } 
-        else if (string_startswith(command_buffer, "rename")) {
+        } else if (string_startswith(command_buffer, "rename")) {
             char* file = shell_get_arg(command_buffer, 6);
             vfs_file* target = file_find_by_name(file);
             

@@ -1,5 +1,6 @@
 #include "multiboot.h"
 #include "dogeio.h"
+#include "string.h"
 #include "time.h"
 #include <stdint.h>
 
@@ -26,11 +27,5 @@ int such_check_multiboot(uint32_t magic, multiboot_info_t* mbi) {
 
 void record_boot_time(char* boot_buffer) {
     char* raw = time_get_raw();
-
-    int i = 0;
-    while (raw[i] != '\0') {
-        boot_buffer[i] = raw[i];
-        i++;
-    }
-    boot_buffer[i] = '\0';
+    string_strcpy(raw, boot_buffer);
 }
