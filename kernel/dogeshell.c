@@ -64,6 +64,7 @@ void doge_shell() {
         else if (string_strcmp(command_buffer, "time") == 0 || string_strcmp(command_buffer, "date") == 0) {
             time_update_time();
             time_show();
+            dogeio_print("\n");
             handled = 1;
         } else if (string_strcmp(command_buffer, "dir") == 0) {
             file_list_files();
