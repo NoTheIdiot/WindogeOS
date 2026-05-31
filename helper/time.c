@@ -5,6 +5,9 @@
 #include "dogeio.h"
 #include "string.h"
 
+// global variables for RTC
+volatile unsigned long rtc_tick = 0;
+
 struct {
     uint8_t second, minute, hour, day, month;
     uint32_t year;
@@ -13,6 +16,31 @@ struct {
 uint8_t time_read_rtc(int reg) {
     ports_outb(0x70, reg);
     return ports_inb(0x71);
+}
+
+void time_rtc_handler() {
+    rtc_tick++;
+    ports_outb(0x70, 0x0C);
+    ports_inb(0x71);
+}
+
+void time_rtc_init(uint8_t rate) {
+    __asm__ volatile("cli");
+    
+    ports_outb(0x70, 0x8B);
+    uint8_t prevB = ports_inb(0x71);
+    ports_outb(0x70, 0x8B);
+    ports_outb(0x71, prevB | 0x40);
+    
+    ports_outb(0x70, 0x8A);
+    uint8_t prevA = ports_inb(0x71);
+    ports_outb(0x70, 0x8A);
+    ports_outb(0x71, (prevA & 0xF0) | (rate & 0x0F));
+    
+    ports_outb(0x70, 0x0C);
+    ports_inb(0x71);
+
+    __asm__ volatile("sti");
 }
 
 void time_update_time() {
@@ -81,3 +109,10 @@ char* time_get_raw() {
     return raw_buffer;
 }
 
+void time_wait_ms(unsigned long ms) {
+    unsigned long start = rtc_tick;
+    unsigned long target = start + ms;
+    while (rtc_tick < target) { 
+        __asm__ volatile("hlt"); 
+    }
+}
