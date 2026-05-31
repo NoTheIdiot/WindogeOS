@@ -263,5 +263,36 @@ void doge_shell() {
         dogeio_print("windoge~# ");
         dogeio_input(command_buffer, 128, LIGHT_BROWN);
         dogeshell_execute(command_buffer);
+            if (target == NULL) {
+                dogeio_println("File not found, try refering to [dir]");
+            } else {
+                file_delete_file(file);
+            }
+            handled = 1;
+        
+        } else if (string_startswith(command_buffer, "createfile")) {
+            char* filename = shell_get_arg(command_buffer, 10);
+            dogeio_println("File extension?");
+            dogeio_input(create_buffer, 8, LIGHT_BROWN);
+            file_create_file(filename, create_buffer);
+            (void)create_buffer;
+            
+            handled = 1;
+        } else if (string_startswith(command_buffer, "sysinfo")) {
+            system_systeminfo();
+            handled = 1;
+            
+        } else if (string_startswith(command_buffer, "wait")) {
+            char* time_string = shell_get_arg(command_buffer, 4);
+            int time = 0;
+            string_itoa(time, time_string);
+            time_wait_ms(time * 1000);
+            handled = 1;
+        }
+        
+        if (!handled) {
+            dogeio_print(command_buffer);
+            dogeio_println(": command not such found :(");
+        }
     }
 }
