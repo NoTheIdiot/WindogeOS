@@ -1,6 +1,13 @@
 import subprocess
 import shutil
 import os
+import platform
+
+system = platform.system()
+if (system == "Windows"):
+    linker_var = "ld.lld"
+else:
+    linker_var = "ld"
 
 def cmd(command):
     return subprocess.run(command, shell=True, capture_output=True)
@@ -19,6 +26,7 @@ def compile_all_files():
             if doge.startswith("#") or not doge:
                 continue
 
+
             if doge.startswith("dogec "):
                 shibe = gcc + doge[6:]
                 nstring = str(n) + " "
@@ -29,6 +37,16 @@ def compile_all_files():
 
                 if result.returncode != 0:
                     print("[Such Error] your code sucks")
+                    return False
+
+            elif doge.startswith("linklinkering"):
+                shibe = doge.replace("linklinkering", linker_var)
+                nstring = str(n) + " "
+                print(nstring + shibe)
+                result = subprocess.run(shibe, shell=True)
+                n += 1
+                if result.returncode != 0:
+                    print("[Such Error] compile failed")
                     return False
 
             else:

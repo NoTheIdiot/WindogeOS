@@ -121,7 +121,7 @@ void mem_init(multiboot_info_t* mbi) {
 }
 
 // WHY DOES GCC NOT SEE ITTTTTTT
-void system_systeminfo() {
+void system_sysinfo() {
     mem_calculate_usage();
 
     char cpu_name[64];

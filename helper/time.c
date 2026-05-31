@@ -20,10 +20,12 @@ uint8_t time_read_rtc(int reg) {
 
 void time_rtc_handler() {
     rtc_tick++;
+    dogeio_print(".");
     ports_outb(0x70, 0x0C);
     ports_inb(0x71);
 }
 
+/* This kept breaking because of stupid IDT
 void time_rtc_init(uint8_t rate) {
     __asm__ volatile("cli");
     
@@ -41,7 +43,7 @@ void time_rtc_init(uint8_t rate) {
     ports_inb(0x71);
 
     __asm__ volatile("sti");
-}
+}*/
 
 void time_update_time() {
     while (time_read_rtc(0x0A) & 0x80);
@@ -109,9 +111,9 @@ char* time_get_raw() {
     return raw_buffer;
 }
 
-void time_wait_ms(unsigned long ms) {
+void time_wait_sec(unsigned long seconds) {
     unsigned long start = rtc_tick;
-    unsigned long target = start + ms;
+    unsigned long target = start + (seconds * 2);
     while (rtc_tick < target) { 
         __asm__ volatile("hlt"); 
     }

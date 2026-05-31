@@ -27,7 +27,6 @@ char* shell_get_arg(char* buffer, int command_len) {
 
 void dogeshell_execute(char* command_buffer) {
     int handled = 0;
-    char create_buffer[8];
     
     int len = string_strlen(command_buffer);
     while (len > 0 && (command_buffer[len - 1] == '\n' || command_buffer[len - 1] == '\r')) {
@@ -46,7 +45,7 @@ void dogeshell_execute(char* command_buffer) {
     } 
     else if (string_startswith(command_buffer, "bark")) {
         char* arg = shell_get_arg(command_buffer, 4);
-        dogeio_println(arg ? arg : "");
+        dogeio_println(arg ? arg : "Woof!");
         handled = 1;
     }
     else if (string_strcmp(command_buffer, "clear") == 0) {
@@ -65,7 +64,7 @@ void dogeshell_execute(char* command_buffer) {
         handled = 1;
     } 
     else if (string_strcmp(command_buffer, "sysinfo") == 0) {
-        system_sysinfo(); // what
+        system_sysinfo(); 
         handled = 1;
     }
     else if (string_strcmp(command_buffer, "dir") == 0) {
@@ -209,7 +208,8 @@ void dogeshell_execute(char* command_buffer) {
             }
         }
         handled = 1;
-    } else if (string_startswith(command_buffer, "dogescript")) {
+    } 
+    else if (string_startswith(command_buffer, "dogescript")) {
         char* file = shell_get_arg(command_buffer, 10);
         vfs_file* target = file_find_by_name(file);
         
@@ -223,7 +223,8 @@ void dogeshell_execute(char* command_buffer) {
             }
         }
         handled = 1;
-    } else if (string_startswith(command_buffer, "deletefile")) {
+    } 
+    else if (string_startswith(command_buffer, "deletefile")) {
         char* file = shell_get_arg(command_buffer, 10);
         vfs_file* target = file_find_by_name(file);
 
@@ -236,63 +237,37 @@ void dogeshell_execute(char* command_buffer) {
     } 
     else if (string_startswith(command_buffer, "createfile")) {
         char* file = shell_get_arg(command_buffer, 10);
+        char create_buffer[8];
         if (file == NULL || string_strlen(file) == 0) {
-            dogeio_println("usage: createfile <filename>");
+            dogeio_println("Usage: createfile <filename>");
         } else {
             vfs_file* target = file_find_by_name(file);
             if (target != NULL) {
-                dogeio_println("file already exists, pls try another name?");
+                dogeio_println("Such file already exists!");
             } else {
-            	dogeio_println("File extension?");
-            	dogeio_input(create_buffer, 8, 0x0E);
-                file_create_file(file, create_buffer); 
+                dogeio_println("file extension?");
+                dogeio_input(create_buffer, 8, 0x0E);
+                file_create_file(file, create_buffer);
             }
         }
         handled = 1;
+    } else if (string_startswith(command_buffer, "wait")) {
+    	dogeio_println("nope im not doing this now");
+    	handled = 1;
     }
 
     if (!handled) {
-        dogeio_println("Such unknown command, much confuse.");
+        dogeio_print(command_buffer);
+        dogeio_println(": command not found");
     }
 }
 
 void doge_shell() {
-    char command_buffer[128];
+    char command_buffer[128]; 
 
     while (true) {
         dogeio_print("windoge~# ");
         dogeio_input(command_buffer, 128, LIGHT_BROWN);
         dogeshell_execute(command_buffer);
-            if (target == NULL) {
-                dogeio_println("File not found, try refering to [dir]");
-            } else {
-                file_delete_file(file);
-            }
-            handled = 1;
-        
-        } else if (string_startswith(command_buffer, "createfile")) {
-            char* filename = shell_get_arg(command_buffer, 10);
-            dogeio_println("File extension?");
-            dogeio_input(create_buffer, 8, LIGHT_BROWN);
-            file_create_file(filename, create_buffer);
-            (void)create_buffer;
-            
-            handled = 1;
-        } else if (string_startswith(command_buffer, "sysinfo")) {
-            system_systeminfo();
-            handled = 1;
-            
-        } else if (string_startswith(command_buffer, "wait")) {
-            char* time_string = shell_get_arg(command_buffer, 4);
-            int time = 0;
-            string_itoa(time, time_string);
-            time_wait_ms(time * 1000);
-            handled = 1;
-        }
-        
-        if (!handled) {
-            dogeio_print(command_buffer);
-            dogeio_println(": command not such found :(");
-        }
     }
 }
