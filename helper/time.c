@@ -19,21 +19,27 @@ uint8_t time_read_rtc(int reg) {
 }
 
 void time_rtc_handler() {
-	rtc_tick++;
-	ports_outb(0x70, 0x0C);
-	ports_inb(0x71);
+    rtc_tick++;
+    ports_outb(0x70, 0x0C);
+    ports_inb(0x71);
 }
 
-void rtc_init(uint8_t rate) {
+void time_rtc_init(uint8_t rate) {
     __asm__ volatile("cli");
+    
     ports_outb(0x70, 0x8B);
-    uint8_t prevB = ports_inb(0x01);
+    uint8_t prevB = ports_inb(0x71);
     ports_outb(0x70, 0x8B);
     ports_outb(0x71, prevB | 0x40);
+    
     ports_outb(0x70, 0x8A);
     uint8_t prevA = ports_inb(0x71);
-    ports_outb(0x70, 0x8B);
-    ports_outb(0x71, (prevA & 0xF0) | rate);
+    ports_outb(0x70, 0x8A);
+    ports_outb(0x71, (prevA & 0xF0) | (rate & 0x0F));
+    
+    ports_outb(0x70, 0x0C);
+    ports_inb(0x71);
+
     __asm__ volatile("sti");
 }
 
@@ -103,8 +109,10 @@ char* time_get_raw() {
     return raw_buffer;
 }
 
-void time_wait_ms(unsigned long ms, unsigned long tick_ms) {
-	unsigned long start = rtc_tick;
-	unsigned long target = start + (ms / tick_ms);
-	while (rtc_tick < target) { __asm__ volatile("hlt"); }
+void time_wait_ms(unsigned long ms) {
+    unsigned long start = rtc_tick;
+    unsigned long target = start + ms;
+    while (rtc_tick < target) { 
+        __asm__ volatile("hlt"); 
+    }
 }
