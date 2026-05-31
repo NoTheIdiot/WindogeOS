@@ -120,8 +120,7 @@ void mem_init(multiboot_info_t* mbi) {
     (void)mbi;
 }
 
-
-
+// WHY DOES GCC NOT SEE ITTTTTTT
 void system_systeminfo() {
     mem_calculate_usage();
 
