@@ -265,6 +265,12 @@ void doge_shell() {
             system_systeminfo();
             handled = 1;
             
+        } else if (string_startswith(command_buffer, "wait")) {
+            char* time_string = shell_get_arg(command_buffer, 4);
+            int time = 0;
+            string_itoa(time, time_string);
+            time_wait_ms(time * 1000);
+            handled = 1;
         }
         
         if (!handled) {
