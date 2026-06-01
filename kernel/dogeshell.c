@@ -17,6 +17,25 @@ extern char* such_windoge_version_short;
 extern char* boot_time;
 extern void system_sysinfo(void);
 
+char* command_help[] = {
+    "print/bark         | prints a message",
+    "clear              | clears the screen",
+    "time/date          | prints the time",
+    "sysinfo            | prints the system information of your wow system",
+    "dir                | lists many files",
+    "read               | outputs a file",
+    "rename             | renames a file",
+    "write              | writes a single line of text into a file",
+    "multiwrite         | writes multiple lines of text into a file",
+    "deleteline         | deletes the selected line in a file",
+    "dogescript         | runs a dogescript file",
+    "createfile         | creates a file",
+    "deletefile         | deletes a file",
+    "wait               | waits, though i can't do it",
+    "help               | shows this help message",
+    "history            | shows history"
+};
+
 char dogeshell_history[32][128];
 int dogeshell_history_count = 0;
 int dogeshell_history_starter = 0;
@@ -49,7 +68,7 @@ void dogeshell_execute(char* command_buffer) {
     } 
     else if (string_startswith(command_buffer, "bark")) {
         char* arg = shell_get_arg(command_buffer, 4);
-        dogeio_println(arg ? arg : "Woof!");
+        dogeio_println(arg ? arg : "");
         handled = 1;
     }
     else if (string_strcmp(command_buffer, "clear") == 0) {
@@ -244,6 +263,12 @@ void dogeshell_execute(char* command_buffer) {
         }
         handled = 1;
     } 
+    else if (string_strcmp(command_buffer, "history") == 0) {
+        for (int i = 0; i < dogeshell_history_count; i++) {
+            dogeio_println(dogeshell_history[i]);
+        }
+        handled = 1;
+    }
     else if (string_startswith(command_buffer, "createfile")) {
         char* file = shell_get_arg(command_buffer, 10);
         char create_buffer[8];
@@ -260,12 +285,14 @@ void dogeshell_execute(char* command_buffer) {
             }
         }
         handled = 1;
-    } else if (string_startswith(command_buffer, "wait")) {
+    } 
+    else if (string_startswith(command_buffer, "wait")) {
         dogeio_println("nope im not doing this now");
         handled = 1;
-    } else if (string_strcmp(command_buffer, "history") == 0) {
-        for (int i = 0; i < dogeshell_history_count; i++) {
-            dogeio_println(dogeshell_history[i]);
+    } 
+    else if (string_strcmp(command_buffer, "help") == 0) {
+        for (int i = 0; i < 16; i++) {
+            dogeio_println(command_help[i]);
         }
         handled = 1;
     }
@@ -275,7 +302,7 @@ void dogeshell_execute(char* command_buffer) {
         dogeio_println(": command not found");
     }
 
-    if (string_strcmp(command_buffer, "history") != 0) {
+    if (string_strcmp(command_buffer, "history") != 0 && string_strcmp(command_buffer, "help") != 0) {
         string_strncpy(dogeshell_history[dogeshell_history_starter], command_buffer, 127);
         dogeshell_history[dogeshell_history_starter][127] = '\0';
         
