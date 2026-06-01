@@ -11,11 +11,15 @@
 #include "info.h"
 #include "multiboot.h"
 
+extern void doge_script(vfs_file* file);
 extern char* such_windoge_version;
 extern char* such_windoge_version_short;
 extern char* boot_time;
-
 extern void system_sysinfo(void);
+
+char dogeshell_history[32][128];
+int dogeshell_history_count = 0;
+int dogeshell_history_starter = 0;
 
 char* shell_get_arg(char* buffer, int command_len) {
     char* arg = buffer + command_len;
@@ -211,15 +215,20 @@ void dogeshell_execute(char* command_buffer) {
     } 
     else if (string_startswith(command_buffer, "dogescript")) {
         char* file = shell_get_arg(command_buffer, 10);
-        vfs_file* target = file_find_by_name(file);
-        
-        if (target == NULL) {
-            dogeio_println("file not found, try refering to dir");
-        } else {
-            int s_line = 0;
-            while (s_line < 64 && target->content[s_line][0] != '\0') {
-                dogeshell_execute(target->content[s_line]);
-                s_line++;
+
+        if (file == NULL) {
+            dogeio_println("usage: dogescript <file>");
+            dogeio_println("       --version");
+        } 
+        else if (string_strcmp(file, "--version") == 0) {
+            dogeio_println("Dogescript V1.1");
+        } 
+        else {
+            vfs_file* target = file_find_by_name(file);
+            if (target == NULL) {
+                dogeio_println("file not found, try refering to dir");
+            } else {
+                doge_script(target); 
             }
         }
         handled = 1;
@@ -252,13 +261,32 @@ void dogeshell_execute(char* command_buffer) {
         }
         handled = 1;
     } else if (string_startswith(command_buffer, "wait")) {
-    	dogeio_println("nope im not doing this now");
-    	handled = 1;
+        dogeio_println("nope im not doing this now");
+        handled = 1;
+    } else if (string_strcmp(command_buffer, "history") == 0) {
+        for (int i = 0; i < dogeshell_history_count; i++) {
+            dogeio_println(dogeshell_history[i]);
+        }
+        handled = 1;
     }
 
     if (!handled) {
         dogeio_print(command_buffer);
         dogeio_println(": command not found");
+    }
+
+    if (string_strcmp(command_buffer, "history") != 0) {
+        string_strncpy(dogeshell_history[dogeshell_history_starter], command_buffer, 127);
+        dogeshell_history[dogeshell_history_starter][127] = '\0';
+        
+        dogeshell_history_starter++;
+        if (dogeshell_history_count < 32) {
+            dogeshell_history_count++;
+        }
+        
+        if (dogeshell_history_starter >= 32) {
+            dogeshell_history_starter = 0;
+        }
     }
 }
 
