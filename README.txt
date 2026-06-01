@@ -38,5 +38,7 @@ skip this step if you downloaded and extracted using ZIP files.
 - if python doesn't work, maybe try: python3?
 - new changes happen in branch v0.1 for some reason.
 - stable stuff is at main, download it there.
+- you now MUST run msys2 in windows because of grub tools.
+F##K YOU GNU
 
 - Now WindogeOS should run!
