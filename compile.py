@@ -44,6 +44,15 @@ def compile_all_files():
                     result = subprocess.run("bash tools/link.sh", shell=True, capture_output=True, text=True)
                     print(result.stdout)
 
+            elif doge == "clean":
+                print("cleaning object files")
+                if system == "Windows":
+                    result = subprocess.run(["tools\\clean.bat"], shell=True, capture_output=True, text=True)
+                    print(result.stdout)
+                else:
+                    result = subprocess.run("bash tools/clean.sh", shell=True, capture_output=True, text=True)
+                    print(result.stdout)
+
             else:
                 nstring = str(n) + " "
                 print(nstring + doge)
