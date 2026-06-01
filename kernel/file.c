@@ -40,6 +40,9 @@ vfs_file file_pool[14];
 size_t pool_index = 0;
 
 void file_init_filesystem() {
+	for (int i = 0; i < 16; i++) {
+        file_system[i] = NULL;
+    }
     file_system[0] = &readme;
     file_system[1] = &dogescript_example;
     file_amount = 2;

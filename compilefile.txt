@@ -35,6 +35,7 @@ rm vbe.o
 rm dogeio_graphics.o
 rm font.o
 rm file.o
+rm idt.o
 
 rm suchboot.o
 rm data.o
