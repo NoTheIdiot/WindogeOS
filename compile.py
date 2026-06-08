@@ -35,14 +35,6 @@ def compile_all_files():
                     print("[Such Error] your code sucks")
                     return False
 
-            elif doge == "linklinkering":
-                print("linking files, pray that it works")
-                if system == "Windows":
-                    result = subprocess.run(["tools\\link.bat"], shell=True, capture_output=True, text=True)
-                    print(result.stdout)
-                else:
-                    result = subprocess.run("bash tools/link.sh", shell=True, capture_output=True, text=True)
-                    print(result.stdout)
 
             elif doge == "clean":
                 print("cleaning object files")
