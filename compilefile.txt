@@ -22,7 +22,25 @@ dogec -c kernel/file.c -o file.o
 dogec -c kernel/kernel.c -o kernel.o
 
 # link
-ld -m elf_i386 -T linker/linker.ld -o windoge.bin boot.o kernel.o idt.o data.o info.o serial.o dogescript.o dogeshell.o dogeio.o ports.o string.o suchboot.o time.o vbe.o dogeio_graphics.o font.o file.o
+linklinkering -m elf_i386 -T linker/linker.ld -o windoge.bin boot.o kernel.o idt.o data.o info.o serial.o dogescript.o dogeshell.o dogeio.o ports.o string.o suchboot.o time.o vbe.o dogeio_graphics.o font.o file.o
 
 # delete
-clean
+rm boot.o
+
+rm dogeio.o
+rm time.o
+rm string.o
+rm ports.o
+rm vbe.o
+rm dogeio_graphics.o
+rm font.o
+rm file.o
+rm idt.o
+
+rm suchboot.o
+rm data.o
+rm info.o
+rm serial.o
+rm dogeshell.o
+rm dogescript.o
+rm kernel.o
