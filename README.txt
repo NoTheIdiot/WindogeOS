@@ -6,10 +6,11 @@ but it's hard to use for new users, while Windows is easy to use
 but paid for all features, and macOS is just idk.
 
 = Updates
-It now has a virtual file system, and now using graphics VBE mode (768p tho)
+Now I'm in the process of making a filesystem, which is a modified 
+version of USTAR
 
 = How to such compile and run?
-- Install git, gcc, nasm, and qemu-system
+- Install git, gcc, nasm, and qemu-system, grub-common2
 
 - Run this in your terminal, if you are on windows, install msys2 via this
 link: https://msys2.org and run the command for installing the needed
@@ -23,3 +24,9 @@ programs above.
   python start_vm.py
 
 - Now WindogeOS should run!
+
+= Notes
+- if the python command doesn't work, try using python3.
+- do not make the qemu-system command yourself, run python start_vm.py.
+  if you somehow got a better result, please make a pull request,
+  less headaches are better.

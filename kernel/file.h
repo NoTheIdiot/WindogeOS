@@ -1,24 +1,19 @@
 #ifndef FILE_H
 #define FILE_H
 
-// Virtual file system using arrays of strings
-// First element is filename, rest are data lines, ended with NULL
+/*
+This works as a USTAR mod to add padding to allow read and writes.
+I did this so I do not have to deal with FAT which wasted tons of 
+time.
+*/
 
-typedef struct {
-    char name[32];
-    char file_extension[4];
-    char content[64][1024];
-} vfs_file;
-
-extern vfs_file* file_system[16];
-
-void file_init_filesystem();
-void file_read_file(char* filename);
-void file_list_files();
-vfs_file* file_find_by_name(char* filename);
-void file_rename_file(char* filename, const char* new_name);
-void file_write_file(char* filename, const char* string);
-void file_create_file(char* filename, char* extension);
-void file_delete_file(char* filename);
+typedef struct fs;
+bool read_disk_sector(uint32_t lba, uint8_t* buffer);
+bool write_disk_sector(uint32_t lba, const uint8_t* buffer);
+bool fs_format_disk();
+bool fs_read_file(char* filename, uint8_t* output);
+bool fs_write_file(const char* filename, const uint8_t* input_data, uint32_t num_bytes);
+bool fs_create_file(const char* filename, uint32_t allocate_sectors);
+bool fs_delete_file(const char* filename);
 
 #endif
