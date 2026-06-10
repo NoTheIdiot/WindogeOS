@@ -7,7 +7,14 @@ I did this so I do not have to deal with FAT which wasted tons of
 time.
 */
 
-typedef struct fs;
+typedef struct {
+    char        name[32];
+    uint32_t    start_sector;
+    uint32_t    max_sectors;
+    uint32_t    current_size_bytes;
+    uint8_t     used;
+    uint8_t     blank;
+} fs;
 bool read_disk_sector(uint32_t lba, uint8_t* buffer);
 bool write_disk_sector(uint32_t lba, const uint8_t* buffer);
 bool fs_format_disk();

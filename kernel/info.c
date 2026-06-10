@@ -123,19 +123,6 @@ void mem_init(multiboot_info_t* mbi) {
 
 void system_sysinfo() {
     mem_calculate_usage();
-    int file_count = 0;
-    char count_str[16]; // Declared out here so the entire function can see it
-
-    // Fixed the missing variable 'i' declaration
-    for (int i = 0; i < 16; i++) {
-        vfs_file* check_file = file_system[i];
-        if (check_file->name[0] != '\0') {
-            file_count++;
-        }
-    }
-    
-    // Convert to string ONCE after counting is completely done
-    string_itoa(file_count, count_str);
 
     char cpu_name[64];
     info_get_cpu_name(cpu_name);
@@ -159,6 +146,4 @@ void system_sysinfo() {
     dogeio_println(" MB");
     dogeio_print("Boot Time: ");
     dogeio_println(boot_time);
-    dogeio_print("File amount: ");
-    dogeio_println(count_str);
 }

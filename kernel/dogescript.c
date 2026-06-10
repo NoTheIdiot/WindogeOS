@@ -6,6 +6,7 @@
 #include "dogeshell.h"
 
 // use extern for now
+/*
 void doge_script(vfs_file* file) {
     for (int i = 1; i < 64; i++) {
         char* line = file->content[i];
@@ -35,3 +36,4 @@ void doge_script(vfs_file* file) {
         }
     }
 }
+*/

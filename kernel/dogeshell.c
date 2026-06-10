@@ -11,7 +11,7 @@
 #include "info.h"
 #include "multiboot.h"
 
-extern void doge_script(vfs_file* file);
+//extern void doge_script(vfs_file* file);
 extern char* such_windoge_version;
 extern char* such_windoge_version_short;
 extern char* boot_time;
@@ -91,10 +91,10 @@ void dogeshell_execute(char* command_buffer) {
         handled = 1;
     }
     else if (string_strcmp(command_buffer, "dir") == 0) {
-        file_list_files();
+        dogeio_println("Feature in progress");
         handled = 1;
     } 
-    else if (string_startswith(command_buffer, "read")) {
+    /*else if (string_startswith(command_buffer, "read")) {
         char* file = shell_get_arg(command_buffer, 4);
         vfs_file* target = file_find_by_name(file);
         
@@ -285,7 +285,7 @@ void dogeshell_execute(char* command_buffer) {
             }
         }
         handled = 1;
-    } 
+    } */
     else if (string_startswith(command_buffer, "wait")) {
         dogeio_println("nope im not doing this now");
         handled = 1;
