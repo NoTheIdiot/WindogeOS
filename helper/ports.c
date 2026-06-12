@@ -24,3 +24,18 @@ uint16_t ports_inw(uint16_t port) {
 void ports_outw(uint16_t port, uint16_t data) {
     __asm__ volatile("outw %0, %1" : : "a"(data), "Nd"(port));
 }
+
+void ports_outsw(unsigned short port, const void *addr, unsigned long count) {
+    __asm__ volatile (
+        "rep outsw"
+        : : "d" (port), "S" (addr), "c" (count)
+    );
+}
+
+void ports_insw(unsigned short port, void *addr, unsigned long count) {
+    __asm__ volatile (
+        "rep insw"
+        : : "d" (port), "D" (addr), "c" (count)
+        : "memory"
+    );
+}

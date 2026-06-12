@@ -52,7 +52,7 @@ def compile_src():
                     return False
                     
             elif doge.startswith("dogelink"):
-                shibe = doge.replace("dogelink", "linker_var")
+                shibe = doge.replace("dogelink", linker_var)
                 nstring = str(n) + " "
                 print(nstring)
                 
@@ -95,7 +95,7 @@ def create_grub_iso():
     iso_created = False
 
     # Try GRUB tool native runtime
-    result = cmd("which grub-mkrescue")
+    result = run_cmd("which grub-mkrescue")
     if result.returncode == 0:
         print("using GRUB to make the ISO...")
         subprocess.run("grub-mkrescue -o windoge.iso isoroot 2>/dev/null", shell=True)
@@ -103,14 +103,14 @@ def create_grub_iso():
 
     # Fallback to absolute bare toolchains if eltorito modules exist locally
     if not iso_created:
-        result = cmd("which xorriso")
+        result = run_cmd("which xorriso")
         if result.returncode == 0:
             print("[Such Notes] Using xorriso to make the ISO...")
             subprocess.run("xorriso -as mkisofs -R -b boot/grub/i386-pc/eltorito.img -no-emul-boot -boot-load-size 4 -boot-info-table -o windoge.iso isoroot 2>/dev/null", shell=True)
             iso_created = os.path.exists("windoge.iso") and os.path.getsize("windoge.iso") > 0
     
     if not iso_created:
-        result = cmd("which mkisofs")
+        result = run_cmd("which mkisofs")
         if result.returncode == 0:
             print("using mkisofs to create ISO...")
             subprocess.run("mkisofs -R -b boot/grub/i386-pc/eltorito.img -no-emul-boot -boot-load-size 4 -boot-info-table -o windoge.iso isoroot 2>/dev/null", shell=True)

@@ -33,7 +33,7 @@ bool read_disk_sector(uint32_t lba, uint8_t* buffer) {
 
     while ((ports_inb(0x1F7) & 0x08) == 0);
 
-    insw(0x1F0, buffer, 256);
+    ports_insw(0x1F0, buffer, 256);
     return true;
 }
 
@@ -68,13 +68,13 @@ bool fs_format_disk() {
 // what code im i writing
 bool fs_read_file(char* filename, uint8_t* output) {
     uint8_t sector_buffer[512];
-    if (!read_disk_buffer(1, sector_buffer)) return false;
+    if (!read_disk_sector(1, sector_buffer)) return false;
     fs* entries = (fs*) sector_buffer;
     for (int i = 0;i < 8; i++) {
         if (entries[i].used && string_strcmp(entries[i].name, filename)) {
             uint32_t sectors_to_read = (entries[i].current_size_bytes + 511) / 512;
             for (uint32_t s = 0; s < sectors_to_read; s++) {
-                if (1 read_disk_sector(entries[i].start_sector + s, output_buffer + (s*512))){
+                if (read_disk_sector(entries[i].start_sector + s, output + (s*512))) {
                     return false;
                 }
             }
@@ -115,7 +115,7 @@ bool fs_create_file(const char* filename, uint32_t allocate_sectors) {
     uint32_t next_available_sector = 10;
 
     for (int i = 0; i < 8; i++) {
-        if (!entries[i].is_used && free_slot == -1) {
+        if (!entries[i].used && free_slot == -1) {
             free_slot = i;
         }
         if (entries[i].used) {
@@ -132,7 +132,7 @@ bool fs_create_file(const char* filename, uint32_t allocate_sectors) {
     entries[free_slot].start_sector = next_available_sector;
     entries[free_slot].max_sectors = allocate_sectors;
     entries[free_slot].current_size_bytes = 0;
-    entries[free_slot].is_used = 1;
+    entries[free_slot].used = 1;
 
     return write_disk_sector(1, sector_buffer);
 
@@ -144,7 +144,7 @@ bool fs_delete_file(const char* filename) {
 
     fs* entries = (fs*)sector_buffer;
     for (int i = 0; i < 8; i++) {
-        if (entries[i].used && stirng_strcmp(entries[i].name, filename)) {
+        if (entries[i].used && string_strcmp(entries[i].name, filename)) {
             entries[i].used = 0;
             return write_disk_sector(1, sector_buffer);
         }
