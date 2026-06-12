@@ -1,24 +1,18 @@
-# import modules
 import subprocess
 import shutil
 import os
 import platform
 
-# used because you can't just do
-# if platform.system == "Windows":
 system = platform.system()
 
-# used so I can try to target cross platform
 if system == "Windows":
     linker_var = "ld.lld"
 else:
     linker_var = "ld"
 
-# to run commands easier
 def run_cmd(command):
-    return subprocess.run(command, shell=True, capture_output=True)
+    return subprocess.run(command, shell=True)
 
-# clean up object files
 def clean_object_files():
     if system == "Windows":
         run_cmd("./tools/clean.bat")
@@ -75,56 +69,51 @@ def compile_src():
                     return False
     return True
 
-def create_grub_iso():
+def create_fat32_image():
     if not os.path.exists("windoge.bin"):
         print("windoge.bin missing, cannot bake image.")
         return False
 
-    if os.path.exists("isoroot"):
-        shutil.rmtree("isoroot")
+    final_img = "windoge.img"
+    build_root = "fat_root"
     
-    os.makedirs("isoroot/boot/grub", exist_ok=True)
-    shutil.copy("windoge.bin", "isoroot/windoge.bin")
-    shutil.copy("windoge.bin", "isoroot/boot/windoge.bin")
+    if os.path.exists(build_root):
+        shutil.rmtree(build_root)
+    if os.path.exists(final_img):
+        os.remove(final_img)
+        
+    os.makedirs(f"{build_root}/boot/grub", exist_ok=True)
+    shutil.copy("windoge.bin", f"{build_root}/boot/windoge.bin")
     
-    if os.path.exists("grub.cfg"):
-        shutil.copy("grub.cfg", "isoroot/boot/grub/grub.cfg")
-    else:
-        print("[Warning] No grub.cfg found, GRUB will drop to rescue prompt.")
+    with open(f"{build_root}/boot/grub/grub.cfg", "w") as cfg:
+        cfg.write("set timeout=0\n")
+        cfg.write("set default=0\n")
+        cfg.write('menuentry "WinDoge OS" {\n')
+        cfg.write("  multiboot /boot/windoge.bin\n")
+        cfg.write("  boot\n")
+        cfg.write("}\n")
 
-    iso_created = False
-
-    # Try GRUB tool native runtime
-    result = run_cmd("which grub-mkrescue")
-    if result.returncode == 0:
-        print("using GRUB to make the ISO...")
-        subprocess.run("grub-mkrescue -o windoge.iso isoroot 2>/dev/null", shell=True)
-        iso_created = os.path.exists("windoge.iso") and os.path.getsize("windoge.iso") > 0
-
-    # Fallback to absolute bare toolchains if eltorito modules exist locally
-    if not iso_created:
-        result = run_cmd("which xorriso")
-        if result.returncode == 0:
-            print("[Such Notes] Using xorriso to make the ISO...")
-            subprocess.run("xorriso -as mkisofs -R -b boot/grub/i386-pc/eltorito.img -no-emul-boot -boot-load-size 4 -boot-info-table -o windoge.iso isoroot 2>/dev/null", shell=True)
-            iso_created = os.path.exists("windoge.iso") and os.path.getsize("windoge.iso") > 0
+    print("Generating bootable disk layout using GRUB utilities...")
+    # grub-mkrescue natively bakes an image containing both ISO and flat MBR/FAT hard disk partitions
+    run_cmd(f"grub-mkrescue -o {final_img} {build_root}")
     
-    if not iso_created:
-        result = run_cmd("which mkisofs")
-        if result.returncode == 0:
-            print("using mkisofs to create ISO...")
-            subprocess.run("mkisofs -R -b boot/grub/i386-pc/eltorito.img -no-emul-boot -boot-load-size 4 -boot-info-table -o windoge.iso isoroot 2>/dev/null", shell=True)
-            iso_created = os.path.exists("windoge.iso") and os.path.getsize("windoge.iso") > 0
+    shutil.rmtree(build_root)
     
-    return iso_created
+    # Pad or truncate the file out to your desired 128MB size bounds safely
+    if os.path.exists(final_img):
+        img_size_bytes = 128 * 1024 * 1024
+        with open(final_img, "r+b") as f:
+            f.truncate(img_size_bytes)
+        return True
+        
+    return False
 
-# execute 
 if compile_src():
-    print("creating iso...")
-    if create_grub_iso():
-        print("compile success, doesn't mean that it will boot >:)")
+    print("creating FAT32 disk image...")
+    if create_fat32_image():
+        print("compile success! Image baked cleanly.")
     else:
-        print("can't create grub iso, direct kernel load.")
+        print("failed to build structured FAT32 target disk layout.")
 else:
     print("are you debugging mr squidward")
     clean_object_files()

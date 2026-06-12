@@ -47,8 +47,8 @@ void kernel_main(uint32_t magic, multiboot_info_t* mbi) {
 
     // time_rtc_init(0x0F);
     record_boot_time(boot_time);
+    fat32_init(2048); // init fat32
     mem_init(mbi);
-    fs_format_disk();
     such_check_multiboot(magic, mbi);
     dogeio_print("Welcome to WindogeOS! ");
     dogeio_println(such_windoge_version_short);
