@@ -99,9 +99,8 @@ def create_fat32_image():
     
     shutil.rmtree(build_root)
     
-    # Pad or truncate the file out to your desired 128MB size bounds safely
     if os.path.exists(final_img):
-        img_size_bytes = 128 * 1024 * 1024
+        img_size_bytes = 96 * 1024 * 1024
         with open(final_img, "r+b") as f:
             f.truncate(img_size_bytes)
         return True
