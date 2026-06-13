@@ -1,4 +1,3 @@
-// include files
 #include <stddef.h>
 #include <stdint.h>
 #include "string.h"
@@ -11,7 +10,6 @@
 #include "info.h"
 #include "multiboot.h"
 
-//extern void doge_script(vfs_file* file);
 extern char* such_windoge_version;
 extern char* such_windoge_version_short;
 extern char* boot_time;
@@ -24,14 +22,6 @@ char* command_help[] = {
     "sysinfo            | prints the system information of your wow system",
     "dir                | lists many files",
     "read               | outputs a file",
-    "rename             | renames a file",
-    "write              | writes a single line of text into a file",
-    "multiwrite         | writes multiple lines of text into a file",
-    "deleteline         | deletes the selected line in a file",
-    "dogescript         | runs a dogescript file",
-    "createfile         | creates a file",
-    "deletefile         | deletes a file",
-    "wait               | waits, though i can't do it",
     "help               | shows this help message",
     "history            | shows history"
 };
@@ -39,6 +29,8 @@ char* command_help[] = {
 char dogeshell_history[32][128];
 int dogeshell_history_count = 0;
 int dogeshell_history_starter = 0;
+
+static uint8_t shell_file_buffer[4096];
 
 char* shell_get_arg(char* buffer, int command_len) {
     char* arg = buffer + command_len;
@@ -71,6 +63,60 @@ void dogeshell_execute(char* command_buffer) {
         dogeio_println(arg ? arg : "");
         handled = 1;
     }
+    else if (string_startswith(command_buffer, "read")) {
+        char* arg = shell_get_arg(command_buffer, 4);
+        if (!arg) {
+            dogeio_println("usage: read [filename.ext]");
+        } else {
+            char name[9];
+            char ext[4];
+            int ni = 0;
+            int ei = 0;
+            int dot_found = 0;
+
+            for (int i = 0; i < 8; i++) name[i] = ' ';
+            name[8] = '\0';
+            for (int i = 0; i < 3; i++) ext[i] = ' ';
+            ext[3] = '\0';
+
+            while (arg[ni] != '\0' && arg[ni] != '.' && ni < 8) {
+                name[ni] = arg[ni];
+                ni++;
+            }
+            name[ni] = '\0';
+
+            int scan = 0;
+            while (arg[scan] != '\0') {
+                if (arg[scan] == '.') {
+                    dot_found = scan + 1;
+                    break;
+                }
+                scan++;
+            }
+
+            if (dot_found > 0) {
+                while (arg[dot_found] != '\0' && ei < 3) {
+                    ext[ei] = arg[dot_found];
+                    ei++;
+                    dot_found++;
+                }
+                ext[ei] = '\0';
+            }
+
+            for (int i = 0; i < 4096; i++) {
+                shell_file_buffer[i] = '\0';
+            }
+
+            int read_status = fat32_read_file(name, ext, shell_file_buffer);
+            if (read_status != -1) {
+                dogeio_println((char*)shell_file_buffer);
+            } else {
+                dogeio_print("error: could not read ");
+                dogeio_println(arg);
+            }
+        }
+        handled = 1;
+    }
     else if (string_strcmp(command_buffer, "clear") == 0) {
         dogeio_clear_screen();
         handled = 1;
@@ -91,7 +137,7 @@ void dogeshell_execute(char* command_buffer) {
         handled = 1;
     }
     else if (string_strcmp(command_buffer, "dir") == 0) {
-        dogeio_println("Feature in progress");
+        fat32_list_directory("/");
         handled = 1;
     } 
     else if (string_startswith(command_buffer, "wait")) {
@@ -99,7 +145,7 @@ void dogeshell_execute(char* command_buffer) {
         handled = 1;
     } 
     else if (string_strcmp(command_buffer, "help") == 0) {
-        for (int i = 0; i < 16; i++) {
+        for (int i = 0; i < 8; i++) {
             dogeio_println(command_help[i]);
         }
         handled = 1;

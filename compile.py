@@ -13,6 +13,13 @@ else:
 def run_cmd(command):
     return subprocess.run(command, shell=True)
 
+def check_mtools():
+    try:
+        shutil.which("mformat")
+        return True
+    except Exception:
+        return False
+
 def clean_object_files():
     if system == "Windows":
         run_cmd("./tools/clean.bat")
@@ -70,49 +77,68 @@ def compile_src():
     return True
 
 def create_fat32_image():
+    if not check_mtools():
+        print("[!] FATAL ERROR: 'mtools' package is missing on your host machine!")
+        print("    -> Linux: Run 'sudo apt install mtools'")
+        print("    -> macOS: Run 'brew install mtools'")
+        print("    -> Windows: Install mtools binaries or verify your environment PATH variable.")
+        return False
+
     if not os.path.exists("windoge.bin"):
         print("windoge.bin missing, cannot bake image.")
         return False
 
     final_img = "windoge.img"
-    build_root = "fat_root"
     
-    if os.path.exists(build_root):
-        shutil.rmtree(build_root)
     if os.path.exists(final_img):
         os.remove(final_img)
         
-    os.makedirs(f"{build_root}/boot/grub", exist_ok=True)
-    shutil.copy("windoge.bin", f"{build_root}/boot/windoge.bin")
-    
-    with open(f"{build_root}/boot/grub/grub.cfg", "w") as cfg:
-        cfg.write("set timeout=0\n")
-        cfg.write("set default=0\n")
-        cfg.write('menuentry "WinDoge OS" {\n')
-        cfg.write("  multiboot /boot/windoge.bin\n")
-        cfg.write("  boot\n")
-        cfg.write("}\n")
+    print("[*] Allocating clean 32MB disk matrix storage...")
+    img_size_bytes = 32 * 1024 * 1024
+    with open(final_img, "wb") as f:
+        f.seek(img_size_bytes - 1)
+        f.write(b"\0")
 
-    print("Generating bootable disk layout using GRUB utilities...")
-    # grub-mkrescue natively bakes an image containing both ISO and flat MBR/FAT hard disk partitions
-    run_cmd(f"grub-mkrescue -o {final_img} {build_root}")
-    
-    shutil.rmtree(build_root)
-    
-    if os.path.exists(final_img):
-        img_size_bytes = 96 * 1024 * 1024
-        with open(final_img, "r+b") as f:
-            f.truncate(img_size_bytes)
-        return True
+    print("[*] Formatting drive space as flat authentic FAT32...")
+    mformat_cmd = f"mformat -F -c 1 -m 0xf8 -h 16 -s 32 -t 128 -v WINDOGE -i {final_img} ::"
+    run_cmd(mformat_cmd)
+
+    print("[*] Structuring internal system path maps...")
+    run_cmd(f"mmd -i {final_img} ::boot")
+
+    print("[*] Injecting windoge.bin kernel structure...")
+    run_cmd(f"mcopy -o -i {final_img} windoge.bin ::boot/windoge.bin")
+
+    asset_source_dir = "infiles"
+    if not os.path.exists(asset_source_dir):
+        os.makedirs(asset_source_dir)
         
-    return False
+    target_readme_file = os.path.join(asset_source_dir, "readme.txt")
+    
+    # CRITICAL FIX: If the file does not exist or has a 0-byte layout size, write the payload
+    if not os.path.exists(target_readme_file) or os.path.getsize(target_readme_file) == 0:
+        with open(target_readme_file, "w") as f:
+            f.write("Welcome to WindogeOS!\n")
+            f.write("This operating system now finally has FAT32 after...7 attempts.\n")
+            f.write("Well, it's read only for now.\n")
+            f.write("Enjoy\n")
+
+    print(f"[*] Copying user assets from '{asset_source_dir}' into root FAT cluster maps...")
+    for root, dirs, files in os.walk(asset_source_dir):
+        for file in files:
+            local_file_path = os.path.join(root, file)
+            target_fat_name = file.upper()
+            run_cmd(f"mcopy -o -i {final_img} {local_file_path} ::{target_fat_name}")
+            print(f"    -> Injected file: {target_fat_name}")
+
+    return True
 
 if compile_src():
     print("creating FAT32 disk image...")
     if create_fat32_image():
-        print("compile success! Image baked cleanly.")
+        print("compile success")
     else:
-        print("failed to build structured FAT32 target disk layout.")
+        print("build failed")
 else:
     print("are you debugging mr squidward")
     clean_object_files()

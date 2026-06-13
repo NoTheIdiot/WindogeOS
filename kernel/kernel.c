@@ -1,4 +1,3 @@
-// include files
 #include <stdint.h>
 #include <stddef.h>
 #include "dogeio.h"
@@ -22,12 +21,12 @@ extern char* such_windoge_version_short;
 char* boot_time = "";
 uint8_t rtc_init = 2;
 
-void kernel_main(uint32_t magic, multiboot_info_t* mbi) {
+extern uint32_t find_dir_cluster_by_path(const char* path);
+extern void read_cluster(uint32_t cluster, uint8_t *buffer);
 
-    // i just wasted a whole day trying to add WAITING?
-    // always set this first
-    //idt_init();
-    //set_idt_gate(40, (uint32_t)rtc_isr);
+static uint8_t file_text_buffer[4096];
+
+void kernel_main(uint32_t magic, multiboot_info_t* mbi) {
 
     dogeio_init_graphics_from_multiboot(mbi);
 
@@ -45,12 +44,23 @@ void kernel_main(uint32_t magic, multiboot_info_t* mbi) {
     serial_write_hex(vbe_initialized);
     serial_write_string("\n");
 
-    // time_rtc_init(0x0F);
+    dogeio_clear_screen();
     record_boot_time(boot_time);
-    fat32_init(2048); // init fat32
+    fat32_init(0); 
     mem_init(mbi);
     such_check_multiboot(magic, mbi);
     dogeio_print("Welcome to WindogeOS! ");
     dogeio_println(such_windoge_version_short);
+
+    uint32_t text_file_cluster = find_dir_cluster_by_path("/doge.txt");
+    if (text_file_cluster != (uint32_t)-1) {
+        for (int i = 0; i < 4096; i++) {
+            file_text_buffer[i] = '\0';
+        }
+        read_cluster((uint32_t)text_file_cluster, file_text_buffer);
+        dogeio_println((char*)file_text_buffer);
+    }
+
+    dogeio_println("");
     doge_shell();
 }

@@ -10,10 +10,12 @@ align 4
     dd MULTIBOOT_MAGIC
     dd MULTIBOOT_HEADER_FLAGS
     dd MULTIBOOT_CHECK
-    dd 1          ; mode_type (1 = graphics)
-    dd 1024       ; width
-    dd 768        ; height
-    dd 32         ; depth
+    
+    dd 0, 0, 0, 0, 0
+    dd 0    
+    dd 1024 
+    dd 768  
+    dd 32   
 
 section .text
 global _start
@@ -22,8 +24,8 @@ extern kernel_main
 _start:
     cli
     mov esp, stack_top
-    push ebx
-    push eax
+    push ebx 
+    push eax 
     call kernel_main
 
 .halt:

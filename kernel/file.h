@@ -69,5 +69,6 @@ typedef struct {
 
 void fat32_init(uint32_t partition_lba_start);
 int fat32_read_file(const char* name, const char* extension, uint8_t* buffer);
+int fat32_list_directory(const char* path);
 
 #endif
