@@ -6,8 +6,8 @@ but it's hard to use for new users, while Windows is easy to use
 but paid for all features, and macOS is just idk.
 
 = Updates
-Now I'm in the process of making a filesystem, which is a modified 
-version of USTAR
+I've made a FAT32 file system, though VBE no longer works, if you can,
+pls send me a solution.
 
 = How to such compile and run?
 - Install git, gcc, nasm, and qemu-system, grub-common2
