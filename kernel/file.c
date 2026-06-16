@@ -15,9 +15,7 @@ void ata_read_sector(uint32_t lba, uint8_t *target_buffer) {
     ports_outb(ATA_LBA_HIGH, (uint8_t)(lba >> 16));
     ports_outb(ATA_COMMAND, 0x20);
 
-    while (!(ports_inb(ATA_STATUS) & 0x08)) {
-    }
-
+    while (!(ports_inb(ATA_STATUS) & 0x08));
     ports_insw(ATA_DATA, target_buffer, 256);
 }
 
