@@ -28,8 +28,10 @@ static uint8_t file_text_buffer[4096];
 
 void kernel_main(uint32_t magic, multiboot_info_t* mbi) {
 
-    dogeio_init_graphics_from_multiboot(mbi);
+    // initialize vbe from multiboot
+    dogeio_init_vbe_from_multiboot(mbi);
 
+    // debug multiboot information
     serial_write_string("[DEBUG] mbi.flags=");
     serial_write_hex(mbi->flags);
     serial_write_string(" framebuf=");
@@ -44,14 +46,22 @@ void kernel_main(uint32_t magic, multiboot_info_t* mbi) {
     serial_write_hex(vbe_initialized);
     serial_write_string("\n");
 
+    // clear the display
     dogeio_clear_screen();
+    // record the boot time
     record_boot_time(boot_time);
+    // initialize fat32 at sector 0
     fat32_init(0); 
+    // initialize memory tracking
     mem_init(mbi);
+    // check if multiboot is valid
     such_check_multiboot(magic, mbi);
+
+    // start the operating system
     dogeio_print("Welcome to WindogeOS! ");
     dogeio_println(such_windoge_version_short);
 
+    // finish the cluster for the text file
     uint32_t text_file_cluster = find_dir_cluster_by_path("/doge.txt");
     if (text_file_cluster != (uint32_t)-1) {
         for (int i = 0; i < 4096; i++) {

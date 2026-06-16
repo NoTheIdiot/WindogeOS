@@ -3,7 +3,7 @@ nasm -f elf32 boot/boot.asm -o boot.o
 
 # helper/
 dogec -c helper/dogeio_vbe.c -o dogeio_graphics.o
-dogec -c helper/vbe.c -o vbe.o
+dogec -c drivers/vbe.c -o vbe.o
 dogec -c helper/font.c -o font.o
 dogec -c helper/dogeio.c -o dogeio.o
 dogec -c helper/time.c -o time.o
@@ -18,7 +18,7 @@ dogec -c kernel/info.c -o info.o
 dogec -c kernel/serial.c -o serial.o
 dogec -c kernel/dogeshell.c -o dogeshell.o
 dogec -c kernel/dogescript.c -o dogescript.o
-dogec -c kernel/file.c -o file.o
+dogec -c kernel/filesystem/file.c -o file.o
 dogec -c kernel/kernel.c -o kernel.o
 
 # link
