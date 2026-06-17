@@ -62,12 +62,12 @@ void kernel_main(uint32_t magic, multiboot_info_t* mbi) {
     dogeio_clear_screen();
 
     // start the operating system
-    dogeio_println("**************************************************************");
+    dogeio_println("***********************************************************");
     dogeio_print  ("          Welcome to WindogeOS! ");
     dogeio_println(such_windoge_version_short);
     dogeio_print  ("        Version ");
     dogeio_println(such_windoge_version);
-    dogeio_println("**************************************************************");
+    dogeio_println("***********************************************************");
 
     // finish the cluster for the text file
     uint32_t text_file_cluster = find_dir_cluster_by_path("/doge.txt");
