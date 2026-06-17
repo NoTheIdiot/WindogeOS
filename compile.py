@@ -114,14 +114,23 @@ def create_fat32_image():
         os.makedirs(asset_source_dir)
         
     target_readme_file = os.path.join(asset_source_dir, "readme.txt")
+    target_shiba_file = os.path.join(asset_source_dir, "shibainu.txt")
     
-    # CRITICAL FIX: If the file does not exist or has a 0-byte layout size, write the payload
     if not os.path.exists(target_readme_file) or os.path.getsize(target_readme_file) == 0:
         with open(target_readme_file, "w") as f:
             f.write("Welcome to WindogeOS!\n")
             f.write("This operating system now finally has FAT32 after...7 attempts.\n")
             f.write("Well, it's read only for now.\n")
             f.write("Enjoy\n")
+
+    with open(target_shiba_file, "w") as f:
+        f.write("#    #  ####  #    # \n")
+        f.write("#    # #    # #    # \n")
+        f.write("#    # #    # #    # \n")
+        f.write("# ## # #    # # ## # \n")
+        f.write("##  ## #    # ##  ## \n")
+        f.write("#    #  ####  #    # \n")
+        f.write("shiba inu super fluffy\n")
 
     print(f"[*] Copying user assets from '{asset_source_dir}' into root FAT cluster maps...")
     for root, dirs, files in os.walk(asset_source_dir):
