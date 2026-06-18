@@ -1,9 +1,11 @@
 // include files
 #include <stdint.h>
 #include <stddef.h>
-#include "string.h"
+#include <string.h>
+#include <dogeio.h>
 #include "../kernel/dogeshell.h"
-#include "bool.h"
+#include <bool.h>
+#include <consts.h>
 
 void friendly_mode() {
     // a logo for WindogeOS friendly mode
@@ -27,6 +29,11 @@ void friendly_mode() {
             dogeio_println(logo[i]);
         }
 
-        dogeio_println("[1]");
+        dogeio_println("[1] Terminal");
+        dogeio_println("[2] Calculator");
+        dogeio_println("[3] File Explorer");
+        dogeio_println("[4] Exit");
+
+        dogeio_input(choice, 32, DOGE_COLOR);
     }
 }
