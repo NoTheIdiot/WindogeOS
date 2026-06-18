@@ -37,7 +37,7 @@ int windoge_boot_manager() {
             dogeio_input(boot_choice, 16, DOGE_COLOR);
         } else if (string_strcmp(boot_choice, "4") == 0) { 
             dogeio_clear_screen();
-            dogeio_println("System halted safely. Goodbye.");
+            dogeio_println("Such doge, very goodbye even without a such hi.");
             while(1) {
                 __asm__ __volatile__("hlt");
             }
