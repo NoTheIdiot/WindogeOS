@@ -16,9 +16,16 @@
 
 extern int such_check_multiboot(uint32_t magic, multiboot_info_t* mbi);
 extern void record_boot_time(char* boot_buffer);
+
+// FIXED: Changed from extern void to extern int to match Option A's return behavior!
+extern int windoge_boot_manager(); 
+
+extern int friendly_mode();
 extern char* such_windoge_version;
 extern char* such_windoge_version_short;
-char* boot_time = "";
+
+// FIX PREVENTING UB: Changed to an explicit array size to prevent undefined behavior when writing strings
+char boot_time[64] = ""; 
 uint8_t rtc_init = 2;
 
 extern uint32_t find_dir_cluster_by_path(const char* path);
@@ -28,7 +35,9 @@ static uint8_t file_text_buffer[4096];
 
 void kernel_main(uint32_t magic, multiboot_info_t* mbi) {
 
-    // initialize vbe from multiboot
+    // boot manager, always must be and should be first.
+    int friendly = windoge_boot_manager();
+
     dogeio_init_vbe_from_multiboot(mbi);
 
     // debug multiboot information
@@ -56,12 +65,16 @@ void kernel_main(uint32_t magic, multiboot_info_t* mbi) {
     mem_init(mbi);
     // check if multiboot is valid
     such_check_multiboot(magic, mbi);
-    dogeio_println("Press Enter to Such Boot.");
+    dogeio_println("Press Enter to start WindogeOS.");
     char enter[4];
     dogeio_input(enter, 4, DOGE_COLOR);
     dogeio_clear_screen();
 
-    // start the operating system
+    if (friendly == 1) {
+        friendly_mode();
+    } 
+
+    // start the operating system 
     dogeio_println("**********************************************************************");
     dogeio_println("** Welcome to WindogeOS!");
     dogeio_print("** Version ");

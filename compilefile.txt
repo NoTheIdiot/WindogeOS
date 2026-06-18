@@ -1,5 +1,6 @@
 # boot/
 nasm -f elf32 boot/boot.asm -o boot.o
+dogec -c boot/manager.c -o manager.o
 
 # helper/
 dogec -c helper/dogeio_vbe.c -o dogeio_graphics.o
@@ -25,7 +26,7 @@ dogec -c kernel/kernel.c -o kernel.o
 dogec -c programs/friendly.c -o friendly.o
 
 # link
-dogelink -m elf_i386 -T linker/linker.ld -o windoge.bin boot.o kernel.o friendly.o idt.o data.o info.o serial.o dogescript.o dogeshell.o dogeio.o ports.o string.o suchboot.o time.o vbe.o dogeio_graphics.o font.o file.o
+dogelink -m elf_i386 -T linker/linker.ld -o windoge.bin boot.o kernel.o manager.o friendly.o idt.o data.o info.o serial.o dogescript.o dogeshell.o dogeio.o ports.o string.o suchboot.o time.o vbe.o dogeio_graphics.o font.o file.o
 
 # delete
 rm boot.o

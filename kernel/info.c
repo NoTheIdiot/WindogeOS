@@ -121,7 +121,7 @@ void mem_init(multiboot_info_t* mbi) {
     (void)mbi;
 }
 
-void system_sysinfo() {
+void system_systeminfo() {
     mem_calculate_usage();
 
     char cpu_name[64];
@@ -146,4 +146,5 @@ void system_sysinfo() {
     dogeio_println(" MB");
     dogeio_print("Boot Time: ");
     dogeio_println(boot_time);
+    
 }

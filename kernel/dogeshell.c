@@ -149,7 +149,7 @@ void dogeshell_execute(char* command) {
         dogeio_print("\n");
         handled = 1;
     } else if (string_strcmp(command, "sysinfo") == 0) {
-        system_sysinfo(); 
+        system_systeminfo(); 
         handled = 1;
     }
 
