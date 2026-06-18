@@ -12,9 +12,9 @@
 #include "serial.h"
 #include "file.h"
 #include "idt.h"
+#include "dogeshell.h"
 
 extern int such_check_multiboot(uint32_t magic, multiboot_info_t* mbi);
-extern void doge_shell();
 extern void record_boot_time(char* boot_buffer);
 extern char* such_windoge_version;
 extern char* such_windoge_version_short;
@@ -62,12 +62,11 @@ void kernel_main(uint32_t magic, multiboot_info_t* mbi) {
     dogeio_clear_screen();
 
     // start the operating system
-    dogeio_println("***********************************************************");
-    dogeio_print  ("          Welcome to WindogeOS! ");
-    dogeio_println(such_windoge_version_short);
-    dogeio_print  ("        Version ");
+    dogeio_println("**********************************************************************");
+    dogeio_println("** Welcome to WindogeOS!");
+    dogeio_print("** Version ");
     dogeio_println(such_windoge_version);
-    dogeio_println("***********************************************************");
+    dogeio_println("**********************************************************************");
 
     // finish the cluster for the text file
     uint32_t text_file_cluster = find_dir_cluster_by_path("/doge.txt");
@@ -80,5 +79,5 @@ void kernel_main(uint32_t magic, multiboot_info_t* mbi) {
     }
 
     dogeio_println("");
-    doge_shell();
+    doge_shell(0);
 }

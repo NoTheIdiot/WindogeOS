@@ -1,6 +1,3 @@
-// include files
-#include <stdint.h>
-#include <stddef.h>
 #include <string.h>
 #include <dogeio.h>
 #include "../kernel/dogeshell.h"
@@ -8,7 +5,7 @@
 #include <consts.h>
 
 void friendly_mode() {
-    // a logo for WindogeOS friendly mode
+    dogeio_clear_screen();
     const char *logo[] = {
         "__        ___           _                   ___  ____  ",
         "\\ \\      / (_)_ __   __| | ___   __ _  ___ / _ \\/ ___| ",
@@ -18,22 +15,32 @@ void friendly_mode() {
         "                                |___/                  "
     };
 
-    // calculate the amount of lines inside of array logo
     int lines = sizeof(logo) / sizeof(logo[0]);
 
-    // loop friendly mode
     while (true) {
         char choice[32];
-        // print the logo
+        
         for (int i = 0; i < lines; i++) {
-            dogeio_println(logo[i]);
+
+            if (logo[i] != NULL) {
+                dogeio_println((char*)logo[i]);
+            }
         }
+        dogeio_println("Welcome to Friendly Mode!");
 
         dogeio_println("[1] Terminal");
         dogeio_println("[2] Calculator");
-        dogeio_println("[3] File Explorer");
-        dogeio_println("[4] Exit");
+        dogeio_println("[3] Exit");
 
         dogeio_input(choice, 32, DOGE_COLOR);
+
+        if (string_strcmp(choice, "1") == 0 || string_startswith(choice, "Terminal")) {
+            dogeio_clear_screen();
+            doge_shell(1);
+            dogeio_clear_screen();
+        } else if (string_strcmp(choice, "3") == 0 || string_startswith(choice, "Exit")) {
+            dogeio_clear_screen();
+            return;
+        } 
     }
 }

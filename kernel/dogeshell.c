@@ -14,6 +14,7 @@
 extern char* such_windoge_version;
 extern char* such_windoge_version_short;
 extern char* boot_time;
+extern void friendly_mode();
 extern void system_sysinfo();
 
 char* command_help[] = {
@@ -24,7 +25,8 @@ char* command_help[] = {
     "dir                          | list files",
     "readfile [filename]          | reads and output a file",
     "help                         | prints this help message",
-    "history                      | prints your shell history"
+    "history                      | prints your shell history",
+    "friendly                     | starts friendly mode"
 };
 
 // array for storing shell history
@@ -155,7 +157,7 @@ void dogeshell_execute(char* command) {
      * BASIC UTILITIES
      ***************************************************/
     if (string_strcmp(command, "help") == 0) {
-        for (int i = 0; i < 8; i++) {
+        for (int i = 0; i < 9; i++) {
             dogeio_println(command_help[i]);
         }
         handled = 1;
@@ -188,12 +190,20 @@ void dogeshell_execute(char* command) {
     }
 }
 
-void doge_shell() {
+void doge_shell(int can_exit) {
     char command_buffer[128]; 
 
     while (true) {
         dogeio_print("wow (root) > ");
         dogeio_input(command_buffer, 128, LIGHT_BROWN);
-        dogeshell_execute(command_buffer);
+        if (string_strcmp(command_buffer, "exit") == 0) {
+            if (can_exit == 1) return;
+            else continue;
+        } else if (string_strcmp(command_buffer, "friendly") == 0) {
+            if (can_exit == 0) friendly_mode();
+            else dogeio_println("friendly mode is not avalible when you are already in friendly mode.");
+        } else {
+            dogeshell_execute(command_buffer);
+        }
     }
 }
