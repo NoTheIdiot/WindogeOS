@@ -19,7 +19,7 @@ void friendly_mode() {
 
     while (true) {
         char choice[32];
-        
+        dogeio_clear_screen();
         for (int i = 0; i < lines; i++) {
 
             if (logo[i] != NULL) {
@@ -32,12 +32,15 @@ void friendly_mode() {
         dogeio_println("[2] Calculator");
         dogeio_println("[3] Exit");
 
+        dogeio_print("> ");
         dogeio_input(choice, 32, DOGE_COLOR);
 
         if (string_strcmp(choice, "1") == 0 || string_startswith(choice, "Terminal")) {
             dogeio_clear_screen();
             doge_shell(1);
             dogeio_clear_screen();
+        } else if (string_strcmp(choice, "2") == 0 || string_startswith(choice, "Calculator")) {
+
         } else if (string_strcmp(choice, "3") == 0 || string_startswith(choice, "Exit")) {
             dogeio_clear_screen();
             return;
