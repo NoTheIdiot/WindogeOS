@@ -26,7 +26,7 @@ int windoge_boot_manager() {
         dogeio_print("> ");
         dogeio_input(boot_choice, 16, DOGE_COLOR);
 
-        if (string_strcmp(boot_choice, "1") == 0) {
+        if (string_strcmp(boot_choice, "1") == 0 || string_strcmp(boot_choice, "") == 0) {
             return 0;
         } else if (string_strcmp(boot_choice, "2") == 0) {
             return 1;

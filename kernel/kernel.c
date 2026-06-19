@@ -35,9 +35,7 @@ static uint8_t file_text_buffer[4096];
 
 void kernel_main(uint32_t magic, multiboot_info_t* mbi) {
 
-    // boot manager, always must be and should be first.
-    int friendly = windoge_boot_manager();
-
+    // init vbe
     dogeio_init_vbe_from_multiboot(mbi);
 
     // debug multiboot information
@@ -63,8 +61,13 @@ void kernel_main(uint32_t magic, multiboot_info_t* mbi) {
     fat32_init(0); 
     // initialize memory tracking
     mem_init(mbi);
+
+    // boot manager, always must be and should be after the hardware init.
+    int friendly = windoge_boot_manager();
+
     // check if multiboot is valid
     such_check_multiboot(magic, mbi);
+
     dogeio_println("Press Enter to start WindogeOS.");
     char enter[4];
     dogeio_input(enter, 4, DOGE_COLOR);

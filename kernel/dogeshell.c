@@ -15,7 +15,7 @@ extern char* such_windoge_version;
 extern char* such_windoge_version_short;
 extern char* boot_time;
 extern void friendly_mode();
-extern void system_sysinfo();
+extern void system_systeminfo();
 
 char* command_help[] = {
     "print/bark [message]         | prints a message",
@@ -36,6 +36,7 @@ int dogeshell_history_starter = 0;
 
 // a buffer to store files for reading
 uint8_t shell_file_buffer[4096];
+// char current_directory[64];
 
 // get an argument for a command
 char* shell_get_arg(char* buffer, int command_len) {
@@ -52,7 +53,6 @@ char* shell_get_arg(char* buffer, int command_len) {
  */
 
 void dogeshell_execute(char* command) {
-    // this to check if the command exists
     int handled = 0;
 
     int len = string_strlen(command);
@@ -81,11 +81,15 @@ void dogeshell_execute(char* command) {
     /***************************************************
      * FILE MANIPULATION
      ***************************************************/
-    if (string_startswith(command, "readfile")) {
+    else if (string_startswith(command, "readfile")) {
         char* argument = shell_get_arg(command, 8);
         
-        if (!argument) {
-            dogeio_println("usage: readfile [filename]");
+        // FIXED: Now checks if string comparison evaluates exactly to 0
+        if (!argument || string_strcmp(argument, "--help") == 0) {
+            dogeio_println("Such usage: readfile [filename]");
+            dogeio_println("Reads a file and outputs it into the display.");
+            dogeio_println("Input must be fully capitalized, for example:");
+            dogeio_println("readfile README.TXT");
         } else {
             char name[9];
             char ext[4];
@@ -143,20 +147,31 @@ void dogeshell_execute(char* command) {
     /*****************************************************
      * INFORMATION SECTION
      *****************************************************/
-    if (string_strcmp(command, "time") == 0 || string_strcmp(command, "date") == 0) {
+    else if (string_strcmp(command, "time") == 0 || string_strcmp(command, "date") == 0) {
         time_update_time();
         time_show();
         dogeio_print("\n");
         handled = 1;
-    } else if (string_strcmp(command, "sysinfo") == 0) {
-        system_systeminfo(); 
+    } else if (string_startswith(command, "time ") || string_startswith(command, "date ")) {
+        char* argument = shell_get_arg(command, 4);
+        if (argument && string_strcmp(argument, "--help") == 0) {
+            dogeio_println("Much usage: time/date");
+        }
         handled = 1;
+    }
+
+    else if (string_strcmp(command, "sysinfo") == 0) {
+        char* argument = shell_get_arg(command, 7);
+        if (!argument) {
+            system_systeminfo(); 
+            handled = 1;
+        }
     }
 
     /****************************************************
      * BASIC UTILITIES
      ***************************************************/
-    if (string_strcmp(command, "help") == 0) {
+    else if (string_strcmp(command, "help") == 0) {
         for (int i = 0; i < 9; i++) {
             dogeio_println(command_help[i]);
         }
@@ -168,6 +183,13 @@ void dogeshell_execute(char* command) {
     } else if (string_strcmp(command, "clear") == 0) {
         dogeio_clear_screen();
         handled = 1;
+    } else if (string_strcmp(command, "history") == 0) {
+        int index = (dogeshell_history_count == 32) ? dogeshell_history_starter : 0;
+        for (int i = 0; i < dogeshell_history_count; i++) {
+            dogeio_println(dogeshell_history[index]);
+            index = (index + 1) % 32;
+        }
+        handled = 1;
     }
 
     if (!handled) {
@@ -175,7 +197,7 @@ void dogeshell_execute(char* command) {
         dogeio_println(": command not found");
     }
      
-    if (string_strcmp(command, "history") != 0 && string_strcmp(command, "help") != 0) {
+    if (string_strcmp(command, "history") != 0 && string_strcmp(command, "help") != 0 && len > 0) {
         string_strncpy(dogeshell_history[dogeshell_history_starter], command, 127);
         dogeshell_history[dogeshell_history_starter][127] = '\0';
         

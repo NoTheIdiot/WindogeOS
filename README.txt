@@ -30,3 +30,9 @@ programs above.
 - do not make the qemu-system command yourself, run python start_vm.py.
   if you somehow got a better result, please make a pull request,
   less headaches are better.
+
+
+= Notes for development
+- the infiles folder at root is for files going to be inject to FAT32.
+- the dump folder is used for deleted code that could be reused in the future
+  for a feature that is not needed before.
