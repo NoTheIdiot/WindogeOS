@@ -9,6 +9,7 @@
 // global variables
 int cursor_x = 0;               // x position of the text cursor
 int cursor_y = 0;               // y position of the text cursor
+uint8_t terminal_color = DOGE_COLOR;
 
 // the scancode list for inputs
 char scan_to_ascii[] = {
@@ -80,7 +81,7 @@ void dogeio_putchar(char input, int x_position, int y_position) {
     // set the calculated position to the inputed char
     video_adress[vga_offset] = input;
     // set the char's color 
-    video_adress[vga_offset + 1] = DOGE_COLOR;
+    video_adress[vga_offset + 1] = terminal_color;
 }
 
 // prints a string in the display

@@ -192,6 +192,17 @@ void dogeshell_execute(char* command) {
         handled = 1;
     }
 
+    /***********************************************************
+     * FUNNI TERMINAL STUFF
+     ***********************************************************/
+    else if (string_startswith(command, "color")) {
+        //char* arguments = shell_get_arg(command, 5);
+
+        dogeio_clear_screen();
+        //
+        handled = 1;
+    }
+
     if (!handled) {
         dogeio_print(command);
         dogeio_println(": command not found");
