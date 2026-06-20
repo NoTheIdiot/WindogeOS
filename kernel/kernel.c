@@ -28,9 +28,6 @@ extern char* such_windoge_version_short;
 char boot_time[64] = ""; 
 uint8_t rtc_init = 2;
 
-extern uint32_t find_dir_cluster_by_path(const char* path);
-extern void read_cluster(uint32_t cluster, uint8_t *buffer);
-
 static uint8_t file_text_buffer[4096];
 
 void kernel_main(uint32_t magic, multiboot_info_t* mbi) {

@@ -123,7 +123,7 @@ void dogeshell_execute(char* command) {
                 shell_file_buffer[i] = '\0';
             }
 
-            if (fat32_read_file(name, ext, shell_file_buffer) != -1) {
+            if (fat32_read_file("/", name, ext, shell_file_buffer) != -1) {
                 dogeio_println((char*)shell_file_buffer);
             } else {
                 dogeio_print("error: could not read ");

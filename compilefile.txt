@@ -48,3 +48,5 @@ rm serial.o
 rm dogeshell.o
 rm dogescript.o
 rm kernel.o
+rm manager.o
+rm friendly.o
