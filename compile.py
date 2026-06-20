@@ -114,7 +114,7 @@ def create_fat32_image():
         os.makedirs(asset_source_dir)
         
     target_readme_file = os.path.join(asset_source_dir, "readme.txt")
-    target_shiba_file = os.path.join(asset_source_dir, "shibainu.txt")
+    target_shiba_file = os.path.join(asset_source_dir, "random.txt")
     
     if not os.path.exists(target_readme_file) or os.path.getsize(target_readme_file) == 0:
         with open(target_readme_file, "w") as f:
@@ -130,7 +130,6 @@ def create_fat32_image():
         f.write("# ## # #    # # ## # \n")
         f.write("##  ## #    # ##  ## \n")
         f.write("#    #  ####  #    # \n")
-        f.write("shiba inu super fluffy\n")
 
     print(f"[*] Copying user assets from '{asset_source_dir}' into root FAT cluster maps...")
     for root, dirs, files in os.walk(asset_source_dir):
