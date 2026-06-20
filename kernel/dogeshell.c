@@ -4,20 +4,20 @@
 #include <string.h>
 #include <dogeio.h>
 #include <time.h>
-#include <bool.h>
+#include <bool.h> // Swapped back to your original bool header
 #include "info.h"
 #include <consts.h>
 #include <file.h>
 
-// extern some files and variables for version, boot time, 
-// and the system information function.
+// extern files and variables
 extern char* such_windoge_version;
 extern char* such_windoge_version_short;
 extern char* boot_time;
+extern uint8_t terminal_color;
 extern void friendly_mode();
 extern void system_systeminfo();
 
-char* command_help[] = {
+const char* command_help[9] = {
     "print/bark [message]         | prints a message",
     "clear                        | clears the display",
     "time/date                    | prints the time",
@@ -36,12 +36,10 @@ int dogeshell_history_starter = 0;
 
 // a buffer to store files for reading
 uint8_t shell_file_buffer[4096];
-// char current_directory[64];
 
 // get an argument for a command
 char* shell_get_arg(char* buffer, int command_len) {
     char* arg = buffer + command_len;
-    // splits the command using spaces till it's \0
     while (*arg == ' ' && *arg != '\0') {
         arg++;
     }
@@ -54,8 +52,9 @@ char* shell_get_arg(char* buffer, int command_len) {
 
 void dogeshell_execute(char* command) {
     int handled = 0;
-
     int len = string_strlen(command);
+    
+    // Clean trailing newlines
     while (len > 0 && (command[len - 1] == '\n' || command[len - 1] == '\r')) {
         command[len - 1] = '\0';
         len--;
@@ -68,12 +67,11 @@ void dogeshell_execute(char* command) {
     /*****************************************************
      * BASIC SHELL OUTPUT
      *****************************************************/
-    if (string_startswith(command, "print")) {
-        char* argument = shell_get_arg(command, 5);
-        dogeio_println(argument ? argument : "");
-        handled = 1;
-    } else if (string_startswith(command, "bark")) {
-        char* argument = shell_get_arg(command, 4);
+    int is_print = string_startswith(command, "print");
+    int is_bark  = string_startswith(command, "bark");
+    
+    if (is_print || is_bark) {
+        char* argument = shell_get_arg(command, is_print ? 5 : 4);
         dogeio_println(argument ? argument : "");
         handled = 1;
     }
@@ -84,54 +82,48 @@ void dogeshell_execute(char* command) {
     else if (string_startswith(command, "readfile")) {
         char* argument = shell_get_arg(command, 8);
         
-        // FIXED: Now checks if string comparison evaluates exactly to 0
         if (!argument || string_strcmp(argument, "--help") == 0) {
             dogeio_println("Such usage: readfile [filename]");
             dogeio_println("Reads a file and outputs it into the display.");
             dogeio_println("Input must be fully capitalized, for example:");
             dogeio_println("readfile README.TXT");
         } else {
-            char name[9];
-            char ext[4];
+            char name[9] = "        "; 
+            char ext[4]  = "   ";
             int ni = 0;
-            int ei = 0;
-            int dot_found = 0;
-
-            for (int i = 0; i < 8; i++) name[i] = ' ';
-            name[8] = '\0';
-            for (int i = 0; i < 3; i++) ext[i] = ' ';
-            ext[3] = '\0';
-
+            
             while (argument[ni] != '\0' && argument[ni] != '.' && ni < 8) {
                 name[ni] = argument[ni];
                 ni++;
             }
             name[ni] = '\0';
 
-            int scan = 0;
-            while (argument[scan] != '\0') {
-                if (argument[scan] == '.') {
-                    dot_found = scan + 1;
+            // Custom inline strchr replacement to find the dot
+            char* dot = NULL;
+            char* scan = argument;
+            while (*scan != '\0') {
+                if (*scan == '.') {
+                    dot = scan;
                     break;
                 }
                 scan++;
             }
 
-            if (dot_found > 0) {
-                while (argument[dot_found] != '\0' && ei < 3) {
-                    ext[ei] = argument[dot_found];
-                    ei++;
-                    dot_found++;
+            if (dot) {
+                dot++; // Skip the dot itself
+                int ei = 0;
+                while (*dot != '\0' && ei < 3) {
+                    ext[ei++] = *dot++;
                 }
                 ext[ei] = '\0';
             }
 
+            // Custom inline memset replacement
             for (int i = 0; i < 4096; i++) {
                 shell_file_buffer[i] = '\0';
             }
 
-            int read_status = fat32_read_file(name, ext, shell_file_buffer);
-            if (read_status != -1) {
+            if (fat32_read_file(name, ext, shell_file_buffer) != -1) {
                 dogeio_println((char*)shell_file_buffer);
             } else {
                 dogeio_print("error: could not read ");
@@ -158,11 +150,8 @@ void dogeshell_execute(char* command) {
             dogeio_println("Much usage: time/date");
         }
         handled = 1;
-    }
-
-    else if (string_strcmp(command, "sysinfo") == 0) {
-        char* argument = shell_get_arg(command, 7);
-        if (!argument) {
+    } else if (string_strcmp(command, "sysinfo") == 0) {
+        if (!shell_get_arg(command, 7)) {
             system_systeminfo(); 
             handled = 1;
         }
@@ -173,13 +162,13 @@ void dogeshell_execute(char* command) {
      ***************************************************/
     else if (string_strcmp(command, "help") == 0) {
         for (int i = 0; i < 9; i++) {
-            dogeio_println(command_help[i]);
+            dogeio_println((char*)command_help[i]);
         }
         handled = 1;
     } else if (string_strcmp(command, "halt") == 0) {
         dogeio_clear_screen();
         dogeio_println("Halting such CPU, very goodbye.");
-        while (true) { __asm__ volatile ("hlt"); }
+        while (1) { __asm__ volatile ("hlt"); }
     } else if (string_strcmp(command, "clear") == 0) {
         dogeio_clear_screen();
         handled = 1;
@@ -196,29 +185,48 @@ void dogeshell_execute(char* command) {
      * FUNNI TERMINAL STUFF
      ***********************************************************/
     else if (string_startswith(command, "color")) {
-        //char* arguments = shell_get_arg(command, 5);
+        char* argument = shell_get_arg(command, 5);
 
-        dogeio_clear_screen();
-        //
+        if (!argument || string_strcmp(argument, "--help") == 0) {
+            dogeio_println("Many usage: color [color_name]");
+            dogeio_println("Changes the terminal color.");
+            dogeio_println("Color options:");
+            dogeio_println("black, blue, green, red, brown, doge, white");
+        } else {
+            int valid_color = 1;
+            if (string_strcmp(argument, "white") == 0)       terminal_color = WHITE;
+            else if (string_strcmp(argument, "blue") == 0)   terminal_color = BLUE;
+            else if (string_strcmp(argument, "green") == 0)  terminal_color = GREEN;
+            else if (string_strcmp(argument, "red") == 0)    terminal_color = RED;
+            else if (string_strcmp(argument, "brown") == 0)  terminal_color = BROWN;
+            else if (string_strcmp(argument, "doge") == 0)   terminal_color = DOGE_COLOR;
+            else valid_color = 0;
+
+            if (valid_color) {
+                dogeio_clear_screen();
+            } else {
+                dogeio_print("color ");
+                dogeio_print(argument);
+                dogeio_println(" not exist.");
+            }
+        }
         handled = 1;
     }
 
+    // Command not found fall-through
     if (!handled) {
         dogeio_print(command);
         dogeio_println(": command not found");
     }
      
+    // Save history using secure index wrap-around tracking
     if (string_strcmp(command, "history") != 0 && string_strcmp(command, "help") != 0 && len > 0) {
         string_strncpy(dogeshell_history[dogeshell_history_starter], command, 127);
         dogeshell_history[dogeshell_history_starter][127] = '\0';
         
-        dogeshell_history_starter++;
+        dogeshell_history_starter = (dogeshell_history_starter + 1) % 32;
         if (dogeshell_history_count < 32) {
             dogeshell_history_count++;
-        }
-        
-        if (dogeshell_history_starter >= 32) {
-            dogeshell_history_starter = 0;
         }
     }
 }
@@ -226,15 +234,19 @@ void dogeshell_execute(char* command) {
 void doge_shell(int can_exit) {
     char command_buffer[128]; 
 
-    while (true) {
+    while (1) {
         dogeio_print("wow (root) > ");
-        dogeio_input(command_buffer, 128, LIGHT_BROWN);
+        dogeio_input(command_buffer, 128, terminal_color);
+        
         if (string_strcmp(command_buffer, "exit") == 0) {
             if (can_exit == 1) return;
             else continue;
         } else if (string_strcmp(command_buffer, "friendly") == 0) {
-            if (can_exit == 0) friendly_mode();
-            else dogeio_println("friendly mode is not avalible when you are already in friendly mode.");
+            if (can_exit == 0) {
+                friendly_mode();
+            } else {
+                dogeio_println("friendly mode is not available when you are already in friendly mode.");
+            }
         } else {
             dogeshell_execute(command_buffer);
         }
