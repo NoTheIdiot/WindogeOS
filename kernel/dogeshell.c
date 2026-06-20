@@ -46,6 +46,31 @@ char* shell_get_arg(char* buffer, int command_len) {
     return (*arg == '\0') ? NULL : arg;
 }
 
+// parse filenames because it's annoying
+int parse_filename(const char* input, char* name, char* ext) {
+    for (int i = 0; i < 8; i++) name[i] = ' ';
+    for (int i = 0; i < 3; i++) ext[i] = ' ';
+
+    int ni = 0, ei = 0;
+    int seen_dot = 0;
+
+    for (int i = 0; input[i] != '\0'; i++) {
+        if (input[i] == '.') {
+            seen_dot = 1;
+            continue;
+        }
+
+        if (!seen_dot && ni < 8) {
+            name[ni++] = input[i];
+        } else if (seen_dot && ei < 3) {
+            ext[ei++] = input[i];
+        }
+    }
+
+    return (ni > 0);
+}
+
+
 /******************************************************
  * SHELL STUFF
  */
@@ -131,10 +156,90 @@ void dogeshell_execute(char* command) {
             }
         }
         handled = 1;
+
     } else if (string_strcmp(command, "dir") == 0) {
         fat32_list_directory("/");
         handled = 1;
+    
+    } else if (string_startswith(command, "createfile")) {
+        char* argument = shell_get_arg(command, 10);
+
+        if (!argument) {
+            dogeio_println("usage: createfile NAME.EXT");
+        } else {
+            char name[8], ext[3];
+
+            if (!parse_filename(argument, name, ext)) {
+                dogeio_println("invalid filename");
+            } else {
+                int res = fat32_create_file("/", name, ext);
+                if (res == 0) {
+                    dogeio_println("file created");
+                } else {
+                    dogeio_println("error creating file");
+                }
+            }
+        }
+        handled = 1;
+    } else if (string_startswith(command, "deletefile")) {
+        char* argument = shell_get_arg(command, 10);
+
+        if (!argument) {
+            dogeio_println("usage: deletefile NAME.EXT");
+        } else {
+            char name[8], ext[3];
+
+            if (!parse_filename(argument, name, ext)) {
+                dogeio_println("invalid filename");
+            } else {
+                int res = fat32_delete_file("/", name, ext);
+
+                if (res == 0) {
+                    dogeio_print("file ");
+                    dogeio_print(argument);
+                    dogeio_println(" such deleted.");
+                } else {
+                    dogeio_println("delete failed, you should try again.");
+                }
+            }
+        }
+        handled = 1;
+    } else if (string_startswith(command, "writefile")) {
+    char* argument = shell_get_arg(command, 9);
+
+    if (!argument || string_strcmp(argument, "--help") == 0) {
+        dogeio_println("usage: writefile NAME.EXT TEXT");
+    } else {
+        // split filename and content
+        char* space = argument;
+        while (*space != '\0' && *space != ' ') space++;
+
+        if (*space == '\0') {
+            dogeio_println("missing text");
+        } else {
+                *space = '\0';
+                char* text = space + 1;
+
+                char name[8], ext[3];
+
+                if (!parse_filename(argument, name, ext)) {
+                    dogeio_println("invalid filename");
+                } else {
+                    int res = fat32_write_file("/", name, ext, (uint8_t*)text, string_strlen(text));
+
+                    if (res == 0) {
+                        dogeio_println("write success");
+                    } else {
+                        dogeio_println("write failed");
+                    }
+                }
+            }
+        }
+        handled = 1;
     }
+
+
+
 
     /*****************************************************
      * INFORMATION SECTION

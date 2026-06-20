@@ -478,7 +478,7 @@ int fat32_list_directory(const char* path) {
             format_83_name(dir[i].filename, dir[i].ext, name_buffer);
 
             if (dir[i].attributes & 0x10) {
-                dogeio_print("   ");
+                dogeio_print("FOLDER  ");
                 dogeio_println(name_buffer);
             } else {
                 dogeio_print("FILE    ");
