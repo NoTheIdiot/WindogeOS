@@ -2,6 +2,8 @@
 #include <stddef.h>
 #include "font.h"
 #include "vbe.h"
+#include "ports.h"
+#include "multiboot.h"
 
 #define FONT_WIDTH 8
 #define FONT_HEIGHT 12
@@ -106,37 +108,103 @@ const uint8_t font_data[95][8] = {
     {0x6E, 0x3B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},  // 126: ~
 };
 
-// draw a single character at (x, y)
+// Global handles extracted from multiboot.c initialization steps
+extern uint32_t vbe_frame_buffer;
+extern uint16_t vbe_pitch;
+extern uint16_t vbe_width;
+extern uint16_t vbe_height;
+extern uint8_t  vbe_bits_per_pixel;
+extern uint8_t  vbe_initialized;
+
+// Direct Blit Pixel Writer (Optimized for internal fast execution paths)
+static inline void direct_putpixel_32(uint16_t x, uint16_t y, uint32_t color) {
+    uint32_t* lfb = (uint32_t*)vbe_frame_buffer;
+    lfb[y * (vbe_pitch / 4) + x] = color;
+}
+
+// Draw a single character at (x, y) coordinates
 void font_draw_char(uint16_t x, uint16_t y, char c, uint32_t fg_color, uint32_t bg_color) {
-    if (c < 32 || c > 126) {
-        return;
-    }
+    if (!vbe_initialized || vbe_bits_per_pixel != 32) return;
+    if (c < 32 || c > 126) return;
+    if (x + FONT_WIDTH > vbe_width || y + FONT_HEIGHT > vbe_height) return;
 
     const uint8_t* char_bitmap = font_data[c - 32];
+    uint32_t* lfb = (uint32_t*)vbe_frame_buffer;
+    uint32_t stride = vbe_pitch / 4;
 
     for (uint16_t row = 0; row < FONT_HEIGHT; row++) {
+        // Fetch raw horizontal byte configuration matching our map
         uint8_t bitmap = char_bitmap[font_row_map[row]];
-        uint16_t pixel_y = y + row;
-        for (uint16_t col = 0; col < FONT_WIDTH; col++) {
-            uint32_t color = (bitmap & (1 << col)) ? fg_color : bg_color;
-            vbe_putpixel(x + col, pixel_y, color);
+        uint32_t* target_line = lfb + ((y + row) * stride) + x;
+
+        // FIXED: Reversed bitmask order (0x80 down to 0x01) to stop text mirroring bugs
+        target_line[0] = (bitmap & 0x80) ? fg_color : bg_color;
+        target_line[1] = (bitmap & 0x40) ? fg_color : bg_color;
+        target_line[2] = (bitmap & 0x20) ? fg_color : bg_color;
+        target_line[3] = (bitmap & 0x10) ? fg_color : bg_color;
+        target_line[4] = (bitmap & 0x08) ? fg_color : bg_color;
+        target_line[5] = (bitmap & 0x04) ? fg_color : bg_color;
+        target_line[6] = (bitmap & 0x02) ? fg_color : bg_color;
+        target_line[7] = (bitmap & 0x01) ? fg_color : bg_color;
+    }
+}
+
+// Print an absolute string string at coordinate values
+void font_draw_string(uint16_t x, uint16_t y, const char* string, uint32_t fg_color, uint32_t bg_color) {
+    uint16_t current_x = x;
+    uint16_t current_y = y;
+
+    for (size_t i = 0; string[i] != '\0'; i++) {
+        if (string[i] == '\n') {
+            current_x = x;
+            current_y += FONT_HEIGHT;
+            
+            // Loop scroll safety triggers if multi-line string goes past display bounds
+            if (current_y + FONT_HEIGHT > vbe_height) {
+                current_y = vbe_height - FONT_HEIGHT;
+            }
+        } else {
+            font_draw_char(current_x, current_y, string[i], fg_color, bg_color);
+            current_x += FONT_WIDTH;
+
+            // Handle horizontal wrapping
+            if (current_x + FONT_WIDTH > vbe_width) {
+                current_x = x;
+                current_y += FONT_HEIGHT;
+            }
         }
     }
 }
 
-// pfing a string in VBE mode.
-void font_draw_string(uint16_t x, uint16_t y, const char* string, uint32_t fg_color, uint32_t bg_color) {
-    uint16_t current_x = x;
-    uint16_t current_y = y;
-    size_t i = 0;
+// Clear high-res graphic display instantly to a target background color
+void vbe_clear_screen(uint32_t color) {
+    if (!vbe_initialized || vbe_bits_per_pixel != 32) return;
 
-    for (i = 0; string[i] != '\0'; i++) {
-        if (string[i] == '\n') {
-            current_x = x;
-            current_y += FONT_HEIGHT;
-        } else {
-            font_draw_char(current_x, current_y, string[i], fg_color, bg_color);
-            current_x += FONT_WIDTH;
-        }
+    uint32_t* lfb = (uint32_t*)vbe_frame_buffer;
+    uint32_t total_pixels = (vbe_pitch / 4) * vbe_height;
+
+    for (uint32_t i = 0; i < total_pixels; i++) {
+        lfb[i] = color;
+    }
+}
+
+// Blazing-fast bare-metal scrolling block operation
+void vbe_scroll_terminal(uint32_t bg_color) {
+    if (!vbe_initialized || vbe_bits_per_pixel != 32) return;
+
+    uint32_t* lfb = (uint32_t*)vbe_frame_buffer;
+    uint32_t stride = vbe_pitch / 4;
+
+    // Shift pixels up by exactly FONT_HEIGHT (12 pixel scanlines)
+    uint32_t pixels_to_shift = (vbe_height - FONT_HEIGHT) * stride;
+    uint32_t shift_offset = FONT_HEIGHT * stride;
+
+    for (uint32_t i = 0; i < pixels_to_shift; i++) {
+        lfb[i] = lfb[i + shift_offset];
+    } // Wipe out the newly opened bottom row (last 12 horizontal pixel rows)
+    uint32_t starting_clear_pixel = (vbe_height - FONT_HEIGHT) * stride;
+    uint32_t total_pixels = stride * vbe_height;
+    for (uint32_t i = starting_clear_pixel; i < total_pixels; i++) {
+        lfb[i] = bg_color;
     }
 }

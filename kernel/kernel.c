@@ -69,6 +69,7 @@ void kernel_main(uint32_t magic, multiboot_info_t* mbi) {
     char enter[4];
     dogeio_input(enter, 4, DOGE_COLOR);
     dogeio_clear_screen();
+    dogeio_clear_screen(); 
 
     if (friendly == 1) {
         friendly_mode();
