@@ -6,9 +6,9 @@ import platform
 system = platform.system()
 
 if system == "Windows":
-    linker_var = "ld.lld"
+    linker_var = "clang --target=i386-pc-none-elf -ffreestanding -nostdlib -fuse-ld=lld -Wl, -T, linker/linker.ld"
 else:
-    linker_var = "ld"
+    linker_var = "ld -m elf-i386 -T linker/linker.ld"
 
 def run_cmd(command):
     return subprocess.run(command, shell=True)
