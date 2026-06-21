@@ -26,7 +26,7 @@ dogec -c kernel/kernel.c -o kernel.o
 dogec -c programs/friendly.c -o friendly.o
 
 # link
-dogelink linker/linker.ld -o windoge.bin boot.o kernel.o manager.o friendly.o idt.o data.o info.o serial.o dogescript.o dogeshell.o dogeio.o ports.o string.o suchboot.o time.o vbe.o dogeio_graphics.o font.o file.o
+dogelink -o windoge.bin boot.o kernel.o manager.o friendly.o idt.o data.o info.o serial.o dogescript.o dogeshell.o dogeio.o ports.o string.o suchboot.o time.o vbe.o dogeio_graphics.o font.o file.o
 
 # delete
 rm boot.o
