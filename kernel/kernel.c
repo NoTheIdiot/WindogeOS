@@ -29,14 +29,22 @@ uint8_t rtc_init = 2;
 static uint8_t file_text_buffer[4096];
 
 void kernel_main(uint32_t magic, multiboot_info_t* mbi) {
-    // 1. HARDWARE & MEMORY INITIALIZATION FIRST
-    // Initialize low-level memory layout maps before touching driver layers
+    // init ran for sysinfo
     mem_init(mbi);
+    dogeio_clear_screen();
 
-    // 2. RUN GRUB MULTIBOOT HANDSHAKE EVALUATION
+    record_boot_time(boot_time);
+    fat32_init(0); // Targets sector 0 for raw, unpartitioned loopback storage matrix mappings
+
+    int friendly = windoge_boot_manager();
+
     such_check_multiboot(magic, mbi);
+    dogeio_println("Press Enter to start WindogeOS.");
+    char enter[4];
+    dogeio_input(enter, 4, DOGE_COLOR);
+    dogeio_clear_screen();
 
-    // 3. INITIALIZE VBE GRAPHICS NOW THAT MEMORY MAPS ARE SAFE
+    // initialize VESA VBE
     dogeio_init_vbe_from_multiboot(mbi);
 
     // Debugging verification pipeline output
@@ -53,17 +61,6 @@ void kernel_main(uint32_t magic, multiboot_info_t* mbi) {
     serial_write_string(" vbe=");
     serial_write_hex(vbe_initialized);
     serial_write_string("\n");
-    dogeio_clear_screen();
-
-    record_boot_time(boot_time);
-    fat32_init(0); // Targets sector 0 for raw, unpartitioned loopback storage matrix mappings
-
-    int friendly = windoge_boot_manager();
-
-    dogeio_println("Press Enter to start WindogeOS.");
-    char enter[4];
-    dogeio_input(enter, 4, DOGE_COLOR);
-    dogeio_clear_screen();
 
     if (friendly == 1) {
         friendly_mode();

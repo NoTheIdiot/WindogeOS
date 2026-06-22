@@ -157,8 +157,17 @@ void dogeshell_execute(char* command) {
         }
         handled = 1;
 
-    } else if (string_strcmp(command, "dir") == 0) {
-        fat32_list_directory("/");
+    } else if (string_startswith(command, "dir")) {
+        char* argument = shell_get_arg(command, 3);
+        
+        if (!argument) {
+            fat32_list_directory("/");
+        } else if (string_strcmp(argument, "--help") == 0) {
+            dogeio_println("wow usage: dir [directory]");
+            dogeio_println("this command can be used without a argument input.");
+        } else {
+            fat32_list_directory(argument);
+        }
         handled = 1;
     
     } else if (string_startswith(command, "createfile")) {
