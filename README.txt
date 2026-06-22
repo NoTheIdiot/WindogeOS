@@ -10,7 +10,7 @@ I've made a FAT32 file system, though VBE no longer works, if you can,
 pls send me a solution.
 
 = How to such compile and run?
-- Install git, gcc, nasm, and qemu-system, grub-common2, and make.
+- Install git, gcc, nasm, and qemu-system, grub-common2.
 
 - Run this in your terminal, if you are on windows, install msys2 via this
 link: https://msys2.org and run the command for installing the needed
