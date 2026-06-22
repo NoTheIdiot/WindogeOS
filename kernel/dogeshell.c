@@ -22,7 +22,7 @@ const char* command_help[9] = {
     "clear                        | clears the display",
     "time/date                    | prints the time",
     "sysinfo                      | prints your system information",
-    "dir                          | list files",
+    "dir [folder]                 | list files",
     "readfile [filename]          | reads and output a file",
     "help                         | prints this help message",
     "history                      | prints your shell history",
@@ -173,8 +173,9 @@ void dogeshell_execute(char* command) {
     } else if (string_startswith(command, "createfile")) {
         char* argument = shell_get_arg(command, 10);
 
-        if (!argument) {
-            dogeio_println("usage: createfile NAME.EXT");
+        if (!argument || string_strcmp(argument, "--help") == 0) {
+            dogeio_println("usage: createfile [filename]");
+            dogeio_println("creates a file.");
         } else {
             char name[8], ext[3];
 
@@ -193,8 +194,9 @@ void dogeshell_execute(char* command) {
     } else if (string_startswith(command, "deletefile")) {
         char* argument = shell_get_arg(command, 10);
 
-        if (!argument) {
-            dogeio_println("usage: deletefile NAME.EXT");
+        if (!argument || string_strcmp(argument, "--help") == 0) {
+            dogeio_println("usage: deletefile [filename]");
+            dogeio_println("deletes a file.");
         } else {
             char name[8], ext[3];
 
@@ -217,7 +219,9 @@ void dogeshell_execute(char* command) {
     char* argument = shell_get_arg(command, 9);
 
     if (!argument || string_strcmp(argument, "--help") == 0) {
-        dogeio_println("usage: writefile NAME.EXT TEXT");
+        dogeio_println("usage: writefile [filename] [text]");
+        dogeio_println("writes a piece of text of text to a file, though");
+        dogeio_println("it erases a file's data and will be fixed soon.");
     } else {
         // split filename and content
         char* space = argument;
