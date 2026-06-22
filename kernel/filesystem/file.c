@@ -311,9 +311,7 @@ int fat32_create_file(const char* dir_path, const char* name, const char* extens
 
 int fat32_write_file(const char* dir_path, const char* name, const char* extension, uint8_t* buffer, uint32_t size) {
     int32_t target_dir = find_dir_cluster_by_path(dir_path);
-    if (target_dir == -1) {
-        return -1;
-    }
+    if (target_dir == -1) return -1;
 
     uint32_t current_cluster = (uint32_t)target_dir;
     char parsed_name[8], parsed_ext[3];
@@ -325,58 +323,75 @@ int fat32_write_file(const char* dir_path, const char* name, const char* extensi
         fat32_dir_t* dir = (fat32_dir_t*)global_cluster_buffer;
 
         for (uint32_t i = 0; i < total_dir_entries; i++) {
-            if (dir[i].filename[0] == 0x00) {
-                return -1;
-            }
-            if (dir[i].filename[0] == 0xE5) {
-                continue;
-            }
+            if (dir[i].filename[0] == 0x00) return -1;
+            if (dir[i].filename[0] == 0xE5) continue;
 
             if (match_dos_name(dir[i].filename, (const char*)parsed_name, 8) &&
                 match_dos_name(dir[i].ext, (const char*)parsed_ext, 3)) {
 
                 uint32_t file_cluster = ((uint32_t)dir[i].first_cluster_high << 16) | dir[i].first_cluster_low;
-                dir[i].file_size = size;
+                uint32_t old_size = dir[i].file_size;
+                
+                // calculate metadata
+                dir[i].file_size = old_size + size; 
+                write_cluster(current_cluster, global_cluster_buffer); // Save new size
 
-                write_cluster(current_cluster, global_cluster_buffer);
+                uint32_t cluster_bytes = fs.sectors_per_cluster * 512;
+                
+                uint32_t current_offset = old_size;
+                while (current_offset >= cluster_bytes) {
+                    uint32_t next = get_next_cluster(file_cluster);
+                    if (next >= 0x0FFFFFF8) {
+                        // Edge case: File size metadata was tracking, but no cluster allocated
+                        next = allocate_free_cluster();
+                        if (next == 0) return -2;
+                        set_next_cluster(file_cluster, next);
+                    }
+                    file_cluster = next;
+                    current_offset -= cluster_bytes;
+                }
 
                 uint32_t bytes_written = 0;
-                uint32_t cluster_bytes = fs.sectors_per_cluster * 512;
-                uint8_t cluster_scratch[512 * 8];
+                uint8_t cluster_scratch[512 * 8]; // Ensure this matches your actual cluster size max
 
                 while (bytes_written < size) {
-                    uint32_t left = size - bytes_written;
-                    uint32_t chunk = (left < cluster_bytes) ? left : cluster_bytes;
+                    // Always read the existing cluster data first to avoid destroying surrounding bytes!
+                    read_cluster(file_cluster, cluster_scratch);
 
+                    uint32_t cluster_space_left = cluster_bytes - current_offset;
+                    uint32_t data_left_to_write = size - bytes_written;
+                    uint32_t chunk = (data_left_to_write < cluster_space_left) ? data_left_to_write : cluster_space_left;
+
+                    // Copy new data over the exact slice inside the scratch buffer
                     for (uint32_t k = 0; k < chunk; k++) {
-                        cluster_scratch[k] = buffer[bytes_written + k];
-                    }
-                    for (uint32_t k = chunk; k < cluster_bytes; k++) {
-                        cluster_scratch[k] = 0x00;
+                        cluster_scratch[current_offset + k] = buffer[bytes_written + k];
                     }
 
+                    // Write the modified cluster back to storage
                     write_cluster(file_cluster, cluster_scratch);
+                    
                     bytes_written += chunk;
+                    current_offset = 0;
 
                     if (bytes_written < size) {
                         uint32_t next = get_next_cluster(file_cluster);
                         if (next >= 0x0FFFFFF8) {
                             next = allocate_free_cluster();
-                            if (next == 0) {
-                                return -2;
-                            }
+                            if (next == 0) return -2; // Out of disk space, go and get a job to get
+                                                      // more storage.
                             set_next_cluster(file_cluster, next);
                         }
                         file_cluster = next;
                     }
                 }
-                return 0;
+                return 0; // Success
             }
         }
         current_cluster = get_next_cluster(current_cluster);
     }
     return -1;
 }
+
 
 int fat32_delete_file(const char* dir_path, const char* name, const char* extension) {
     int32_t target_dir = find_dir_cluster_by_path(dir_path);
