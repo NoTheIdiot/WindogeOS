@@ -35,7 +35,36 @@ void ata_write_sector(uint32_t lba, uint8_t *source_buffer) {
     while (ports_inb(ATA_STATUS) & 0x80); // Wait for BSY to clear
 }
 
-/* --- Cluster and Sector Mathematical Mapping Helper Macros/Functions --- */
+uint8_t fat32_read_byte_at_offset(uint32_t start_cluster, uint32_t offset) {
+    uint32_t cluster_bytes = fs.sectors_per_cluster * 512;
+    uint32_t current_cluster = start_cluster;
+
+    while (offset >= cluster_bytes) {
+        current_cluster = get_next_cluster(current_cluster);
+        if (current_cluster >= 0x0FFFFFF8) return 0; 
+        offset -= cluster_bytes;
+    }
+
+    read_cluster(current_cluster, global_cluster_buffer);
+    return global_cluster_buffer[offset];
+}
+
+void fat32_write_byte_at_offset(uint32_t start_cluster, uint32_t offset, uint8_t data) {
+    uint32_t cluster_bytes = fs.sectors_per_cluster * 512;
+    uint32_t current_cluster = start_cluster;
+
+    while (offset >= cluster_bytes) {
+        current_cluster = get_next_cluster(current_cluster);
+        if (current_cluster >= 0x0FFFFFF8) return; 
+        offset -= cluster_bytes;
+    }
+
+    read_cluster(current_cluster, global_cluster_buffer);
+    global_cluster_buffer[offset] = data;
+    write_cluster(current_cluster, global_cluster_buffer);
+}
+
+
 
 uint32_t cluster_to_sector(uint32_t cluster) {
     return ((cluster - 2) * fs.sectors_per_cluster) + fs.data_start_sector;
@@ -504,79 +533,133 @@ int fat32_list_directory(const char* path) {
     }
     return 0;
 }
-#include "file.h"
-#include "vbe.h"
-#include "string.h" // Assuming your custom string operations live here
 
-// Helper to look up a directory file record entry and extract its cluster ID
-static uint32_t get_file_first_cluster(const char* dir_path, const char* name, const char* extension) {
-    // We look up the directory cluster index matching your path parameter
-    int32_t dir_cluster = find_dir_cluster_by_path(dir_path);
-    if (dir_cluster == -1) return 0xFFFFFFFF;
+// there are a single edge case that i should mention
+// windows (DOS/NT) uses \r\n
+// POSIX uses \n
+// what the f##k
+int fat32_delete_line_by_number(const char* dir_path, const char* name, const char* extension, uint32_t line_number) {
+    if (line_number == 0) return -1; // Line numbers usually start at 1
 
-    uint32_t current_cluster = (uint32_t)dir_cluster;
-    uint8_t sector_buffer[512];
+    int32_t target_dir = find_dir_cluster_by_path(dir_path);
+    if (target_dir == -1) return -1;
 
-    // Traverse directory sector regions to find the 8.3 matching name token
-    while (current_cluster < 0x0FFFFFF8) {
-        uint32_t sector_start = cluster_to_sector(current_cluster);
-        
-        for (uint8_t s = 0; s < fs.sectors_per_cluster; s++) {
-            ata_read_sector(sector_start + s, sector_buffer);
-            
-            // Loop through all 16 potential 32-byte records inside a standard 512-byte sector block
-            for (int i = 0; i < 512; i += 32) {
-                fat32_dir_t* entry = (fat32_dir_t*)&sector_buffer[i];
+    char parsed_name[8], parsed_ext[3];
+    parse_to_83_format(name, extension, parsed_name, parsed_ext);
+
+    uint32_t current_dir_cluster = (uint32_t)target_dir;
+    
+    while (current_dir_cluster < 0x0FFFFFF8) {
+        read_cluster(current_dir_cluster, global_cluster_buffer);
+        uint32_t total_dir_entries = (fs.sectors_per_cluster * 512) / sizeof(fat32_dir_t);
+        fat32_dir_t* dir = (fat32_dir_t*)global_cluster_buffer;
+
+        for (uint32_t i = 0; i < total_dir_entries; i++) {
+            if (dir[i].filename[0] == 0x00) return -1;
+            if (dir[i].filename[0] == 0xE5) continue;
+
+            if (match_dos_name(dir[i].filename, (const char*)parsed_name, 8) &&
+                match_dos_name(dir[i].ext, (const char*)parsed_ext, 3)) {
+
+                uint32_t start_cluster = ((uint32_t)dir[i].first_cluster_high << 16) | dir[i].first_cluster_low;
+                uint32_t original_size = dir[i].file_size;
                 
-                // End of directory entries condition check
-                if (entry->filename[0] == 0x00) return 0xFFFFFFFF;
-                // Skipped/Deleted directory record condition check
-                if (entry->filename[0] == 0xE5) continue;
-                // Ignore Subdirectories or Volume Label indicators
-                if (entry->attributes & (FAT32_ATTR_DIRECTORY | FAT32_ATTR_VOLUME_ID)) continue;
+                uint32_t line_start_offset = 0;
+                uint32_t line_end_offset = 0;
+                uint32_t current_line = 1;
+                
+                uint32_t cluster_bytes = fs.sectors_per_cluster * 512;
+                uint8_t scratch[512 * 8]; // Match your cluster size max
+                
+                // --- STEP 1: SCAN FOR '\n' AND TRACK WINDOWS \r\n EDGE CASES ---
+                uint32_t file_cluster = start_cluster;
+                uint32_t global_offset = 0;
+                int found_start = 0;
+                int found_end = 0;
 
-                // Match against your custom DOS string rules
-                if (match_dos_name(entry->filename, name, 8) && match_dos_name(entry->ext, extension, 3)) {
-                    // Reassemble and return the full 32-bit entry cluster address
-                    return ((uint32_t)entry->first_cluster_high << 16) | entry->first_cluster_low;
+                while (file_cluster < 0x0FFFFFF8 && global_offset < original_size) {
+                    read_cluster(file_cluster, scratch);
+                    uint32_t bytes_to_read = (original_size - global_offset < cluster_bytes) ? 
+                                             (original_size - global_offset) : cluster_bytes;
+                    
+                    for (uint32_t k = 0; k < bytes_to_read; k++) {
+                        uint32_t absolute_byte_offset = global_offset + k;
+
+                        // Catch the absolute beginning of the requested line
+                        if (current_line == line_number && !found_start) {
+                            line_start_offset = absolute_byte_offset;
+                            found_start = 1;
+                        }
+
+                        // Trigger tracking when we hit a newline character
+                        if (scratch[k] == '\n') {
+                            if (current_line == line_number) {
+                                line_end_offset = absolute_byte_offset + 1; // Deletion zone includes '\n'
+                                found_end = 1;
+                                break;
+                            }
+                            current_line++; // Increment line counter
+                        }
+                    }
+                    if (found_end) break;
+                    
+                    global_offset += cluster_bytes;
+                    file_cluster = get_next_cluster(file_cluster);
                 }
+
+                // If the line number requested is out of range, exit early
+                if (!found_start) return -3; 
+
+                // Last line of file does not have a trailing '\n'
+                if (found_start && !found_end) {
+                    line_end_offset = original_size;
+                }
+
+                uint32_t line_length = line_end_offset - line_start_offset;
+                if (line_length == 0) return 0; // Empty line deletion, nothing to shift
+
+                // --- STEP 2: STREAM SHIFT DATA FORWARD OVER THE DELETED ZONE ---
+                uint32_t write_pointer = line_start_offset;
+                uint32_t read_pointer = line_end_offset;
+
+                while (read_pointer < original_size) {
+                    // Use byte/block helpers to cascade data backwards without RAM caching
+                    uint8_t byte_data = fat32_read_byte_at_offset(start_cluster, read_pointer);
+                    fat32_write_byte_at_offset(start_cluster, write_pointer, byte_data);
+                    
+                    read_pointer++;
+                    write_pointer++;
+                }
+
+                // --- STEP 3: UPDATE METADATA AND FREE REMAINING ORPHAN CLUSTERS ---
+                uint32_t new_size = original_size - line_length;
+                dir[i].file_size = new_size;
+                write_cluster(current_dir_cluster, global_cluster_buffer); // Commit size change
+
+                // Calculate exact number of clusters the shortened file needs
+                uint32_t total_clusters_needed = (new_size + cluster_bytes - 1) / cluster_bytes;
+                if (total_clusters_needed == 0) total_clusters_needed = 1; // Maintain base cluster allocation
+
+                // Walk down the FAT chain to find our new End-of-Chain cluster
+                file_cluster = start_cluster;
+                for (uint32_t c = 1; c < total_clusters_needed; c++) {
+                    file_cluster = get_next_cluster(file_cluster);
+                }
+                
+                // Unlink trailing clusters and clear them inside the FAT
+                uint32_t cluster_to_free = get_next_cluster(file_cluster);
+                set_next_cluster(file_cluster, 0x0FFFFFFF); // Write standard EOC marker
+
+                while (cluster_to_free < 0x0FFFFFF8 && cluster_to_free != 0) {
+                    uint32_t next_free = get_next_cluster(cluster_to_free);
+                    set_next_cluster(cluster_to_free, 0x00000000); // clear the fat index
+                    cluster_to_free = next_free;
+                }
+
+                return 0; // Success
             }
         }
-        current_cluster = get_next_cluster(current_cluster);
+        current_dir_cluster = get_next_cluster(current_dir_cluster);
     }
-    return 0xFFFFFFFF;
-}
-
-// Full screen fast-streaming blit routine
-int vbe_stream_wallpaper(const char* dir_path, const char* name, const char* extension) {
-    if (!vbe_initialized || vbe_bits_per_pixel != 32) {
-        return -1; // Fail if not locked into 32bpp linear graphics mode
-    }
-
-    // Locate the first cluster of the raw .img file
-    uint32_t current_cluster = get_file_first_cluster(dir_path, name, extension);
-    if (current_cluster == 0xFFFFFFFF) {
-        return -1; // File entry not found
-    }
-
-    // Point directly to the start of the VBE linear memory pointer address
-    uint8_t* vram_row_ptr = (uint8_t*)vbe_frame_buffer;
-    int current_row = 0;
-
-    // Stream exactly 768 clusters sequentially into your 768 screen pixel rows
-    while (current_cluster < 0x0FFFFFF8 && current_row < vbe_height) {
-        
-        // Blast the cluster sector blocks straight onto the physical video memory address!
-        // No temporary buffer middlemen, zero memory copy overhead, zero memory allocation
-        read_cluster(current_cluster, vram_row_ptr);
-
-        // Advance your pointer target by exactly your physical hardware row stride (vbe_pitch)
-        vram_row_ptr += vbe_pitch;
-        current_row++;
-
-        // Fetch next link chunk inside your FAT link map chain table
-        current_cluster = get_next_cluster(current_cluster);
-    }
-
-    return 0; // Display update completed successfully!
+    return -1; // File not found
 }

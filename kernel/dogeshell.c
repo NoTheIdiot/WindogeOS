@@ -249,7 +249,55 @@ void dogeshell_execute(char* command) {
             }
         }
         handled = 1;
+    } else if (string_startswith(command, "deleteline")) {
+        char* filename_arg = shell_get_arg(command, 11); 
+
+        if (!filename_arg || string_strcmp(filename_arg, "--help") == 0) {
+            dogeio_println("usage: deleteline [filename] [line]");
+            dogeio_println("removes a specific line from a file without caching the whole file.");
+        } else {
+            char* line_arg = filename_arg;
+            while (*line_arg != '\0' && *line_arg != ' ') {
+                line_arg++;
+            }
+
+            if (*line_arg == '\0') {
+                dogeio_println("error: missing line number argument");
+            } else {
+                *line_arg = '\0'; 
+                line_arg++; 
+        
+                while (*line_arg == ' ') {
+                    line_arg++;
+                }
+
+                int line = string_atoi(line_arg);
+
+                if (line <= 0) {
+                    dogeio_println("error: invalid or missing line number");
+                } else {
+                    char name[9];  
+                    char ext[4];   
+
+                    if (!parse_filename(filename_arg, name, ext)) {
+                        dogeio_println("error: invalid filename format");
+                    } else {
+                        int res = fat32_delete_line_by_number("/", name, ext, line);
+
+                        if (res == 0) {
+                            dogeio_println("delete line success");
+                        } else if (res == -3) {
+                            dogeio_println("delete line failed: line number out of range");
+                        } else {
+                            dogeio_println("delete line failed: file not found");
+                        }
+                    }
+                }
+            }
+        }
     }
+
+
 
 
 

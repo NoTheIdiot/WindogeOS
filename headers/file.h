@@ -104,5 +104,6 @@ int fat32_delete_file(const char* dir_path, const char* name, const char* extens
 void fat32_init(uint32_t partition_lba_start);
 void fat32_list_root_directory(void);
 int fat32_list_directory(const char* path);
+int fat32_delete_line_by_number(const char* dir_path, const char* name, const char* extension, uint32_t line_number);
 
 #endif /* FILE_H */
