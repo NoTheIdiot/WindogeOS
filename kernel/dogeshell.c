@@ -312,12 +312,17 @@ void dogeshell_execute(char* command) {
             dogeio_println("black, blue, green, red, brown, doge, white");
         } else {
             int valid_color = 1;
-            if (string_strcmp(argument, "white") == 0)       terminal_color = WHITE;
-            else if (string_strcmp(argument, "blue") == 0)   terminal_color = BLUE;
-            else if (string_strcmp(argument, "green") == 0)  terminal_color = GREEN;
-            else if (string_strcmp(argument, "red") == 0)    terminal_color = RED;
-            else if (string_strcmp(argument, "brown") == 0)  terminal_color = BROWN;
-            else if (string_strcmp(argument, "doge") == 0)   terminal_color = DOGE_COLOR;
+            if (string_strcmp(argument, "white") == 0)          terminal_color = WHITE;
+            else if (string_strcmp(argument, "blue") == 0)      terminal_color = BLUE;
+            else if (string_strcmp(argument, "green") == 0)     terminal_color = GREEN;
+            else if (string_strcmp(argument, "red") == 0)       terminal_color = RED;
+            else if (string_strcmp(argument, "brown") == 0)     terminal_color = BROWN;
+            else if (string_strcmp(argument, "doge") == 0)      terminal_color = DOGE_COLOR;
+            else if (string_strcmp(argument, "cyan") == 0)      terminal_color = CYAN;
+            else if (string_strcmp(argument, "lightblue") == 0) terminal_color = LIGHT_BLUE;
+            else if (string_strcmp(argument, "lightgreen") == 0)terminal_color = LIGHT_GREEN;
+            else if (string_strcmp(argument, "lightgrey") == 0) terminal_color = LIGHT_GREY;
+            else if (string_strcmp(argument, "lightmangenta") == 0)terminal_color = LIGHT_MAGENTA;
             else valid_color = 0;
 
             if (valid_color) {
