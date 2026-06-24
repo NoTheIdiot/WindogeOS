@@ -17,13 +17,16 @@ extern uint8_t terminal_color;
 extern void friendly_mode();
 extern void system_systeminfo();
 
-const char* command_help[9] = {
+const char* command_help[12] = {
     "print/bark [message]         | prints a message",
     "clear                        | clears the display",
     "time/date                    | prints the time",
     "sysinfo                      | prints your system information",
     "dir [folder]                 | list files",
     "readfile [filename]          | reads and output a file",
+    "createfile [filename]        | creates a file",
+    "deletefile [filename]        | deletes a file",
+    "writefile [filename] [text]  | writes a single line of text to a file\n"
     "help                         | prints this help message",
     "history                      | prints your shell history",
     "friendly                     | starts friendly mode"
@@ -327,7 +330,7 @@ void dogeshell_execute(char* command) {
      * BASIC UTILITIES
      ***************************************************/
     else if (string_strcmp(command, "help") == 0) {
-        for (int i = 0; i < 9; i++) {
+        for (int i = 0; i < 12; i++) {
             dogeio_println((char*)command_help[i]);
         }
         handled = 1;

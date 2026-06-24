@@ -134,6 +134,22 @@ void system_systeminfo() {
     string_itoa(used_mb, used_str);
     string_itoa(total_mb, total_str);
 
+    // i do not think this is a good idea
+     const char *logo_double[] = {
+        "__        ___           _                   ___  ____  ",
+        "\\ \\      / (_)_ __   __| | ___   __ _  ___ / _ \\/ ___| ",
+        " \\ \\ /\\ / /| | '_ \\ / _` |/ _ \\ / _` |/ _ \\ | | \\___ \\ ",
+        "  \\ V  V / | | | | | (_| | (_) | (_| |  __/ |_| |___) |",
+        "   \\_/\\_/  |_|_| |_|\\__,_|\\___/ \\__, |\\___|\\___/|____/ ",
+        "                                |___/                  "
+    };
+
+    int lines = sizeof(logo_double) / sizeof(logo_double[0]);
+    for (int i = 0; i < lines; i++) {
+        if (logo_double[i] != NULL) {
+            dogeio_println((char*)logo_double[i]);
+        }
+    }
     dogeio_println("System information of your wow system:\n");
     dogeio_print("WindogeOS Version: ");
     dogeio_println(such_windoge_version);
