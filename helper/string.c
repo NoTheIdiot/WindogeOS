@@ -1,132 +1,60 @@
-// include files
 #include <stdint.h>
 #include <stddef.h>
+#include "string.h"
 
-// stringing compare
-int string_strcmp(const char *string1, const char *string2) {
-    while (*string1 && (*string1 == *string2)) {
-        string1++;
-        string2++;
+// GCC and Clang reserve the right to generate calls to the following
+// 4 functions even if they are not directly called.
+// They must be implemented as the C specification mandates.
+// DO NOT remove or rename these functions, or stuff will eventually break!
+// you forgot that i made the compiling script :P
+
+void *memcpy(void *restrict dest, const void *restrict src, size_t n) {
+    uint8_t *restrict pdest = dest;
+    const uint8_t *restrict psrc = src;
+
+    for (size_t i = 0; i < n; i++) {
+        pdest[i] = psrc[i];
     }
-    return *(const unsigned char*)string1 - *(const unsigned char*)string2;
+
+    return dest;
 }
 
-size_t string_strlen(const char *string) {
-    size_t counter = 0;
-    while (string[counter] != '\0') {
-        counter++;
+void *memset(void *s, int c, size_t n) {
+    uint8_t *p = s;
+
+    for (size_t i = 0; i < n; i++) {
+        p[i] = (uint8_t)c;
     }
-    return counter;
+
+    return s;
 }
 
-void string_itoa(int n, char* string) {
-    int i = 0;
-    int is_negative = 0;
+void *memmove(void *dest, const void *src, size_t n) {
+    uint8_t *pdest = dest;
+    const uint8_t *psrc = src;
 
-    if (n == 0) {
-        string[i++] = '0';
-        string[i] = '\0';
-        return;
-    }
-
-    if (n < 0) {
-        is_negative = 1;
-        n = -n;
-    }
-
-    while (n != 0) {
-        string[i++] = (n % 10) + '0';
-        n = n / 10;
-    }
-
-    if (is_negative) {
-        string[i++] = '-';
-    }
-
-    string[i] = '\0';
-
-    int start = 0;
-    int end = i - 1;
-    while (start < end) {
-        char temp = string[start];
-        string[start] = string[end];
-        string[end] = temp;
-        start++;
-        end--;
-    }
-}
-
-int string_strncmp(const char *string1, const char *string2, size_t n) {
-    while (n > 0 && *string1 && (*string1 == *string2)) {
-        string1++;
-        string2++;
-        n--;
-    }
-    if (n == 0) {
-        return 0;
-    }
-    return *(const unsigned char*)string1 - *(const unsigned char*)string2;
-}
-
-int string_startswith(const char *string, const char *prefix) {
-    while (*prefix) {
-        if (*string != *prefix) {
-            return 0;
+    if ((uintptr_t)src > (uintptr_t)dest) {
+        for (size_t i = 0; i < n; i++) {
+            pdest[i] = psrc[i];
         }
-        string++;
-        prefix++;
-    }
-    return 1;
-}
-
-int string_atoi(char* s) {
-    int res = 0;
-    while (*s >= '0' && *s <= '9') {
-        res = res * 10 + (*s - '0');
-        s++;
-    }
-    return res;
-}
-
-void string_strcpy(char *dest, const char *src) {
-    int i = 0;
-    while (src[i] != '\0') {
-        dest[i] = src[i];
-        i++;
-    }
-    dest[i] = '\0';
-}
-
-// did i just copy unsafe code
-char* string_strncpy(char* dest, const char* src, size_t n) {
-    size_t i;
-
-    for (i = 0; i < n && src[i] != '\0'; i++) {
-        dest[i] = src[i];
-    }
-
-    for (; i < n; i++) {
-        dest[i] = '\0';
+    } else if ((uintptr_t)src < (uintptr_t)dest) {
+        for (size_t i = n; i > 0; i--) {
+            pdest[i-1] = psrc[i-1];
+        }
     }
 
     return dest;
 }
 
-char* string_strcat(char* dest, const char* src) {  
-    int i = 0;
-    while (dest[i] != '\0') 
-    {
-        i++;
+int memcmp(const void *s1, const void *s2, size_t n) {
+    const uint8_t *p1 = s1;
+    const uint8_t *p2 = s2;
+
+    for (size_t i = 0; i < n; i++) {
+        if (p1[i] != p2[i]) {
+            return p1[i] < p2[i] ? -1 : 1;
+        }
     }
 
-    int j = 0;
-    while (src[j] != '\0') 
-    {
-        dest[i] = src[j];
-        i++;
-        j++;
-    }
-
-    dest[i] = '\0';
-    return dest;
+    return 0;
 }

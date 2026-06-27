@@ -1,91 +1,82 @@
 #include <stdint.h>
 #include <stddef.h>
-#include "dogeio.h"
-#include "dogeio_vbe.h"
-#include "vbe.h"
-#include "string.h"
-#include "ports.h"
-#include "time.h"
-#include "consts.h"
-#include "multiboot.h"
-#include "info.h"
-#include "serial.h"
-#include "file.h"
-#include "idt.h"
-#include "dogeshell.h"
+#include <bool.h>
+#include <limine.h>
+#include <dogeio.h>
 
-extern int such_check_multiboot(uint32_t magic, multiboot_info_t* mbi);
-extern void record_boot_time(char* boot_buffer);
-extern int windoge_boot_manager(void); 
-extern int friendly_mode(void);
+// Set the base revision to 6, this is recommended as this is the latest
+// base revision described by the Limine boot protocol specification.
+// See specification for further info.
 
-extern char* such_windoge_version;
-extern char* such_windoge_version_short;
+__attribute__((used, section(".limine_requests")))
+volatile uint64_t limine_base_revision[] = LIMINE_BASE_REVISION(6);
 
-char boot_time[64] = ""; 
-uint8_t rtc_init = 2;
+// The Limine requests can be placed anywhere, but it is important that
+// the compiler does not optimise them away, so, usually, they should
+// be made volatile or equivalent, _and_ they should be accessed at least
+// once or marked as used with the "used" attribute as done here.
 
-// Placed in .bss away from the critical execution stack region
-static uint8_t file_text_buffer[4096];
+__attribute__((used, section(".limine_requests")))
+volatile struct limine_framebuffer_request framebuffer_request = {
+    .id = LIMINE_FRAMEBUFFER_REQUEST_ID,
+    .revision = 0
+};
 
-void kernel_main(uint32_t magic, multiboot_info_t* mbi) {
-    // init ran for sysinfo
-    mem_init(mbi);
-    dogeio_clear_screen();
+// Finally, define the start and end markers for the Limine requests.
+// These can also be moved anywhere, to any .c file, as seen fit.
 
-    record_boot_time(boot_time);
-    fat32_init(0); // Targets sector 0 for raw, unpartitioned loopback storage matrix mappings
+__attribute__((used, section(".limine_requests_start")))
+volatile uint64_t limine_requests_start_marker[] = LIMINE_REQUESTS_START_MARKER;
 
-    int friendly = windoge_boot_manager();
+__attribute__((used, section(".limine_requests_end")))
+volatile uint64_t limine_requests_end_marker[] = LIMINE_REQUESTS_END_MARKER;
 
-    such_check_multiboot(magic, mbi);
-    dogeio_println("Press Enter to start WindogeOS.");
-    char enter[4];
-    dogeio_input(enter, 4, DOGE_COLOR);
-    dogeio_clear_screen();
+// Halt and catch fire function.
+void hcf(void) {
+    for (;;) {
+#if defined (__x86_64__)
+        asm ("hlt");
+#elif defined (__aarch64__) || defined (__riscv)
+        asm ("wfi");
+#elif defined (__loongarch64)
+        asm ("idle 0");
+#endif
+    }
+}
 
-    // initialize VESA VBE
-    dogeio_init_vbe_from_multiboot(mbi);
-
-    // Debugging verification pipeline output
-    serial_write_string("[DEBUG] mbi.flags=");
-    serial_write_hex(mbi->flags);
-    serial_write_string(" framebuf=");
-    serial_write_hex((uint32_t)(mbi->framebuffer_addr & 0xFFFFFFFF));
-    serial_write_string(" width=");
-    serial_write_hex(mbi->framebuffer_width);
-    serial_write_string(" height=");
-    serial_write_hex(mbi->framebuffer_height);
-    serial_write_string(" bpp=");
-    serial_write_hex(mbi->framebuffer_bpp);
-    serial_write_string(" vbe=");
-    serial_write_hex(vbe_initialized);
-    serial_write_string("\n");
-
-    if (friendly == 1) {
-        friendly_mode();
-    } 
-
-    // 6. WELCOME SPLASH LAYER OUTPUT
-    dogeio_println("**********************************************************************");
-    dogeio_println("** Welcome to WindogeOS!");
-    dogeio_print("** Version ");
-    dogeio_println(such_windoge_version);
-    dogeio_println("**********************************************************************");
-
-    // High-speed block reset
-    for (int i = 0; i < 4096; i++) {
-        file_text_buffer[i] = '\0';
+// The following will be our kernel's entry point.
+// If renaming kmain() to something else, make sure to change the
+// linker script accordingly.
+void kmain(void) {
+    // Ensure the bootloader actually understands our base revision (see spec).
+    if (LIMINE_BASE_REVISION_SUPPORTED(limine_base_revision) == false) {
+        hcf();
     }
 
-    // Correct file extraction using your standard high-level FAT32 filesystem user-space routing APIs
-    if (fat32_read_file("/", "DOGE    ", "TXT", file_text_buffer) != -1) {
-        dogeio_println((char*)file_text_buffer);
-    } else {
-        serial_write_string("[ERROR] Failed to extract boot splash text file asset\n");
+    // Ensure we got a framebuffer.
+    if (framebuffer_request.response == NULL
+     || framebuffer_request.response->framebuffer_count < 1) {
+        hcf();
     }
 
-    dogeio_println("");
-    
-    doge_shell(0);
+    // Fetch the first framebuffer.
+    struct limine_framebuffer *framebuffer = framebuffer_request.response->framebuffers[0];
+
+    /*
+    // Print a nice pattern to screen as an example.
+    // Note: we assume the framebuffer model is RGB with 32-bit pixels.
+    volatile uint32_t *fb_ptr = framebuffer->address;
+    for (size_t y = 0; y < framebuffer->height; y++) {
+        for (size_t x = 0; x < framebuffer->width; x++) {
+            uint32_t nX = x * 255 / framebuffer->width;
+            uint32_t nY = y * 255 / framebuffer->height;
+            fb_ptr[y * (framebuffer->pitch / 4) + x] = (nY << 8) | nX;
+        }
+    }*/
+
+    dogeio_text_clear();
+    dogeio_text_print("Welcome to WindogeOS Bliss! V0.0.2 L1");
+
+    // We're done, just hang...
+    hcf();
 }
