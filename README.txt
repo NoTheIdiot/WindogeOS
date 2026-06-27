@@ -6,8 +6,7 @@ but it's hard to use for new users, while Windows is easy to use
 but paid for all features, and macOS is just idk.
 
 = Updates
-I've made a FAT32 file system, though VBE no longer works, if you can,
-pls send me a solution.
+I have fully converted to Limine, future updates will come very soon.
 
 = How to such compile and run?
 - Install git, gcc, nasm, and qemu-system, grub-common2.
