@@ -9,7 +9,8 @@ but paid for all features, and macOS is just idk.
 I have fully converted to Limine, future updates will come very soon.
 
 = How to such compile and run?
-- Install git, gcc, nasm, and qemu-system, grub-common2.
+- Install git, gcc, and qemu-system. Yes, the other tools (like limine, that's it)
+  is already included.
 
 - Run this in your terminal, if you are on windows, install msys2 via this
 link: https://msys2.org and run the command for installing the needed
