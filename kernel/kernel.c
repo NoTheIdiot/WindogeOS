@@ -75,7 +75,9 @@ void kmain(void) {
     }*/
 
     dogeio_text_clear();
-    dogeio_text_print("Welcome to WindogeOS Bliss! V0.0.2 L1");
+    dogeio_text_println("Welcome to WindogeOS Bliss! V0.0.2 L2");
+    char input[64];
+    dogeio_text_input("Input for no reason: ", input, 64);
 
     // We're done, just hang...
     hcf();

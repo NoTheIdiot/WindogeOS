@@ -9,6 +9,7 @@ extern volatile struct limine_framebuffer_request framebuffer_request;
 uint32_t cursor_x = 0;
 uint32_t cursor_y = 0;
 uint32_t dogeio_text_bcolor = 0x000000;
+uint32_t dogeio_text_tcolor = 0xffffff;
 
 void dogeio_text_putchar(char c, uint32_t x_pos, uint32_t y_pos) {
     if (framebuffer_request.response == NULL || framebuffer_request.response->framebuffer_count < 1) {
@@ -77,6 +78,11 @@ void dogeio_text_print(const char *str) {
             cursor_y = 0;
         }
     }
+}
+
+void dogeio_text_println(const char* str) {
+    dogeio_text_print(str);
+    dogeio_text_print("\n");
 }
 
 void dogeio_text_clear() {

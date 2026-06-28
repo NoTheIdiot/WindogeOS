@@ -57,21 +57,21 @@ void dogeio_text_input(const char *prompt, char *buffer, size_t max_len) {
     size_t length = 0;
 
     while (1) {
-        char key = dogeio_getchar();
+        char key = dogeio_text_getchar();
 
         if (key == '\n') {
             buffer[length] = '\0';
-            dogeio_text_putchar('\n', current_cursor_x, current_cursor_y); 
+            dogeio_text_putchar('\n', cursor_x, cursor_y); 
             return;
         }
 
         if (key == '\b') {
             if (length > 0) {
                 length--;
-                if (current_cursor_x >= 8) {
-                    current_cursor_x -= 8;
+                if (cursor_x >= 8) {
+                    cursor_x -= 8;
                 }
-                dogeio_text_putchar(' ', current_cursor_x, current_cursor_y);
+                dogeio_text_putchar(' ', cursor_x, cursor_y);
             }
             continue;
         }
@@ -79,8 +79,8 @@ void dogeio_text_input(const char *prompt, char *buffer, size_t max_len) {
         if (length < (max_len - 1)) {
             buffer[length] = key;
             length++;
-            dogeio_text_putchar(key, current_cursor_x, current_cursor_y);
-            current_cursor_x += 8;
+            dogeio_text_putchar(key, cursor_x, cursor_y);
+            cursor_x += 8;
         }
     }
 }
