@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <dogeio.h>
-#include "limine.h"
+#include <limine.h>
 
 extern volatile struct limine_framebuffer_request framebuffer_request;
 
@@ -9,14 +9,6 @@ extern volatile struct limine_framebuffer_request framebuffer_request;
 uint32_t cursor_x = 0;
 uint32_t cursor_y = 0;
 uint32_t dogeio_text_bcolor = 0x000000;
-uint32_t dogeio_text_tcolor = 0xffffff;
-
-#include <stdint.h>
-#include <stddef.h>
-#include <dogeio.h>
-#include "limine.h"
-
-extern volatile struct limine_framebuffer_request framebuffer_request;
 
 void dogeio_text_putchar(char c, uint32_t x_pos, uint32_t y_pos) {
     if (framebuffer_request.response == NULL || framebuffer_request.response->framebuffer_count < 1) {
