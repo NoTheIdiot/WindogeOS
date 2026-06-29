@@ -5,7 +5,6 @@
 
 extern volatile struct limine_framebuffer_request framebuffer_request;
 
-// Cursor coordinate trackers
 uint32_t cursor_x = 0;
 uint32_t cursor_y = 0;
 uint32_t dogeio_text_bcolor = 0x000000;
@@ -65,8 +64,7 @@ void dogeio_text_print(const char *str) {
             cursor_y += 16;
             
             if (cursor_y + 16 >= fb->height) {
-                cursor_x = 0;
-                cursor_y = 0;
+                dogeio_text_clear();
             }
             continue;
         }
@@ -92,6 +90,10 @@ void dogeio_text_print(const char *str) {
             continue;
         }
 
+        if (cursor_y + 16 >= fb->height) {
+            dogeio_text_clear();
+        }
+
         dogeio_text_putchar(c, cursor_x, cursor_y);
 
         cursor_x += 8;
@@ -100,14 +102,12 @@ void dogeio_text_print(const char *str) {
             cursor_x = 0;
             cursor_y += 16;
         }
-        
+
         if (cursor_y + 16 >= fb->height) {
-            cursor_x = 0;
-            cursor_y = 0;
+            dogeio_text_clear();
         }
     }
 }
-
 
 void dogeio_text_println(const char* str) {
     dogeio_text_print(str);

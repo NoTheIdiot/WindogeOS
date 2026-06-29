@@ -44,6 +44,9 @@ void hcf(void) {
     }
 }
 
+// extern other stuff
+extern void system_dogeshell();
+
 // The following will be our kernel's entry point.
 // If renaming kmain() to something else, make sure to change the
 // linker script accordingly.
@@ -76,11 +79,7 @@ void kmain(void) {
 
     dogeio_text_clear();
     dogeio_text_println("Welcome to WindogeOS Bliss! V0.0.2 L2");
-    char input[64];
-    dogeio_text_input("Input for no reason: ", input, 64);
-    dogeio_text_print("Output from your input: ");
-    dogeio_text_println(input);
-
+    system_dogeshell();
     // We're done, just hang...
     hcf();
 }
