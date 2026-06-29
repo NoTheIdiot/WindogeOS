@@ -1,4 +1,3 @@
-// include files cuz needed
 #include <dogeio.h>
 #include <string.h>
 #include <bool.h>
@@ -6,7 +5,6 @@
 
 extern void hcf(void);
 
-// main
 void system_dogeshell_execute(const char* command) {
     int handled = 0;
 
@@ -14,7 +12,6 @@ void system_dogeshell_execute(const char* command) {
         return;
     }
 
-    // BASIC
     if (string_startswith(command, "print ") || string_startswith(command, "bark ")) {
         int offset = string_startswith(command, "print ") ? 6 : 5;
         dogeio_text_println(command + offset);
@@ -33,7 +30,6 @@ void system_dogeshell_execute(const char* command) {
         hcf();
     }
     
-    // INFORMATION
     else if (string_strcmp(command, "cpuinfo") == 0) {
         char buffer[64];
         system_info_cpu(buffer);
@@ -68,12 +64,15 @@ void system_dogeshell_execute(const char* command) {
         } else if (string_strcmp(args, "clear") == 0) {
             dogeio_text_println("usage: clear");
             dogeio_text_println("clears the display");
-        } else if (string_strcmp(args, "raminfo")) {
+        } else if (string_strcmp(args, "raminfo") == 0) {
             dogeio_text_println("usage: raminfo");
             dogeio_text_println("prints the ram information");
-        } else if (string_strcmp(args, "cpuinfo")) {
+        } else if (string_strcmp(args, "cpuinfo") == 0) {
             dogeio_text_println("usage: cpuinfo");
             dogeio_text_println("prints out the cpu information");
+        } else if (string_strcmp(args, "help") == 0) {
+            dogeio_text_println("usage: help [command]");
+            dogeio_text_println("shows usage rules for system utilities.");
         } else {
             dogeio_text_println("command doesn't exist.");
         }
