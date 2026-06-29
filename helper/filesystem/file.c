@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <string.h>
 #include <bool.h>
+#include <lowlevel.h>
 
 __attribute__((packed)) struct fat32_bpb {
     uint8_t boot_jump[3];
@@ -54,16 +55,16 @@ static struct fat32_bpb global_bpb;
 static uint32_t first_data_sector;
 
 void system_file_read_sector(uint32_t lba, uint8_t *buffer) {
-    while (lowlevel_port_inb(0x1F7) & 0x80);
+    while (lowlevel_ports_inb(0x1F7) & 0x80);
 
-    lowlevel_port_outb(0x1F6, 0xE0 | ((lba >> 24) & 0x0F));
-    lowlevel_port_outb(0x1F2, 1);
-    lowlevel_port_outb(0x1F3, (uint8_t)lba);
-    lowlevel_port_outb(0x1F4, (uint8_t)(lba >> 8));
-    lowlevel_port_outb(0x1F5, (uint8_t)(lba >> 16));
-    lowlevel_port_outb(0x1F7, 0x20);
+    lowlevel_ports_outb(0x1F6, 0xE0 | ((lba >> 24) & 0x0F));
+    lowlevel_ports_outb(0x1F2, 1);
+    lowlevel_ports_outb(0x1F3, (uint8_t)lba);
+    lowlevel_ports_outb(0x1F4, (uint8_t)(lba >> 8));
+    lowlevel_ports_outb(0x1F5, (uint8_t)(lba >> 16));
+    lowlevel_ports_outb(0x1F7, 0x20);
 
-    while (!(lowlevel_port_inb(0x1F7) & 0x08));
+    while (!(lowlevel_ports_inb(0x1F7) & 0x08));
 
     uint16_t *ptr = (uint16_t *)buffer;
     for (int i = 0; i < 256; i++) {
