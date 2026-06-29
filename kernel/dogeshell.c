@@ -2,6 +2,9 @@
 #include <dogeio.h>
 #include <string.h>
 #include <bool.h>
+#include <system.h>
+
+extern void hcf(void);
 
 // main
 void system_dogeshell_execute(const char* command) {
@@ -23,8 +26,26 @@ void system_dogeshell_execute(const char* command) {
         dogeio_text_clear();
         handled = 1;
     }
+
+    else if (string_strcmp(command, "shutdown") == 0 || string_strcmp(command, "goodbye") == 0) {
+        dogeio_text_clear();
+        dogeio_text_print("Such shutdown, very goodbye.");
+        hcf();
+    }
     
     // INFORMATION
+    else if (string_strcmp(command, "cpuinfo") == 0) {
+        char buffer[64];
+        system_info_cpu(buffer);
+        dogeio_text_println(buffer);
+        handled = 1;
+    } else if (string_strcmp(command, "raminfo") == 0) {
+        char buffer[64];
+        system_info_ram(buffer);
+        dogeio_text_println(buffer);
+        handled = 1;
+    }
+
     else if (string_startswith(command, "help")) {
         const char *args = command + 4;
         if (*args == ' ') {
@@ -36,6 +57,8 @@ void system_dogeshell_execute(const char* command) {
             dogeio_text_println("help [command]         | shows this help message");
             dogeio_text_println("shutdown/goodbye       | halts the system");
             dogeio_text_println("clear                  | clears the display");
+            dogeio_text_println("cpuinfo                | prints out the cpu info");
+            dogeio_text_println("raminfo                | prints the ram info.");
         } else if (string_strcmp(args, "print") == 0 || string_strcmp(args, "bark") == 0) {
             dogeio_text_println("usage: print/bark [message]");
             dogeio_text_println("prints some text, that's it.");
@@ -45,6 +68,12 @@ void system_dogeshell_execute(const char* command) {
         } else if (string_strcmp(args, "clear") == 0) {
             dogeio_text_println("usage: clear");
             dogeio_text_println("clears the display");
+        } else if (string_strcmp(args, "raminfo")) {
+            dogeio_text_println("usage: raminfo");
+            dogeio_text_println("prints the ram information");
+        } else if (string_strcmp(args, "cpuinfo")) {
+            dogeio_text_println("usage: cpuinfo");
+            dogeio_text_println("prints out the cpu information");
         } else {
             dogeio_text_println("command doesn't exist.");
         }
