@@ -45,6 +45,9 @@ void dogeio_text_putchar(char c, uint32_t x_pos, uint32_t y_pos) {
     }
 }
 
+void dogeio_text_printchar(char c) {
+    dogeio_text_putchar(c, cursor_x, cursor_y);
+}
 
 void dogeio_text_print(const char *str) {
     if (framebuffer_request.response == NULL || framebuffer_request.response->framebuffer_count < 1) {
@@ -52,6 +55,7 @@ void dogeio_text_print(const char *str) {
     }
 
     struct limine_framebuffer *fb = framebuffer_request.response->framebuffers[0];
+    uint32_t *fb_ptr = (uint32_t *)fb->address;
 
     for (size_t i = 0; str[i] != '\0'; i++) {
         char c = str[i];
@@ -59,26 +63,51 @@ void dogeio_text_print(const char *str) {
         if (c == '\n') {
             cursor_x = 0;
             cursor_y += 16;
+            
+            if (cursor_y + 16 >= fb->height) {
+                cursor_x = 0;
+                cursor_y = 0;
+            }
             continue;
         }
 
-        // Draw character with bright retro BIOS green (0x00FF00)
+        if (c == '\b') {
+            if (cursor_x >= 8) {
+                cursor_x -= 8;
+            } else if (cursor_y >= 16) {
+                cursor_y -= 16;
+                cursor_x = ((fb->width / 8) * 8) - 8;
+            } else {
+                continue;
+            }
+
+            for (int row = 0; row < 16; row++) {
+                if (cursor_y + row >= fb->height) break;
+                for (int col = 0; col < 8; col++) {
+                    if (cursor_x + col >= fb->width) break;
+                    size_t pixel_index = (cursor_y + row) * (fb->pitch / 4) + (cursor_x + col);
+                    fb_ptr[pixel_index] = dogeio_text_bcolor;
+                }
+            }
+            continue;
+        }
+
         dogeio_text_putchar(c, cursor_x, cursor_y);
 
-        cursor_x += 8; // Move cursor right by 8 pixels
+        cursor_x += 8;
 
         if (cursor_x + 8 >= fb->width) {
             cursor_x = 0;
             cursor_y += 16;
         }
         
-        // Loop back up to the top edge window pane to avoid out of bounds page corruption faults
         if (cursor_y + 16 >= fb->height) {
             cursor_x = 0;
             cursor_y = 0;
         }
     }
 }
+
 
 void dogeio_text_println(const char* str) {
     dogeio_text_print(str);
