@@ -29,6 +29,11 @@ void system_dogeshell_execute(const char* command) {
         dogeio_text_print("Such shutdown, very goodbye.");
         hcf();
     }
+
+    else if (string_strcmp(command, "dir") == 0) {
+        system_file_list_directory();
+        handled = 1;
+    }
     
     else if (string_strcmp(command, "cpuinfo") == 0) {
         char buffer[64];
@@ -54,7 +59,8 @@ void system_dogeshell_execute(const char* command) {
             dogeio_text_println("shutdown/goodbye       | halts the system");
             dogeio_text_println("clear                  | clears the display");
             dogeio_text_println("cpuinfo                | prints out the cpu info");
-            dogeio_text_println("raminfo                | prints the ram info.");
+            dogeio_text_println("raminfo                | prints the ram info");
+            dogeio_text_println("dir                    | lists directory/folder");
         } else if (string_strcmp(args, "print") == 0 || string_strcmp(args, "bark") == 0) {
             dogeio_text_println("usage: print/bark [message]");
             dogeio_text_println("prints some text, that's it.");
@@ -70,6 +76,9 @@ void system_dogeshell_execute(const char* command) {
         } else if (string_strcmp(args, "cpuinfo") == 0) {
             dogeio_text_println("usage: cpuinfo");
             dogeio_text_println("prints out the cpu information");
+        } else if (string_strcmp(args, "dir") == 0) {
+            dogeio_text_println("usage: dir");
+            dogeio_text_println("lists the root folder/directory");
         } else if (string_strcmp(args, "help") == 0) {
             dogeio_text_println("usage: help [command]");
             dogeio_text_println("shows usage rules for system utilities.");

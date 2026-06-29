@@ -60,7 +60,15 @@ static struct fat32_bpb global_bpb;
 static uint32_t first_data_sector;
 
 void system_file_read_sector(uint32_t lba, uint8_t *buffer) {
-    while (lowlevel_ports_inb(0x1F7) & 0x80);
+    uint32_t timeout = 0;
+    while ((lowlevel_ports_inb(0x1F7) & 0x80)) {
+        timeout++;
+        if (timeout > 500000) {
+            dogeio_text_println("not wow: filesystem has timeout, you cannot access files");
+            dogeio_text_println("         much sad.");
+            return; 
+        }
+    }
 
     lowlevel_ports_outb(0x1F6, (uint8_t)(0xE0 | ((lba >> 24) & 0x0F)));
     lowlevel_ports_outb(0x1F2, 1);
@@ -77,14 +85,14 @@ void system_file_read_sector(uint32_t lba, uint8_t *buffer) {
     }
 }
 
-void system_file_init() {
+void system_file_init(void) {
     uint8_t sector0[512];
-    system_file_read_sector(0, sector0);
+    system_file_read_sector(2048, sector0);
     
     struct fat32_bpb *bpb = (struct fat32_bpb *)sector0;
     global_bpb = *bpb;
 
-    first_data_sector = bpb->reserved_sectors + (bpb->fat_count * bpb->sectors_per_fat_large);
+    first_data_sector = 2048 + bpb->reserved_sectors + (bpb->fat_count * bpb->sectors_per_fat_large);
 }
 
 uint32_t system_file_cluster_to_sector(uint32_t cluster) {
@@ -93,7 +101,7 @@ uint32_t system_file_cluster_to_sector(uint32_t cluster) {
 
 uint32_t system_file_get_next_cluster(uint32_t current_cluster) {
     uint32_t fat_offset = current_cluster * 4;
-    uint32_t fat_sector = global_bpb.reserved_sectors + (fat_offset / global_bpb.bytes_per_sector);
+    uint32_t fat_sector = 2048 + global_bpb.reserved_sectors + (fat_offset / global_bpb.bytes_per_sector);
     uint32_t ent_offset = fat_offset % global_bpb.bytes_per_sector;
 
     uint8_t sector_data[512];
@@ -103,7 +111,7 @@ uint32_t system_file_get_next_cluster(uint32_t current_cluster) {
     return next_cluster & 0x0FFFFFFF;
 }
 
-void system_file_list_directory() {
+void system_file_list_directory(void) {
     uint8_t dir_buf[512];
     uint32_t root_sector = system_file_cluster_to_sector(global_bpb.root_cluster);
     

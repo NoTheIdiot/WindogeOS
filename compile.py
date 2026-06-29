@@ -75,6 +75,8 @@ mcopy -i {img_file}@@1M limine-binary/limine-bios.sys ::/boot/limine;
 mcopy -i {img_file}@@1M limine-binary/BOOTX64.EFI ::/EFI/BOOT;
 mcopy -i {img_file}@@1M limine-binary/BOOTIA32.EFI ::/EFI/BOOT;
 rm -f {objects_string} kernel.elf
+mcopy -o -i windoge_bliss.img@@1M files/readme.txt ::/readme.txt
+mdir -i windoge_bliss.img@@1M ::/
 """
 
 create_img_script_arm64 = f"""
@@ -88,6 +90,8 @@ mcopy -i {img_file}@@1M kernel.elf ::/boot;
 mcopy -i {img_file}@@1M limine.conf ::/boot/limine;
 mcopy -i {img_file}@@1M limine-binary/BOOTAA64.EFI ::/EFI/BOOT;
 rm -f {objects_string} kernel.elf
+mcopy -o -i windoge_bliss.img@@1M files/readme.txt ::/readme.txt
+mdir -i windoge_bliss.img@@1M ::/
 """
 
 try:
