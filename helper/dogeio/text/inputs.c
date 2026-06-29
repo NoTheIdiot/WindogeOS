@@ -26,7 +26,7 @@ void dogeio_text_input(const char *prompt, char *buffer, size_t max_size) {
     size_t index = 0;
     bool shift_pressed = false;
 
-    while (index < (max_size - 1)) {
+    while (1) {
         while ((lowlevel_ports_inb(0x64) & 1) == 0);
 
         uint8_t code = lowlevel_ports_inb(0x60);
@@ -63,9 +63,11 @@ void dogeio_text_input(const char *prompt, char *buffer, size_t max_size) {
             char c = shift_pressed ? map_upper[code] : map_lower[code];
 
             if (c != 0) {
-                buffer[index++] = c;
-                char str[2] = {c, '\0'};
-                dogeio_text_print(str);
+                if (index < (max_size - 1)) {
+                    buffer[index++] = c;
+                    char str[] = {c, '\0'};
+                    dogeio_text_print(str);
+                }
             }
         }
     }

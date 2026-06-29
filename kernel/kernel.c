@@ -22,6 +22,11 @@ volatile struct limine_framebuffer_request framebuffer_request = {
     .revision = 0
 };
 
+volatile struct limine_memmap_request memmap_request = {
+    .id = { 0x67cf3d9d78a91A1E, 0x9fb54d6d67cf3d9d },
+    .revision = 0
+};
+
 // Finally, define the start and end markers for the Limine requests.
 // These can also be moved anywhere, to any .c file, as seen fit.
 
@@ -30,6 +35,7 @@ volatile uint64_t limine_requests_start_marker[] = LIMINE_REQUESTS_START_MARKER;
 
 __attribute__((used, section(".limine_requests_end")))
 volatile uint64_t limine_requests_end_marker[] = LIMINE_REQUESTS_END_MARKER;
+
 
 // Halt and catch fire function.
 void hcf(void) {
