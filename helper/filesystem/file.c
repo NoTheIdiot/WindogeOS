@@ -3,9 +3,14 @@
 #include <stddef.h>
 #include <string.h>
 #include <bool.h>
+#include <dogeio.h>
 #include <lowlevel.h>
 
-__attribute__((packed)) struct fat32_bpb {
+uint8_t lowlevel_ports_inb(uint16_t port);
+uint16_t lowlevel_ports_inw(uint16_t port);
+void lowlevel_ports_outb(uint16_t port, uint8_t value);
+
+struct __attribute__((packed)) fat32_bpb {
     uint8_t boot_jump[3];
     char oem_id[8];
     uint16_t bytes_per_sector;
@@ -35,7 +40,7 @@ __attribute__((packed)) struct fat32_bpb {
     char system_id[8];
 };
 
-__attribute__((packed)) struct fat32_dir_entry {
+struct __attribute__((packed)) fat32_dir_entry {
     char name[8];
     char ext[3];
     uint8_t attributes;
@@ -57,7 +62,7 @@ static uint32_t first_data_sector;
 void system_file_read_sector(uint32_t lba, uint8_t *buffer) {
     while (lowlevel_ports_inb(0x1F7) & 0x80);
 
-    lowlevel_ports_outb(0x1F6, 0xE0 | ((lba >> 24) & 0x0F));
+    lowlevel_ports_outb(0x1F6, (uint8_t)(0xE0 | ((lba >> 24) & 0x0F)));
     lowlevel_ports_outb(0x1F2, 1);
     lowlevel_ports_outb(0x1F3, (uint8_t)lba);
     lowlevel_ports_outb(0x1F4, (uint8_t)(lba >> 8));
@@ -68,13 +73,13 @@ void system_file_read_sector(uint32_t lba, uint8_t *buffer) {
 
     uint16_t *ptr = (uint16_t *)buffer;
     for (int i = 0; i < 256; i++) {
-        ptr[i] = lowlevel_port_inw(0x1F0);
+        ptr[i] = lowlevel_ports_inw(0x1F0);
     }
 }
 
 void system_file_init() {
     uint8_t sector0[512];
-    fat32_read_sector(0, sector0);
+    system_file_read_sector(0, sector0);
     
     struct fat32_bpb *bpb = (struct fat32_bpb *)sector0;
     global_bpb = *bpb;
@@ -82,7 +87,7 @@ void system_file_init() {
     first_data_sector = bpb->reserved_sectors + (bpb->fat_count * bpb->sectors_per_fat_large);
 }
 
-uint32_t fat32_cluster_to_sector(uint32_t cluster) {
+uint32_t system_file_cluster_to_sector(uint32_t cluster) {
     return ((cluster - 2) * global_bpb.sectors_per_cluster) + first_data_sector;
 }
 
@@ -92,7 +97,7 @@ uint32_t system_file_get_next_cluster(uint32_t current_cluster) {
     uint32_t ent_offset = fat_offset % global_bpb.bytes_per_sector;
 
     uint8_t sector_data[512];
-    fat32_read_sector(fat_sector, sector_data);
+    system_file_read_sector(fat_sector, sector_data);
 
     uint32_t next_cluster = *(uint32_t *)(&sector_data[ent_offset]);
     return next_cluster & 0x0FFFFFFF;
@@ -100,9 +105,9 @@ uint32_t system_file_get_next_cluster(uint32_t current_cluster) {
 
 void system_file_list_directory() {
     uint8_t dir_buf[512];
-    uint32_t root_sector = fat32_cluster_to_sector(global_bpb.root_cluster);
+    uint32_t root_sector = system_file_cluster_to_sector(global_bpb.root_cluster);
     
-    fat32_read_sector(root_sector, dir_buf);
+    system_file_read_sector(root_sector, dir_buf);
     struct fat32_dir_entry *entry = (struct fat32_dir_entry *)dir_buf;
 
     for (int i = 0; i < 16; i++) {
@@ -142,9 +147,9 @@ void system_file_list_directory() {
 
 void system_file_output_file(const char *filename) {
     uint8_t dir_buf[512];
-    uint32_t root_sector = fat32_cluster_to_sector(global_bpb.root_cluster);
+    uint32_t root_sector = system_file_cluster_to_sector(global_bpb.root_cluster);
     
-    fat32_read_sector(root_sector, dir_buf);
+    system_file_read_sector(root_sector, dir_buf);
     struct fat32_dir_entry *entry = (struct fat32_dir_entry *)dir_buf;
 
     uint32_t file_cluster = 0;
@@ -184,10 +189,10 @@ void system_file_output_file(const char *filename) {
     uint8_t cluster_buf[512]; 
 
     while (current_cluster < 0x0FFFFFF8 && current_cluster != 0) {
-        uint32_t sector = fat32_cluster_to_sector(current_cluster);
+        uint32_t sector = system_file_cluster_to_sector(current_cluster);
         
         for (int s = 0; s < global_bpb.sectors_per_cluster; s++) {
-            fat32_read_sector(sector + s, cluster_buf);
+            system_file_read_sector(sector + s, cluster_buf);
             
             for (int chunk = 0; chunk < 512; chunk++) {
                 char c = (char)cluster_buf[chunk];
@@ -198,7 +203,7 @@ void system_file_output_file(const char *filename) {
             }
         }
         
-        current_cluster = fat32_get_next_cluster(current_cluster);
+        current_cluster = system_file_get_next_cluster(current_cluster);
     }
 
 file_done:
