@@ -4,6 +4,7 @@
 #include <limine.h>
 #include <dogeio.h>
 #include <system.h>
+#include <string.h>
 
 __attribute__((used, section(".limine_requests")))
 volatile uint64_t limine_base_revision[] = LIMINE_BASE_REVISION(6);
@@ -54,10 +55,18 @@ void kmain(void) {
     if (framebuffer_request.response == NULL || framebuffer_request.response->framebuffer_count < 1) {
         hcf();
     }
-
-    system_file_init();
-
+    
     dogeio_text_clear();
+    if (module_request.response == NULL || module_request.response->module_count == 0) {
+        dogeio_text_println("now wow: limine boot modules not found.");
+    }
+
+    int status = system_file_init(module_request.response);
+    if (status != 0) {
+        dogeio_text_println("not wow: filesystem context init failed.");
+        dogeio_text_println("fat32 will not be avaliable.");
+    }
+
     dogeio_text_println("Welcome to WindogeOS Bliss! V0.0.2 L2");
     system_dogeshell();
     hcf();
