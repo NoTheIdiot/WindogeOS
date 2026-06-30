@@ -5,6 +5,7 @@
 #include <dogeio.h>
 #include <system.h>
 #include <string.h>
+#include <time.h> 
 
 __attribute__((used, section(".limine_requests")))
 volatile uint64_t limine_base_revision[] = LIMINE_BASE_REVISION(6);
@@ -57,6 +58,7 @@ void kmain(void) {
     }
     
     dogeio_text_clear();
+    time_rtc_init();
     if (module_request.response == NULL || module_request.response->module_count == 0) {
         dogeio_text_println("now wow: limine boot modules not found.");
     }

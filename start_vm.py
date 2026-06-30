@@ -16,9 +16,9 @@ if not os.path.exists(img_file):
 print(f"Launching QEMU virtual machine for {args.arch}...")
 
 if args.arch == "x86_64":
-    qemu_cmd = f"qemu-system-x86_64 -hda {img_file} -M q35 -m 256M"
+    qemu_cmd = f"qemu-system-x86_64 -rtc base=localtime -hda {img_file} -M q35 -m 256M"
 elif args.arch in ["arm64", "aarch64"]:
-    qemu_cmd = f"qemu-system-aarch64 -M virt -cpu cortex-a57 -m 256M -bios limine-binary/BOOTAA64.EFI -drive file={img_file},if=none,id=drv0 -device virtio-blk-device,drive=drv0"
+    qemu_cmd = f"qemu-system-aarch64 -rtc base=localtime -M virt -cpu cortex-a57 -m 256M -bios limine-binary/BOOTAA64.EFI -drive file={img_file},if=none,id=drv0 -device virtio-blk-device,drive=drv0"
 else:
     print("Unknown architecture! Only x86_64 or arm64 (or aarch64) are supported.")
     exit(1)

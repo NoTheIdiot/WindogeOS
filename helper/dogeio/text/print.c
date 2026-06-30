@@ -130,3 +130,8 @@ void dogeio_text_clear() {
     cursor_x = 0;
     cursor_y = 0;
 }
+
+void dogeio_text_change_color(uint32_t color) {
+    dogeio_text_tcolor = color;
+    dogeio_text_clear();
+}
