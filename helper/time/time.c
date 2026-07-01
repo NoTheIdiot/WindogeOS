@@ -80,7 +80,7 @@ void time_show() {
     dogeio_text_print(buffer);
 }
 
-char* time_get_raw() {
+char* time_get() {
     time_update_time();
 
     static char raw_buffer[16];

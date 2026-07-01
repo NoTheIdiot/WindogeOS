@@ -7,6 +7,35 @@
 #include <string.h>
 #include <time.h> 
 
+void init_kernel_fpu(void) {
+#if defined(__x86_64__)
+    unsigned long cr0, cr4;
+
+    __asm__ volatile("mov %%cr0, %0" : "=r"(cr0));
+    cr0 &= ~(1ULL << 2);
+    cr0 |=  (1ULL << 1);
+    __asm__ volatile("mov %0, %%cr0" :: "r"(cr0));
+
+    __asm__ volatile("mov %%cr4, %0" : "=r"(cr4));
+    cr4 |= (1ULL << 9) | (1ULL << 10);
+    __asm__ volatile("mov %0, %%cr4" :: "r"(cr4));
+
+#elif defined(__aarch64__)
+    unsigned long cpacr;
+
+    __asm__ volatile("mrs %0, cpacr_el1" : "=r"(cpacr));
+    
+    cpacr |= (3ULL << 20);
+    
+    __asm__ volatile(
+        "msr cpacr_el1, %0\n\t"
+        "isb"
+        :: "r"(cpacr) : "memory"
+    );
+#endif
+}
+
+
 __attribute__((used, section(".limine_requests")))
 volatile uint64_t limine_base_revision[] = LIMINE_BASE_REVISION(6);
 
@@ -81,6 +110,7 @@ void kmain(void) {
     dogeio_text_clear();
     time_rtc_init();
     draw_menu_bar();
+    init_kernel_fpu();
     if (module_request.response == NULL || module_request.response->module_count == 0) {
         dogeio_text_println("now wow: limine boot modules not found.");
     }

@@ -18,7 +18,7 @@ uint8_t time_read_rtc(int reg);
 void time_rtc_handler(void);
 void time_update_time(void);
 void time_show(void);
-char* time_get_raw(void);
+char* time_get(void);
 void time_wait_sec(unsigned long seconds);
 void time_rtc_init(void);
 

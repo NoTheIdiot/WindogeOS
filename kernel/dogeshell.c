@@ -3,9 +3,48 @@
 #include <bool.h>
 #include <system.h>
 #include <time.h>
+#include <math.h>
 
 extern void hcf(void);
 extern uint32_t dogeio_text_tcolor;
+
+void shell_print_float(float num) {
+    char buf[32];
+    int ipart = (int)num;
+    float fpart = num - (float)ipart;
+    
+    if (fpart < 0.0f) {
+        fpart = -fpart;
+        if (ipart == 0) {
+            dogeio_text_print("-");
+        }
+    }
+    
+    string_itoa(ipart, buf);
+    dogeio_text_print(buf);
+    dogeio_text_print(".");
+    
+    int fpart_int = (int)(fpart * 10000.0f);
+    if (fpart_int < 0) fpart_int = -fpart_int;
+    
+    if (fpart_int < 1000) dogeio_text_print("0");
+    if (fpart_int < 100)  dogeio_text_print("0");
+    if (fpart_int < 10)   dogeio_text_print("0");
+    
+    string_itoa(fpart_int, buf);
+    dogeio_text_print(buf);
+}
+
+void parse_two_floats(const char* args, float* f1, float* f2) {
+    *f1 = string_atof(args);
+    while (*args && *args != ' ') {
+        args++;
+    }
+    while (*args == ' ') {
+        args++;
+    }
+    *f2 = string_atof(args);
+}
 
 void system_dogeshell_execute(const char* command) {
     int handled = 0;
@@ -112,6 +151,50 @@ void system_dogeshell_execute(const char* command) {
         handled = 1;
     }
 
+    else if (string_startswith(command, "add ")) {
+        float f1, f2;
+        parse_two_floats(command + 4, &f1, &f2);
+        shell_print_float(f1 + f2);
+        dogeio_text_println("");
+        handled = 1;
+    }
+
+    else if (string_startswith(command, "sub ")) {
+        float f1, f2;
+        parse_two_floats(command + 4, &f1, &f2);
+        shell_print_float(f1 - f2);
+        dogeio_text_println("");
+        handled = 1;
+    }
+
+    else if (string_startswith(command, "mul ")) {
+        float f1, f2;
+        parse_two_floats(command + 4, &f1, &f2);
+        shell_print_float(f1 * f2);
+        dogeio_text_println("");
+        handled = 1;
+    }
+
+    else if (string_startswith(command, "pow ")) {
+        float f1, f2;
+        parse_two_floats(command + 4, &f1, &f2);
+        shell_print_float(math_power(f1, f2));
+        dogeio_text_println("");
+        handled = 1;
+    }
+
+    else if (string_startswith(command, "root ")) {
+        float f1, f2;
+        parse_two_floats(command + 5, &f1, &f2);
+        if (f1 < 0.0f) {
+            dogeio_text_println("Error: Base cannot be negative.");
+        } else {
+            shell_print_float(math_root(f1, f2));
+            dogeio_text_println("");
+        }
+        handled = 1;
+    }
+
     else if (string_startswith(command, "help")) {
         const char *args = command + 4;
         if (*args == ' ') {
@@ -129,6 +212,8 @@ void system_dogeshell_execute(const char* command) {
             dogeio_text_println("dir                    | lists directory/folder");
             dogeio_text_println("time                   | shows the current time");
             dogeio_text_println("color [color]          | change color of text.");
+            dogeio_text_println("add/sub/mul/pow [a] [b]| math operations");
+            dogeio_text_println("root [base] [n]        | calculates n-th root");
         } else if (string_strcmp(args, "print") == 0 || string_strcmp(args, "bark") == 0) {
             dogeio_text_println("usage: print/bark [message]");
             dogeio_text_println("prints some text, that's it.");
@@ -159,6 +244,12 @@ void system_dogeshell_execute(const char* command) {
             dogeio_text_println("usage: time");
             dogeio_text_println("outputs the time using RTC, remember to");
             dogeio_text_println("replace your cmos battery or it will desync.");
+        } else if (string_strcmp(args, "add") == 0 || string_strcmp(args, "sub") == 0 || string_strcmp(args, "mul") == 0 || string_strcmp(args, "pow") == 0) {
+            dogeio_text_println("usage: command [num1] [num2]");
+            dogeio_text_println("performs standard mathematical operations.");
+        } else if (string_strcmp(args, "root") == 0) {
+            dogeio_text_println("usage: root [base] [n-th_root]");
+            dogeio_text_println("calculates the n-th root using an estimation method.");
         } else {
             dogeio_text_println("command doesn't exist.");
         }

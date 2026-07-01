@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
+#include <float.h>
 
 // stringing compare
 int string_strcmp(const char *string1, const char *string2) {
@@ -87,6 +88,38 @@ int string_atoi(char* s) {
         s++;
     }
     return res;
+}
+
+float string_atof(const char *str) {
+    float result = 0.0f;
+    float fraction = 1.0f;
+    int is_negative = 0;
+    int point_seen = 0;
+
+    if (*str == '-') {
+        is_negative = 1;
+        str++;
+    }
+
+    while (*str) {
+        if (*str == '.') {
+            point_seen = 1;
+            str++;
+            continue;
+        }
+        if (*str >= '0' && *str <= '9') {
+            if (point_seen) {
+                fraction *= 0.1f;
+                result += (*str - '0') * fraction;
+            } else {
+                result = (result * 10.0f) + (*str - '0');
+            }
+        } else {
+            break; 
+        }
+        str++;
+    }
+    return is_negative ? -result : result;
 }
 
 void string_strcpy(char *dest, const char *src) {

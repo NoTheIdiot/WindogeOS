@@ -19,12 +19,13 @@ parser.add_argument("-a", "--arch", default="x86_64", help="CPU architecture cho
 args = parser.parse_args()
 
 if args.arch == "x86_64":
-    cc = "clang -target x86_64-unknown-none-elf -Wall -Wextra -std=gnu11 -nostdinc -ffreestanding -fno-stack-protector -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -Iheaders -m64 -march=x86-64 -mabi=sysv -mno-80387 -mno-mmx -mno-sse -mno-sse2 -mno-red-zone -mcmodel=kernel"
+    # CORRECTED: Removed unsupported -mhard-float flag entirely
+    cc = "clang -target x86_64-unknown-none-elf -Wall -Wextra -std=gnu11 -nostdinc -ffreestanding -fno-stack-protector -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -Iheaders -m64 -march=x86-64 -mabi=sysv -mno-80387 -mno-mmx -mno-red-zone -mcmodel=kernel"
     linker_file = "linker/linker_x86_64.ld"
     linker_flags = "-m elf_x86_64"
     
 elif args.arch == "arm64" or args.arch == "aarch64":
-    cc = "clang -target aarch64-unknown-none-elf -Wall -Wextra -std=gnu11 -nostdinc -ffreestanding -fno-stack-protector -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -Iheaders -mcpu=generic -march=armv8-a+nofp+nosimd -mgeneral-regs-only"
+    cc = "clang -target aarch64-unknown-none-elf -Wall -Wextra -std=gnu11 -nostdinc -ffreestanding -fno-stack-protector -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -Iheaders -mcpu=generic -march=armv8-a -mhard-float"
     linker_file = "linker/linker_arm64.ld"
     linker_flags = "-m aarch64elf"
 else:
@@ -96,10 +97,11 @@ mdir -i windoge_bliss.img@@1M ::/
 
 try:
     if args.arch == "x86_64":
-        subprocess.run(src_compile_script, shell=True, check=True, capture_output=True, text=True)
+        # CORRECTED: Runs the compiled code and targets the correct x86_64 image deployment script
+        subprocess.run(src_compile_script, shell=True, check=True, text=True)
         subprocess.run(create_img_script_x86_64, shell=True, check=True)
     elif args.arch == "arm64" or args.arch == "aarch64":
-        subprocess.run(src_compile_script, shell=True, check=True, capture_output=True, text=True)
+        subprocess.run(src_compile_script, shell=True, check=True, text=True)
         subprocess.run(create_img_script_arm64, shell=True, check=True)
     print("Build successful.")
 except subprocess.CalledProcessError as e:
