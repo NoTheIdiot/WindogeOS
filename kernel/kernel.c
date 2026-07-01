@@ -46,7 +46,28 @@ void hcf(void) {
     }
 }
 
-extern void system_dogeshell();
+// menu bar function
+void draw_menu_bar() {
+    if (framebuffer_request.response == NULL || framebuffer_request.response->framebuffer_count < 1) {
+        return;
+    }
+
+    struct limine_framebuffer *fb = framebuffer_request.response->framebuffers[0];
+    uint32_t *fb_ptr = (uint32_t *)fb->address;
+    size_t row_width = fb->pitch / 4;
+
+    uint32_t bar_color = 0xffffff;
+    uint32_t text_color = 0x000000;
+
+    for (int row = 0; row < 16; row++) {
+        for (size_t col = 0; col < fb->width; col++) {
+            fb_ptr[row * row_width + col] = bar_color;
+        }
+    }
+
+    dogeio_text_print_at("WindogeOS Bliss V0.0.2", 8, 0, text_color);
+}
+
 
 void kmain(void) {
     if (LIMINE_BASE_REVISION_SUPPORTED(limine_base_revision) == false) {
@@ -59,6 +80,7 @@ void kmain(void) {
     
     dogeio_text_clear();
     time_rtc_init();
+    draw_menu_bar();
     if (module_request.response == NULL || module_request.response->module_count == 0) {
         dogeio_text_println("now wow: limine boot modules not found.");
     }

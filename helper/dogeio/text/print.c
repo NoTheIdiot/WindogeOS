@@ -6,7 +6,7 @@
 extern volatile struct limine_framebuffer_request framebuffer_request;
 
 uint32_t cursor_x = 0;
-uint32_t cursor_y = 0;
+uint32_t cursor_y = 20;
 uint32_t dogeio_text_bcolor = 0x000000;
 uint32_t dogeio_text_tcolor = 0xffffff;
 
@@ -72,7 +72,7 @@ void dogeio_text_print(const char *str) {
         if (c == '\b') {
             if (cursor_x >= 8) {
                 cursor_x -= 8;
-            } else if (cursor_y >= 16) {
+            } else if (cursor_y >= 36) {
                 cursor_y -= 16;
                 cursor_x = ((fb->width / 8) * 8) - 8;
             } else {
@@ -121,17 +121,52 @@ void dogeio_text_clear() {
 
     struct limine_framebuffer *fb = framebuffer_request.response->framebuffers[0];
     uint32_t *fb_ptr = (uint32_t *)fb->address;
+    
+    size_t starting_pixel = (fb->pitch / 4) * 16;
     size_t total_pixels = (fb->pitch / 4) * fb->height;
 
-    for (size_t i = 0; i < total_pixels; i++) {
+    for (size_t i = starting_pixel; i < total_pixels; i++) {
         fb_ptr[i] = dogeio_text_bcolor;
     }
 
     cursor_x = 0;
-    cursor_y = 0;
+    cursor_y = 16;
 }
+
 
 void dogeio_text_change_color(uint32_t color) {
     dogeio_text_tcolor = color;
     dogeio_text_clear();
+}
+
+void dogeio_text_print_at(const char *str, uint32_t x_pos, uint32_t y_pos, uint32_t text_color) {
+    if (framebuffer_request.response == NULL || framebuffer_request.response->framebuffer_count < 1) {
+        return;
+    }
+
+    struct limine_framebuffer *fb = framebuffer_request.response->framebuffers[0];
+    uint32_t current_x = x_pos;
+    uint32_t current_y = y_pos;
+
+    uint32_t original_color = dogeio_text_tcolor;
+    dogeio_text_tcolor = text_color;
+
+    for (size_t i = 0; str[i] != '\0'; i++) {
+        char c = str[i];
+
+        if (c == '\n') {
+            current_x = x_pos;
+            current_y += 16;
+            continue;
+        }
+
+        if (current_x + 8 > fb->width || current_y + 16 > fb->height) {
+            break; 
+        }
+
+        dogeio_text_putchar(c, current_x, current_y);
+        current_x += 8;
+    }
+
+    dogeio_text_tcolor = original_color;
 }
