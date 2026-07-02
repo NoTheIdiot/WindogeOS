@@ -95,6 +95,10 @@ void draw_menu_bar() {
     }
 
     dogeio_text_print_at("WindogeOS Bliss V0.0.2", 8, 0, text_color);
+
+    char *clock_text = time_get();
+    uint32_t clock_x = fb->width > 72 ? fb->width - 72 : 8;
+    dogeio_text_print_at(clock_text, clock_x, 0, text_color);
 }
 
 

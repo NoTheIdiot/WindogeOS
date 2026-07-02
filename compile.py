@@ -26,7 +26,7 @@ if args.arch == "x86_64":
     
 elif args.arch == "arm64" or args.arch == "aarch64":
     cc = "clang -target aarch64-unknown-none-elf -Wall -Wextra -std=gnu11 -nostdinc -ffreestanding -fno-stack-protector -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -Iheaders -mcpu=generic -march=armv8-a -mhard-float"
-    linker_file = "linker/linker_arm64.ld"
+    linker_file = "linker/arm64.ld"
     linker_flags = "-m aarch64elf"
 else:
     print("unknown architecture, only x86_64 or arm64 (or aarch64) supported,")

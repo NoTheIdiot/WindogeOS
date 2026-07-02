@@ -3,6 +3,10 @@
 #include <stddef.h>
 #include <lowlevel.h>
 #include <dogeio.h>
+#include <time.h>
+#include <string.h>
+
+extern void draw_menu_bar(void);
 
 const char map_lower[] = {
     0,  0, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', 0,
@@ -25,9 +29,16 @@ void dogeio_text_input(const char *prompt, char *buffer, size_t max_size) {
 
     size_t index = 0;
     bool shift_pressed = false;
+    char last_time[16] = "";
 
     while (1) {
-        while ((lowlevel_ports_inb(0x64) & 1) == 0);
+        while ((lowlevel_ports_inb(0x64) & 1) == 0) {
+            char *current_time = time_get();
+            if (string_strcmp(current_time, last_time) != 0) {
+                string_strcpy(last_time, current_time);
+                draw_menu_bar();
+            }
+        }
 
         uint8_t code = lowlevel_ports_inb(0x60);
 

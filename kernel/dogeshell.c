@@ -7,6 +7,7 @@
 
 extern void hcf(void);
 extern uint32_t dogeio_text_tcolor;
+extern void draw_menu_bar(void);
 
 void shell_print_float(float num) {
     char buf[32];
@@ -44,6 +45,42 @@ void parse_two_floats(const char* args, float* f1, float* f2) {
         args++;
     }
     *f2 = string_atof(args);
+}
+
+// many functions better than big function
+static void math_subcommand(const char *subcommand) {
+    if (string_startswith(subcommand, "add ")) {
+        float f1, f2;
+        parse_two_floats(subcommand + 4, &f1, &f2);
+        shell_print_float(f1 + f2);
+        dogeio_text_println("");
+    } else if (string_startswith(subcommand, "sub ")) {
+        float f1, f2;
+        parse_two_floats(subcommand + 4, &f1, &f2);
+        shell_print_float(f1 - f2);
+        dogeio_text_println("");
+    } else if (string_startswith(subcommand, "mul ")) {
+        float f1, f2;
+        parse_two_floats(subcommand + 4, &f1, &f2);
+        shell_print_float(f1 * f2);
+        dogeio_text_println("");
+    } else if (string_startswith(subcommand, "pow ")) {
+        float f1, f2;
+        parse_two_floats(subcommand + 4, &f1, &f2);
+        shell_print_float(math_power(f1, f2));
+        dogeio_text_println("");
+    } else if (string_startswith(subcommand, "root ")) {
+        float f1, f2;
+        parse_two_floats(subcommand + 5, &f1, &f2);
+        if (f1 < 0.0f) {
+            dogeio_text_println("Error: Base cannot be negative.");
+        } else {
+            shell_print_float(math_root(f1, f2));
+            dogeio_text_println("");
+        }
+    } else {
+        dogeio_text_println("usage: math [add|sub|mul|pow|root] [a] [b]");
+    }
 }
 
 void system_dogeshell_execute(const char* command) {
@@ -151,47 +188,18 @@ void system_dogeshell_execute(const char* command) {
         handled = 1;
     }
 
-    else if (string_startswith(command, "add ")) {
-        float f1, f2;
-        parse_two_floats(command + 4, &f1, &f2);
-        shell_print_float(f1 + f2);
-        dogeio_text_println("");
+    else if (string_strcmp(command, "ver") == 0) {
+        dogeio_text_println("WindogeOS V0.0.2");
         handled = 1;
     }
 
-    else if (string_startswith(command, "sub ")) {
-        float f1, f2;
-        parse_two_floats(command + 4, &f1, &f2);
-        shell_print_float(f1 - f2);
-        dogeio_text_println("");
+    else if (string_strcmp(command, "math") == 0) {
+        dogeio_text_println("usage: math [add|sub|mul|pow|root] [a] [b]");
         handled = 1;
     }
 
-    else if (string_startswith(command, "mul ")) {
-        float f1, f2;
-        parse_two_floats(command + 4, &f1, &f2);
-        shell_print_float(f1 * f2);
-        dogeio_text_println("");
-        handled = 1;
-    }
-
-    else if (string_startswith(command, "pow ")) {
-        float f1, f2;
-        parse_two_floats(command + 4, &f1, &f2);
-        shell_print_float(math_power(f1, f2));
-        dogeio_text_println("");
-        handled = 1;
-    }
-
-    else if (string_startswith(command, "root ")) {
-        float f1, f2;
-        parse_two_floats(command + 5, &f1, &f2);
-        if (f1 < 0.0f) {
-            dogeio_text_println("Error: Base cannot be negative.");
-        } else {
-            shell_print_float(math_root(f1, f2));
-            dogeio_text_println("");
-        }
+    else if (string_startswith(command, "math ")) {
+        math_subcommand(command + 5);
         handled = 1;
     }
 
@@ -212,8 +220,9 @@ void system_dogeshell_execute(const char* command) {
             dogeio_text_println("dir                    | lists directory/folder");
             dogeio_text_println("time                   | shows the current time");
             dogeio_text_println("color [color]          | change color of text.");
-            dogeio_text_println("add/sub/mul/pow [a] [b]| math operations");
+            dogeio_text_println("math [add|sub|mul|pow|root] [a] [b] | math operations");
             dogeio_text_println("root [base] [n]        | calculates n-th root");
+            dogeio_text_println("ver                    | shows version.");
         } else if (string_strcmp(args, "print") == 0 || string_strcmp(args, "bark") == 0) {
             dogeio_text_println("usage: print/bark [message]");
             dogeio_text_println("prints some text, that's it.");
@@ -265,6 +274,7 @@ void system_dogeshell_execute(const char* command) {
 void system_dogeshell() {
     char command[128];
     while (true) {
+        draw_menu_bar();
         dogeio_text_input("wow (root) > ", command, 128);
         system_dogeshell_execute(command);
     }

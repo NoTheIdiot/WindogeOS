@@ -7,6 +7,6 @@
 float math_power(float base, float exp);
 float math_square_power(float base);
 float math_root(float base, float n);
-float math_square_root(float base)；
+float math_square_root(float base);
 
 #endif

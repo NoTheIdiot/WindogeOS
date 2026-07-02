@@ -28,8 +28,11 @@
 
 
 extern const uint8_t terminal_font[256][16];
-void dogeio_text_putchar(char c, uint32_t x_pos, uint32_t y_pos);
+void dogeio_text_putchar(char c, uint32_t x_pos, uint32_t y_pos, int clear_cell);
 void dogeio_text_printchar(char c);
+void dogeio_text_hide_cursor(void);
+void dogeio_text_redraw_cursor(void);
+void dogeio_text_update_cursor(void);
 void dogeio_text_print(const char *str);
 void dogeio_text_println(const char* str);
 void dogeio_text_print_at(const char *str, uint32_t x_pos, uint32_t y_pos, uint32_t text_color);
