@@ -33,6 +33,5 @@ programs above.
 
 
 = Notes for development
-- the infiles folder at root is for files going to be inject to FAT32.
-- the dump folder is used for deleted code that could be reused in the future
-  for a feature that is not needed before.
+- the files folder will be injected to the filesystem.
+- the help folder is just a reference for me.
