@@ -9,7 +9,7 @@
 
 void system_dogescript_interprate(const char* line_string, int line) {
 	if (string_startswith(line_string, "print")) {
-    	dogeio_text_println(print + 6);
+    	dogeio_text_println(line_string + 6);
     } else {
         dogeio_text_print  ("error: function not found at line ");
         dogeio_text_println(line);
