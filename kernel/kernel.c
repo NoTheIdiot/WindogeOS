@@ -116,16 +116,17 @@ void kmain(void) {
     draw_menu_bar();
     init_kernel_fpu();
     if (module_request.response == NULL || module_request.response->module_count == 0) {
-        dogeio_text_println("now wow: limine boot modules not found.");
+        dogeio_duolog("Not Wow: No Limine boot modules found.");
     }
 
     int status = system_file_init(module_request.response);
     if (status != 0) {
-        dogeio_text_println("not wow: filesystem context init failed.");
-        dogeio_text_println("fat32 will not be avaliable.\n");
+        dogeio_duolog("Not Wow: Failed to Intialize File System.");
+        dogeio_duolog("File System will not be avaliable.");
     }
 
     dogeio_text_println("Welcome to WindogeOS Bliss! V0.0.2 L2");
+    dogeio_log("WindogeOS Boot Success, start celebrating.");
     system_dogeshell();
     hcf();
 }
