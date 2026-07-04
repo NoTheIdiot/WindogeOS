@@ -4,22 +4,21 @@ import os
 import platform
 import argparse
 
-cc_base = "clang"
-cpu = "x86_64"
 img_file = "windoge_bliss.img"
 system = platform.system()
 
 if system == "Windows":
     linker = "ld.lld"
 else:
-    linker = "ld"
+    linker = "ld" 
 
 parser = argparse.ArgumentParser(description="WindogeOS compiler, virtual machine not included")
 parser.add_argument("-a", "--arch", default="x86_64", help="CPU architecture choice, if there is nothing then it's defaultly x86_64")
 args = parser.parse_args()
 
+subprocess.run("clear", shell=True)
+
 if args.arch == "x86_64":
-    # CORRECTED: Removed unsupported -mhard-float flag entirely
     cc = "clang -target x86_64-unknown-none-elf -Wall -Wextra -std=gnu11 -nostdinc -ffreestanding -fno-stack-protector -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -Iheaders -m64 -march=x86-64 -mabi=sysv -mno-80387 -mno-mmx -mno-red-zone -mcmodel=kernel"
     linker_file = "linker/linker_x86_64.ld"
     linker_flags = "-m elf_x86_64"
@@ -75,9 +74,9 @@ mcopy -i {img_file}@@1M limine.conf ::/boot/limine;
 mcopy -i {img_file}@@1M limine-binary/limine-bios.sys ::/boot/limine;
 mcopy -i {img_file}@@1M limine-binary/BOOTX64.EFI ::/EFI/BOOT;
 mcopy -i {img_file}@@1M limine-binary/BOOTIA32.EFI ::/EFI/BOOT;
+mcopy -o -i {img_file}@@1M files/readme.txt ::/readme.txt || true;
 rm -f {objects_string} kernel.elf
-mcopy -o -i windoge_bliss.img@@1M files/readme.txt ::/readme.txt
-mdir -i windoge_bliss.img@@1M ::/
+mdir -i {img_file}@@1M ::/
 """
 
 create_img_script_arm64 = f"""
@@ -90,24 +89,26 @@ mmd -i {img_file}@@1M ::/EFI ::/EFI/BOOT ::/boot ::/boot/limine;
 mcopy -i {img_file}@@1M kernel.elf ::/boot;
 mcopy -i {img_file}@@1M limine.conf ::/boot/limine;
 mcopy -i {img_file}@@1M limine-binary/BOOTAA64.EFI ::/EFI/BOOT;
+mcopy -o -i {img_file}@@1M files/readme.txt ::/readme.txt || true;
 rm -f {objects_string} kernel.elf
-mcopy -o -i windoge_bliss.img@@1M files/readme.txt ::/readme.txt
-mdir -i windoge_bliss.img@@1M ::/
+mdir -i {img_file}@@1M ::/
 """
 
 try:
+    print("compiling source code")
+    subprocess.run(src_compile_script, shell=True, check=True, text=True)
+    
+    print("generating disk image")
     if args.arch == "x86_64":
-        # CORRECTED: Runs the compiled code and targets the correct x86_64 image deployment script
-        subprocess.run(src_compile_script, shell=True, check=True, text=True)
         subprocess.run(create_img_script_x86_64, shell=True, check=True)
     elif args.arch == "arm64" or args.arch == "aarch64":
-        subprocess.run(src_compile_script, shell=True, check=True, text=True)
         subprocess.run(create_img_script_arm64, shell=True, check=True)
-    print("Build successful.")
+        
+    print("build success, doesn't mean it will work >:)")
+    exit(0)
+
 except subprocess.CalledProcessError as e:
-    print("\n--- BUILD FAILED ---")
-    if e.stdout:
-        print("STDOUT:\n", e.stdout)
-    if e.stderr:
-        print("STDERR:\n", e.stderr)
+    print("\n-------build failed--------")
+    print("cleaning object files")
+    subprocess.run(f"rm -f {objects_string} kernel.elf", shell=True)
     exit(1)

@@ -1,3 +1,5 @@
+// on god that this runs on old ass hardware smoothly
+// for bragging rights lolololoolololol
 #ifndef DOGEIO_H
 #define DOGEIO_H
 
@@ -42,5 +44,16 @@ void dogeio_text_change_color(uint32_t new_hex_color);
 // inputs
 char dogeio_text_getchar(void);
 void dogeio_text_input(const char *prompt, char *buffer, size_t max_len);
+
+// serial stuff i guess wtf
+void dogeio_text_serial_init();
+int dogeio_text_serial_transmit_empty();
+void dogeio_text_serial_putchar(char c);
+void dogeio_text_serial_print(const char* str);
+void dogeio_text_serial_println(const char* str);
+
+// basic
+void dogeio_log(const char* string);
+void dogeio_duolog(const char* string);
 
 #endif

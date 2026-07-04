@@ -6,6 +6,7 @@
 #include <limine.h>
 
 void system_dogeshell();
+void system_dogeshell_execute(const char* command);
 
 void system_info_cpuid(uint32_t leaf, uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx);
 void system_info_ram(char *out_buffer);
