@@ -19,3 +19,5 @@ void system_dogescript_interprate(const char* line_string, int line) {
 void system_dogescript(char** array) {
 	// pass
 }
+#include <dogeio.h>
+#include <system.h>
