@@ -122,7 +122,7 @@ void kmain(void) {
     int status = system_file_init(module_request.response);
     if (status != 0) {
         dogeio_text_println("not wow: filesystem context init failed.");
-        dogeio_text_println("fat32 will not be avaliable.");
+        dogeio_text_println("fat32 will not be avaliable.\n");
     }
 
     dogeio_text_println("Welcome to WindogeOS Bliss! V0.0.2 L2");
