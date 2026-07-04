@@ -12,8 +12,8 @@ args = parser.parse_args()
 if not os.path.exists(img_file):
     print(f"Error: Disk image '{img_file}' not found. Please compile it first.")
     exit(1)
+print(f"Starting WindogeOS in QEMU")
 print("-----------------------------------------------------------------------------")
-print(f"Launching QEMU virtual machine for {args.arch}...")
 if args.arch == "x86_64":
     qemu_cmd = f"qemu-system-x86_64 -rtc base=localtime -drive format=raw,file={img_file},if=ide -M q35 -m 256M -serial stdio"
 elif args.arch in ["arm64", "aarch64"]:
