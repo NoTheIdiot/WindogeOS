@@ -32,8 +32,17 @@ void time_rtc_init(void) {
     lowlevel_ports_outb(0x70, 0x8A);
     lowlevel_ports_outb(0x71, (prev & 0xF0) | 0x0F); 
 
+    lowlevel_ports_outb(0x70, 0x8B);  
+    uint8_t reg_b = lowlevel_ports_inb(0x71);
+    lowlevel_ports_outb(0x70, 0x8B);  
+    lowlevel_ports_outb(0x71, reg_b | 0x40);
+
+    lowlevel_ports_outb(0x70, 0x0C);
+    lowlevel_ports_inb(0x71);
+
     __asm__ volatile("sti");
 }
+
 
 void time_update_time() {
     while (time_read_rtc(0x0A) & 0x80);
@@ -102,9 +111,18 @@ char* time_get() {
 }
 
 void time_wait_sec(unsigned long seconds) {
-    unsigned long start = rtc_tick;
-    unsigned long target = start + (seconds * 2);
-    while (rtc_tick < target) { 
-        __asm__ volatile("hlt"); 
+    for (unsigned long i = 0; i < seconds; i++) {
+        while (time_read_rtc(0x0A) & 0x80);
+        
+        uint8_t start_sec = time_read_rtc(0x00);
+        
+        while (1) {
+            while (time_read_rtc(0x0A) & 0x80);
+            
+            uint8_t current_sec = time_read_rtc(0x00);
+            if (current_sec != start_sec) {
+                break;
+            }
+        }
     }
 }

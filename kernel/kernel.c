@@ -124,6 +124,8 @@ void kmain(void) {
         dogeio_duolog("Not Wow: Failed to Intialize File System.");
         dogeio_duolog("File System will not be avaliable.");
     }
+    dogeio_text_println("Waiting 3 seconds");
+    time_wait_sec(3);
 
     dogeio_text_println("Welcome to WindogeOS Bliss! V0.0.2 L2");
     dogeio_log("WindogeOS Boot Success, start celebrating.");
