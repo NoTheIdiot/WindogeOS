@@ -102,6 +102,22 @@ void system_dogeshell_execute(const char* command) {
         handled = 1;
     }
 
+    else if (string_startswith(command, "wait")) {
+        const char* arg = command + 4;
+
+        while (*arg == ' ' || *arg == '\t') {
+            arg++;
+        }
+
+        if (*arg == '\0') {
+            dogeio_text_print("Error: Please specify the number of seconds.\n");
+        } else {
+            int waiting = string_atoi((char*)arg);
+            time_wait_sec(waiting);
+        }
+        handled = 1;
+    }   
+
     else if (string_startswith(command, "color")) {
         const char *arg = command + 6;
         if (string_strcmp(arg, "black") == 0) {
@@ -223,6 +239,7 @@ void system_dogeshell_execute(const char* command) {
             dogeio_text_println("math [add|sub|mul|pow|root] [a] [b] | math operations");
             dogeio_text_println("root [base] [n]        | calculates n-th root");
             dogeio_text_println("ver                    | shows version.");
+            dogeio_text_println("wait [seconds]         | waits");
         } else if (string_strcmp(args, "print") == 0 || string_strcmp(args, "bark") == 0) {
             dogeio_text_println("usage: print/bark [message]");
             dogeio_text_println("prints some text, that's it.");
@@ -259,6 +276,10 @@ void system_dogeshell_execute(const char* command) {
         } else if (string_strcmp(args, "root") == 0) {
             dogeio_text_println("usage: root [base] [n-th_root]");
             dogeio_text_println("calculates the n-th root using an estimation method.");
+            dogeio_text_println("may not be accurate.");
+        } else if (string_strcmp(args, "wait") == 0) {
+            dogeio_text_println("usage: wait [seconds]");
+            dogeio_text_println("waits in seconds.");
         } else {
             dogeio_text_println("command doesn't exist.");
         }
