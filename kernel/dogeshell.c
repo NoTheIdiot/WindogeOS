@@ -183,6 +183,9 @@ void system_dogeshell_execute(const char* command) {
     else if (string_strcmp(command, "dir") == 0) {
         system_file_list_directory();
         handled = 1;
+    } else if (string_startswith(command, "readfile")) {
+        system_file_readfile(command + 9);
+        handled = 1;
     }
     
     else if (string_strcmp(command, "cpuinfo") == 0) {
@@ -240,6 +243,7 @@ void system_dogeshell_execute(const char* command) {
             dogeio_text_println("root [base] [n]        | calculates n-th root");
             dogeio_text_println("ver                    | shows version.");
             dogeio_text_println("wait [seconds]         | waits");
+            dogeio_text_println("readfile [filename]    | reads and outputs an entire file.");
         } else if (string_strcmp(args, "print") == 0 || string_strcmp(args, "bark") == 0) {
             dogeio_text_println("usage: print/bark [message]");
             dogeio_text_println("prints some text, that's it.");
@@ -280,6 +284,9 @@ void system_dogeshell_execute(const char* command) {
         } else if (string_strcmp(args, "wait") == 0) {
             dogeio_text_println("usage: wait [seconds]");
             dogeio_text_println("waits in seconds.");
+        } else if (string_strcmp(args, "readfile") == 0) {
+            dogeio_text_println("usage: readfile [filename]");
+            dogeio_text_println("outputs an entire file from the disk.");
         } else {
             dogeio_text_println("command doesn't exist.");
         }

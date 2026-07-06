@@ -4,6 +4,7 @@
 #include <string.h>
 
 static struct limine_module_response *mod_res = NULL;
+extern volatile struct limine_module_request module_request;
 
 int system_file_init(struct limine_module_response *response) {
     if (!response) {
@@ -35,4 +36,48 @@ int system_file_list_directory(void) {
     }
 
     return 0;
+}
+
+int system_file_readfile(const char *filename) {
+    if (module_request.response == NULL || module_request.response->module_count == 0) {
+        dogeio_duolog("Error: No boot modules loaded in memory.");
+        return -1;
+    }
+
+    for (uint64_t i = 0; i < module_request.response->module_count; i++) {
+        struct limine_file *file = module_request.response->modules[i];
+        
+        const char *haystack = file->path; 
+        const char *needle = filename;
+        uint32_t match = 0;
+
+        while (*haystack != '\0') {
+            const char *h = haystack;
+            const char *n = needle;
+
+            while (*n != '\0' && *h == *n) {
+                h++;
+                n++;
+            }
+
+            if (*n == '\0' && *h == '\0') {
+                match = 1;
+                break;
+            }
+            haystack++;
+        }
+
+        if (match == 1) {
+            char *file_data = (char *)file->address;
+
+            for (uint64_t byte_idx = 0; byte_idx < file->size; byte_idx++) {
+                dogeio_text_printchar(file_data[byte_idx]);
+            }
+            
+            dogeio_text_printchar('\n');
+            return 0; 
+        }
+    }
+
+    return -2;
 }

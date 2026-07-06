@@ -14,5 +14,6 @@ void system_info_cpu(char *out_vendor);
 
 int system_file_init(struct limine_module_response *response);
 int system_file_list_directory(void);
+int system_file_readfile(const char *header_check);
 
 #endif

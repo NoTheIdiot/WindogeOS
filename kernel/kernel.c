@@ -47,13 +47,13 @@ volatile struct limine_framebuffer_request framebuffer_request = {
 
 __attribute__((used, section(".limine_requests")))
 volatile struct limine_module_request module_request = {
-    .id = { 0x67cf3d9d78a91a1e, 0x3bd7d9e63d902f06 }, 
+    .id = LIMINE_MODULE_REQUEST_ID, 
     .revision = 0
 };
 
 __attribute__((used, section(".limine_requests")))
 volatile struct limine_memmap_request memmap_request = {
-    .id = { 0x67cf3d9d78a91a1e, 0x9fb54d6d67cf3d9d },
+    .id = LIMINE_MEMMAP_REQUEST_ID,
     .revision = 0
 };
 
@@ -103,6 +103,8 @@ void draw_menu_bar() {
 
 
 void kmain(void) {
+    init_kernel_fpu();
+
     if (LIMINE_BASE_REVISION_SUPPORTED(limine_base_revision) == false) {
         hcf();
     }
@@ -114,7 +116,7 @@ void kmain(void) {
     dogeio_text_clear();
     time_rtc_init();
     draw_menu_bar();
-    init_kernel_fpu();
+    
     if (module_request.response == NULL || module_request.response->module_count == 0) {
         dogeio_duolog("Not Wow: No Limine boot modules found.");
     }
