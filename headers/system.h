@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include <limine.h>
 
+extern char output[MAX_LINES][MAX_CHARS];
+
 void system_dogeshell();
 void system_dogeshell_execute(const char* command);
 
@@ -15,5 +17,6 @@ void system_info_cpu(char *out_vendor);
 int system_file_init(struct limine_module_response *response);
 int system_file_list_directory(void);
 int system_file_readfile(const char *header_check);
+int system_file_load(const char *filename);
 
 #endif

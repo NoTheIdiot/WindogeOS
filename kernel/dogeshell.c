@@ -186,6 +186,11 @@ void system_dogeshell_execute(const char* command) {
     } else if (string_startswith(command, "readfile")) {
         system_file_readfile(command + 9);
         handled = 1;
+    } else if (string_startswith(command, "writefile")) {
+        char* arg = command + 10;
+        system_file_load(arg);
+        
+        handled = 1;
     }
     
     else if (string_strcmp(command, "cpuinfo") == 0) {

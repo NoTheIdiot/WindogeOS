@@ -3,6 +3,13 @@
 #include <dogeio.h>
 #include <string.h>
 
+#define MAX_LINES 1024
+#define MAX_CHARS 256
+
+static uint32_t range = 0;     
+static uint32_t rangehigh = 0; 
+char output[MAX_LINES][MAX_CHARS]; // output
+
 static struct limine_module_response *mod_res = NULL;
 extern volatile struct limine_module_request module_request;
 
@@ -80,4 +87,63 @@ int system_file_readfile(const char *filename) {
     }
 
     return -2;
+}
+
+int system_file_load(const char *filename) {
+    if (module_request.response == NULL) return -1;
+
+    range = 0;
+    rangehigh = 0;
+
+    for (int i = 0; i < MAX_LINES; i++) {
+        for (int j = 0; j < MAX_CHARS; j++) {
+            output[i][j] = '\0';
+        }
+    }
+
+    for (uint64_t i = 0; i < module_request.response->module_count; i++) {
+        struct limine_file *file = module_request.response->modules[i];
+        
+        if (string_strcmp(file->path, filename) != 0) {
+            continue;
+        }
+
+        const char *file_data = (const char *)file->address;
+        uint64_t file_size = file->size;
+
+        for (uint64_t byte_idx = 0; byte_idx < file_size; byte_idx++) {
+            if (rangehigh >= MAX_LINES) break;
+
+            char current_byte = file_data[byte_idx];
+
+            if (current_byte == '\n' || current_byte == '\r') {
+                if (current_byte == '\r' && (byte_idx + 1 < file_size) && file_data[byte_idx + 1] == '\n') {
+                    byte_idx++; 
+                }
+                
+                output[rangehigh][range] = '\0'; 
+                range = 0;                       
+                rangehigh++;                     
+                continue;
+            }
+
+            output[rangehigh][range] = current_byte;
+            range++;
+
+            if (range >= (MAX_CHARS - 1)) {
+                output[rangehigh][range] = '\0'; 
+                range = 0;                       
+                rangehigh++;                     
+            }
+        }
+
+        if (range > 0 && rangehigh < MAX_LINES) {
+            output[rangehigh][range] = '\0';
+            rangehigh++;
+        }
+
+        return 0; 
+    }
+
+    return -2; 
 }
