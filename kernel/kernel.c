@@ -6,6 +6,7 @@
 #include <system.h>
 #include <string.h>
 #include <time.h> 
+#include <lowlevel.h>
 
 void init_kernel_fpu(void) {
 #if defined(__x86_64__)
@@ -98,6 +99,7 @@ void draw_menu_bar() {
 
 void kmain(void) {
     init_kernel_fpu();
+    init_idt();
 
     if (LIMINE_BASE_REVISION_SUPPORTED(limine_base_revision) == false) {
         hcf();

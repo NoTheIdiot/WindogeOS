@@ -11,4 +11,6 @@ void lowlevel_ports_outw(uint16_t port, uint16_t data);
 void lowlevel_ports_outsw(unsigned short port, const void *addr, unsigned long count);
 void lowlevel_ports_insw(unsigned short port, void *addr, unsigned long count);
 
+void init_idt(void);
+
 #endif 
