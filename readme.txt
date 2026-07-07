@@ -6,7 +6,8 @@ but it's hard to use for new users, while Windows is easy to use
 but paid for all features, and macOS is just idk.
 
 = Updates
-I have fully converted to Limine, future updates will come very soon.
+Currently converting to a RAMFS, if you got a solution for a REAL file system,
+please create a pull request.
 
 = How to such compile and run?
 - Install git, clang, and qemu-system. Yes, the other tools (like limine, that's it)
