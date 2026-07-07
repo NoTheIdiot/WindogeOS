@@ -74,8 +74,6 @@ mcopy -i {img_file}@@1M limine.conf ::/
 mcopy -i {img_file}@@1M limine-binary/limine-bios.sys ::/boot/limine;
 mcopy -i {img_file}@@1M limine-binary/BOOTX64.EFI ::/EFI/BOOT;
 mcopy -i {img_file}@@1M limine-binary/BOOTIA32.EFI ::/EFI/BOOT;
-mcopy -o -i {img_file}@@1M files/readme.txt ::/readme.txt || true;
-mcopy -o -i {img_file}@@1M files/real.txt ::/real.txt || true;
 rm -f {objects_string} kernel.elf
 mdir -i {img_file}@@1M ::/
 """
@@ -90,8 +88,6 @@ mmd -i {img_file}@@1M ::/EFI ::/EFI/BOOT ::/boot ::/boot/limine;
 mcopy -i {img_file}@@1M kernel.elf ::/boot;
 mcopy -i {img_file}@@1M limine.conf ::/boot/limine;
 mcopy -i {img_file}@@1M limine-binary/BOOTAA64.EFI ::/EFI/BOOT;
-mcopy -o -i {img_file}@@1M files/readme.txt ::/readme.txt || true;
-mcopy -o -i {img_file}@@1M files/real.txt ::/real.txt || true;
 rm -f {objects_string} kernel.elf
 mdir -i {img_file}@@1M ::/
 """

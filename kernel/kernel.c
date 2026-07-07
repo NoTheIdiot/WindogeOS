@@ -46,12 +46,6 @@ volatile struct limine_framebuffer_request framebuffer_request = {
 };
 
 __attribute__((used, section(".limine_requests")))
-volatile struct limine_module_request module_request = {
-    .id = LIMINE_MODULE_REQUEST_ID, 
-    .revision = 0
-};
-
-__attribute__((used, section(".limine_requests")))
 volatile struct limine_memmap_request memmap_request = {
     .id = LIMINE_MEMMAP_REQUEST_ID,
     .revision = 0
@@ -116,16 +110,7 @@ void kmain(void) {
     dogeio_text_clear();
     time_rtc_init();
     draw_menu_bar();
-    
-    if (module_request.response == NULL || module_request.response->module_count == 0) {
-        dogeio_duolog("Not Wow: No Limine boot modules found.");
-    }
-
-    int status = system_file_init(module_request.response);
-    if (status != 0) {
-        dogeio_duolog("Not Wow: Failed to Intialize File System.");
-        dogeio_duolog("File System will not be avaliable.");
-    }
+    system_file_init();
 
     dogeio_text_println("Welcome to WindogeOS Bliss! V0.0.2 L2");
     dogeio_log("WindogeOS Boot Success, start celebrating.");

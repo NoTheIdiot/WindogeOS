@@ -83,7 +83,7 @@ static void math_subcommand(const char *subcommand) {
     }
 }
 
-void system_dogeshell_execute(const char* command) {
+void system_dogeshell_execute(char* command) {
     int handled = 0;
 
     if (command[0] == '\0') {
@@ -184,35 +184,12 @@ void system_dogeshell_execute(const char* command) {
 		system_file_list_directory();
 		handled = 1;
 	} else if (string_startswith(command, "readfile")) {
-		//system_file_readfile(command + 9);
+		system_file_readfile(command + 9);
 		handled = 1;
 	} else if (string_startswith(command, "writefile")) {
-		char* arg = command + 10;
-		char input_buffer[256];
-		char short_name[8];
-
-		for (int i = 0; i < 256; i++) {
-			input_buffer[i] = '\0';
-		}
-		for (int i = 0; i < 8; i++) {
-			short_name[i] = '\0';
-		}
-
-		int arg_idx = 0;
-		while (arg[arg_idx] != '\0' && arg[arg_idx] != '.' && arg_idx < 8) {
-			short_name[arg_idx] = arg[arg_idx];
-			arg_idx++;
-		}
-
-		dogeio_text_input("write text> ", input_buffer, 256);
-
-		uint32_t len = 0;
-		while (input_buffer[len] != '\0') {
-			len++;
-		}
-
-		system_file_create(short_name, "TXT", input_buffer, len);
-		dogeio_text_println("FAT32 cluster block operation completed.");
+        char input[256];
+        dogeio_text_input("text> ", input, 256);
+		system_file_write_file(command + 10, input);
 		handled = 1;
 	}
 
