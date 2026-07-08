@@ -1,0 +1,8 @@
+= the helper/ folder
+This folder is basically a lib/
+each folder is a library
+system/ though is actually related to basicutil.h
+
+dogeio/ is for printing functions
+dogeio/ and idt/ are partially related hince half of the 
+hince some idt is dogeio_ prefix
