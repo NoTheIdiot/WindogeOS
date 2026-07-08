@@ -4,6 +4,7 @@
 #include <system.h>
 #include <time.h>
 #include <math.h>
+#include <basicutil.h>
 
 extern void hcf(void);
 extern uint32_t dogeio_text_tcolor;
@@ -177,7 +178,7 @@ void system_dogeshell_execute(char* command) {
     else if (string_strcmp(command, "shutdown") == 0 || string_strcmp(command, "goodbye") == 0) {
         dogeio_text_clear();
         dogeio_text_print("Such shutdown, very goodbye.");
-        hcf();
+        halt();
     }
 
     else if (string_strcmp(command, "dir") == 0) {
