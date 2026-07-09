@@ -3,47 +3,13 @@
   <component name="AutoImportSettings">
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
+  <component name="CMakeProjectFlavorService">
+    <option name="flavorId" value="CMakePlainProjectFlavor" />
+  </component>
   <component name="ChangeListManager">
     <list default="true" id="c8a1ea33-d46e-43ef-b75b-b4177fd34b9f" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/LICENSE" beforeDir="false" afterPath="$PROJECT_DIR$/LICENSE" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/compile.py" beforeDir="false" afterPath="$PROJECT_DIR$/compile.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/headers/bool.h" beforeDir="false" afterPath="$PROJECT_DIR$/headers/bool.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/headers/consts.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/headers/dogeio.h" beforeDir="false" afterPath="$PROJECT_DIR$/headers/dogeio.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/headers/dogeio_vbe.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/headers/file.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/headers/font.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/headers/idt.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/headers/multiboot.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/headers/ports.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/headers/string.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/headers/time.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/headers/vbe.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/help/dogeio.c" beforeDir="false" afterPath="$PROJECT_DIR$/help/dogeio.c" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/help/dogeio_vbe.c" beforeDir="false" afterPath="$PROJECT_DIR$/help/dogeio_vbe.c" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/help/font.c" beforeDir="false" afterPath="$PROJECT_DIR$/help/font.c" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/help/idt.c" beforeDir="false" afterPath="$PROJECT_DIR$/help/idt.c" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/help/ports.c" beforeDir="false" afterPath="$PROJECT_DIR$/help/ports.c" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/help/string.c" beforeDir="false" afterPath="$PROJECT_DIR$/help/string.c" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/help/time.c" beforeDir="false" afterPath="$PROJECT_DIR$/help/time.c" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/helper/string.c" beforeDir="false" afterPath="$PROJECT_DIR$/helper/string.c" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/kernel/data.c" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/kernel/dogescript.c" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/kernel/dogeshell.c" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/kernel/dogeshell.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/kernel/filesystem/file.c" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/kernel/filesystem/filewrite.c" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/kernel/info.c" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/kernel/info.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/kernel/kernel.c" beforeDir="false" afterPath="$PROJECT_DIR$/kernel/kernel.c" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/kernel/program/load_program.c" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/kernel/serial.c" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/kernel/serial.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/kernel/suchboot.c" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/linker/linker.ld" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/linker/program.ld" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/start_vm.py" beforeDir="false" afterPath="$PROJECT_DIR$/start_vm.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/headers/system.h" beforeDir="false" afterPath="$PROJECT_DIR$/headers/system.h" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -56,11 +22,17 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "customColor": "",
-  "associatedIndex": 7
-}]]></component>
+  <component name="MacroExpansionManager">
+    <option name="directoryName" value="OJuAoSos" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;customColor&quot;: &quot;&quot;,
+  &quot;associatedIndex&quot;: 7
+}</component>
   <component name="ProjectId" id="3FkjsDN9J6XRpY0upP6bbnVHFjd" />
+  <component name="ProjectStatusUIService"><![CDATA[{
+  "uiKindId": "Widget"
+}]]></component>
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
@@ -77,6 +49,7 @@
     "cidr.known.project.marker": "true",
     "codeWithMe.voiceChat.enabledByDefault": "false",
     "git-widget-placeholder": "main",
+    "last_opened_file_path": "//wsl.localhost/Ubuntu/home/user/WindogeOS",
     "org.rust.first.attach.projects": "true",
     "vue.rearranger.settings.migration": "true"
   }
@@ -89,7 +62,11 @@
       <option name="presentableId" value="Default" />
       <updated>1782626176031</updated>
       <workItem from="1782626181570" duration="24000" />
+      <workItem from="1783601842948" duration="251000" />
     </task>
     <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
   </component>
 </project>

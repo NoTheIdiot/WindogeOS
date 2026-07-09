@@ -8,7 +8,7 @@
 #define MAX_LINES 1024
 #define MAX_CHARS 256
 
-// shell stuiff
+// shell stuff
 void system_dogeshell();
 void system_dogeshell_execute(char* command);
 
@@ -36,6 +36,25 @@ struct __attribute__((packed)) mbr_partitionEntry {
     uint32_t total_sectors;
 };
 
+struct __attribute__((packed)) mbr_sector {
+    uint8_t                     boot_code[446];
+    struct mbr_partitionEntry   partitions[4];
+    uint16_t                    boot_signature;
+};
 
+struct __attribute__((packed)) fs_vbr {
+    uint8_t     jmp_code[3];
+    char        oem_name[8];
+    uint16_t    bytes_per_sector;
+    uint8_t     sectors_per_clusters;
+    uint16_t    reserved_sectors;
+    uint8_t     num_fats;
+    uint16_t    root_entries;
+    uint16_t    total_sectors_16;
+    uint8_t     media_descriptor;
+    uint16_t    fat_size_16;
+    uint16_t    sectors_per_track;
+    uint16_t    sectors_per_track;
+}
 
 #endif
