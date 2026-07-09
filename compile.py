@@ -47,6 +47,14 @@ for folder in search_directories:
                     source_files.append(source_path)
                     object_files.append(flat_object_name)
                     compile_lines.append(f"{cc} -c {source_path} -o {flat_object_name}")
+                
+                # wonder why this keeps disappearing
+                if file.endswith(".asm"):
+                    source_path = os.path.join(root, file)
+                    flat_object_name = source_path.replace(os.sep, "_").replace(".asm", ".o")
+                    source_files.append(source_path)
+                    object_files.append(flat_object_name)
+                    compile_lines.append(f"nasm -f elf64 {source_path} -o {flat_object_name}")
 
 if not source_files:
     print("Error: No source files found to build.")

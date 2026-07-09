@@ -6,6 +6,7 @@
 #include <system.h>
 #include <string.h>
 #include <time.h> 
+#include <drivers.h>
 #include <basicutil.h>
 
 void init_kernel_fpu(void) {
@@ -87,6 +88,7 @@ void draw_menu_bar() {
 
 void kmain(void) {
     init_kernel_fpu();
+    serial_init();
 
     if (LIMINE_BASE_REVISION_SUPPORTED(limine_base_revision) == false) {
         halt();
