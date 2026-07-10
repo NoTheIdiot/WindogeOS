@@ -35,4 +35,8 @@ typedef struct {
 
 void idt_init(void);
 
+// disk stuff
+void fs_disk_write(uint32_t sector, const void* buffer);
+void fs_disk_read(uint32_t sector, void* buffer);
+
 #endif 
