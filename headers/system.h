@@ -18,43 +18,28 @@ void system_info_ram(char *out_buffer);
 void system_info_cpu(char *out_vendor);
 
 // file system
-#define FS_SECTOR_SIZE  512 
-#define FS_READ_ONLY    0x01
-#define FS_HIDDEN       0x02
-#define FS_SYSTEM       0x04
-#define FS_VOLUME_ID    0x08
-#define FS_DIRECTORY    0x10
-#define FS_ARCHIVE      0x20
-#define FS_LONG_NAME    0x0F
+#define FS_MAGIC            0x45534653
+#define SECTIOR_SIZE        512
+#define MAX_EXTENTS         4
+#define MAX_FILE_NAME       31
+#define TOTAL_DISK_SECTORS  65536
 
-struct __attribute__((packed)) mbr_partitionEntry {
-    uint8_t boot_indicator;
-    uint8_t starting_chs[3];
-    uint8_t partition_type;
-    uint8_t ending_chs[3];
-    uint32_t starting_lba;
-    uint32_t total_sectors;
-};
+#define FS_SUPER_SECTOR     0
+#define FS_BITMAP_SECTOR    1
+#define FS_DIR_SECTOR       2
 
-struct __attribute__((packed)) mbr_sector {
-    uint8_t                     boot_code[446];
-    struct mbr_partitionEntry   partitions[4];
-    uint16_t                    boot_signature;
-};
+typedef struct {
+    uint32_t start_sector;
+    uint32_t sector_count;
+} __attribute__((packed)) fs_extent_t;
 
-struct __attribute__((packed)) fs_vbr {
-    uint8_t     jmp_code[3];
-    char        oem_name[8];
-    uint16_t    bytes_per_sector;
-    uint8_t     sectors_per_clusters;
-    uint16_t    reserved_sectors;
-    uint8_t     num_fats;
-    uint16_t    root_entries;
-    uint16_t    total_sectors_16;
-    uint8_t     media_descriptor;
-    uint16_t    fat_size_16;
-    uint16_t    sectors_per_track;
-    uint16_t    sectors_per_track;
-}
+typedef struct {
+    char        filename[MAX_FILE_NAME + 1];
+    uint32_t    file_size;
+    uint8_t     is_used;
+    uint8_t     extent_count;
+    fs_extent_t extents[MAX_EXTENTS];
+    uint8_t     padding[10];
+} __attribute__((packed)) fsf_superblock_t;
 
 #endif
