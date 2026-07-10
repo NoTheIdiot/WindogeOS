@@ -101,7 +101,7 @@ void kmain(void) {
     dogeio_text_clear();
     time_rtc_init();
     draw_menu_bar();
-    system_file_init();
+    //system_file_init();
 
     dogeio_text_println("Welcome to WindogeOS Bliss! V0.0.2 L2");
     dogeio_log("WindogeOS Boot Success, start celebrating.");

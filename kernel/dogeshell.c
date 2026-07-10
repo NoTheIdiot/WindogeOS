@@ -182,15 +182,15 @@ void system_dogeshell_execute(char* command) {
     }
 
     else if (string_strcmp(command, "dir") == 0) {
-		system_file_list_directory();
+		//system_file_list_directory();
 		handled = 1;
 	} else if (string_startswith(command, "readfile")) {
-		system_file_readfile(command + 9);
+		//system_file_readfile(command + 9);
 		handled = 1;
 	} else if (string_startswith(command, "writefile")) {
-        char input[256];
-        dogeio_text_input("text> ", input, 256);
-		system_file_write_file(command + 10, input);
+        //char input[256];
+        //dogeio_text_input("text> ", input, 256);
+		//system_file_write_file(command + 10, input);
 		handled = 1;
 	}
 

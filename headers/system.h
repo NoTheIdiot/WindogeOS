@@ -19,7 +19,7 @@ void system_info_cpu(char *out_vendor);
 
 // file system
 #define FS_MAGIC            0x45534653
-#define SECTIOR_SIZE        512
+#define SECTOR_SIZE         512
 #define MAX_EXTENTS         4
 #define MAX_FILE_NAME       31
 #define TOTAL_DISK_SECTORS  65536
@@ -40,6 +40,13 @@ typedef struct {
     uint8_t     extent_count;
     fs_extent_t extents[MAX_EXTENTS];
     uint8_t     padding[10];
-} __attribute__((packed)) fsf_superblock_t;
+} __attribute__((packed)) fs_inode_t;
+
+typedef struct {
+    uint32_t    magic;              
+    uint32_t    total_sectors;      
+    uint32_t    file_count;         
+    uint8_t     padding[500];
+} __attribute__((packed)) fs_superblock_t;
 
 #endif
