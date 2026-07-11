@@ -28,7 +28,7 @@ uint32_t allocate_sectors_from_bitmap(uint8_t* bitmap, uint32_t sectors_needed) 
             consecutive = 0;
         }
     }
-    return (uint32_t)-1;  // too fragmented, idiot
+    return (uint32_t)-1; 
 }
 
 void fs_format() {
@@ -46,6 +46,7 @@ void fs_format() {
     fs_disk_write(FS_BITMAP_SECTOR, fs_scratch_buffer); 
     
     uint32_t dir_sectors_needed = (sizeof(fs_inode_t) * 8 + SECTOR_SIZE - 1) / SECTOR_SIZE;
+    memset(fs_scratch_buffer, 0, SECTOR_SIZE);
     for (uint32_t i = 0; i < dir_sectors_needed; i++) {
         fs_disk_write(FS_DIR_SECTOR + i, fs_scratch_buffer);
     }
@@ -69,6 +70,7 @@ int fs_write_file(const char* name, const uint8_t* data, uint32_t size) {
     fs_superblock_t sb;
     uint8_t bitmap[SECTOR_SIZE];
     fs_inode_t dir_table[8];
+    uint32_t total_dir_bytes = sizeof(fs_inode_t) * 8;
 
     fs_disk_read(FS_SUPER_SECTOR, fs_scratch_buffer);
     memcpy(&sb, fs_scratch_buffer, sizeof(fs_superblock_t));
@@ -76,12 +78,24 @@ int fs_write_file(const char* name, const uint8_t* data, uint32_t size) {
     fs_disk_read(FS_BITMAP_SECTOR, fs_scratch_buffer);
     memcpy(bitmap, fs_scratch_buffer, SECTOR_SIZE);
     
-    uint32_t dir_sectors = (sizeof(fs_inode_t) * 8 + SECTOR_SIZE - 1) / SECTOR_SIZE;
+    uint32_t dir_sectors = (total_dir_bytes + SECTOR_SIZE - 1) / SECTOR_SIZE;
     for (uint32_t i = 0; i < dir_sectors; i++) {
         fs_disk_read(FS_DIR_SECTOR + i, fs_scratch_buffer);
         uint32_t offset = i * SECTOR_SIZE;
-        uint32_t chunk_size = (sizeof(fs_inode_t) * 8 - offset > SECTOR_SIZE) ? SECTOR_SIZE : (sizeof(fs_inode_t) * 8 - offset);
-        memcpy(((uint8_t*)dir_table) + offset, fs_scratch_buffer, chunk_size);
+        
+        uint32_t chunk_size = SECTOR_SIZE;
+        if (offset < total_dir_bytes) {
+            uint32_t bytes_left = total_dir_bytes - offset;
+            if (bytes_left < SECTOR_SIZE) {
+                chunk_size = bytes_left;
+            }
+        } else {
+            chunk_size = 0;
+        }
+
+        if (chunk_size > 0) {
+            memcpy(((uint8_t*)dir_table) + offset, fs_scratch_buffer, chunk_size);
+        }
     }
 
     int slot = -1;
@@ -92,6 +106,7 @@ int fs_write_file(const char* name, const uint8_t* data, uint32_t size) {
         }
     }
     if (slot == -1) return -1;
+    
     uint32_t sectors_needed = (size + SECTOR_SIZE - 1) / SECTOR_SIZE;
     if (sectors_needed == 0) sectors_needed = 1;
 
@@ -133,6 +148,7 @@ int fs_write_file(const char* name, const uint8_t* data, uint32_t size) {
         extent_idx++;
     }
     dir_table[slot].extent_count = extent_idx;
+    
     uint32_t data_pointer = 0;
     for (uint32_t e = 0; e < dir_table[slot].extent_count; e++) {
         fs_extent_t ext = dir_table[slot].extents[e];
@@ -170,8 +186,20 @@ int fs_write_file(const char* name, const uint8_t* data, uint32_t size) {
     for (uint32_t i = 0; i < dir_sectors; i++) {
         memset(fs_scratch_buffer, 0, SECTOR_SIZE);
         uint32_t offset = i * SECTOR_SIZE;
-        uint32_t chunk_size = (sizeof(fs_inode_t) * 8 - offset > SECTOR_SIZE) ? SECTOR_SIZE : (sizeof(fs_inode_t) * 8 - offset);
-        memcpy(fs_scratch_buffer, ((uint8_t*)dir_table) + offset, chunk_size);
+        
+        uint32_t chunk_size = SECTOR_SIZE;
+        if (offset < total_dir_bytes) {
+            uint32_t bytes_left = total_dir_bytes - offset;
+            if (bytes_left < SECTOR_SIZE) {
+                chunk_size = bytes_left;
+            }
+        } else {
+            chunk_size = 0;
+        }
+
+        if (chunk_size > 0) {
+            memcpy(fs_scratch_buffer, ((uint8_t*)dir_table) + offset, chunk_size);
+        }
         fs_disk_write(FS_DIR_SECTOR + i, fs_scratch_buffer);
     }
 
@@ -180,16 +208,28 @@ int fs_write_file(const char* name, const uint8_t* data, uint32_t size) {
 
 int fs_read_file(const char* filename, uint8_t* out_buffer) {
     fs_inode_t dir_table[8];
+    uint32_t total_dir_bytes = sizeof(fs_inode_t) * 8;
     
-    uint32_t dir_sectors = (sizeof(fs_inode_t) * 8 + SECTOR_SIZE - 1) / SECTOR_SIZE;
+    uint32_t dir_sectors = (total_dir_bytes + SECTOR_SIZE - 1) / SECTOR_SIZE;
     for (uint32_t i = 0; i < dir_sectors; i++) {
         fs_disk_read(FS_DIR_SECTOR + i, fs_scratch_buffer);
         uint32_t offset = i * SECTOR_SIZE;
-        uint32_t chunk_size = (sizeof(fs_inode_t) * 8 - offset > SECTOR_SIZE) ? SECTOR_SIZE : (sizeof(fs_inode_t) * 8 - offset);
-        memcpy(((uint8_t*)dir_table) + offset, fs_scratch_buffer, chunk_size);
+        
+        uint32_t chunk_size = SECTOR_SIZE;
+        if (offset < total_dir_bytes) {
+            uint32_t bytes_left = total_dir_bytes - offset;
+            if (bytes_left < SECTOR_SIZE) {
+                chunk_size = bytes_left;
+            }
+        } else {
+            chunk_size = 0;
+        }
+
+        if (chunk_size > 0) {
+            memcpy(((uint8_t*)dir_table) + offset, fs_scratch_buffer, chunk_size);
+        }
     }
 
-    // search for the filename
     fs_inode_t* target = 0;
     for (int i = 0; i < 8; i++) {
         if (dir_table[i].is_used && string_strcmp(dir_table[i].filename, filename) == 0) {
