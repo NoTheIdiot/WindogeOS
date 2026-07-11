@@ -49,4 +49,11 @@ typedef struct {
     uint8_t     padding[500];
 } __attribute__((packed)) fs_superblock_t;
 
+#define FS_DRIVE_MAGIC 0x446f6765
+
+void fs_format();
+void fs_init();
+int fs_write_file(const char* name, const uint8_t* data, uint32_t size);
+int fs_read_file(const char* filename, uint8_t* out_buffer);
+
 #endif
