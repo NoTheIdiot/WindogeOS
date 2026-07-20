@@ -10,7 +10,7 @@ Currently converting to a RAMFS, if you got a solution for a REAL file system,
 please create a pull request.
 
 = How to such compile and run?
-- Install git, clang, and qemu-system. Yes, the other tools (like limine, that's it)
+- Install git, clang, python, and qemu-system. Yes, the other tools (like limine, that's it)
   is already included.
 
 - Run this in your terminal, if you are on windows, install msys2 via this
