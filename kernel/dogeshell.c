@@ -58,6 +58,26 @@ int system_dogeshell_ex(char* command) {
         handled = 0;
     }
 
+	else if (string_startswith(command, "writefile")) {
+		size_t len = string_strlen(command);
+
+		if (len >= 10 && command[8] == ' ') {
+            char* argument = command + 9;
+
+            if (string_strcmp(argument, "--help") == 0) {
+                dogeio_text_println("Usage: writefile [filename]");
+                dogeio_text_println("Writes a string of text to the file sepcificed.");
+            } else {
+				char input[256];
+				dogeio_text_input("Text to Write:\n", input, 256);
+				system_fs_writefile(argument, input);
+            }
+        } else {
+            dogeio_text_println("Usage: readfile [filename]");
+        }
+        handled = 0;
+	}
+
     else if (string_startswith(command, "help")) {
         for (int i = 0; i < 6; i++) {
             dogeio_text_println(help_command_array[i]);

@@ -32,6 +32,7 @@ void system_fs_format();
 void system_fs_list();
 void system_fs_createfile(char* name, char* ext);
 bool system_fs_readfile(char* name);
+bool system_fs_writefile(char* name, char* string);
 void system_fs_start_init();
 
 #endif
