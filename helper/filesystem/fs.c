@@ -4,37 +4,35 @@
 #include <bool.h>
 #include <stddef.h>
 
-int fileamount;
 file_t filesystem[FS_MAX_FILE_AMOUNT];
 
 file_t* system_fs_find(char* filename) {
 	for (int i = 0; i < FS_MAX_FILE_AMOUNT; i++) {
-		if (string_strcmp(filesystem[i].name, filename) == 0) {
-			return &filesystem[i];
+		if (filesystem[i].name[0] != '\0') {
+			if (string_strcmp(filesystem[i].name, filename) == 0) {
+				return &filesystem[i];
+			}
 		}
 	}
 	return NULL;
 }
 
 void system_fs_format() {
-    for (int i = 0; i < FS_MAX_FILE_AMOUNT; i++) {
-        filesystem[i].name[0] = '\0';
-        filesystem[i].cols_last = 0;
-        
-        filesystem[i].ext[0] = '\0';
-        filesystem[i].content[0][0] = '\0';
-    }
-	fileamount = 0;
+	for (int i = 0; i < FS_MAX_FILE_AMOUNT; i++) {
+		filesystem[i].name[0] = '\0';
+		filesystem[i].cols_last = 0;
+		filesystem[i].ext[0] = '\0';
+		filesystem[i].content[0][0] = '\0';
+	}
 }
 
 void system_fs_list() {
+	dogeio_text_println("name");
+	dogeio_text_println("-------------------------");
 	for (int i = 0; i < FS_MAX_FILE_AMOUNT; i++) {
 		if (filesystem[i].name[0] == '\0') {
-            continue;
-        }
-
-		dogeio_text_println("name");
-		dogeio_text_println("-------------------------");
+			continue;
+		}
 		dogeio_text_print(filesystem[i].name);
 		dogeio_text_print(".");
 		dogeio_text_println(filesystem[i].ext);
@@ -42,27 +40,37 @@ void system_fs_list() {
 }
 
 void system_fs_createfile(char* name, char* ext) {
-	if (fileamount >= FS_MAX_FILE_AMOUNT) {
+	int target_index = -1;
+	for (int i = 0; i < FS_MAX_FILE_AMOUNT; i++) {
+		if (filesystem[i].name[0] == '\0') {
+			target_index = i;
+			break;
+		}
+	}
+
+	if (target_index == -1) {
 		dogeio_text_println("Your drive is full, please delete some useless files");
 		return;
 	}
 
-	for (int j = 0; j < 31; j++) {
-        filesystem[fileamount].name[j] = name[j];
-        if (name[j] == '\0') break;
+	if (system_fs_find(name) != NULL) {
+		dogeio_text_println("Error: A file with that name already exists.");
+		return;
 	}
-	filesystem[fileamount].name[31] = '\0';
 
-	for (int j = 0; j < 3; j++) {
-        filesystem[fileamount].ext[j] = ext[j];
-        if (ext[j] == '\0') break;
-    }
-    filesystem[fileamount].ext[3] = '\0';
+	int j;
+	for (j = 0; j < 31 && name[j] != '\0'; j++) {
+		filesystem[target_index].name[j] = name[j];
+	}
+	filesystem[target_index].name[j] = '\0';
 
-	filesystem[fileamount].cols_last = 0;
-    filesystem[fileamount].content[0][0] = '\0';
+	for (j = 0; j < 3 && ext[j] != '\0'; j++) {
+		filesystem[target_index].ext[j] = ext[j];
+	}
+	filesystem[target_index].ext[j] = '\0';
 
-	fileamount++;
+	filesystem[target_index].cols_last = 0;
+	filesystem[target_index].content[0][0] = '\0';
 }
 
 bool system_fs_readfile(char* name) {
@@ -72,11 +80,7 @@ bool system_fs_readfile(char* name) {
 		dogeio_text_println("Error: File does not exist.");
 		return false;
 	} else {
-		for (int i = 0; i < FS_CONTENT_COLS; i++) {
-			if (file->content[i][0] == '\0') {
-				break; 
-			}
-
+		for (int i = 0; i < file->cols_last; i++) {
 			dogeio_text_println(file->content[i]);
 		}
 		return true;
@@ -99,6 +103,24 @@ bool system_fs_writefile(char* name, char* string) {
 	string_strcpy(file->content[file->cols_last], string);
 	
 	file->cols_last++;
+	return true;
+}
+
+bool system_fs_deleteline(char* filename) {
+	file_t* file = system_fs_find(filename);
+	
+	if (file == NULL) {
+		dogeio_text_println("Error: File does not exist.");
+		return false;
+	}
+
+	if (file->cols_last == 0) {
+		dogeio_text_println("Error: File is already empty.");
+		return false;
+	}
+
+	file->cols_last--;
+	file->content[file->cols_last][0] = '\0';
 	return true;
 }
 
