@@ -1,10 +1,9 @@
-#ifndef __FREESTANDING_C_HDRS_STDBOOL_H
-#define __FREESTANDING_C_HDRS_STDBOOL_H 1
+#ifndef BOOL_H
+#define BOOL_H 1
 
 #ifndef __cplusplus
 
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L
-    /* These do not need to be defined for C23+ */
 #else
 #  undef bool
 #  define bool _Bool

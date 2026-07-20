@@ -1,5 +1,5 @@
-#ifndef __FREESTANDING_C_HDRS_STDDEF_H
-#define __FREESTANDING_C_HDRS_STDDEF_H 1
+#ifndef STDDEF_H
+#define STDDEF_H 1
 
 typedef __SIZE_TYPE__ size_t;
 typedef __PTRDIFF_TYPE__ ptrdiff_t;

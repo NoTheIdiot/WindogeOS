@@ -1,11 +1,11 @@
-// include files
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
-#include <float.h>
 
-// stringing compare
-int string_strcmp(const char *string1, const char *string2) {
+#define INT_MIN (-2147483647 - 1)
+#define INT_MAX (2147483647)
+
+int string_strcmp(const char* string1, const char *string2) {
     while (*string1 && (*string1 == *string2)) {
         string1++;
         string2++;
@@ -14,6 +14,7 @@ int string_strcmp(const char *string1, const char *string2) {
 }
 
 size_t string_strlen(const char *string) {
+    if (!string) return 0; // Basic null safety check
     size_t counter = 0;
     while (string[counter] != '\0') {
         counter++;
@@ -23,30 +24,28 @@ size_t string_strlen(const char *string) {
 
 void string_itoa(int n, char* string) {
     int i = 0;
-    int is_negative = 0;
-
+    
     if (n == 0) {
         string[i++] = '0';
         string[i] = '\0';
         return;
     }
 
-    if (n < 0) {
-        is_negative = 1;
-        n = -n;
-    }
-
+    // Use a negative-safe loop to completely prevent INT_MIN overflow
+    int is_negative = (n < 0);
+    
     while (n != 0) {
-        string[i++] = (n % 10) + '0';
+        int rem = n % 10;
+        string[i++] = (char)((is_negative ? -rem : rem) + '0');
         n = n / 10;
     }
 
     if (is_negative) {
         string[i++] = '-';
     }
-
     string[i] = '\0';
 
+    // Reverse string
     int start = 0;
     int end = i - 1;
     while (start < end) {
@@ -83,62 +82,39 @@ int string_startswith(const char *string, const char *prefix) {
 
 int string_atoi(char* s) {
     int res = 0;
+    int sign = 1;
+
+    // Handle leading signs
+    if (*s == '-') {
+        sign = -1;
+        s++;
+    } else if (*s == '+') {
+        s++;
+    }
+
     while (*s >= '0' && *s <= '9') {
+        // Simple overflow prevention check
+        if (res > (INT_MAX - (*s - '0')) / 10) {
+            return (sign == 1) ? INT_MAX : INT_MIN;
+        }
         res = res * 10 + (*s - '0');
         s++;
     }
-    return res;
-}
-
-float string_atof(const char *str) {
-    float result = 0.0f;
-    float fraction = 1.0f;
-    int is_negative = 0;
-    int point_seen = 0;
-
-    if (*str == '-') {
-        is_negative = 1;
-        str++;
-    }
-
-    while (*str) {
-        if (*str == '.') {
-            point_seen = 1;
-            str++;
-            continue;
-        }
-        if (*str >= '0' && *str <= '9') {
-            if (point_seen) {
-                fraction *= 0.1f;
-                result += (*str - '0') * fraction;
-            } else {
-                result = (result * 10.0f) + (*str - '0');
-            }
-        } else {
-            break; 
-        }
-        str++;
-    }
-    return is_negative ? -result : result;
+    return res * sign;
 }
 
 void string_strcpy(char *dest, const char *src) {
-    int i = 0;
-    while (src[i] != '\0') {
-        dest[i] = src[i];
-        i++;
-    }
-    dest[i] = '\0';
+    while ((*dest++ = *src++));
 }
 
-// did i just copy unsafe code
 char* string_strncpy(char* dest, const char* src, size_t n) {
+    if (n == 0) return dest;
+    
     size_t i;
-
-    for (i = 0; i < n && src[i] != '\0'; i++) {
+    for (i = 0; i < n - 1 && src[i] != '\0'; i++) {
         dest[i] = src[i];
     }
-
+    
     for (; i < n; i++) {
         dest[i] = '\0';
     }
@@ -147,20 +123,10 @@ char* string_strncpy(char* dest, const char* src, size_t n) {
 }
 
 char* string_strcat(char* dest, const char* src) {  
-    int i = 0;
-    while (dest[i] != '\0') 
-    {
-        i++;
+    char *ptr = dest;
+    while (*ptr != '\0') {
+        ptr++;
     }
-
-    int j = 0;
-    while (src[j] != '\0') 
-    {
-        dest[i] = src[j];
-        i++;
-        j++;
-    }
-
-    dest[i] = '\0';
+    while ((*ptr++ = *src++));
     return dest;
 }

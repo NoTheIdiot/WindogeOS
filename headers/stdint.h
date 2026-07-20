@@ -1,5 +1,5 @@
-#ifndef __FREESTANDING_C_HDRS_STDINT_H
-#define __FREESTANDING_C_HDRS_STDINT_H 1
+#ifndef STDINT_H
+#define STDINT_H 1
 
 #ifdef __UINT8_TYPE__
 typedef __UINT8_TYPE__ uint8_t;
