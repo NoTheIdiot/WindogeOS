@@ -44,11 +44,15 @@ int system_dogeshell_ex(char* command) {
         size_t len = string_strlen(command);
         if (len >= 9 && command[8] == ' ') {
             char* argument = command + 9;
+			char name[32];
+			char ext[8];
+
+			string_split_filename(argument, name, ext);
             if (string_strcmp(argument, "--help") == 0) {
                 dogeio_text_println("Usage: readfile [filename]");
                 dogeio_text_println("Outputs the contents of a file.");
             } else {
-                system_fs_readfile(argument);
+                system_fs_readfile(name, ext);
             }
         } else {
             dogeio_text_println("Usage: readfile [filename]");
@@ -60,15 +64,20 @@ int system_dogeshell_ex(char* command) {
         size_t len = string_strlen(command);
         if (len >= 10 && command[9] == ' ') {
             char* argument = command + 10;
+			char name[32];
+			char ext[8];
+
+			string_split_filename(argument, name, ext);
+
             if (string_strcmp(argument, "--help") == 0) {
                 dogeio_text_println("Usage: writefile [filename]");
                 dogeio_text_println("Writes a string of text to the file specified.");
-            } else if (1) {
+            } else if (string_strcmp(argument, "--delete") == 0) {
 
 			} else {
                 char input[256];
                 dogeio_text_input("Text to Write:\n", input, 256);
-                system_fs_writefile(argument, input);
+                system_fs_writefile(name, ext, input);
             }
         } else {
             dogeio_text_println("Usage: writefile [filename]");

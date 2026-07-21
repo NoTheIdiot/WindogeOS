@@ -6,10 +6,10 @@
 
 file_t filesystem[FS_MAX_FILE_AMOUNT];
 
-file_t* system_fs_find(char* filename) {
+file_t* system_fs_find(char* filename, char* ext) {
 	for (int i = 0; i < FS_MAX_FILE_AMOUNT; i++) {
 		if (filesystem[i].name[0] != '\0') {
-			if (string_strcmp(filesystem[i].name, filename) == 0) {
+			if (string_strcmp(filesystem[i].name, filename) == 0 || string_strcmp(filesystem[i].ext, ext) == 0) {
 				return &filesystem[i];
 			}
 		}
@@ -53,7 +53,7 @@ void system_fs_createfile(char* name, char* ext) {
 		return;
 	}
 
-	if (system_fs_find(name) != NULL) {
+	if (system_fs_find(name, ext) != NULL) {
 		dogeio_text_println("Error: A file with that name already exists.");
 		return;
 	}
@@ -73,8 +73,8 @@ void system_fs_createfile(char* name, char* ext) {
 	filesystem[target_index].content[0][0] = '\0';
 }
 
-bool system_fs_readfile(char* name) {
-	file_t* file = system_fs_find(name);
+bool system_fs_readfile(char* name, char* ext) {
+	file_t* file = system_fs_find(name, ext);
 	
 	if (file == NULL) {
 		dogeio_text_println("Error: File does not exist.");
@@ -87,8 +87,8 @@ bool system_fs_readfile(char* name) {
 	}
 }
 
-bool system_fs_writefile(char* name, char* string) {
-	file_t* file = system_fs_find(name);
+bool system_fs_writefile(char* name, char* ext, char* string) {
+	file_t* file = system_fs_find(name, ext);
 	
 	if (file == NULL) {
 		dogeio_text_println("Error: File does not exist.");
@@ -106,8 +106,8 @@ bool system_fs_writefile(char* name, char* string) {
 	return true;
 }
 
-bool system_fs_deleteline(char* filename) {
-	file_t* file = system_fs_find(filename);
+bool system_fs_deleteline(char* filename, char* ext) {
+	file_t* file = system_fs_find(filename, ext);
 	
 	if (file == NULL) {
 		dogeio_text_println("Error: File does not exist.");
@@ -127,5 +127,5 @@ bool system_fs_deleteline(char* filename) {
 void system_fs_start_init() {
 	system_fs_format();
 	system_fs_createfile("readme", "txt"); 
-	system_fs_writefile("readme", "Welcome to WindogeOS v0.0.3! Do anything around here");
+	system_fs_writefile("readme", "txt", "Welcome to WindogeOS v0.0.3! Do anything around here");
 }

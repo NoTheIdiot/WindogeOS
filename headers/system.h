@@ -22,17 +22,17 @@ void system_dogeshell();
 
 typedef struct {
 	char name[32];
-	char ext [4];
+	char ext [8];		// ill use .file
 	char content[FS_CONTENT_COLS][FS_CONTENT_ROWS];
 	uint8_t cols_last;
 } file_t;
 
-file_t* system_fs_find(char* filename);
+file_t* system_fs_find(char* filename, char* ext);
 void system_fs_format();
 void system_fs_list();
 void system_fs_createfile(char* name, char* ext);
-bool system_fs_readfile(char* name);
-bool system_fs_writefile(char* name, char* string);
+bool system_fs_readfile(char* name, char* ext);
+bool system_fs_writefile(char* name, char* ext, char* string);
 void system_fs_start_init();
 
 #endif

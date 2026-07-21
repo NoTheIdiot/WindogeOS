@@ -130,3 +130,28 @@ char* string_strcat(char* dest, const char* src) {
     while ((*ptr++ = *src++));
     return dest;
 }
+
+void string_split_filename(const char *input, char *name, char *ext) {
+    int dot_index = -1;
+    int length = 0;
+
+    while (input[length] != '\0') {
+        if (input[length] == '.') {
+            dot_index = length;
+        }
+        length++;
+    }
+    int i = 0;
+    while (i < dot_index) {
+        name[i] = input[i];
+        i++;
+    }
+    name[i] = '\0'; 
+
+    int j = 0;
+    while (dot_index != -1 && (dot_index + 1 + j) < length) {
+        ext[j] = input[dot_index + 1 + j];
+        j++;
+    }
+    ext[j] = '\0'; 
+}

@@ -25,5 +25,6 @@ void string_strcpy(char *dest, const char *src);
 char* string_strncpy(char* dest, const char* src, size_t n);
 float string_atof(const char *str);
 char* string_strcat(char* dest, const char* src);
+void string_split_filename(const char *input, char *name, char *ext);
 
 #endif
