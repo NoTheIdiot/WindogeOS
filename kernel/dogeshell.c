@@ -3,6 +3,7 @@
 #include <bool.h>
 #include <basicutil.h>
 #include <system.h>
+#include <time.h>
 
 int system_dogeshell_ex(char* command) {
     int handled = 1; 
@@ -41,6 +42,12 @@ int system_dogeshell_ex(char* command) {
         system_fs_list();
         handled = 0;
     }
+
+    else if (string_startswith(command, "time")) {
+        dogeio_text_println(time_get());
+        handled = 0;
+    }
+    
 
     else if (string_startswith(command, "readfile")) {
         size_t len = string_strlen(command);
