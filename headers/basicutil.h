@@ -27,4 +27,7 @@ void serial_println(const char* str);
 void log(const char* string);
 void duolog(const char* string);
 
+// info
+char* cpuid(void);
+
 #endif

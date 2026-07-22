@@ -15,5 +15,6 @@ void dogeio_text_print(const char *str);
 void dogeio_text_println(const char *str);
 void dogeio_text_print_at(const char *str, uint32_t x_pos, uint32_t y_pos, uint32_t text_color);
 void dogeio_text_input(const char* prompt, char* buffer, size_t max_string_length);
+void dogeio_text_color_change(uint32_t color) ;
 
 #endif

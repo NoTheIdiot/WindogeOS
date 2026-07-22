@@ -1,19 +1,21 @@
 #include <dogeio.h>
 #include <string.h>
 #include <bool.h>
+#include <basicutil.h>
 #include <system.h>
 
 int system_dogeshell_ex(char* command) {
     int handled = 1; 
     
-    char* help_command_array[7] = {
+    char* help_command_array[8] = {
         "print          | simply prints a piece of text",
         "clear          | clears the terminal screen",
         "dir            | list the contents of the current folder",
         "readfile       | outputs the contents of a file",
         "writefile      | writes a string of text to a file",
         "help           | outputs this help menu breakdown",
-        "shutdown       | shutsdown the computer"
+        "shutdown       | shutsdown the computer",
+		"cpuinfo		| prints the cpu name"
     };
 
     if (command == NULL || command[0] == '\0') {
@@ -92,6 +94,11 @@ int system_dogeshell_ex(char* command) {
         handled = 0;
     }
 
+	else if (string_startswith(command, "cpuinfo")) {
+		dogeio_text_println(cpuid());
+		handled = 0;
+	}
+
     if (handled == 1) {
         dogeio_text_print(command);
         dogeio_text_println(": command doesn't exist :(");
@@ -102,8 +109,7 @@ int system_dogeshell_ex(char* command) {
 
 void system_dogeshell() {
     char input[256];
-    char prompt[32];
-    int  status     = 0;
+    int  status = 0;
 
     while (true) {
         for (int i = 0; i < 256; i++) {
@@ -111,12 +117,27 @@ void system_dogeshell() {
         }
 
         if (status == 1) {
-            string_strcpy(prompt, "wow (root) [1] > ");
+			dogeio_text_color_change(0x0000FF00);
+            dogeio_text_print("wow");
+			dogeio_text_color_change(0xFFFFFFFF);
+			dogeio_text_print(" (root) ");
+			dogeio_text_color_change(0x00FF0000);
+			dogeio_text_print("[1] ");
         } else {
-            string_strcpy(prompt, "wow (root) > ");
+            dogeio_text_color_change(0x0000FF00);
+            dogeio_text_print("wow");
+			dogeio_text_color_change(0xFFFFFFFF);
+			dogeio_text_print(" (root) ");
         }
 
-        dogeio_text_input(prompt, input, 256);
+		dogeio_text_color_change(0xFFFFFFFF);
+        dogeio_text_input("> ", input, 256);
         status = system_dogeshell_ex(input);
     }
 }
+
+/*
+void system_dogeshell() {
+
+}
+*/

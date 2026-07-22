@@ -172,3 +172,7 @@ void dogeio_text_print_at(const char *str, uint32_t x_pos, uint32_t y_pos, uint3
 
     dogeio_text_color = original_color;
 }
+
+void dogeio_text_color_change(uint32_t color) {
+	dogeio_text_color = color;
+}
