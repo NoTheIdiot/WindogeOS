@@ -43,18 +43,18 @@ int system_dogeshell_ex(char* command) {
         handled = 0;
     }
 
+    // alright it actually works
     else if (string_startswith(command, "time")) {
         dogeio_text_println(time_get());
         handled = 0;
     }
-    
 
     else if (string_startswith(command, "readfile")) {
         size_t len = string_strlen(command);
         if (len >= 9 && command[8] == ' ') {
             char* argument = command + 9;
-			char name[32];
-			char ext[8];
+	        char name[32];
+	      	char ext[8];
 
 			string_split_filename(argument, name, ext);
             if (string_strcmp(argument, "--help") == 0) {
@@ -142,9 +142,3 @@ void system_dogeshell() {
         status = system_dogeshell_ex(input);
     }
 }
-
-/*
-void system_dogeshell() {
-
-}
-*/

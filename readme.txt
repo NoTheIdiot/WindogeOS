@@ -10,7 +10,7 @@ Currently converting to a RAMFS, if you got a solution for a REAL file system,
 please create a pull request.
 
 = How to such compile and run?
-- Install git, clang, python, and qemu-system. Yes, the other tools (like limine, that's it)
+- Install git, clang, python, nasm, and qemu-system. Yes, the other tools (like limine, that's it)
   is already included.
 
 - Run this in your terminal, if you are on windows, install msys2 via this
@@ -31,8 +31,3 @@ programs above.
 - do not make the qemu-system command yourself, run python start_vm.py.
   if you somehow got a better result, please make a pull request,
   less headaches are better.
-
-
-= Notes for development
-- the files folder will be injected to the filesystem.
-- the help folder is just a reference for me.
