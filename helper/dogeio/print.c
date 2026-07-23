@@ -5,6 +5,7 @@
 #include <boot/limine.h>
 #include <basicutil.h>
 #include <stddef.h>
+#include <boot/kernel.h>
 
 // get the framebuffer array in the kernel
 extern volatile struct limine_framebuffer_request framebuffer_request;
@@ -19,7 +20,7 @@ char text_grid[TERMINAL_ROWS * TERMINAL_COLS];
 
 // other stuff
 uint32_t cursor_x = 0;
-uint32_t cursor_y = 0;
+uint32_t cursor_y = 1;
 uint32_t dogeio_background_color = 0x000000;
 uint32_t dogeio_text_color       = 0xffffff;
 
@@ -69,6 +70,26 @@ void dogeio_text_putchar(char c, uint32_t x, uint32_t y) {
 // func() better than func(void)
 void dogeio_text_clear() {
     for (uint32_t i = 0; i < (TERMINAL_ROWS * TERMINAL_COLS); i++) {
+        text_grid[i] = ' ';
+    }
+    
+    if (framebuffer_request.response != NULL && framebuffer_request.response->framebuffer_count >= 1) {
+        struct limine_framebuffer *framebuffer = framebuffer_request.response->framebuffers[0];
+        uint32_t* fb_ptr = (uint32_t*)framebuffer->address;
+        size_t total_pixels = (framebuffer->pitch / 4) * framebuffer->height;
+        
+        for (size_t i = 0; i < total_pixels; i++) {
+            fb_ptr[i] = dogeio_background_color;
+        }
+    }
+
+    cursor_x = 0;
+    cursor_y = 1;
+	menubar_draw();
+}
+
+void dogeio_text_clear_raw() {
+	for (uint32_t i = 0; i < (TERMINAL_ROWS * TERMINAL_COLS); i++) {
         text_grid[i] = ' ';
     }
     
@@ -175,4 +196,8 @@ void dogeio_text_print_at(const char *str, uint32_t x_pos, uint32_t y_pos, uint3
 
 void dogeio_text_color_change(uint32_t color) {
 	dogeio_text_color = color;
+}
+
+void dogeio_text_background_change(uint32_t color) {
+	dogeio_background_color = color;
 }

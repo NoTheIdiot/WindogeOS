@@ -7,6 +7,7 @@
 #include <stddef.h>
 #include <basicutil.h>
 #include <system.h>
+#include <boot/kernel.h>
 
 __attribute__((used, section(".limine_requests_start")))
 volatile uint64_t limine_requests_start_marker[] = LIMINE_REQUESTS_START_MARKER;
@@ -52,6 +53,7 @@ void kernel_main(void) {
 	log("[Wow] Format Sucess");
 
     log("WindogeOS has successfully booted. Start celebrating broski.");
+	menubar_draw();
     dogeio_text_print("============================================================================\n");
     dogeio_text_print("=                       Welcome to WindogeOS! v0.0.3                       =\n");
     dogeio_text_print("=                  Type 'help' for help in the dogeshell.                  =\n");
