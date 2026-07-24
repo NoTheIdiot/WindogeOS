@@ -48,6 +48,13 @@ void kernel_main(void) {
     }
     log("[Wow] Limine's Framebuffer Initialize Sucess, very very wow.");
 
+	if (memmap_request.response == NULL) {
+		log("[Not Wow] Holy shit RAM does not exist.... How?");
+		log("          memmap_request.response == NULL");
+		halt();
+	}
+	log("[Wow] Memory Map has been found.");
+
 	log("Formating ramisk, such patience");
 	system_fs_start_init();
 	log("[Wow] Format Sucess");

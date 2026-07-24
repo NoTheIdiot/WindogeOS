@@ -102,7 +102,13 @@ int system_dogeshell_ex(char* command) {
     }
 
 	else if (string_startswith(command, "cpuinfo")) {
+		dogeio_text_println("Cpu Name: ");
 		dogeio_text_println(cpuid());
+		handled = 0;
+	}
+
+	else if (string_startswith(command, "raminfo")) {
+		dogeio_text_print("RAM Amount: ");
 		handled = 0;
 	}
 
