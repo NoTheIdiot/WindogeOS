@@ -106,6 +106,11 @@ int system_dogeshell_ex(char* command) {
 		handled = 0;
 	}
 
+	else if (string_strcmp(command, "bash") == 0) {
+		system_bash();
+		handled = 0;
+	}
+
     if (handled == 1) {
         dogeio_text_print(command);
         dogeio_text_println(": command doesn't exist :(");

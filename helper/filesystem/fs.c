@@ -124,6 +124,13 @@ bool system_fs_deleteline(char* filename, char* ext) {
 	return true;
 }
 
+/*bool system_fs_deletefile(char* filename, char* ext) {
+	file_t* file = system_fs_find(filename, ext);
+	if (file == NULL) {
+
+	}
+}*/
+
 void system_fs_start_init() {
 	system_fs_format();
 	system_fs_createfile("readme", "txt"); 

@@ -9,6 +9,8 @@ extern uint8_t terminal_font[128][16];
 
 extern uint32_t cursor_x;
 extern uint32_t cursor_y;
+extern uint32_t dogeio_background_color;
+extern uint32_t dogeio_text_color;
 
 // good ol text stuff
 void dogeio_text_putchar(char c, uint32_t x, uint32_t y);

@@ -7,6 +7,7 @@
 
 int system_dogeshell_ex(char* command);
 void system_dogeshell();
+void system_bash();
 
 #define FS_CONTENT_ROWS 256
 #define FS_CONTENT_COLS 512
