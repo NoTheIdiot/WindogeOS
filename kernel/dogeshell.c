@@ -117,6 +117,13 @@ int system_dogeshell_ex(char* command) {
 		handled = 0;
 	}
 
+	else if (string_strcmp(command, "logo") == 0) {
+		for (int i = 0; i < 22; i++) {
+			dogeio_text_println(doge_ascii[i]);
+		}
+		handled = 0;
+	}
+
     if (handled == 1) {
         dogeio_text_print(command);
         dogeio_text_println(": command doesn't exist :(");

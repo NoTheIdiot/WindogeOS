@@ -1,5 +1,33 @@
 #include <stdint.h> 
 #include <basicutil.h>
+#include <boot/limine.h>
+
+extern volatile struct limine_memmap_request memmap_request;
+
+const char* doge_ascii[22] = {
+    "                 ;i.",
+    "                  M$L                    .;i.",
+    "                  M$Y;                .;iii;;.",
+    "                 ;$YY$i._           .iiii;;;;;",
+    "                .iiiYYYYYYiiiii;;;;i;iii;; ;;;",
+    "              .;iYYYYYYiiiiiiYYYiiiiiii;;  ;;;",
+    "           .YYYY$$$$YYYYYYYYYYYYYYYYiii;; ;;;;",
+    "         .YYY$$$$$$YYYYYY$$$$iiiY$$$$$$$ii;;;;",
+    "        :YYYF`,  TYYYYY$$$$$YYYYYYYi$$$$$iiiii;",
+    "       Y$MM: \\\\  :YYYY$$P\"````\"T$YYMMMMMMMMiiYY.",
+    "     `.;\\[M\\]b.,dYY\\[Yi; .(     .YYMMM\\]\\$MMMMYY",
+    "    .._MMMMM!YYYYYYYYYi;.`\"  .;iiMMM$MMMMMMMYY",
+    "    ._$MMMP` ```\"\"4$$$$$iiiiiiii$MMMMMMMMMMMMMY;",
+    "     MMMM$:       :$$$$$$$MMMMMMMMMMM$$MMMMMMMYYL",
+    "    :MMMM$$.    .;PPb$$$$MMMMMMMMMM$$$$MMMMMMiYYU:",
+    "     iMM$$;;: ;;;;i$$$$$$$MMMMM$$$$MMMMMMMMMMYYYYY",
+    "     `$$$$i .. ``:iiii!*\"``.$$$$$$$$$MMMMMMM$YiYYY",
+    "      :Y$$iii;;;.. ` ..;;i$$$$$$$$$MMMMMM$$YYYYiYY:",
+    "       :$$$$$iiiiiii$$$$$$$$$$$MMMMMMMMMMYYYYiiYYYY.",
+    "        `$$$$$$$$$$$$$$$$$$$$MMMMMMMM$YYYYYiiiYYYYYY",
+    "         YY$$$$$$$$$$$$$$$$MMMMMMM$$YYYiiiiiiYYYYYYY",
+    "        :YYYYYY$$$$$$$$$$$$$$$$$$YYYYYYYiiiiYYYYYYi'"
+};
 
 char* cpuid(void) {
     static char vendor[13]; 
@@ -29,4 +57,23 @@ char* cpuid(void) {
     vendor[12] = '\0'; 
 
     return vendor; 
+}
+
+uint64_t get_ram(void) {
+	if (memmap_request.response == NULL) {
+        return 0; 
+    }
+
+    uint64_t total_ram_bytes = 0;
+    uint64_t entries = memmap_request.response->entry_count;
+
+    for (uint64_t i = 0; i < entries; i++) {
+        struct limine_memmap_entry *entry = memmap_request.response->entries[i];
+
+        if (entry->type == LIMINE_MEMMAP_USABLE) {
+            total_ram_bytes += entry->length;
+        }
+    }
+
+    return total_ram_bytes;
 }

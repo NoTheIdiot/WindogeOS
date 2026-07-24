@@ -8,6 +8,8 @@
 // really basic stuff
 void halt();
 
+extern const char* doge_ascii[22];
+
 // low level ports
 uint8_t ports_inb(uint16_t port);
 void ports_outb(uint16_t port, uint8_t val);

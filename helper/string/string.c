@@ -14,7 +14,7 @@ int string_strcmp(const char* string1, const char *string2) {
 }
 
 size_t string_strlen(const char *string) {
-    if (!string) return 0; // Basic null safety check
+    if (!string) return 0;
     size_t counter = 0;
     while (string[counter] != '\0') {
         counter++;
@@ -31,7 +31,6 @@ void string_itoa(int n, char* string) {
         return;
     }
 
-    // Use a negative-safe loop to completely prevent INT_MIN overflow
     int is_negative = (n < 0);
     
     while (n != 0) {
@@ -45,7 +44,34 @@ void string_itoa(int n, char* string) {
     }
     string[i] = '\0';
 
-    // Reverse string
+    int start = 0;
+    int end = i - 1;
+    while (start < end) {
+        char temp = string[start];
+        string[start] = string[end];
+        string[end] = temp;
+        start++;
+        end--;
+    }
+}
+
+void string_u64toa(uint64_t n, char* string) {
+    int i = 0;
+    
+    if (n == 0) {
+        string[i++] = '0';
+        string[i] = '\0';
+        return;
+    }
+
+    while (n != 0) {
+        uint64_t rem = n % 10;
+        string[i++] = (char)(rem + '0');
+        n = n / 10;
+    }
+
+    string[i] = '\0';
+
     int start = 0;
     int end = i - 1;
     while (start < end) {
@@ -84,7 +110,6 @@ int string_atoi(char* s) {
     int res = 0;
     int sign = 1;
 
-    // Handle leading signs
     if (*s == '-') {
         sign = -1;
         s++;
@@ -93,7 +118,6 @@ int string_atoi(char* s) {
     }
 
     while (*s >= '0' && *s <= '9') {
-        // Simple overflow prevention check
         if (res > (INT_MAX - (*s - '0')) / 10) {
             return (sign == 1) ? INT_MAX : INT_MIN;
         }
