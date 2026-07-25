@@ -136,3 +136,25 @@ void system_fs_start_init() {
 	system_fs_createfile("readme", "txt"); 
 	system_fs_writefile("readme", "txt", "Welcome to WindogeOS v0.0.3! Do anything around here");
 }
+
+int system_get_file_amount() {
+	int output = 0;
+	for (int i = 0; i < FS_MAX_FILE_AMOUNT; i++) {
+		if (filesystem[i].name[0] != '\0') {
+			output++;
+		}
+	}
+	return output;
+}
+
+char* system_file_amount_string() {
+	int output = 0;
+	for (int i = 0; i < FS_MAX_FILE_AMOUNT; i++) {
+		if (filesystem[i].name[0] != '\0') {
+			output++;
+		}
+	}
+	static char real_output[4];
+	string_itoa(output,real_output);
+	return real_output;
+}

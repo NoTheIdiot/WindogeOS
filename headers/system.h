@@ -35,5 +35,10 @@ void system_fs_createfile(char* name, char* ext);
 bool system_fs_readfile(char* name, char* ext);
 bool system_fs_writefile(char* name, char* ext, char* string);
 void system_fs_start_init();
+int system_get_file_amount();
+char* system_file_amount_string();
+
+void system_fetch();
+extern char* windoge_version;
 
 #endif

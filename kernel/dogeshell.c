@@ -107,6 +107,11 @@ int system_dogeshell_ex(char* command) {
 		handled = 0;
 	}
 
+	else if (string_strcmp(command, "fetch") == 0) {
+		system_fetch();
+		handled = 0;
+	}
+
 	else if (string_startswith(command, "raminfo")) {
 		dogeio_text_print("RAM Amount: ");
 		handled = 0;
@@ -117,10 +122,18 @@ int system_dogeshell_ex(char* command) {
 		handled = 0;
 	}
 
-	else if (string_strcmp(command, "logo") == 0) {
-		for (int i = 0; i < 22; i++) {
-			dogeio_text_println(doge_ascii[i]);
-		}
+	else if (string_strcmp(command, "ver") == 0) {
+		dogeio_text_println(windoge_version);
+		handled = 0;
+	}
+
+	else if (string_strcmp(command, "whoami") == 0) {
+		dogeio_text_println("wow");
+		handled = 0;
+	}
+	
+	else if (string_strcmp(command, "whereami") == 0) {
+		dogeio_text_println("root (/)");
 		handled = 0;
 	}
 

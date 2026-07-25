@@ -1,66 +1,64 @@
 #include <stdint.h> 
+#include <dogeio.h>
+#include <string.h>
 #include <basicutil.h>
+#include <system.h>
 #include <boot/limine.h>
 
 extern volatile struct limine_memmap_request memmap_request;
 
+char* windoge_version = "WindogeOS v0.0.3";
+
 const char* doge_ascii[22] = {
     "                 ;i.",
-    "                  M$L                    .;i.",
-    "                  M$Y;                .;iii;;.",
-    "                 ;$YY$i._           .iiii;;;;;",
-    "                .iiiYYYYYYiiiii;;;;i;iii;; ;;;",
-    "              .;iYYYYYYiiiiiiYYYiiiiiii;;  ;;;",
-    "           .YYYY$$$$YYYYYYYYYYYYYYYYiii;; ;;;;",
-    "         .YYY$$$$$$YYYYYY$$$$iiiY$$$$$$$ii;;;;",
-    "        :YYYF`,  TYYYYY$$$$$YYYYYYYi$$$$$iiiii;",
-    "       Y$MM: \\\\  :YYYY$$P\"````\"T$YYMMMMMMMMiiYY.",
-    "     `.;\\[M\\]b.,dYY\\[Yi; .(     .YYMMM\\]\\$MMMMYY",
-    "    .._MMMMM!YYYYYYYYYi;.`\"  .;iiMMM$MMMMMMMYY",
-    "    ._$MMMP` ```\"\"4$$$$$iiiiiiii$MMMMMMMMMMMMMY;",
-    "     MMMM$:       :$$$$$$$MMMMMMMMMMM$$MMMMMMMYYL",
-    "    :MMMM$$.    .;PPb$$$$MMMMMMMMMM$$$$MMMMMMiYYU:",
-    "     iMM$$;;: ;;;;i$$$$$$$MMMMM$$$$MMMMMMMMMMYYYYY",
-    "     `$$$$i .. ``:iiii!*\"``.$$$$$$$$$MMMMMMM$YiYYY",
-    "      :Y$$iii;;;.. ` ..;;i$$$$$$$$$MMMMMM$$YYYYiYY:",
-    "       :$$$$$iiiiiii$$$$$$$$$$$MMMMMMMMMMYYYYiiYYYY.",
-    "        `$$$$$$$$$$$$$$$$$$$$MMMMMMMM$YYYYYiiiYYYYYY",
-    "         YY$$$$$$$$$$$$$$$$MMMMMMM$$YYYiiiiiiYYYYYYY",
-    "        :YYYYYY$$$$$$$$$$$$$$$$$$YYYYYYYiiiiYYYYYYi'"
+    "                  M$L                    .;i.          ",
+    "                  M$Y;                .;iii;;.         ",
+    "                 ;$YY$i._           .iiii;;;;;         ",
+    "                .iiiYYYYYYiiiii;;;;i;iii;; ;;;         ",
+    "              .;iYYYYYYiiiiiiYYYiiiiiii;;  ;;;         ",
+    "           .YYYY$$$$YYYYYYYYYYYYYYYYiii;; ;;;;         ",
+    "         .YYY$$$$$$YYYYYY$$$$iiiY$$$$$$$ii;;;;         ",
+    "        :YYYF`,  TYYYYY$$$$$YYYYYYYi$$$$$iiiii;        ",
+    "       Y$MM: \\\\  :YYYY$$P\"````\"T$YYMMMMMMMMiiYY.     ",
+    "     `.;\\\\[M\\\\]b.,dYY\\\\[Yi; .( .YYMMM\\\\]\\\\$MMMMYY      ",
+    "    .._MMMMM!YYYYYYYYYi;.`\\\\\"  .;iiMMM$MMMMMMMYY      ",
+    "    ._$MMMP` ```\"\"4$$$$$iiiiiiii$MMMMMMMMMMMMMY;     ",
+    "     MMMM$:       :$$$$$$$MMMMMMMMMMM$$MMMMMMMYYL      ",
+    "    :MMMM$$.    .;PPb$$$$MMMMMMMMMM$$$$MMMMMMiYYU:     ",
+    "     iMM$$;;: ;;;;i$$$$$$$MMMMM$$$$MMMMMMMMMMYYYYY     ",
+    "     `$$$$i .. ``:iiii!*\"``.$$$$$$$$$MMMMMMM$YiYYY    ",
+    "      :Y$$iii;;;.. ` ..;;i$$$$$$$$$MMMMMM$$YYYYiYY:    ",
+    "       :$$$$$iiiiiii$$$$$$$$$$$MMMMMMMMMMYYYYiiYYYY.   ",
+    "        `$$$$$$$$$$$$$$$$$$$$MMMMMMMM$YYYYYiiiYYYYYY   ",
+    "         YY$$$$$$$$$$$$$$$$MMMMMMM$$YYYiiiiiiYYYYYYY   ",
+    "        :YYYYYY$$$$$$$$$$$$$$$$$$YYYYYYYiiiiYYYYYYi'   "
 };
 
 char* cpuid(void) {
-    static char vendor[13]; 
-    uint32_t eax, ebx, ecx, edx;
+    static char brand[49];
+    uint32_t regs[4];
 
-    __asm__ volatile (
-        "cpuid"
-        : "=a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx)
-        : "a" (0)
-    );
+    for (uint32_t i = 0; i < 3; i++) {
+        __asm__ volatile (
+            "cpuid"
+            : "=a" (regs[0]), "=b" (regs[1]), "=c" (regs[2]), "=d" (regs[3])
+            : "a" (0x80000002 + i)
+        );
 
-    vendor[0]  = (char)(ebx & 0xFF);
-    vendor[1]  = (char)((ebx >> 8) & 0xFF);
-    vendor[2]  = (char)((ebx >> 16) & 0xFF);
-    vendor[3]  = (char)((ebx >> 24) & 0xFF);
+        for (uint32_t j = 0; j < 4; j++) {
+            brand[(i * 16) + (j * 4) + 0] = (char)(regs[j] & 0xFF);
+            brand[(i * 16) + (j * 4) + 1] = (char)((regs[j] >> 8) & 0xFF);
+            brand[(i * 16) + (j * 4) + 2] = (char)((regs[j] >> 16) & 0xFF);
+            brand[(i * 16) + (j * 4) + 3] = (char)((regs[j] >> 24) & 0xFF);
+        }
+    }
 
-    vendor[4]  = (char)(edx & 0xFF);
-    vendor[5]  = (char)((edx >> 8) & 0xFF);
-    vendor[6]  = (char)((edx >> 16) & 0xFF);
-    vendor[7]  = (char)((edx >> 24) & 0xFF);
-
-    vendor[8]  = (char)(ecx & 0xFF);
-    vendor[9]  = (char)((ecx >> 8) & 0xFF);
-    vendor[10] = (char)((ebx >> 16) & 0xFF);
-    vendor[11] = (char)((ecx >> 24) & 0xFF);
-    
-    vendor[12] = '\0'; 
-
-    return vendor; 
+    brand[48] = '\0';
+    return brand;
 }
 
 uint64_t get_ram(void) {
-	if (memmap_request.response == NULL) {
+    if (memmap_request.response == NULL) {
         return 0; 
     }
 
@@ -76,4 +74,47 @@ uint64_t get_ram(void) {
     }
 
     return total_ram_bytes;
+}
+
+void system_fetch() {
+    char ram_str[32]; 
+
+    for (int i = 0; i < 22; i++) {
+        dogeio_text_print(doge_ascii[i]);
+
+        switch (i) {
+            case 1:
+                dogeio_text_println("wow/computer");
+                break;
+            case 2:
+                dogeio_text_println("-----------------------------");
+                break;
+			case 3:
+				dogeio_text_print("Such User: ");
+				dogeio_text_println("wow");
+				break;
+			case 4:
+				dogeio_text_print("Version: ");
+				dogeio_text_println(windoge_version);
+				break;
+            case 5:
+                dogeio_text_print("CPU: ");
+                dogeio_text_println(cpuid());
+                break;
+            case 6:
+                dogeio_text_print("RAM: ");
+                string_itoa((int)(get_ram() / 1024 / 1024), ram_str); 
+                dogeio_text_print(ram_str);
+                dogeio_text_println(" MB");
+                break;
+			case 7:
+				dogeio_text_print("HDD: ");
+				dogeio_text_print(system_file_amount_string());
+				dogeio_text_println(" / 32 files");
+				break;
+            default:
+                dogeio_text_println(""); 
+                break;
+        }
+    }
 }

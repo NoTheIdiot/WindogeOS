@@ -57,6 +57,21 @@ int system_bash_ex(char* command) {
         handled = 0;
     }
 
+	else if (string_strcmp(command, "fetch") == 0) {
+		system_fetch();
+		handled = 0;
+	}
+
+	else if (string_strcmp(command, "whoami") == 0) {
+		dogeio_text_println("wow");
+		handled = 0;
+	}
+
+	else if (string_strcmp(command, "pwd") == 0) {
+		dogeio_text_println("root (/)");;
+		handled = 0;
+	}
+
     else if (string_startswith(command, "sed")) {
         size_t len = string_strlen(command);
         if (len >= 4 && command[3] == ' ') {
