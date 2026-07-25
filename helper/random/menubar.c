@@ -2,6 +2,7 @@
 #include <dogeio.h>
 #include <boot/kernel.h>
 #include <time.h>
+#include <system.h>
 
 #define TERMINAL_COLS 160
 
@@ -12,7 +13,7 @@ void menubar_draw() {
     uint32_t old_cursor_y = cursor_y;
 
     dogeio_text_color_change(0x000000);
-    dogeio_text_background_change(0xffffff);
+    dogeio_text_background_change(old);
     
     cursor_x = 0;
     cursor_y = 0;

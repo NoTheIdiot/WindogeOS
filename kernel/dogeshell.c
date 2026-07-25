@@ -5,10 +5,12 @@
 #include <system.h>
 #include <time.h>
 
+uint32_t old = 0xffffff;
+
 int system_dogeshell_ex(char* command) {
     int handled = 1; 
     
-    char* help_command_array[15] = {
+    char* help_command_array[16] = {
         "print              | simply prints a piece of text",
         "clear              | clears the terminal screen",
         "dir                | list the contents of the current folder",
@@ -23,7 +25,8 @@ int system_dogeshell_ex(char* command) {
 		"whereami           | displays your current folder location",
 		"time               | displays the time",
 		"ver                | shows version",
-		"fetch              | shows the system information"
+		"fetch              | shows the system information",
+		"color              | changes color of text."
     };
 
     if (command == NULL || command[0] == '\0') {
@@ -37,6 +40,63 @@ int system_dogeshell_ex(char* command) {
         } else {
             dogeio_text_println(""); 
         }
+        handled = 0;
+    }
+
+	else if (string_startswith(command, "color")) {
+        const char *arg = command + 6;
+        if (string_strcmp(arg, "black") == 0) {
+            dogeio_text_color = 0xFF000000;
+            dogeio_text_clear();
+        } else if (string_strcmp(arg, "white") == 0) {
+            dogeio_text_color = 0xFFFFFFFF;
+            dogeio_text_clear();
+        } else if (string_strcmp(arg, "grey") == 0) {
+            dogeio_text_color = 0xFF808080;
+            dogeio_text_clear();
+        } else if (string_strcmp(arg, "dark_grey") == 0) {
+            dogeio_text_color = 0xFF404040;
+            dogeio_text_clear();
+        } else if (string_strcmp(arg, "red") == 0) {
+            dogeio_text_color = 0xFFFF0000;
+            dogeio_text_clear();
+        } else if (string_strcmp(arg, "green") == 0) {
+            dogeio_text_color = 0xFF00FF00;
+            dogeio_text_clear();
+        } else if (string_strcmp(arg, "blue") == 0) {
+            dogeio_text_color = 0xFF0000FF;
+            dogeio_text_clear();
+        } else if (string_strcmp(arg, "yellow") == 0) {
+            dogeio_text_color = 0xFFFFFF00;
+            dogeio_text_clear();
+        } else if (string_strcmp(arg, "cyan") == 0) {
+            dogeio_text_color = 0xFF00FFFF;
+            dogeio_text_clear();
+        } else if (string_strcmp(arg, "magenta") == 0) {
+            dogeio_text_color = 0xFFFF00FF;
+            dogeio_text_clear();
+        } else if (string_strcmp(arg, "navy") == 0) {
+            dogeio_text_color = 0xFF000080;
+            dogeio_text_clear();
+        } else if (string_strcmp(arg, "maroon") == 0) {
+            dogeio_text_color = 0xFF800000;
+            dogeio_text_clear();
+        } else if (string_strcmp(arg, "teal") == 0) {
+            dogeio_text_color = 0xFF008080;
+            dogeio_text_clear();
+        } else if (string_strcmp(arg, "olive") == 0) {
+            dogeio_text_color = 0xFF808000;
+            dogeio_text_clear();
+        } else if (string_strcmp(arg, "doge_gold") == 0) {
+            dogeio_text_color = 0xFFE1B857;
+            dogeio_text_clear();
+        } else if (string_strcmp(arg, "doge_tan") == 0) {
+            dogeio_text_color = 0xFFF4DFB1;
+            dogeio_text_clear();
+        } else {
+            dogeio_text_println("unknown colorpreset.");
+        }
+		old = dogeio_text_color;
         handled = 0;
     }
 
@@ -141,7 +201,7 @@ int system_dogeshell_ex(char* command) {
 	}
 
     else if (string_strcmp(command, "help") == 0) {
-        for (int i = 0; i < 15; i++) {
+        for (int i = 0; i < 16; i++) {
             dogeio_text_println(help_command_array[i]);
         }
         handled = 0;
@@ -203,18 +263,18 @@ void system_dogeshell() {
         if (status == 1) {
 			dogeio_text_color_change(0x0000FF00);
             dogeio_text_print("wow");
-			dogeio_text_color_change(0xFFFFFFFF);
+			dogeio_text_color_change(old);
 			dogeio_text_print(" (root) ");
 			dogeio_text_color_change(0x00FF0000);
 			dogeio_text_print("[1] ");
         } else {
             dogeio_text_color_change(0x0000FF00);
             dogeio_text_print("wow");
-			dogeio_text_color_change(0xFFFFFFFF);
+			dogeio_text_color_change(old);
 			dogeio_text_print(" (root) ");
         }
-
-		dogeio_text_color_change(0xFFFFFFFF);
+		
+		dogeio_text_color_change(old);
         dogeio_text_input("> ", input, 256);
         status = system_dogeshell_ex(input);
     }

@@ -41,5 +41,6 @@ void system_fs_delete_file(char* name, char* ext);
 
 void system_fetch();
 extern char* windoge_version;
+extern uint32_t old;
 
 #endif

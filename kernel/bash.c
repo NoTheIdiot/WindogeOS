@@ -6,6 +6,8 @@
 #include <time.h>
 #include <system.h>
 
+char history[32][64];
+
 int system_bash_ex(char* command) {
     int handled = 1; 
 
@@ -36,6 +38,62 @@ int system_bash_ex(char* command) {
     else if (string_startswith(command, "date")) {
         dogeio_text_println(time_get());
         handled = 0;
+    }
+
+	else if (string_startswith(command, "color")) {
+        const char *arg = command + 6;
+        if (string_strcmp(arg, "black") == 0) {
+            dogeio_text_color = 0xFF000000;
+            dogeio_text_clear();
+        } else if (string_strcmp(arg, "white") == 0) {
+            dogeio_text_color = 0xFFFFFFFF;
+            dogeio_text_clear();
+        } else if (string_strcmp(arg, "grey") == 0) {
+            dogeio_text_color = 0xFF808080;
+            dogeio_text_clear();
+        } else if (string_strcmp(arg, "dark_grey") == 0) {
+            dogeio_text_color = 0xFF404040;
+            dogeio_text_clear();
+        } else if (string_strcmp(arg, "red") == 0) {
+            dogeio_text_color = 0xFFFF0000;
+            dogeio_text_clear();
+        } else if (string_strcmp(arg, "green") == 0) {
+            dogeio_text_color = 0xFF00FF00;
+            dogeio_text_clear();
+        } else if (string_strcmp(arg, "blue") == 0) {
+            dogeio_text_color = 0xFF0000FF;
+            dogeio_text_clear();
+        } else if (string_strcmp(arg, "yellow") == 0) {
+            dogeio_text_color = 0xFFFFFF00;
+            dogeio_text_clear();
+        } else if (string_strcmp(arg, "cyan") == 0) {
+            dogeio_text_color = 0xFF00FFFF;
+            dogeio_text_clear();
+        } else if (string_strcmp(arg, "magenta") == 0) {
+            dogeio_text_color = 0xFFFF00FF;
+            dogeio_text_clear();
+        } else if (string_strcmp(arg, "navy") == 0) {
+            dogeio_text_color = 0xFF000080;
+            dogeio_text_clear();
+        } else if (string_strcmp(arg, "maroon") == 0) {
+            dogeio_text_color = 0xFF800000;
+            dogeio_text_clear();
+        } else if (string_strcmp(arg, "teal") == 0) {
+            dogeio_text_color = 0xFF008080;
+            dogeio_text_clear();
+        } else if (string_strcmp(arg, "olive") == 0) {
+            dogeio_text_color = 0xFF808000;
+            dogeio_text_clear();
+        } else if (string_strcmp(arg, "doge_gold") == 0) {
+            dogeio_text_color = 0xFFE1B857;
+            dogeio_text_clear();
+        } else if (string_strcmp(arg, "doge_tan") == 0) {
+            dogeio_text_color = 0xFFF4DFB1;
+            dogeio_text_clear();
+        } else {
+            dogeio_text_println("unknown colorpreset.");
+        }
+        handled = 1;
     }
 
     else if (string_startswith(command, "cat")) {
