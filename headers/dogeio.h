@@ -7,6 +7,9 @@
 
 extern uint8_t terminal_font[128][16];
 
+#define TERMINAL_COLS 160
+#define TERMINAL_ROWS 50
+
 extern uint32_t cursor_x;
 extern uint32_t cursor_y;
 extern uint32_t dogeio_background_color;

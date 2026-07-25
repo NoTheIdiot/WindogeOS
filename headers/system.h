@@ -37,6 +37,7 @@ bool system_fs_writefile(char* name, char* ext, char* string);
 void system_fs_start_init();
 int system_get_file_amount();
 char* system_file_amount_string();
+void system_fs_delete_file(char* name, char* ext);
 
 void system_fetch();
 extern char* windoge_version;

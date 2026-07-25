@@ -10,11 +10,6 @@
 // get the framebuffer array in the kernel
 extern volatile struct limine_framebuffer_request framebuffer_request;
 
-// macros over consts >:)
-// this is double of vga text
-#define TERMINAL_COLS 160
-#define TERMINAL_ROWS 50
-
 // terminal array exactly 8K bytes
 char text_grid[TERMINAL_ROWS * TERMINAL_COLS];
 

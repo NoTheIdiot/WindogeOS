@@ -61,7 +61,7 @@ void kernel_main(void) {
 
     log("WindogeOS has successfully booted. Start celebrating broski.");
 	menubar_draw();
-    dogeio_text_print("============================================================================\n");
+    for (int i = 0; i < )
     dogeio_text_print("=                       Welcome to WindogeOS! v0.0.3                       =\n");
     dogeio_text_print("=                  Type 'help' for help in the dogeshell.                  =\n");
     dogeio_text_print("============================================================================\n");

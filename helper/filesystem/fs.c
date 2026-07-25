@@ -9,7 +9,7 @@ file_t filesystem[FS_MAX_FILE_AMOUNT];
 file_t* system_fs_find(char* filename, char* ext) {
 	for (int i = 0; i < FS_MAX_FILE_AMOUNT; i++) {
 		if (filesystem[i].name[0] != '\0') {
-			if (string_strcmp(filesystem[i].name, filename) == 0 || string_strcmp(filesystem[i].ext, ext) == 0) {
+			if (string_strcmp(filesystem[i].name, filename) == 0 && string_strcmp(filesystem[i].ext, ext) == 0) {
 				return &filesystem[i];
 			}
 		}
@@ -40,37 +40,37 @@ void system_fs_list() {
 }
 
 void system_fs_createfile(char* name, char* ext) {
-	int target_index = -1;
-	for (int i = 0; i < FS_MAX_FILE_AMOUNT; i++) {
-		if (filesystem[i].name[0] == '\0') {
-			target_index = i;
-			break;
-		}
-	}
+    int target_index = -1;
+    for (int i = 0; i < FS_MAX_FILE_AMOUNT; i++) {
+        if (filesystem[i].name[0] == '\0') {
+            target_index = i;
+            break;
+        }
+    }
 
-	if (target_index == -1) {
-		dogeio_text_println("Your drive is full, please delete some useless files");
-		return;
-	}
+    if (target_index == -1) {
+        dogeio_text_println("Your drive is full, please delete some useless files");
+        return;
+    }
 
-	if (system_fs_find(name, ext) != NULL) {
-		dogeio_text_println("Error: A file with that name already exists.");
-		return;
-	}
+    if (system_fs_find(name, ext) != NULL) {
+        dogeio_text_println("Error: A file with that name already exists.");
+        return;
+    }
 
-	int j;
-	for (j = 0; j < 31 && name[j] != '\0'; j++) {
-		filesystem[target_index].name[j] = name[j];
-	}
-	filesystem[target_index].name[j] = '\0';
+    int j;
+    for (j = 0; j < 31 && name[j] != '\0'; j++) {
+        filesystem[target_index].name[j] = name[j];
+    }
+    filesystem[target_index].name[j] = '\0';
 
-	for (j = 0; j < 3 && ext[j] != '\0'; j++) {
-		filesystem[target_index].ext[j] = ext[j];
-	}
-	filesystem[target_index].ext[j] = '\0';
+    for (j = 0; j < 3 && ext[j] != '\0'; j++) {
+        filesystem[target_index].ext[j] = ext[j];
+    }
+    filesystem[target_index].ext[j] = '\0';
 
-	filesystem[target_index].cols_last = 0;
-	filesystem[target_index].content[0][0] = '\0';
+    filesystem[target_index].cols_last = 0;
+    filesystem[target_index].content[0][0] = '\0';
 }
 
 bool system_fs_readfile(char* name, char* ext) {
@@ -124,13 +124,6 @@ bool system_fs_deleteline(char* filename, char* ext) {
 	return true;
 }
 
-/*bool system_fs_deletefile(char* filename, char* ext) {
-	file_t* file = system_fs_find(filename, ext);
-	if (file == NULL) {
-
-	}
-}*/
-
 void system_fs_start_init() {
 	system_fs_format();
 	system_fs_createfile("readme", "txt"); 
@@ -154,7 +147,19 @@ char* system_file_amount_string() {
 			output++;
 		}
 	}
-	static char real_output[4];
-	string_itoa(output,real_output);
+	static char real_output[16];
+	string_itoa(output, real_output);
 	return real_output;
+}
+
+void system_fs_delete_file(char* name, char* ext) {
+    file_t* file = system_fs_find(name, ext);
+    if (file == NULL) {
+        dogeio_text_println("Not Wow: File does not exist.");
+        return;
+    }
+    file->name[0] = '\0';
+    file->ext[0] = '\0';
+    file->cols_last = 0;
+    file->content[0][0] = '\0';
 }
