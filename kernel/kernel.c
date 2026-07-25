@@ -6,7 +6,6 @@
 #include <bool.h>
 #include <stddef.h>
 #include <basicutil.h>
-#include <system.h>
 #include <boot/kernel.h>
 
 __attribute__((used, section(".limine_requests_start")))
@@ -48,23 +47,33 @@ void kernel_main(void) {
     }
     log("[Wow] Limine's Framebuffer Initialize Sucess, very very wow.");
 
-	if (memmap_request.response == NULL) {
-		log("[Not Wow] Holy shit RAM does not exist.... How?");
-		log("          memmap_request.response == NULL");
-		halt();
-	}
-	log("[Wow] Memory Map has been found.");
+    if (memmap_request.response == NULL) {
+        log("[Not Wow] Holy shit RAM does not exist.... How?");
+        log("          memmap_request.response == NULL");
+        halt();
+    }
+    log("[Wow] Memory Map has been found.");
 
-	log("Formating ramisk, such patience");
-	system_fs_start_init();
-	log("[Wow] Format Sucess");
+    log("Formating ramisk, such patience");
+    system_fs_start_init();
+    log("[Wow] Format Sucess");
 
     log("WindogeOS has successfully booted. Start celebrating broski.");
-	menubar_draw();
-    for (int i = 0; i < )
-    dogeio_text_print("=                       Welcome to WindogeOS! v0.0.3                       =\n");
-    dogeio_text_print("=                  Type 'help' for help in the dogeshell.                  =\n");
-    dogeio_text_print("============================================================================\n");
+    menubar_draw();
+
+    const char* starting[6] = {
+		"================================================================================================================================================================",
+		"=                                                                                                                                                              =",
+		"=                                                                 Welcome to WindogeOS v0.0.3!                                                                 =",
+		"=                                                          Type 'help' for more help in the dogeshell                                                          =",
+		"=                                                                                                                                                              =",
+		"================================================================================================================================================================"
+	};
+
+    for (int i = 0; i < 6; i++) {
+        dogeio_text_print(starting[i]);
+    }
+
     log("Starting Dogeshell");
     system_dogeshell();
     halt();

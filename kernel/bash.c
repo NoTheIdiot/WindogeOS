@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <dogeio.h>
+#include <basicutil.h>
 #include <string.h>
 #include <bool.h>
 #include <time.h>
@@ -130,6 +131,13 @@ int system_bash_ex(char* command) {
         }
         handled = 0;
     }
+
+	else if (string_strcmp(command, "shutdown") == 0) {
+		dogeio_text_clear_raw();
+		dogeio_text_println("Such shutdown, very goodbye.");
+		halt();
+		handled = 0;
+	}
 
     if (handled == 1) {
         dogeio_text_print(command);
