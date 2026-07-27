@@ -55,16 +55,6 @@ void ports_insw(unsigned short port, void *addr, unsigned long count) {
     );
 }
 
-uint32_t ports_inl(uint16_t port) {
-	uint32_t ret;
-	__asm__ volatile ("inl %1, %0" : "=a"(ret) : "Nd"(port));
-	return ret;
-}
-
-void ports_outl(uint16_t port, uint32_t val) {
-	__asm__ volatile ("outl %0, %0" : : "a"(val), "Nd"(port));
-}
-
 // debugging logging
 // also this is copied from the old code cuz it works
 // use qemu for this dumbass

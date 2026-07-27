@@ -27,4 +27,25 @@ void dogeio_text_color_change(uint32_t color);
 void dogeio_text_background_change(uint32_t color);
 void dogeio_text_clear_raw();
 
+// file system items
+#define BLOCK_SIZE              512
+#define MAX_FILES               64
+#define MAX_FILENAME            32
+#define TOTAL_DATA_BLOCKS       4096
+#define BLOCKS_PER_FILE         64
+
+struct fs_inode {
+    uint8_t     used;
+    char        filename[MAX_FILENAME];
+    uint32_t    size;
+    uint32_t    start_block;
+};
+
+struct fs_layout {
+    uint32_t    magic;
+    uint32_t    total_blocks;
+    struct      fs_inode file_table[MAX_FILES];
+    uint8_t     data_region[TOTAL_DATA_BLOCKS][BLOCK_SIZE];
+};
+
 #endif
