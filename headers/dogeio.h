@@ -28,24 +28,29 @@ void dogeio_text_background_change(uint32_t color);
 void dogeio_text_clear_raw();
 
 // file system items
-#define BLOCK_SIZE              512
-#define MAX_FILES               64
-#define MAX_FILENAME            32
-#define TOTAL_DATA_BLOCKS       4096
-#define BLOCKS_PER_FILE         64
+#define SFS_MAGIC        0x53465321  
+#define BLOCK_SIZE       512
+#define MAX_FILENAME     32
+#define MAX_FILES        64
+#define TOTAL_BLOCKS     4096        
+#define DIRECT_POINTERS  12          
 
-struct fs_inode {
-    uint8_t     used;
-    char        filename[MAX_FILENAME];
-    uint32_t    size;
-    uint32_t    start_block;
+#define SUPERBLOCK_LBA   0
+#define BITMAP_LBA       1
+#define INODE_START_LBA  2
+#define DATA_START_LBA   10 
+
+struct sfs_superblock {
+    uint32_t magic;
+    uint32_t total_blocks;
+    uint32_t inode_count;
 };
 
-struct fs_layout {
-    uint32_t    magic;
-    uint32_t    total_blocks;
-    struct      fs_inode file_table[MAX_FILES];
-    uint8_t     data_region[TOTAL_DATA_BLOCKS][BLOCK_SIZE];
+struct sfs_inode {
+    uint8_t  used;
+    char     filename[MAX_FILENAME];
+    uint32_t size;
+    uint32_t direct_blocks[DIRECT_POINTERS]; 
 };
 
 #endif

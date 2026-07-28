@@ -10,51 +10,21 @@ This is a part of dogeio header file.
 #include <dogeio.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <basicutil.h>
 
-// system memory config.
-// simply so the FS doesn't break the kernel itself.
-static struct fs_layout *fs = (struct fs_layout*)0x5000000;
+#define ATA_DATA        0x1F0
+#define ATA_FEATURES    0x1F1
+#define ATA_SECTOR_CNT  0x1F2
+#define ATA_LBA_LOW     0x1F3
+#define ATA_LBA_MID     0x1F4
+#define ATA_LBA_HIGH    0x1F5
+#define ATA_DRIVE_HEAD  0x1F6
+#define ATA_COMMAND     0x1F7
+#define ATA_STATUS      0x1F7
 
 
-/*
-format the disk by just spamming zeros, also known as 0x00.
-also deletes the memory space.
-*/
-void fs_format() {
-    // put magic
-    fs->magic = 0x444f4745;
-    fs->total_blocks = TOTAL_DATA_BLOCKS;
-
-    for (int i = 0; i < MAX_FILES; i++) {
-        fs->file_table[i].used = 0;
-        fs->file_table[i].size = 0;
-        
-        fs->file_table[i].start_block = (uint32_t)i * BLOCKS_PER_FILE;
-        
-        for (int j = 0; j < MAX_FILENAME; j++) {
-            fs->file_table[i].filename[j] = 0;
-        }
-    }
-}
-
-// creates file, obvious by function name.]
-// returns file descriptor id int on sucess, and -1 is shit goes out bad.
-int fs_create(const char* name) {
-    for (int i = 0; i < MAX_FILES; i++) {
-        if (fs->file_table[i].used == 0) {
-            fs->file_table[i].used = 1;
-            fs->file_table[i].size = 0;
-            
-            int j = 0;
-            while (name[j] != '\0' && j < (MAX_FILENAME - 1)) {
-                fs->file_table[i].filename[j] = name[j];
-                j++;
-            }
-            fs->file_table[i].filename[j] = '\0';
-            
-            return i; 
-        }
-    }
-    // too full, no indexing left.
-    return -1;
+// function to wait till ata is ready.
+// just waits till the port responses with... *something*
+static void ata_ready(void) {
+    while ((ports_inb(ATA_STATUS) & 0x80) || !(ports_inb(ATA_STATUS) & 0x40));
 }
