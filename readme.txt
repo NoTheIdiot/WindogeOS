@@ -16,10 +16,6 @@ coding a long term project
   python compile.py
   python start_vm.py
 
-- Now WindogeOS should run!
-
 = Notes
-- if the python command doesn't work, try using python3.
-- do not make the qemu-system command yourself, run python start_vm.py.
-  if you somehow got a better result, please make a pull request,
-  less headaches are better.
+Devnew is the main development branch. I work on shit there, do expect that it doesn't boot
+on that branch for a while somtimes.
