@@ -69,4 +69,22 @@ static void ata_WriteSector(uint16_t lba, const uint8_t *buffer) {
     ports_outb(ATA_COMMAND, 0xE7); 
     ata_Ready();
 }
+
+int fs_format(void) {
+	uint8_t sector_buffer[BLOCK_SIZE];
+    struct sfs_superblock *sb = (struct sfs_superblock*)sector_buffer;
+    sb->magic = SFS_MAGIC;
+    sb->total_blocks = TOTAL_BLOCKS;
+    sb->inode_count = MAX_FILES;
+    ports_ata_write_sector(SUPERBLOCK_LBA, sector_buffer);
+
+    memset(sector_buffer, 0, BLOCK_SIZE);
+    ports_ata_write_sector(BITMAP_LBA, sector_buffer);
+
+    memset(sector_buffer, 0, BLOCK_SIZE);
+    for (int i = 0; i < 8; i++) {
+        ports_ata_write_sector(INODE_START_LBA + i, sector_buffer);
+    }
+    return 0;
+}
 #pragma clang diagnostic pop
