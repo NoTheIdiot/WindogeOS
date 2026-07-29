@@ -53,4 +53,9 @@ struct sfs_inode {
     uint32_t direct_blocks[DIRECT_POINTERS]; 
 };
 
+int fs_format(void);
+int fs_create(const char *name);
+int fs_write(int inode_idx, const uint8_t *buffer, uint32_t count);
+int fs_read(int inode_idx, uint8_t *output_buffer, uint32_t max_bytes);
+
 #endif

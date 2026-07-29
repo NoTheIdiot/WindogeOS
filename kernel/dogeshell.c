@@ -6,6 +6,7 @@
 #include <time.h>
 
 uint32_t old = 0xffffff;
+extern void fstest_shell();
 
 int system_dogeshell_ex(char* command) {
     int handled = 1; 
@@ -242,6 +243,11 @@ int system_dogeshell_ex(char* command) {
 		dogeio_text_println("root (/)");
 		handled = 0;
 	}
+
+    else if (string_strcmp(command, "test") == 0) {
+        fstest_shell();
+        handled = 0;
+    }
 
     if (handled == 1) {
         dogeio_text_print(command);
