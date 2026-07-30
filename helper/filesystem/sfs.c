@@ -15,7 +15,15 @@
 #define ATA_STATUS      0x1F7
 
 #ifndef FS_BASE_LBA
-#define FS_BASE_LBA     2048
+#define FS_BASE_LBA     8192
+#endif
+
+#ifndef BLOCK_SIZE
+#define BLOCK_SIZE      512
+#endif
+
+#ifndef INODES_PER_SECTOR
+#define INODES_PER_SECTOR ((uint32_t)(BLOCK_SIZE / sizeof(struct sfs_inode)))
 #endif
 
 extern void duolog(const char* message);
@@ -25,22 +33,24 @@ static void ata_Ready(void) {
         ports_inb(ATA_STATUS);
     }
     
-    uint8_t status = ports_inb(ATA_STATUS);
-    if (status == 0xFF) {
-        return;
-    }
-
-    while ((ports_inb(ATA_STATUS) & 0x80) || !(ports_inb(ATA_STATUS) & 0x40));
+    uint8_t status;
+    do {
+        status = ports_inb(ATA_STATUS);
+        if (status & 0x20) { 
+            break;
+        }
+    } while ((status & 0x80) || !(status & 0x08));
 }
 
 static void ata_ReadSector(uint32_t lba, uint8_t *buffer) {
-    ports_outb(ATA_DRIVE_HEAD, 0xE0 | (((lba + FS_BASE_LBA) >> 24) & 0x0F));
+    uint32_t target_lba = lba + FS_BASE_LBA;
+    ports_outb(ATA_DRIVE_HEAD, 0xE0 | ((target_lba >> 24) & 0x0F));
     for (volatile int i = 0; i < 4; i++) ports_inb(ATA_STATUS);
 
     ports_outb(ATA_SECTOR_CNT, 1);
-    ports_outb(ATA_LBA_LOW,  (uint8_t)(lba + FS_BASE_LBA));
-    ports_outb(ATA_LBA_MID,  (uint8_t)((lba + FS_BASE_LBA) >> 8));
-    ports_outb(ATA_LBA_HIGH, (uint8_t)((lba + FS_BASE_LBA) >> 16));
+    ports_outb(ATA_LBA_LOW,  (uint8_t)target_lba);
+    ports_outb(ATA_LBA_MID,  (uint8_t)(target_lba >> 8));
+    ports_outb(ATA_LBA_HIGH, (uint8_t)(target_lba >> 16));
     ports_outb(ATA_COMMAND,  0x20);
 
     ata_Ready();
@@ -50,8 +60,8 @@ static void ata_ReadSector(uint32_t lba, uint8_t *buffer) {
     }
 }
 
-static void ata_WriteSector(uint16_t lba, const uint8_t *buffer) {
-    uint32_t target_lba = (uint32_t)lba + FS_BASE_LBA;
+static void ata_WriteSector(uint32_t lba, const uint8_t *buffer) {
+    uint32_t target_lba = lba + FS_BASE_LBA;
     
     ports_outb(ATA_DRIVE_HEAD, 0xE0 | ((target_lba >> 24) & 0x0F));
     for (volatile int i = 0; i < 4; i++) ports_inb(ATA_STATUS);
@@ -69,8 +79,14 @@ static void ata_WriteSector(uint16_t lba, const uint8_t *buffer) {
         ports_outw(ATA_DATA, ptr[i]);
     }
     
+    // Flush/Cache flush command to ensure write completion
     ports_outb(ATA_COMMAND, 0xE7); 
-    for (volatile int i = 0; i < 1000; i++);
+    
+    // Wait for BSY to drop completely after write
+    uint8_t status;
+    do {
+        status = ports_inb(ATA_STATUS);
+    } while (status & 0x80);
 }
 
 int fs_format(void) {
@@ -79,19 +95,19 @@ int fs_format(void) {
     sb->magic = SFS_MAGIC;
     sb->total_blocks = TOTAL_BLOCKS;
     sb->inode_count = MAX_FILES;
-    ata_WriteSector((uint16_t)SUPERBLOCK_LBA, sector_buffer);
+    ata_WriteSector((uint32_t)SUPERBLOCK_LBA, sector_buffer);
 
     memset(sector_buffer, 0, BLOCK_SIZE);
-    ata_WriteSector((uint16_t)BITMAP_LBA, sector_buffer);
+    ata_WriteSector((uint32_t)BITMAP_LBA, sector_buffer);
 
-    int total_inode_sectors = MAX_FILES / 8;
-    if (MAX_FILES % 8 != 0) {
+    uint32_t total_inode_sectors = MAX_FILES / INODES_PER_SECTOR;
+    if (MAX_FILES % INODES_PER_SECTOR != 0) {
         total_inode_sectors++;
     }
 
     memset(sector_buffer, 0, BLOCK_SIZE);
-    for (int i = 0; i < total_inode_sectors; i++) {
-        ata_WriteSector((uint16_t)(INODE_START_LBA + i), sector_buffer);
+    for (uint32_t i = 0; i < total_inode_sectors; i++) {
+        ata_WriteSector((uint32_t)(INODE_START_LBA + i), sector_buffer);
     }
     return 0;
 }
@@ -99,23 +115,27 @@ int fs_format(void) {
 int fs_create(const char *name) {
     uint8_t sector_buffer[BLOCK_SIZE];
     struct sfs_inode *inodes = (struct sfs_inode *)sector_buffer;
-    int total_inode_sectors = MAX_FILES / 8;
-    if (MAX_FILES % 8 != 0) {
+    uint32_t total_inode_sectors = MAX_FILES / INODES_PER_SECTOR;
+    if (MAX_FILES % INODES_PER_SECTOR != 0) {
         total_inode_sectors++;
     }
 
-    for (int sec = 0; sec < total_inode_sectors; sec++) {
+    for (uint32_t sec = 0; sec < total_inode_sectors; sec++) {
         ata_ReadSector((uint32_t)(INODE_START_LBA + sec), sector_buffer);
 
-        for (int i = 0; i < 8; i++) {
+        for (uint32_t i = 0; i < INODES_PER_SECTOR; i++) {
+            if ((sec * INODES_PER_SECTOR) + i >= (uint32_t)MAX_FILES) break;
+            
             if (!inodes[i].used) {
                 inodes[i].used = 1;
                 inodes[i].size = 0;
                 memset(inodes[i].direct_blocks, 0, sizeof(inodes[i].direct_blocks));
-                string_strncpy(inodes[i].filename, name, MAX_FILENAME);
+                
+                string_strncpy(inodes[i].filename, name, MAX_FILENAME - 1);
+                inodes[i].filename[MAX_FILENAME - 1] = '\0';
 
-                ata_WriteSector((uint16_t)(INODE_START_LBA + sec), sector_buffer);
-                return (sec * 8) + i; 
+                ata_WriteSector((uint32_t)(INODE_START_LBA + sec), sector_buffer);
+                return (int)((sec * INODES_PER_SECTOR) + i); 
             }
         }
     }
@@ -123,7 +143,7 @@ int fs_create(const char *name) {
 }
 
 int fs_write(int inode_idx, const uint8_t *buffer, uint32_t count) {
-    if (inode_idx < 0 || inode_idx >= MAX_FILES) {
+    if (inode_idx < 0 || (uint32_t)inode_idx >= MAX_FILES) {
         return -1;
     }
 
@@ -133,8 +153,8 @@ int fs_write(int inode_idx, const uint8_t *buffer, uint32_t count) {
     }
 
     uint8_t inode_sector[BLOCK_SIZE];
-    uint32_t target_inode_lba = (uint32_t)(INODE_START_LBA + (inode_idx / 8));
-    uint32_t inner_offset = (uint32_t)(inode_idx % 8);
+    uint32_t target_inode_lba = (uint32_t)(INODE_START_LBA + ((uint32_t)inode_idx / INODES_PER_SECTOR));
+    uint32_t inner_offset = (uint32_t)((uint32_t)inode_idx % INODES_PER_SECTOR);
 
     ata_ReadSector(target_inode_lba, inode_sector);
     struct sfs_inode *file_inode = &((struct sfs_inode *)inode_sector)[inner_offset];
@@ -145,20 +165,28 @@ int fs_write(int inode_idx, const uint8_t *buffer, uint32_t count) {
     uint8_t bitmap[BLOCK_SIZE];
     ata_ReadSector((uint32_t)BITMAP_LBA, bitmap);
 
+    for (int b = 0; b < DIRECT_POINTERS; b++) {
+        uint32_t old_block = file_inode->direct_blocks[b];
+        if (old_block > 0 && old_block < TOTAL_BLOCKS) {
+            uint32_t byte_idx = old_block / 8;
+            uint32_t bit_idx = old_block % 8;
+            bitmap[byte_idx] &= (uint8_t)~(1 << bit_idx);
+            file_inode->direct_blocks[b] = 0;
+        }
+    }
+
     uint32_t bytes_written = 0;
     uint32_t block_index = 0;
     uint8_t data_sector[BLOCK_SIZE];
-    int bitmap_changed = 0;
 
     while (bytes_written < count && block_index < DIRECT_POINTERS) {
         int free_block = -1;
-        for (int b = 0; b < TOTAL_BLOCKS; b++) {
-            int byte_idx = b / 8;
-            int bit_idx = b % 8;
+        for (uint32_t b = 0; b < (uint32_t)TOTAL_BLOCKS; b++) {
+            uint32_t byte_idx = b / 8;
+            uint32_t bit_idx = b % 8;
             if (!(bitmap[byte_idx] & (1 << bit_idx))) {
-                free_block = b;
+                free_block = (int)b;
                 bitmap[byte_idx] |= (uint8_t)(1 << bit_idx); 
-                bitmap_changed = 1;
                 break;
             }
         }
@@ -173,29 +201,26 @@ int fs_write(int inode_idx, const uint8_t *buffer, uint32_t count) {
             data_sector[i] = buffer[bytes_written + i];
         }
 
-        ata_WriteSector((uint16_t)(DATA_START_LBA + free_block), data_sector);
+        ata_WriteSector((uint32_t)(DATA_START_LBA + (uint32_t)free_block), data_sector);
         bytes_written += chunk;
         block_index++;
     }
 
     file_inode->size = bytes_written;
-    ata_WriteSector((uint16_t)target_inode_lba, inode_sector);
-    
-    if (bitmap_changed) {
-        ata_WriteSector((uint16_t)BITMAP_LBA, bitmap);
-    }
+    ata_WriteSector((uint32_t)target_inode_lba, inode_sector);
+    ata_WriteSector((uint32_t)BITMAP_LBA, bitmap);
 
     return (int)bytes_written;
 }
 
 int fs_read(int inode_idx, uint8_t *output_buffer, uint32_t max_bytes) {
-    if (inode_idx < 0 || inode_idx >= MAX_FILES) {
+    if (inode_idx < 0 || (uint32_t)inode_idx >= MAX_FILES) {
         return -1;
     }
 
     uint8_t inode_sector[BLOCK_SIZE];
-    uint32_t target_inode_lba = (uint32_t)(INODE_START_LBA + (inode_idx / 8));
-    uint32_t inner_offset = (uint32_t)(inode_idx % 8);
+    uint32_t target_inode_lba = (uint32_t)(INODE_START_LBA + ((uint32_t)inode_idx / INODES_PER_SECTOR));
+    uint32_t inner_offset = (uint32_t)((uint32_t)inode_idx % INODES_PER_SECTOR);
 
     ata_ReadSector(target_inode_lba, inode_sector);
     struct sfs_inode *file_inode = &((struct sfs_inode *)inode_sector)[inner_offset];
@@ -232,16 +257,18 @@ int fs_list_directory(void) {
     uint8_t sector_buffer[BLOCK_SIZE];
     struct sfs_inode *inodes = (struct sfs_inode *)sector_buffer;
     int files_found = 0;
-    int total_inode_sectors = MAX_FILES / 8;
-    if (MAX_FILES % 8 != 0) {
+    uint32_t total_inode_sectors = MAX_FILES / INODES_PER_SECTOR;
+    if (MAX_FILES % INODES_PER_SECTOR != 0) {
         total_inode_sectors++;
     }
 
-    for (int sec = 0; sec < total_inode_sectors; sec++) {
+    for (uint32_t sec = 0; sec < total_inode_sectors; sec++) {
         ata_ReadSector((uint32_t)(INODE_START_LBA + sec), sector_buffer);
 
-        for (int i = 0; i < 8; i++) {
-            if (inodes[i].used == 1 && inodes[i].size != 0xFFFFFFFF) {
+        for (uint32_t i = 0; i < INODES_PER_SECTOR; i++) {
+            if ((sec * INODES_PER_SECTOR) + i >= (uint32_t)MAX_FILES) break;
+
+            if (inodes[i].used == 1) {
                 if (inodes[i].filename[0] != '\0') {
                     dogeio_text_print(inodes[i].filename);
                 } else {
