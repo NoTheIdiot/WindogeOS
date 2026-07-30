@@ -7,13 +7,14 @@ why am i doing this
 #include <bool.h>
 #include <dogeio.h>
 
-char* shit[6] = {
+char* shit[7] = {
     "h                  - help",
     "f                  - format",
     "c                  - create file",
     "d                  - delete file",
+    "l                  - list files",
     "r                  - read file",
-    "cs                  - clear"
+    "cs                 - clear"
 };
 
 void fstest_shell_ex(char* command) {
@@ -23,7 +24,7 @@ void fstest_shell_ex(char* command) {
     }
 
     if (string_strcmp(command,"h") == 0) {
-        for (int i = 0; i< 6; i++) {
+        for (int i = 0; i< 7; i++) {
             dogeio_text_println(shit[i]);
         }
     }
@@ -32,11 +33,18 @@ void fstest_shell_ex(char* command) {
         fs_format();
     }
 
+    else if (string_strcmp(command, "l")==0) {
+        fs_list_directory();
+    }
+
     else if (string_strcmp(command,"cs")==0) {
         dogeio_text_clear();
-        for (int i = 0; i< 6; i++) {
-            dogeio_text_println(shit[i]);
-        }
+    }
+
+    else if (string_strcmp(command,"c")==0) {
+        char input_name[32];
+        dogeio_text_input("name: ", input_name, 32);
+        fs_create(input_name);
     }
 
     else {
@@ -47,7 +55,7 @@ void fstest_shell_ex(char* command) {
 void fstest_shell() {
     char input[4];
     dogeio_text_println("Welcome to WindogeOS tester lol.");
-    for (int i = 0; i< 6; i++) {
+    for (int i = 0; i< 7; i++) {
         dogeio_text_println(shit[i]);
     }
     while (true) {

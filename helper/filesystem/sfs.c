@@ -1,12 +1,3 @@
-/*
-random notes:
- - to anyone who wants to modify and call it your own, pls do delete this to avoid
-   your drama
-
-This is just the development of an actualy file system, do not delete fs.c.
-This is a part of dogeio header file.
-*/
-
 #include <dogeio.h>
 #include <stdint.h>
 #include <string.h>
@@ -36,7 +27,6 @@ static void ata_Ready(void) {
     
     uint8_t status = ports_inb(ATA_STATUS);
     if (status == 0xFF) {
-        duolog("ata_Ready detection error: floating bus");
         return;
     }
 
@@ -44,12 +34,8 @@ static void ata_Ready(void) {
 }
 
 static void ata_ReadSector(uint32_t lba, uint8_t *buffer) {
-    duolog("ata_ReadSector start");
-    
     ports_outb(ATA_DRIVE_HEAD, 0xE0 | (((lba + FS_BASE_LBA) >> 24) & 0x0F));
     for (volatile int i = 0; i < 4; i++) ports_inb(ATA_STATUS);
-    
-    ata_Ready();
 
     ports_outb(ATA_SECTOR_CNT, 1);
     ports_outb(ATA_LBA_LOW,  (uint8_t)(lba + FS_BASE_LBA));
@@ -62,18 +48,13 @@ static void ata_ReadSector(uint32_t lba, uint8_t *buffer) {
     for (int i = 0; i < 256; i++) {
         ptr[i] = ports_inw(ATA_DATA);
     }
-    duolog("ata_ReadSector end");
 }
 
 static void ata_WriteSector(uint16_t lba, const uint8_t *buffer) {
-    duolog("ata_WriteSector start");
-    
     uint32_t target_lba = (uint32_t)lba + FS_BASE_LBA;
     
     ports_outb(ATA_DRIVE_HEAD, 0xE0 | ((target_lba >> 24) & 0x0F));
     for (volatile int i = 0; i < 4; i++) ports_inb(ATA_STATUS);
-    
-    ata_Ready();
 
     ports_outb(ATA_SECTOR_CNT, 1);
     ports_outb(ATA_LBA_LOW,  (uint8_t)target_lba);
@@ -89,14 +70,11 @@ static void ata_WriteSector(uint16_t lba, const uint8_t *buffer) {
     }
     
     ports_outb(ATA_COMMAND, 0xE7); 
-    
     for (volatile int i = 0; i < 1000; i++);
-    duolog("ata_WriteSector end");
 }
 
 int fs_format(void) {
-    duolog("fs_format start");
-	uint8_t sector_buffer[BLOCK_SIZE];
+    uint8_t sector_buffer[BLOCK_SIZE];
     struct sfs_superblock *sb = (struct sfs_superblock*)sector_buffer;
     sb->magic = SFS_MAGIC;
     sb->total_blocks = TOTAL_BLOCKS;
@@ -106,20 +84,27 @@ int fs_format(void) {
     memset(sector_buffer, 0, BLOCK_SIZE);
     ata_WriteSector((uint16_t)BITMAP_LBA, sector_buffer);
 
+    int total_inode_sectors = MAX_FILES / 8;
+    if (MAX_FILES % 8 != 0) {
+        total_inode_sectors++;
+    }
+
     memset(sector_buffer, 0, BLOCK_SIZE);
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < total_inode_sectors; i++) {
         ata_WriteSector((uint16_t)(INODE_START_LBA + i), sector_buffer);
     }
-    duolog("fs_format end");
     return 0;
 }
 
 int fs_create(const char *name) {
-    duolog("fs_create start");
     uint8_t sector_buffer[BLOCK_SIZE];
     struct sfs_inode *inodes = (struct sfs_inode *)sector_buffer;
+    int total_inode_sectors = MAX_FILES / 8;
+    if (MAX_FILES % 8 != 0) {
+        total_inode_sectors++;
+    }
 
-    for (int sec = 0; sec < 8; sec++) {
+    for (int sec = 0; sec < total_inode_sectors; sec++) {
         ata_ReadSector((uint32_t)(INODE_START_LBA + sec), sector_buffer);
 
         for (int i = 0; i < 8; i++) {
@@ -130,19 +115,15 @@ int fs_create(const char *name) {
                 string_strncpy(inodes[i].filename, name, MAX_FILENAME);
 
                 ata_WriteSector((uint16_t)(INODE_START_LBA + sec), sector_buffer);
-                duolog("fs_create end success");
                 return (sec * 8) + i; 
             }
         }
     }
-    duolog("fs_create end failure");
     return -1; 
 }
 
 int fs_write(int inode_idx, const uint8_t *buffer, uint32_t count) {
-    duolog("fs_write start");
     if (inode_idx < 0 || inode_idx >= MAX_FILES) {
-        duolog("fs_write invalid inode");
         return -1;
     }
 
@@ -158,7 +139,6 @@ int fs_write(int inode_idx, const uint8_t *buffer, uint32_t count) {
     ata_ReadSector(target_inode_lba, inode_sector);
     struct sfs_inode *file_inode = &((struct sfs_inode *)inode_sector)[inner_offset];
     if (!file_inode->used) {
-        duolog("fs_write inode not used");
         return -1;
     }
 
@@ -205,14 +185,11 @@ int fs_write(int inode_idx, const uint8_t *buffer, uint32_t count) {
         ata_WriteSector((uint16_t)BITMAP_LBA, bitmap);
     }
 
-    duolog("fs_write end");
     return (int)bytes_written;
 }
 
 int fs_read(int inode_idx, uint8_t *output_buffer, uint32_t max_bytes) {
-    duolog("fs_read start");
     if (inode_idx < 0 || inode_idx >= MAX_FILES) {
-        duolog("fs_read invalid inode");
         return -1;
     }
 
@@ -223,7 +200,6 @@ int fs_read(int inode_idx, uint8_t *output_buffer, uint32_t max_bytes) {
     ata_ReadSector(target_inode_lba, inode_sector);
     struct sfs_inode *file_inode = &((struct sfs_inode *)inode_sector)[inner_offset];
     if (!file_inode->used) {
-        duolog("fs_read inode not used");
         return -1;
     }
 
@@ -249,6 +225,51 @@ int fs_read(int inode_idx, uint8_t *output_buffer, uint32_t max_bytes) {
         bytes_read += chunk;
         block_index++;
     }
-    duolog("fs_read end");
     return (int)bytes_read;
+}
+
+int fs_list_directory(void) {
+    uint8_t sector_buffer[BLOCK_SIZE];
+    struct sfs_inode *inodes = (struct sfs_inode *)sector_buffer;
+    int files_found = 0;
+    int total_inode_sectors = MAX_FILES / 8;
+    if (MAX_FILES % 8 != 0) {
+        total_inode_sectors++;
+    }
+
+    for (int sec = 0; sec < total_inode_sectors; sec++) {
+        ata_ReadSector((uint32_t)(INODE_START_LBA + sec), sector_buffer);
+
+        for (int i = 0; i < 8; i++) {
+            if (inodes[i].used == 1 && inodes[i].size != 0xFFFFFFFF) {
+                if (inodes[i].filename[0] != '\0') {
+                    dogeio_text_print(inodes[i].filename);
+                } else {
+                    dogeio_text_print("empty");
+                }
+                
+                dogeio_text_print(" | ");
+
+                uint32_t size = inodes[i].size;
+                if (size == 0) {
+                    dogeio_text_print("0");
+                } else {
+                    char num_buf[16]; 
+                    int idx = 14;
+                    num_buf[15] = '\0';
+                    
+                    while (size > 0 && idx >= 0) {
+                        num_buf[idx] = (char)((size % 10) + '0');
+                        size /= 10;
+                        idx--;
+                    }
+                    dogeio_text_print(&num_buf[idx + 1]);
+                }
+
+                dogeio_text_println(" bytes");
+                files_found++;
+            }
+        }
+    }
+    return files_found;
 }
