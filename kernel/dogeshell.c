@@ -244,7 +244,7 @@ int system_dogeshell_ex(char* command) {
 		handled = 0;
 	}
 
-    else if (str_strcmp(command, "test") == 0) {
+    else if (str_strcmp(command, "fdisk") == 0) {
         fstest_shell();
         handled = 0;
     }
