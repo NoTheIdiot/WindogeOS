@@ -56,13 +56,13 @@ struct sfs_inode {
 typedef struct {
     char name[MAX_FILENAME];
     int id;
-} file_t;
+} fs_t;
 
-extern file_t fs_index[MAX_FILES];
+extern fs_t fs_index[MAX_FILES];
 extern int next_empty_file;
 
 int fs_format(void);
-int fs_create(const char *name);
+int fs_create(char *name);
 int fs_write(int inode_idx, const uint8_t *buffer, uint32_t count);
 int fs_read(int inode_idx, uint8_t *output_buffer, uint32_t max_bytes);
 int fs_list_directory(void);

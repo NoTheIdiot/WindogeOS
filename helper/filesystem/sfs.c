@@ -28,7 +28,7 @@
 
 extern void duolog(const char* message);
 
-file_t fs_index[MAX_FILES];
+fs_t fs_index[MAX_FILES];
 int next_empty_file = 0;
 
 static void ata_Ready(void) {

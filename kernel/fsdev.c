@@ -59,7 +59,7 @@ void fstest_shell_ex(char* command) {
         }
         for (int i = 0; i < MAX_FILES; i++) {
             if (str_strcmp(fs_index[i].name, input_name) == 0) {
-                fs_write(fs_index[i].id, end, amount);
+                fs_write(fs_index[i].id, end, (uint32_t)amount);
             }
         }
     }
