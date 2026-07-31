@@ -58,13 +58,13 @@ void ports_insw(unsigned short port, void *addr, unsigned long count) {
 // debugging logging
 // also this is copied from the old code cuz it works
 // use qemu for this dumbass
-void log(const char* string) {
-    serial_print(string);
+void log(const char* str) {
+    serial_print(str);
     serial_print("\n");
 }
 
 // same thing but it prints both in the OS and in serial
-void duolog(const char* string) {
-    dogeio_text_println(string);
-    serial_println(string);
+void duolog(const char* str) {
+    dogeio_text_println(str);
+    serial_println(str);
 }

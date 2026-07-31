@@ -73,13 +73,13 @@ if not source_files:
     print("Error: No source files found to build.")
     exit(1)
 
-objects_string = " ".join(object_files)
-compile_commands_string = "\n".join(compile_lines)
+objects_str = " ".join(object_files)
+compile_commands_str = "\n".join(compile_lines)
 
 src_compile_script = f"""
 set -e
-{compile_commands_string}
-{linker} {linker_flags} -T {linker_file} {objects_string} -o kernel.elf
+{compile_commands_str}
+{linker} {linker_flags} -T {linker_file} {objects_str} -o kernel.elf
 """
 
 create_img_script_x86_64 = f"""
@@ -95,7 +95,7 @@ mcopy -i {img_file}@@1M limine.conf ::/
 mcopy -i {img_file}@@1M binaries/limine-bios.sys ::/boot/limine;
 mcopy -i {img_file}@@1M binaries/BOOTX64.EFI ::/EFI/BOOT;
 mcopy -i {img_file}@@1M binaries/BOOTIA32.EFI ::/EFI/BOOT;
-rm -f {objects_string} kernel.elf
+rm -f {objects_str} kernel.elf
 mdir -i {img_file}@@1M ::/
 """
 
@@ -109,7 +109,7 @@ mmd -i {img_file}@@1M ::/EFI ::/EFI/BOOT ::/boot ::/boot/limine;
 mcopy -i {img_file}@@1M kernel.elf ::/boot;
 mcopy -i {img_file}@@1M limine.conf ::/boot/limine;
 mcopy -i {img_file}@@1M binaries/BOOTAA64.EFI ::/EFI/BOOT;
-rm -f {objects_string} kernel.elf
+rm -f {objects_str} kernel.elf
 mdir -i {img_file}@@1M ::/
 """
 
@@ -140,7 +140,7 @@ try:
 except subprocess.CalledProcessError as e:
     print("\n-------build failed--------")
     print("cleaning object files")
-    subprocess.run(f"rm -f {objects_string} kernel.elf", shell=True)
+    subprocess.run(f"rm -f {objects_str} kernel.elf", shell=True)
 
     if system == "Windows":
         subprocess.run("del /s /q /f *.plist", shell=True)

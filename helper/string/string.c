@@ -5,29 +5,29 @@
 #define INT_MIN (-2147483647 - 1)
 #define INT_MAX (2147483647)
 
-int string_strcmp(const char* string1, const char *string2) {
-    while (*string1 && (*string1 == *string2)) {
-        string1++;
-        string2++;
+int str_strcmp(const char* str1, const char *str2) {
+    while (*str1 && (*str1 == *str2)) {
+        str1++;
+        str2++;
     }
-    return *(const unsigned char*)string1 - *(const unsigned char*)string2;
+    return *(const unsigned char*)str1 - *(const unsigned char*)str2;
 }
 
-size_t string_strlen(const char *string) {
-    if (!string) return 0;
+size_t str_strlen(const char *str) {
+    if (!str) return 0;
     size_t counter = 0;
-    while (string[counter] != '\0') {
+    while (str[counter] != '\0') {
         counter++;
     }
     return counter;
 }
 
-void string_itoa(int n, char* string) {
+void str_itoa(int n, char* str) {
     int i = 0;
     
     if (n == 0) {
-        string[i++] = '0';
-        string[i] = '\0';
+        str[i++] = '0';
+        str[i] = '\0';
         return;
     }
 
@@ -35,78 +35,78 @@ void string_itoa(int n, char* string) {
     
     while (n != 0) {
         int rem = n % 10;
-        string[i++] = (char)((is_negative ? -rem : rem) + '0');
+        str[i++] = (char)((is_negative ? -rem : rem) + '0');
         n = n / 10;
     }
 
     if (is_negative) {
-        string[i++] = '-';
+        str[i++] = '-';
     }
-    string[i] = '\0';
+    str[i] = '\0';
 
     int start = 0;
     int end = i - 1;
     while (start < end) {
-        char temp = string[start];
-        string[start] = string[end];
-        string[end] = temp;
+        char temp = str[start];
+        str[start] = str[end];
+        str[end] = temp;
         start++;
         end--;
     }
 }
 
-void string_u64toa(uint64_t n, char* string) {
+void str_u64toa(uint64_t n, char* str) {
     int i = 0;
     
     if (n == 0) {
-        string[i++] = '0';
-        string[i] = '\0';
+        str[i++] = '0';
+        str[i] = '\0';
         return;
     }
 
     while (n != 0) {
         uint64_t rem = n % 10;
-        string[i++] = (char)(rem + '0');
+        str[i++] = (char)(rem + '0');
         n = n / 10;
     }
 
-    string[i] = '\0';
+    str[i] = '\0';
 
     int start = 0;
     int end = i - 1;
     while (start < end) {
-        char temp = string[start];
-        string[start] = string[end];
-        string[end] = temp;
+        char temp = str[start];
+        str[start] = str[end];
+        str[end] = temp;
         start++;
         end--;
     }
 }
 
-int string_strncmp(const char *string1, const char *string2, size_t n) {
-    while (n > 0 && *string1 && (*string1 == *string2)) {
-        string1++;
-        string2++;
+int str_strncmp(const char *str1, const char *str2, size_t n) {
+    while (n > 0 && *str1 && (*str1 == *str2)) {
+        str1++;
+        str2++;
         n--;
     }
     if (n == 0) {
         return 0;
     }
-    return *(const unsigned char*)string1 - *(const unsigned char*)string2;
+    return *(const unsigned char*)str1 - *(const unsigned char*)str2;
 }
 
-int string_startswith(const char *string, const char *prefix) {
+int str_startswith(const char *str, const char *prefix) {
     while (*prefix) {
-        if (*string != *prefix) {
+        if (*str != *prefix) {
             return 0;
         }
-        string++;
+        str++;
         prefix++;
     }
     return 1;
 }
 
-int string_atoi(char* s) {
+int str_atoi(char* s) {
     int res = 0;
     int sign = 1;
 
@@ -127,11 +127,11 @@ int string_atoi(char* s) {
     return res * sign;
 }
 
-void string_strcpy(char *dest, const char *src) {
+void str_strcpy(char *dest, const char *src) {
     while ((*dest++ = *src++));
 }
 
-char* string_strncpy(char* dest, const char* src, size_t n) {
+char* str_strncpy(char* dest, const char* src, size_t n) {
     if (n == 0) return dest;
     
     size_t i;
@@ -146,7 +146,7 @@ char* string_strncpy(char* dest, const char* src, size_t n) {
     return dest;
 }
 
-char* string_strcat(char* dest, const char* src) {  
+char* str_strcat(char* dest, const char* src) {  
     char *ptr = dest;
     while (*ptr != '\0') {
         ptr++;
@@ -155,7 +155,7 @@ char* string_strcat(char* dest, const char* src) {
     return dest;
 }
 
-void string_split_filename(const char *input, char *name, char *ext) {
+void str_split_filename(const char *input, char *name, char *ext) {
     int dot_index = -1;
     int length = 0;
 

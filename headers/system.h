@@ -33,10 +33,10 @@ void system_fs_format();
 void system_fs_list();
 void system_fs_createfile(char* name, char* ext);
 bool system_fs_readfile(char* name, char* ext);
-bool system_fs_writefile(char* name, char* ext, char* string);
+bool system_fs_writefile(char* name, char* ext, char* str);
 void system_fs_start_init();
 int system_get_file_amount();
-char* system_file_amount_string();
+char* system_file_amount_str();
 void system_fs_delete_file(char* name, char* ext);
 
 void system_fetch();

@@ -103,13 +103,13 @@ void system_fetch() {
                 break;
             case 6:
                 dogeio_text_print("RAM: ");
-                string_itoa((int)(get_ram() / 1024 / 1024), ram_str); 
+                str_itoa((int)(get_ram() / 1024 / 1024), ram_str); 
                 dogeio_text_print(ram_str);
                 dogeio_text_println(" MB");
                 break;
 			case 7:
 				dogeio_text_print("HDD: ");
-				dogeio_text_print(system_file_amount_string());
+				dogeio_text_print(system_file_amount_str());
 				dogeio_text_println(" / 32 files");
 				break;
             default:
