@@ -9,7 +9,7 @@ file_t filesystem[FS_MAX_FILE_AMOUNT];
 file_t* system_fs_find(char* filename, char* ext) {
 	for (int i = 0; i < FS_MAX_FILE_AMOUNT; i++) {
 		if (filesystem[i].name[0] != '\0') {
-			if (string_strcmp(filesystem[i].name, filename) == 0 && string_strcmp(filesystem[i].ext, ext) == 0) {
+			if (str_strcmp(filesystem[i].name, filename) == 0 && str_strcmp(filesystem[i].ext, ext) == 0) {
 				return &filesystem[i];
 			}
 		}
@@ -87,7 +87,7 @@ bool system_fs_readfile(char* name, char* ext) {
 	}
 }
 
-bool system_fs_writefile(char* name, char* ext, char* string) {
+bool system_fs_writefile(char* name, char* ext, char* str) {
 	file_t* file = system_fs_find(name, ext);
 	
 	if (file == NULL) {
@@ -100,7 +100,7 @@ bool system_fs_writefile(char* name, char* ext, char* string) {
 		return false;
 	}
 
-	string_strcpy(file->content[file->cols_last], string);
+	str_strcpy(file->content[file->cols_last], str);
 	
 	file->cols_last++;
 	return true;
@@ -140,7 +140,7 @@ int system_get_file_amount() {
 	return output;
 }
 
-char* system_file_amount_string() {
+char* system_file_amount_str() {
 	int output = 0;
 	for (int i = 0; i < FS_MAX_FILE_AMOUNT; i++) {
 		if (filesystem[i].name[0] != '\0') {
@@ -148,7 +148,7 @@ char* system_file_amount_string() {
 		}
 	}
 	static char real_output[16];
-	string_itoa(output, real_output);
+	str_itoa(output, real_output);
 	return real_output;
 }
 

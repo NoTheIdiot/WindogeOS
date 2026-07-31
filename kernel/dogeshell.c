@@ -16,7 +16,7 @@ int system_dogeshell_ex(char* command) {
         "clear              | clears the terminal screen",
         "dir                | list the contents of the current folder",
         "readfile           | outputs the contents of a file",
-        "writefile          | writes a string of text to a file",
+        "writefile          | writes a str of text to a file",
         "help               | outputs this help menu breakdown",
         "shutdown           | shutsdown the computer",
         "cpuinfo            | prints the cpu name",
@@ -34,8 +34,8 @@ int system_dogeshell_ex(char* command) {
         return 0; 
     }
 
-    if (string_strcmp(command, "print") == 0 || string_startswith(command, "print ")) {
-        size_t len = string_strlen(command);
+    if (str_strcmp(command, "print") == 0 || str_startswith(command, "print ")) {
+        size_t len = str_strlen(command);
         if (len >= 6 && command[5] == ' ') {
             dogeio_text_println(command + 6);
         } else {
@@ -44,54 +44,54 @@ int system_dogeshell_ex(char* command) {
         handled = 0;
     }
 
-	else if (string_startswith(command, "color")) {
+	else if (str_startswith(command, "color")) {
         const char *arg = command + 6;
-        if (string_strcmp(arg, "black") == 0) {
+        if (str_strcmp(arg, "black") == 0) {
             dogeio_text_color = 0xFF000000;
             dogeio_text_clear();
-        } else if (string_strcmp(arg, "white") == 0) {
+        } else if (str_strcmp(arg, "white") == 0) {
             dogeio_text_color = 0xFFFFFFFF;
             dogeio_text_clear();
-        } else if (string_strcmp(arg, "grey") == 0) {
+        } else if (str_strcmp(arg, "grey") == 0) {
             dogeio_text_color = 0xFF808080;
             dogeio_text_clear();
-        } else if (string_strcmp(arg, "dark_grey") == 0) {
+        } else if (str_strcmp(arg, "dark_grey") == 0) {
             dogeio_text_color = 0xFF404040;
             dogeio_text_clear();
-        } else if (string_strcmp(arg, "red") == 0) {
+        } else if (str_strcmp(arg, "red") == 0) {
             dogeio_text_color = 0xFFFF0000;
             dogeio_text_clear();
-        } else if (string_strcmp(arg, "green") == 0) {
+        } else if (str_strcmp(arg, "green") == 0) {
             dogeio_text_color = 0xFF00FF00;
             dogeio_text_clear();
-        } else if (string_strcmp(arg, "blue") == 0) {
+        } else if (str_strcmp(arg, "blue") == 0) {
             dogeio_text_color = 0xFF0000FF;
             dogeio_text_clear();
-        } else if (string_strcmp(arg, "yellow") == 0) {
+        } else if (str_strcmp(arg, "yellow") == 0) {
             dogeio_text_color = 0xFFFFFF00;
             dogeio_text_clear();
-        } else if (string_strcmp(arg, "cyan") == 0) {
+        } else if (str_strcmp(arg, "cyan") == 0) {
             dogeio_text_color = 0xFF00FFFF;
             dogeio_text_clear();
-        } else if (string_strcmp(arg, "magenta") == 0) {
+        } else if (str_strcmp(arg, "magenta") == 0) {
             dogeio_text_color = 0xFFFF00FF;
             dogeio_text_clear();
-        } else if (string_strcmp(arg, "navy") == 0) {
+        } else if (str_strcmp(arg, "navy") == 0) {
             dogeio_text_color = 0xFF000080;
             dogeio_text_clear();
-        } else if (string_strcmp(arg, "maroon") == 0) {
+        } else if (str_strcmp(arg, "maroon") == 0) {
             dogeio_text_color = 0xFF800000;
             dogeio_text_clear();
-        } else if (string_strcmp(arg, "teal") == 0) {
+        } else if (str_strcmp(arg, "teal") == 0) {
             dogeio_text_color = 0xFF008080;
             dogeio_text_clear();
-        } else if (string_strcmp(arg, "olive") == 0) {
+        } else if (str_strcmp(arg, "olive") == 0) {
             dogeio_text_color = 0xFF808000;
             dogeio_text_clear();
-        } else if (string_strcmp(arg, "doge_gold") == 0) {
+        } else if (str_strcmp(arg, "doge_gold") == 0) {
             dogeio_text_color = 0xFFE1B857;
             dogeio_text_clear();
-        } else if (string_strcmp(arg, "doge_tan") == 0) {
+        } else if (str_strcmp(arg, "doge_tan") == 0) {
             dogeio_text_color = 0xFFF4DFB1;
             dogeio_text_clear();
         } else {
@@ -101,38 +101,38 @@ int system_dogeshell_ex(char* command) {
         handled = 0;
     }
 
-	else if (string_strcmp(command, "shutdown") == 0) {
+	else if (str_strcmp(command, "shutdown") == 0) {
 		dogeio_text_clear_raw();
 		dogeio_text_println("Such shutdown, very goodbye.");
 		halt();
 		handled = 0;
 	}
 
-    else if (string_strcmp(command, "clear") == 0) {
+    else if (str_strcmp(command, "clear") == 0) {
         dogeio_text_clear();
         handled = 0;
     }
 
-    else if (string_strcmp(command, "dir") == 0) {
+    else if (str_strcmp(command, "dir") == 0) {
         system_fs_list();
         handled = 0;
     }
 
     // alright it actually works
-    else if (string_startswith(command, "time")) {
+    else if (str_startswith(command, "time")) {
         dogeio_text_println(time_get());
         handled = 0;
     }
 
-    else if (string_startswith(command, "readfile")) {
-        size_t len = string_strlen(command);
+    else if (str_startswith(command, "readfile")) {
+        size_t len = str_strlen(command);
         if (len >= 9 && command[8] == ' ') {
             char* argument = command + 9;
 	        char name[32];
 	      	char ext[8];
 
-			string_split_filename(argument, name, ext);
-            if (string_strcmp(argument, "--help") == 0) {
+			str_split_filename(argument, name, ext);
+            if (str_strcmp(argument, "--help") == 0) {
                 dogeio_text_println("Usage: readfile [filename]");
                 dogeio_text_println("Outputs the contents of a file.");
             } else {
@@ -144,19 +144,19 @@ int system_dogeshell_ex(char* command) {
         handled = 0;
     }
 
-    else if (string_startswith(command, "writefile")) {
-        size_t len = string_strlen(command);
+    else if (str_startswith(command, "writefile")) {
+        size_t len = str_strlen(command);
         if (len >= 10 && command[9] == ' ') {
             char* argument = command + 10;
 			char name[32];
 			char ext[8];
 
-			string_split_filename(argument, name, ext);
+			str_split_filename(argument, name, ext);
 
-            if (string_strcmp(argument, "--help") == 0) {
+            if (str_strcmp(argument, "--help") == 0) {
                 dogeio_text_println("Usage: writefile [filename]");
-                dogeio_text_println("Writes a string of text to the file specified.");
-            } else if (string_strcmp(argument, "--delete") == 0) {
+                dogeio_text_println("Writes a str of text to the file specified.");
+            } else if (str_strcmp(argument, "--delete") == 0) {
 
 			} else {
                 char input[256];
@@ -169,7 +169,7 @@ int system_dogeshell_ex(char* command) {
         handled = 0;
     }
 
-	else if (string_startswith(command, "createfile")) {
+	else if (str_startswith(command, "createfile")) {
 		char name[32];
 		char ext[8];
 		dogeio_text_input("name > ", name, 32);
@@ -178,19 +178,19 @@ int system_dogeshell_ex(char* command) {
 		handled = 0;
 	}
 
-	else if (string_startswith(command, "deletefile")) {
-		size_t len = string_strlen(command);
+	else if (str_startswith(command, "deletefile")) {
+		size_t len = str_strlen(command);
         if (len >= 10 && command[9] == ' ') {
             char* argument = command + 10;
 			char name[32];
 			char ext[8];
 
-			string_split_filename(argument, name, ext);
+			str_split_filename(argument, name, ext);
 
-            if (string_strcmp(argument, "--help") == 0) {
+            if (str_strcmp(argument, "--help") == 0) {
                 dogeio_text_println("Usage: writefile [filename]");
-                dogeio_text_println("Writes a string of text to the file specified.");
-            } else if (string_strcmp(argument, "--delete") == 0) {
+                dogeio_text_println("Writes a str of text to the file specified.");
+            } else if (str_strcmp(argument, "--delete") == 0) {
 
 			} else {
 				system_fs_delete_file(name, ext);
@@ -201,50 +201,50 @@ int system_dogeshell_ex(char* command) {
         handled = 0;
 	}
 
-    else if (string_strcmp(command, "help") == 0) {
+    else if (str_strcmp(command, "help") == 0) {
         for (int i = 0; i < 16; i++) {
             dogeio_text_println(help_command_array[i]);
         }
         handled = 0;
     }
 
-	else if (string_startswith(command, "cpuinfo")) {
+	else if (str_startswith(command, "cpuinfo")) {
 		dogeio_text_println("Cpu Name: ");
 		dogeio_text_println(cpuid());
 		handled = 0;
 	}
 
-	else if (string_strcmp(command, "fetch") == 0) {
+	else if (str_strcmp(command, "fetch") == 0) {
 		system_fetch();
 		handled = 0;
 	}
 
-	else if (string_startswith(command, "raminfo")) {
+	else if (str_startswith(command, "raminfo")) {
 		dogeio_text_print("RAM Amount: ");
 		handled = 0;
 	}
 
-	else if (string_strcmp(command, "bash") == 0) {
+	else if (str_strcmp(command, "bash") == 0) {
 		system_bash();
 		handled = 0;
 	}
 
-	else if (string_strcmp(command, "ver") == 0) {
+	else if (str_strcmp(command, "ver") == 0) {
 		dogeio_text_println(windoge_version);
 		handled = 0;
 	}
 
-	else if (string_strcmp(command, "whoami") == 0) {
+	else if (str_strcmp(command, "whoami") == 0) {
 		dogeio_text_println("wow");
 		handled = 0;
 	}
 	
-	else if (string_strcmp(command, "whereami") == 0) {
+	else if (str_strcmp(command, "whereami") == 0) {
 		dogeio_text_println("root (/)");
 		handled = 0;
 	}
 
-    else if (string_strcmp(command, "test") == 0) {
+    else if (str_strcmp(command, "test") == 0) {
         fstest_shell();
         handled = 0;
     }

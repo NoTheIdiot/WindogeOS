@@ -33,7 +33,7 @@ void dogeio_text_input(const char *prompt, char *buffer, size_t max_size) {
     while (1) {
         while ((ports_inb(0x64) & 1) == 0) {
             char* current_time = time_get();
-            if (string_strcmp(current_time, last_seen_time) != 0) {
+            if (str_strcmp(current_time, last_seen_time) != 0) {
                 menubar_draw();
                 for (int i = 0; i < 15; i++) {
                     last_seen_time[i] = current_time[i];

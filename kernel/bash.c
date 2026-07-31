@@ -15,8 +15,8 @@ int system_bash_ex(char* command) {
         return 0; 
     }
 
-    if (string_strcmp(command, "echo") == 0 || string_startswith(command, "echo ")) {
-        size_t len = string_strlen(command);
+    if (str_strcmp(command, "echo") == 0 || str_startswith(command, "echo ")) {
+        size_t len = str_strlen(command);
         if (len >= 5 && command[4] == ' ') {
             dogeio_text_println(command + 5);
         } else {
@@ -25,69 +25,69 @@ int system_bash_ex(char* command) {
         handled = 0;
     }
 
-    else if (string_strcmp(command, "clear") == 0) {
+    else if (str_strcmp(command, "clear") == 0) {
         dogeio_text_clear();
         handled = 0;
     }
 
-    else if (string_strcmp(command, "ls") == 0) {
+    else if (str_strcmp(command, "ls") == 0) {
         system_fs_list();
         handled = 0;
     }
 
-    else if (string_startswith(command, "date")) {
+    else if (str_startswith(command, "date")) {
         dogeio_text_println(time_get());
         handled = 0;
     }
 
-	else if (string_startswith(command, "color")) {
+	else if (str_startswith(command, "color")) {
         const char *arg = command + 6;
-        if (string_strcmp(arg, "black") == 0) {
+        if (str_strcmp(arg, "black") == 0) {
             dogeio_text_color = 0xFF000000;
             dogeio_text_clear();
-        } else if (string_strcmp(arg, "white") == 0) {
+        } else if (str_strcmp(arg, "white") == 0) {
             dogeio_text_color = 0xFFFFFFFF;
             dogeio_text_clear();
-        } else if (string_strcmp(arg, "grey") == 0) {
+        } else if (str_strcmp(arg, "grey") == 0) {
             dogeio_text_color = 0xFF808080;
             dogeio_text_clear();
-        } else if (string_strcmp(arg, "dark_grey") == 0) {
+        } else if (str_strcmp(arg, "dark_grey") == 0) {
             dogeio_text_color = 0xFF404040;
             dogeio_text_clear();
-        } else if (string_strcmp(arg, "red") == 0) {
+        } else if (str_strcmp(arg, "red") == 0) {
             dogeio_text_color = 0xFFFF0000;
             dogeio_text_clear();
-        } else if (string_strcmp(arg, "green") == 0) {
+        } else if (str_strcmp(arg, "green") == 0) {
             dogeio_text_color = 0xFF00FF00;
             dogeio_text_clear();
-        } else if (string_strcmp(arg, "blue") == 0) {
+        } else if (str_strcmp(arg, "blue") == 0) {
             dogeio_text_color = 0xFF0000FF;
             dogeio_text_clear();
-        } else if (string_strcmp(arg, "yellow") == 0) {
+        } else if (str_strcmp(arg, "yellow") == 0) {
             dogeio_text_color = 0xFFFFFF00;
             dogeio_text_clear();
-        } else if (string_strcmp(arg, "cyan") == 0) {
+        } else if (str_strcmp(arg, "cyan") == 0) {
             dogeio_text_color = 0xFF00FFFF;
             dogeio_text_clear();
-        } else if (string_strcmp(arg, "magenta") == 0) {
+        } else if (str_strcmp(arg, "magenta") == 0) {
             dogeio_text_color = 0xFFFF00FF;
             dogeio_text_clear();
-        } else if (string_strcmp(arg, "navy") == 0) {
+        } else if (str_strcmp(arg, "navy") == 0) {
             dogeio_text_color = 0xFF000080;
             dogeio_text_clear();
-        } else if (string_strcmp(arg, "maroon") == 0) {
+        } else if (str_strcmp(arg, "maroon") == 0) {
             dogeio_text_color = 0xFF800000;
             dogeio_text_clear();
-        } else if (string_strcmp(arg, "teal") == 0) {
+        } else if (str_strcmp(arg, "teal") == 0) {
             dogeio_text_color = 0xFF008080;
             dogeio_text_clear();
-        } else if (string_strcmp(arg, "olive") == 0) {
+        } else if (str_strcmp(arg, "olive") == 0) {
             dogeio_text_color = 0xFF808000;
             dogeio_text_clear();
-        } else if (string_strcmp(arg, "doge_gold") == 0) {
+        } else if (str_strcmp(arg, "doge_gold") == 0) {
             dogeio_text_color = 0xFFE1B857;
             dogeio_text_clear();
-        } else if (string_strcmp(arg, "doge_tan") == 0) {
+        } else if (str_strcmp(arg, "doge_tan") == 0) {
             dogeio_text_color = 0xFFF4DFB1;
             dogeio_text_clear();
         } else {
@@ -96,18 +96,18 @@ int system_bash_ex(char* command) {
         handled = 1;
     }
 
-    else if (string_startswith(command, "cat")) {
-        size_t len = string_strlen(command);
+    else if (str_startswith(command, "cat")) {
+        size_t len = str_strlen(command);
         if (len >= 4 && command[3] == ' ') {
             char* argument = command + 4;
             char name[32] = {0};
             char ext[8] = {0};
 
-            if (string_strcmp(argument, "--help") == 0) {
+            if (str_strcmp(argument, "--help") == 0) {
                 dogeio_text_println("Usage: cat [filename.ext]");
                 dogeio_text_println("Outputs the contents of a file.");
             } else {
-                string_split_filename(argument, name, ext);
+                str_split_filename(argument, name, ext);
                 if (name[0] != '\0') {
                     system_fs_readfile(name, ext);
                 } else {
@@ -120,33 +120,33 @@ int system_bash_ex(char* command) {
         handled = 0;
     }
 
-    else if (string_strcmp(command, "fetch") == 0) {
+    else if (str_strcmp(command, "fetch") == 0) {
         system_fetch();
         handled = 0;
     }
 
-    else if (string_strcmp(command, "whoami") == 0) {
+    else if (str_strcmp(command, "whoami") == 0) {
         dogeio_text_println("wow");
         handled = 0;
     }
 
-    else if (string_strcmp(command, "pwd") == 0) {
+    else if (str_strcmp(command, "pwd") == 0) {
         dogeio_text_println("root (/)");
         handled = 0;
     }
 
-    else if (string_startswith(command, "sed")) {
-        size_t len = string_strlen(command);
+    else if (str_startswith(command, "sed")) {
+        size_t len = str_strlen(command);
         if (len >= 4 && command[3] == ' ') {
             char* argument = command + 4;
             char name[32] = {0};
             char ext[8] = {0};
 
-            if (string_strcmp(argument, "--help") == 0) {
+            if (str_strcmp(argument, "--help") == 0) {
                 dogeio_text_println("Usage: sed [filename.ext]");
-                dogeio_text_println("Writes a string of text to the file specified.");
+                dogeio_text_println("Writes a str of text to the file specified.");
             } else {
-                string_split_filename(argument, name, ext);
+                str_split_filename(argument, name, ext);
                 if (name[0] != '\0') {
                     char input[256];
                     dogeio_text_input("Text to Write:\n", input, 256);
@@ -161,7 +161,7 @@ int system_bash_ex(char* command) {
         handled = 0;
     }
 
-    else if (string_startswith(command, "touch")) {
+    else if (str_startswith(command, "touch")) {
         char name[32] = {0};
         char ext[8] = {0};
         dogeio_text_input("name > ", name, 32);
@@ -174,13 +174,13 @@ int system_bash_ex(char* command) {
         handled = 0;
     }
 
-    else if (string_startswith(command, "rm ")) {
-        size_t len = string_strlen(command);
+    else if (str_startswith(command, "rm ")) {
+        size_t len = str_strlen(command);
         if (len >= 4) {
             char* argument = command + 3;
             char name[32] = {0};
             char ext[8] = {0};
-            string_split_filename(argument, name, ext);
+            str_split_filename(argument, name, ext);
             if (name[0] != '\0') {
                 system_fs_delete_file(name, ext);
             } else {
@@ -190,7 +190,7 @@ int system_bash_ex(char* command) {
         handled = 0;
     }
 
-	else if (string_strcmp(command, "shutdown") == 0) {
+	else if (str_strcmp(command, "shutdown") == 0) {
 		dogeio_text_clear_raw();
 		dogeio_text_println("Such shutdown, very goodbye.");
 		halt();
@@ -221,7 +221,7 @@ void system_bash() {
         dogeio_text_color_change(0xFFFFFFFF);
         dogeio_text_input("$ ", input, 256);
 
-        if (string_strcmp(input, "exit") == 0) {
+        if (str_strcmp(input, "exit") == 0) {
             return;
         }
         system_bash_ex(input);

@@ -60,7 +60,7 @@ struct limine_file {
     LIMINE_PTR(void *) address;
     uint64_t size;
     LIMINE_PTR(char *) path;
-    LIMINE_PTR(char *) string;
+    LIMINE_PTR(char *) str;
     uint32_t media_type;
     uint32_t unused;
     uint8_t tftp_ipv4[4];
@@ -453,7 +453,7 @@ struct limine_executable_file_request {
 
 struct limine_internal_module {
     LIMINE_PTR(const char *) path;
-    LIMINE_PTR(const char *) string;
+    LIMINE_PTR(const char *) str;
     uint64_t flags;
 };
 

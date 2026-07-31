@@ -131,7 +131,7 @@ int fs_create(const char *name) {
                 inodes[i].size = 0;
                 memset(inodes[i].direct_blocks, 0, sizeof(inodes[i].direct_blocks));
                 
-                string_strncpy(inodes[i].filename, name, MAX_FILENAME - 1);
+                str_strncpy(inodes[i].filename, name, MAX_FILENAME - 1);
                 inodes[i].filename[MAX_FILENAME - 1] = '\0';
 
                 ata_WriteSector((uint32_t)(INODE_START_LBA + sec), sector_buffer);
