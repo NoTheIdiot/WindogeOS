@@ -16,10 +16,10 @@ print("-------------------------------------------------------------------------
 print("Starting WindogeOS in QEMU")
 print("-----------------------------------------------------------------------------")
 if args.arch == "x86_64":
-    qemu_cmd = f"qemu-system-x86_64 -rtc base=localtime -M q35 -m 16M -device ide-hd,drive=disk -drive file={img_file},if=none,id=disk,format=raw -serial stdio"
+    qemu_cmd = f"qemu-system-x86_64 -rtc base=localtime -M pc -m 16M -hda {img_file} -serial stdio"
 
 elif args.arch in ["arm64", "aarch64"]:
-    qemu_cmd = f"qemu-system-aarch64 -rtc base=localtime -hda -M virt -cpu cortex-a57 -m 256M -bios limine-binary/BOOTAA64.EFI -drive format=raw,file={img_file},if=none,id=drv0 -device virtio-blk-device,drive=drv0 -serial stdio"
+    qemu_cmd = f"qemu-system-aarch64 -rtc base=localtime -M virt -cpu cortex-a57 -m 256M -bios limine-binary/BOOTAA64.EFI -drive format=raw,file={img_file},if=none,id=drv0 -device virtio-blk-device,drive=drv0 -serial stdio"
 else:
     print("Unknown architecture! Only x86_64 or arm64 (or aarch64) are supported.")
     exit(1)

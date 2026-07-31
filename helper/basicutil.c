@@ -68,3 +68,8 @@ void duolog(const char* str) {
     dogeio_text_println(str);
     serial_println(str);
 }
+
+void duolog(const char* str) {
+    dogeio_text_println(str);
+    serial_println(str);
+}

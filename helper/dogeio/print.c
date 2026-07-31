@@ -123,6 +123,23 @@ void dogeio_text_printchar(char c) {
         
         text_grid[cursor_y * TERMINAL_COLS + cursor_x] = ' ';
         dogeio_text_putchar(' ', cursor_x, cursor_y);
+    } else if (c == '\t') {
+        if (cursor_x < TERMINAL_COLS && cursor_y < TERMINAL_ROWS) {
+            text_grid[cursor_y * TERMINAL_COLS + cursor_x] = ' ';
+            for (int i = 0; i < 4; i++) {
+                dogeio_text_putchar(c, cursor_x, cursor_y);
+                cursor_x++;
+            }
+        }
+
+        if (cursor_x >= TERMINAL_COLS) {
+            cursor_x = 0;
+            cursor_y++;
+            
+            if (cursor_y >= TERMINAL_ROWS) {
+                dogeio_text_clear();
+            }
+        }
     }
     // standard printable characters path
     else {

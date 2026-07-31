@@ -26,5 +26,19 @@ char* str_strncpy(char* dest, const char* src, size_t n);
 float str_atof(const char *str);
 char* str_strcat(char* dest, const char* src);
 void str_split_filename(const char *input, char *name, char *ext);
+char str_u8tochar(uint8_t input);
+uint8_t str_chartou8(char input);
+// regular str stuff
+int str_strcmp(const char *str1, const char *str2);
+size_t str_strlen(const char* str);
+void str_itoa(int n, char* str);
+int str_strncmp(const char *str1, const char *str2, size_t n);
+int str_startswith(const char *str, const char *prefix);
+int str_atoi(char* s);
+void str_strcpy(char *dest, const char *src);
+char* str_strncpy(char* dest, const char* src, size_t n);
+float str_atof(const char *str);
+char* str_strcat(char* dest, const char* src);
+void str_split_filename(const char *input, char *name, char *ext);
 
 #endif
