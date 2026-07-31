@@ -58,6 +58,9 @@ typedef struct {
     int id;
 } file_t;
 
+extern file_t fs_index[MAX_FILES];
+extern int next_empty_file;
+
 int fs_format(void);
 int fs_create(const char *name);
 int fs_write(int inode_idx, const uint8_t *buffer, uint32_t count);

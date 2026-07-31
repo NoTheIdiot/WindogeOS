@@ -57,6 +57,11 @@ void fstest_shell_ex(char* command) {
         for (size_t i = 0; i < amount; i++) {
             end[i] = str_chartou8(text[i]);
         }
+        for (int i = 0; i < MAX_FILES; i++) {
+            if (str_strcmp(fs_index[i].name, input_name) == 0) {
+                fs_write(fs_index[i].id, end, amount);
+            }
+        }
     }
 
     else {
