@@ -1,6 +1,7 @@
 #include <dogeio.h>
 #include <stdint.h>
 #include <string.h>
+#include <bool.h>
 #include <stddef.h>
 #include <basicutil.h>
 
@@ -20,10 +21,6 @@
 
 #ifndef BLOCK_SIZE
 #define BLOCK_SIZE      512
-#endif
-
-#ifndef INODES_PER_SECTOR
-#define INODES_PER_SECTOR ((uint32_t)(BLOCK_SIZE / sizeof(struct sfs_inode)))
 #endif
 
 extern void duolog(const char* message);
@@ -150,56 +147,84 @@ int fs_create(char* name) {
     return -1; 
 }
 
-int fs_write(int inode_idx, const uint8_t *buffer, uint32_t count) {
-    if (inode_idx < 0 || (uint32_t)inode_idx >= MAX_FILES) {
+static int find_free_block(uint8_t *bitmap) {
+    for (uint32_t b = 1; b < (uint32_t)TOTAL_BLOCKS; b++) {
+        uint32_t byte_idx = b / 8;
+        uint32_t bit_idx = b % 8;
+        if (!(bitmap[byte_idx] & (1U << bit_idx))) {
+            bitmap[byte_idx] |= (uint8_t)(1U << bit_idx);
+            return (int)b;
+        }
+    }
+    return -1;
+}
+
+int fs_write(const char *filename, const uint8_t *buffer, uint32_t count) {
+    static uint8_t sector_buffer[BLOCK_SIZE];
+    static uint8_t bitmap[BLOCK_SIZE];
+    static uint8_t data_sector[BLOCK_SIZE];
+
+    uint32_t total_inode_sectors = MAX_FILES / INODES_PER_SECTOR;
+    if (MAX_FILES % INODES_PER_SECTOR != 0) {
+        total_inode_sectors++;
+    }
+
+    struct sfs_inode *file_inode = NULL;
+    uint32_t target_inode_lba = 0;
+    uint32_t inner_offset = 0;
+    bool found = false;
+
+    for (uint32_t sec = 0; sec < total_inode_sectors; sec++) {
+        uint32_t current_lba = (uint32_t)(INODE_START_LBA + sec);
+        ata_ReadSector(current_lba, sector_buffer);
+        struct sfs_inode *inodes = (struct sfs_inode *)sector_buffer;
+
+        for (uint32_t i = 0; i < INODES_PER_SECTOR; i++) {
+            uint32_t current_inode_idx = (sec * INODES_PER_SECTOR) + i;
+            if (current_inode_idx >= (uint32_t)MAX_FILES) break;
+
+            if (inodes[i].used && str_strcmp(inodes[i].filename, (char*)filename) == 0) {
+                target_inode_lba = current_lba;
+                inner_offset = i;
+                found = true;
+                break;
+            }
+        }
+        if (found) break;
+    }
+
+    if (!found) {
+        duolog("write err: file not found on disk\n");
         return -1;
     }
+
+    ata_ReadSector(target_inode_lba, sector_buffer);
+    file_inode = &((struct sfs_inode *)sector_buffer)[inner_offset];
 
     uint32_t max_capacity = DIRECT_POINTERS * BLOCK_SIZE;
     if (count > max_capacity) {
         count = max_capacity;
     }
 
-    uint8_t inode_sector[BLOCK_SIZE];
-    uint32_t target_inode_lba = (uint32_t)(INODE_START_LBA + ((uint32_t)inode_idx / INODES_PER_SECTOR));
-    uint32_t inner_offset = (uint32_t)((uint32_t)inode_idx % INODES_PER_SECTOR);
-
-    ata_ReadSector(target_inode_lba, inode_sector);
-    struct sfs_inode *file_inode = &((struct sfs_inode *)inode_sector)[inner_offset];
-    if (!file_inode->used) {
-        return -1;
-    }
-
-    uint8_t bitmap[BLOCK_SIZE];
     ata_ReadSector((uint32_t)BITMAP_LBA, bitmap);
 
     for (int b = 0; b < DIRECT_POINTERS; b++) {
         uint32_t old_block = file_inode->direct_blocks[b];
-        if (old_block > 0 && old_block < TOTAL_BLOCKS) {
-            uint32_t byte_idx = old_block / 8;
-            uint32_t bit_idx = old_block % 8;
-            bitmap[byte_idx] &= (uint8_t)~(1 << bit_idx);
+        if (old_block < TOTAL_BLOCKS && old_block != 0) {
+            bitmap[old_block / 8] &= (uint8_t)~(1U << (old_block % 8));
             file_inode->direct_blocks[b] = 0;
         }
     }
 
     uint32_t bytes_written = 0;
     uint32_t block_index = 0;
-    uint8_t data_sector[BLOCK_SIZE];
 
     while (bytes_written < count && block_index < DIRECT_POINTERS) {
-        int free_block = -1;
-        for (uint32_t b = 0; b < (uint32_t)TOTAL_BLOCKS; b++) {
-            uint32_t byte_idx = b / 8;
-            uint32_t bit_idx = b % 8;
-            if (!(bitmap[byte_idx] & (1 << bit_idx))) {
-                free_block = (int)b;
-                bitmap[byte_idx] |= (uint8_t)(1 << bit_idx); 
-                break;
-            }
+        int free_block = find_free_block(bitmap);
+        if (free_block == -1) {
+            duolog("write err: disk full\n");
+            break;
         }
-
-        if (free_block == -1) break; 
 
         file_inode->direct_blocks[block_index] = (uint32_t)free_block;
         memset(data_sector, 0, BLOCK_SIZE);
@@ -210,16 +235,19 @@ int fs_write(int inode_idx, const uint8_t *buffer, uint32_t count) {
         }
 
         ata_WriteSector((uint32_t)(DATA_START_LBA + (uint32_t)free_block), data_sector);
+        
         bytes_written += chunk;
         block_index++;
     }
 
     file_inode->size = bytes_written;
-    ata_WriteSector((uint32_t)target_inode_lba, inode_sector);
+    ata_WriteSector(target_inode_lba, sector_buffer);
     ata_WriteSector((uint32_t)BITMAP_LBA, bitmap);
 
+    duolog("write ok\n");
     return (int)bytes_written;
 }
+
 
 int fs_read(int inode_idx, uint8_t *output_buffer, uint32_t max_bytes) {
     if (inode_idx < 0 || (uint32_t)inode_idx >= MAX_FILES) {

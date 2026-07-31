@@ -40,6 +40,8 @@ void dogeio_text_clear_raw();
 #define INODE_START_LBA  2
 #define DATA_START_LBA   10 
 
+#define INODES_PER_SECTOR ((uint32_t)(BLOCK_SIZE / sizeof(struct sfs_inode)))
+
 struct sfs_superblock {
     uint32_t magic;
     uint32_t total_blocks;
@@ -63,7 +65,7 @@ extern int next_empty_file;
 
 int fs_format(void);
 int fs_create(char *name);
-int fs_write(int inode_idx, const uint8_t *buffer, uint32_t count);
+int fs_write(const char *filename, const uint8_t *buffer, uint32_t count);
 int fs_read(int inode_idx, uint8_t *output_buffer, uint32_t max_bytes);
 int fs_list_directory(void);
 
