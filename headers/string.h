@@ -26,5 +26,7 @@ char* str_strncpy(char* dest, const char* src, size_t n);
 float str_atof(const char *str);
 char* str_strcat(char* dest, const char* src);
 void str_split_filename(const char *input, char *name, char *ext);
+char str_u8tochar(uint8_t input);
+uint8_t str_chartou8(char input);
 
 #endif

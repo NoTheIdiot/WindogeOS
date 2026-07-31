@@ -47,6 +47,18 @@ void fstest_shell_ex(char* command) {
         fs_create(input_name);
     }
 
+    else if (str_strcmp(command,"w")==0) {
+        char input_name[32];
+        char text[256];
+        uint8_t end[256];
+        dogeio_text_input("name: ", input_name, 32);
+        dogeio_text_input("text: ", text, 256);
+        size_t amount = str_strlen(text);
+        for (size_t i = 0; i < amount; i++) {
+            end[i] = str_chartou8(text[i]);
+        }
+    }
+
     else {
         dogeio_text_println("oops");
     }

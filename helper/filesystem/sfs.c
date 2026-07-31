@@ -28,6 +28,9 @@
 
 extern void duolog(const char* message);
 
+file_t fs_index[MAX_FILES];
+int next_empty_file = 0;
+
 static void ata_Ready(void) {
     for (volatile int i = 0; i < 4; i++) {
         ports_inb(ATA_STATUS);
@@ -109,10 +112,11 @@ int fs_format(void) {
     for (uint32_t i = 0; i < total_inode_sectors; i++) {
         ata_WriteSector((uint32_t)(INODE_START_LBA + i), sector_buffer);
     }
+    next_empty_file = 0;
     return 0;
 }
 
-int fs_create(const char *name) {
+int fs_create(char* name) {
     uint8_t sector_buffer[BLOCK_SIZE];
     struct sfs_inode *inodes = (struct sfs_inode *)sector_buffer;
     uint32_t total_inode_sectors = MAX_FILES / INODES_PER_SECTOR;
@@ -139,6 +143,10 @@ int fs_create(const char *name) {
             }
         }
     }
+    fs_index[next_empty_file].id = next_empty_file;
+    str_strncpy(fs_index[next_empty_file].name, name, MAX_FILENAME - 1);
+    fs_index[next_empty_file].name[MAX_FILENAME - 1] = '\0';
+    next_empty_file++;
     return -1; 
 }
 
