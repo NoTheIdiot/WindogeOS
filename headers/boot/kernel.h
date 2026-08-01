@@ -17,9 +17,9 @@ void menubar_draw();
 #define SUPERBLOCK_LBA   0
 #define BITMAP_LBA       1
 #define INODE_START_LBA  2
-#define DATA_START_LBA   10 
 
 #define INODES_PER_SECTOR ((uint32_t)(BLOCK_SIZE / sizeof(struct sfs_inode)))
+#define DATA_START_LBA   (INODE_START_LBA + ((MAX_FILES + INODES_PER_SECTOR - 1) / INODES_PER_SECTOR))
 
 struct sfs_superblock {
     uint32_t magic;

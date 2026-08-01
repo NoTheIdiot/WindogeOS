@@ -4,12 +4,13 @@
 
 extern void duolog(const char* message);
 
-char* shit[7] = {
+char* shit[8] = {
     "h                  - help",
     "f                  - format",
     "c                  - create file",
     "d                  - delete file",
     "l                  - list files",
+    "w                  - write file",
     "r                  - read file",
     "cs                 - clear"
 };
@@ -20,7 +21,7 @@ void fstest_shell_ex(char* command) {
     }
 
     if (str_strcmp(command, "h") == 0) {
-        for (int i = 0; i < 7; i++) {
+        for (int i = 0; i < 8; i++) {
             dogeio_text_println(shit[i]);
         }
     }
@@ -28,7 +29,7 @@ void fstest_shell_ex(char* command) {
         fs_format();
     }
     else if (str_strcmp(command, "l") == 0) {
-        fs_list_directory();
+        fs_list_dir();
     }
     else if (str_strcmp(command, "cs") == 0) {
         dogeio_text_clear();
@@ -50,11 +51,15 @@ void fstest_shell_ex(char* command) {
 
     else if (str_strcmp(command, "r") == 0) {
         char input_name[32];
-        char output_buffer[512];
+        char output_buffer[512] = {0};
         dogeio_text_input("name: ", input_name, 32);
 
-        fs_write(input_name, output_buffer);
-        dogeio_text_println(output_buffer);
+        int bytes_read = fs_read(input_name, output_buffer);
+        if (bytes_read < 0) {
+            dogeio_text_println("Error: unable to read file.");
+        } else {
+            dogeio_text_println(output_buffer);
+        }
     }
 
     else {
