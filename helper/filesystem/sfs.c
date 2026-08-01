@@ -1,4 +1,5 @@
 #include <dogeio.h>
+#include <boot/kernel.h>
 #include <stdint.h>
 #include <string.h>
 #include <bool.h>
@@ -23,7 +24,7 @@
 #define BLOCK_SIZE       512
 #endif
 
-extern void duolog(const char* message);
+extern void log(const char* message);
 
 static void ata_Ready(void) {
     for (volatile int i = 0; i < 4; i++) {
@@ -104,7 +105,7 @@ int find_inode_by_name(const char *name, uint32_t *out_lba, uint32_t *out_offset
     return -1;
 }
 
-int fs_format(void) {
+int sfs_format(void) {
     uint8_t sector_buffer[BLOCK_SIZE];
     
     struct sfs_superblock *sb = (struct sfs_superblock*)sector_buffer;
@@ -123,7 +124,7 @@ int fs_format(void) {
     return 0;
 }
 
-int fs_create(char* name) {
+int sfs_create(char* name) {
     uint8_t sector_buffer[BLOCK_SIZE];
     uint32_t total_inode_sectors = (MAX_FILES + INODES_PER_SECTOR - 1) / INODES_PER_SECTOR;
 
@@ -161,14 +162,14 @@ static int find_free_block(uint8_t *bitmap) {
     return -1;
 }
 
-int fs_write(const char *filename, const uint8_t *buffer, uint32_t count) {
+int sfs_write(const char *filename, const uint8_t *buffer, uint32_t count) {
     uint8_t sector_buffer[BLOCK_SIZE];
     uint8_t bitmap[BLOCK_SIZE];
     uint8_t data_sector[BLOCK_SIZE];
 
     uint32_t target_lba, inner_offset;
     if (find_inode_by_name(filename, &target_lba, &inner_offset, NULL) < 0) {
-        duolog("write err: file not found\n");
+        log("write err: file not found\n");
         return -1;
     }
 
@@ -194,7 +195,7 @@ int fs_write(const char *filename, const uint8_t *buffer, uint32_t count) {
     while (bytes_written < count && block_index < DIRECT_POINTERS) {
         int free_block = find_free_block(bitmap);
         if (free_block == -1) {
-            duolog("write err: disk full\n");
+            log("write err: disk full\n");
             break;
         }
 
@@ -214,11 +215,11 @@ int fs_write(const char *filename, const uint8_t *buffer, uint32_t count) {
     ata_WriteSector(target_lba, sector_buffer);
     ata_WriteSector((uint32_t)BITMAP_LBA, bitmap);
 
-    duolog("write ok\n");
+    log("write ok\n");
     return (int)bytes_written;
 }
 
-int fs_read(int inode_idx, uint8_t *output_buffer, uint32_t max_bytes) {
+int sfs_read(int inode_idx, uint8_t *output_buffer, uint32_t max_bytes) {
     if (inode_idx < 0 || (uint32_t)inode_idx >= MAX_FILES) return -1;
 
     uint8_t inode_sector[BLOCK_SIZE];
@@ -247,7 +248,7 @@ int fs_read(int inode_idx, uint8_t *output_buffer, uint32_t max_bytes) {
     return (int)bytes_read;
 }
 
-int fs_list_directory(void) {
+int sfs_list_directory(void) {
     uint8_t sector_buffer[BLOCK_SIZE];
     int files_found = 0;
     uint32_t total_inode_sectors = (MAX_FILES + INODES_PER_SECTOR - 1) / INODES_PER_SECTOR;
