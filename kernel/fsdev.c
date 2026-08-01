@@ -54,6 +54,27 @@ void fstest_shell_ex(char* command) {
         fs_write(input_name, end, (uint32_t)amount);
     }
 
+    else if (str_strcmp(command, "r") == 0) {
+        char input_name[32];
+        static uint8_t output[512]; 
+
+        dogeio_text_input("name: ", input_name, 32);
+        int inode_idx = find_inode_by_name(input_name, NULL, NULL, NULL);
+    
+        if (inode_idx < 0) {
+            dogeio_text_println("File not found!");
+        } else {
+            int bytes_read = fs_read(inode_idx, output, sizeof(output) - 1);
+            
+            if (bytes_read < 0) {
+                dogeio_text_println("Error reading file.");
+            } else {
+                output[bytes_read] = '\0';
+                dogeio_text_println((char*)output);
+            }
+        }
+    }
+
     else {
         dogeio_text_println("oops");
     }

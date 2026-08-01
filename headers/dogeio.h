@@ -68,5 +68,6 @@ int fs_create(char *name);
 int fs_write(const char *filename, const uint8_t *buffer, uint32_t count);
 int fs_read(int inode_idx, uint8_t *output_buffer, uint32_t max_bytes);
 int fs_list_directory(void);
+int find_inode_by_name(const char *name, uint32_t *out_lba, uint32_t *out_offset, struct sfs_inode *out_inode);
 
 #endif
