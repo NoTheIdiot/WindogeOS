@@ -27,4 +27,11 @@ void dogeio_text_color_change(uint32_t color);
 void dogeio_text_background_change(uint32_t color);
 void dogeio_text_clear_raw();
 
+// file system stuff
+int fs_format(void);
+int fs_create(char* filename);
+int fs_read(char* filename, char* output_buffer);
+int fs_write(char* filename, char* input_buffer);
+int fs_list_dir(void);
+
 #endif
