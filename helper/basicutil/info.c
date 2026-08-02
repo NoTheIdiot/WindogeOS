@@ -7,7 +7,7 @@
 
 extern volatile struct limine_memmap_request memmap_request;
 
-char* windoge_version = "WindogeOS v0.0.3";
+char* windoge_version = "WindogeOS v0.0.4";
 
 const char* doge_ascii[22] = {
     "                 ;i.",
