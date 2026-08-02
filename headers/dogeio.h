@@ -36,5 +36,6 @@ int fs_read(char* filename, char* output_buffer, uint32_t max_size);
 int fs_write(char* filename, char* input_buffer);
 int fs_exists(char* filename);
 int fs_list_dir(int show_hidden);
+int fs_rename(char* filename, char* newname);
 
 #endif

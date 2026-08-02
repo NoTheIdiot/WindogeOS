@@ -198,11 +198,19 @@ int system_dogeshell_ex(char* command) {
         handled = 0;
     }
 
+    else if (str_startswith(command, "renamefile")) {
+        char* filename = command + 11;
+        char new_name[32];
+        dogeio_text_input("new filename> ", new_name, 32);
+        fs_rename(filename, new_name);
+        handled = 0;
+    }
+
 	else if (str_startswith(command, "createfile")) {
         char* filename = command + 11;
 		int result = fs_create(filename);
 
-        if (result) {
+        if (!result) {
             dogeio_text_println("Not Wow: Failed to create file.");
             dogeio_text_println("File name potentially invalid: nothing cant be a filename.");
         }

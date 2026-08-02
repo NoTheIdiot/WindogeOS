@@ -180,7 +180,7 @@ int system_bash_ex(char* command) {
 
     else if (str_strcmp(command, "history") == 0) {
         static char output_buffer[8192];
-        int bytes_read = fs_read(".bash_history", output_buffer, sizeof(output_buffer));
+        int bytes_read = fs_read(".history", output_buffer, sizeof(output_buffer));
         if (bytes_read < 0) {
             dogeio_text_println("No history available.");
         } else {

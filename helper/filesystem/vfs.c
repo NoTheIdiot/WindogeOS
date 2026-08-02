@@ -70,6 +70,11 @@ int fs_write(char* filename, char* input_buffer) {
         return -1;
     }
 
+    if (!input_buffer || input_buffer[0] == '\0') {
+        log("vfs: invalid input buffer for write.");
+        return -1;
+    }
+
     int inode_idx = find_inode_by_name(filename, NULL, NULL, NULL);
     if (inode_idx < 0) {
         log("vfs: file not found for write.");
@@ -82,7 +87,11 @@ int fs_write(char* filename, char* input_buffer) {
         existing_size = 0;
     }
 
-    size_t input_length = str_strlen(input_buffer);
+    size_t input_length = 0;
+    while (input_buffer[input_length] != '\0' && input_length < sizeof(input_u8) - 1) {
+        input_length++;
+    }
+
     if ((uint32_t)existing_size + input_length + 1 > sizeof(input_u8)) {
         if ((uint32_t)existing_size >= sizeof(input_u8)) {
             log("vfs: file is full, cannot append.");
@@ -117,4 +126,51 @@ int fs_exists(char* filename) {
 
 int fs_list_dir(int hidden) {
     return sfs_list_directory(hidden);
+}
+
+int fs_rename(char* filename, char* newname) {
+    if (!filename || filename[0] == '\0' || !newname || newname[0] == '\0') {
+        dogeio_text_println("Error: invalid rename arguments.");
+        return 0;
+    }
+
+    if (!fs_exists(filename)) {
+        dogeio_text_println("Error: source file does not exist.");
+        return 0;
+    }
+
+    if (fs_exists(newname)) {
+        dogeio_text_println("Error: target file already exists.");
+        return 0;
+    }
+
+    if (fs_create(newname) < 0) {
+        dogeio_text_println("Error: unable to create target file.");
+        return 0;
+    }
+
+    uint8_t raw_buffer[DIRECT_POINTERS * BLOCK_SIZE];
+    int inode_idx = find_inode_by_name(filename, NULL, NULL, NULL);
+    if (inode_idx < 0) {
+        dogeio_text_println("Error: unable to locate source file.");
+        return 0;
+    }
+
+    int bytes_read = sfs_read(inode_idx, raw_buffer, sizeof(raw_buffer));
+    if (bytes_read < 0) {
+        dogeio_text_println("Error: unable to read source file.");
+        return 0;
+    }
+
+    int write_result = sfs_write(newname, raw_buffer, (uint32_t)bytes_read);
+    if (write_result != 1) {
+        dogeio_text_println("Error: unable to write renamed file.");
+        return 0;
+    }
+
+    if (!fs_delete(filename)) {
+        dogeio_text_println("Warning: source file still exists after rename.");
+    }
+
+    return 1;
 }
