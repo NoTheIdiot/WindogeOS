@@ -107,11 +107,6 @@ void system_fetch() {
                 dogeio_text_print(ram_str);
                 dogeio_text_println(" MB");
                 break;
-			case 7:
-				dogeio_text_print("HDD: ");
-				dogeio_text_print(system_file_amount_str());
-				dogeio_text_println(" / 32 files");
-				break;
             default:
                 dogeio_text_println(""); 
                 break;
