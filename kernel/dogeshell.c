@@ -23,7 +23,7 @@ static void append_history(const char* command) {
 int system_dogeshell_ex(char* command) {
     int handled = 1; 
     
-    char* help_command_array[17] = {
+    char* help_command_array[18] = {
         "print              | simply prints a piece of text",
         "clear              | clears the terminal screen",
         "dir                | list the contents of the current folder",
@@ -32,15 +32,16 @@ int system_dogeshell_ex(char* command) {
         "help               | outputs this help menu breakdown",
         "shutdown           | shutsdown the computer",
         "cpuinfo            | prints the cpu name",
-		"deletefile	        | deletes a file",
+		"deletefile         | deletes a file",
 		"createfile         | creates a file",
-		"whoami	            | displays your current username",
+		"whoami             | displays your current username",
 		"whereami           | displays your current folder location",
 		"time               | displays the time",
 		"ver                | shows version",
 		"fetch              | shows the system information",
 		"color              | changes color of text.",
-		"history            | show command history from .history"
+		"history            | show command history from .history",
+        "clear-history      | clears history, saves space."
     };
 
     if (command == NULL || command[0] == '\0') {
@@ -241,7 +242,7 @@ int system_dogeshell_ex(char* command) {
 	}
 
     else if (str_strcmp(command, "help") == 0) {
-        for (int i = 0; i < 16; i++) {
+        for (int i = 0; i < 18; i++) {
             dogeio_text_println(help_command_array[i]);
         }
         handled = 0;
@@ -252,6 +253,12 @@ int system_dogeshell_ex(char* command) {
 		dogeio_text_println(cpuid());
 		handled = 0;
 	}
+
+    else if (str_strcmp(command, "clear-history")) {
+        fs_delete(".history");
+        fs_create(".history");
+        handled = 0;
+    }
 
 	else if (str_strcmp(command, "fetch") == 0) {
 		system_fetch();
@@ -294,6 +301,10 @@ int system_dogeshell_ex(char* command) {
 void system_dogeshell() {
     char input[256];
     int  status = 0;
+
+    if (!fs_exists(".history")) {
+        fs_create(".history");
+    }
 
     while (true) {
         for (int i = 0; i < 256; i++) {

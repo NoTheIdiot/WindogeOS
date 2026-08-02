@@ -72,10 +72,6 @@ void kernel_main(void) {
         dogeio_text_print(starting[i]);
     }
 
-    if (!fs_exists(".history")) {
-        fs_create(".history");
-    }
-
     log("Starting Dogeshell");
     system_dogeshell();
     halt();
