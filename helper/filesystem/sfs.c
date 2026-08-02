@@ -131,7 +131,7 @@ int sfs_format(void) {
     for (uint32_t i = 0; i < total_inode_sectors; i++) {
         if (ata_WriteSector((uint32_t)(INODE_START_LBA + i), sector_buffer) != 0) return -1;
     }
-    return 0;
+    return 1;
 }
 
 int sfs_create(char* name) {

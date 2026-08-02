@@ -116,6 +116,19 @@ int system_bash_ex(char* command) {
         handled = 0;
     }
 
+    else if (str_strcmp(command, "format") == 0) {
+        char r_u_sure[4];
+        dogeio_text_input("Are You Sure? (yes/no)\nMUCH WARNING: THIS WILL ERASE THE DISK.\n", r_u_sure, 4);
+        if (str_strcmp(r_u_sure, "yes") == 0) {
+            int result = fs_format();
+            if (result) {
+                dogeio_text_println("Formated Disk.");
+            } else {
+                dogeio_text_println("Not Wow: Something Went Wrong.");
+            }
+        }
+    }
+
     else if (str_strcmp(command, "fetch") == 0) {
         system_fetch();
         handled = 0;
