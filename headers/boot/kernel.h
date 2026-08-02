@@ -49,7 +49,7 @@ int sfs_append(const char *filename, const uint8_t *buffer, uint32_t count);
 int sfs_delete(const char *filename);
 int sfs_delete_last_line(const char *filename);
 int sfs_read(int inode_idx, uint8_t *output_buffer, uint32_t max_bytes);
-int sfs_list_directory(void);
+int sfs_list_directory(int show_hidden);
 int find_inode_by_name(const char *name, uint32_t *out_lba, uint32_t *out_offset, struct sfs_inode *out_inode);
 
 #endif

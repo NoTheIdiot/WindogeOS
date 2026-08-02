@@ -498,7 +498,7 @@ int sfs_read(int inode_idx, uint8_t *output_buffer, uint32_t max_bytes) {
     return (int)bytes_read;
 }
 
-int sfs_list_directory(void) {
+int sfs_list_directory(int show_hidden) {
     uint8_t sector_buffer[BLOCK_SIZE];
     int files_found = 0;
     uint32_t total_inode_sectors = (MAX_FILES + INODES_PER_SECTOR - 1) / INODES_PER_SECTOR;
@@ -511,6 +511,9 @@ int sfs_list_directory(void) {
             if ((sec * INODES_PER_SECTOR) + i >= (uint32_t)MAX_FILES) break;
 
             if (inodes[i].used) {
+                if (inodes[i].filename[0] == '.' && !show_hidden) {
+                    continue;
+                }
                 dogeio_text_print(inodes[i].filename[0] != '\0' ? inodes[i].filename : "empty");
                 dogeio_text_print(" | ");
                 

@@ -107,6 +107,14 @@ int fs_write(char* filename, char* input_buffer) {
     return 1;
 }
 
-int fs_list_dir(void) {
-    return sfs_list_directory();
+int fs_exists(char* filename) {
+    if (!filename || filename[0] == '\0') {
+        return 0;
+    }
+
+    return find_inode_by_name(filename, NULL, NULL, NULL) >= 0 ? 1 : 0;
+}
+
+int fs_list_dir(int hidden) {
+    return sfs_list_directory(hidden);
 }

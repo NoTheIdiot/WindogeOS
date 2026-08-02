@@ -8,10 +8,22 @@
 uint32_t old = 0xffffff;
 extern void fstest_shell();
 
+static void append_history(const char* command) {
+    if (!command || command[0] == '\0') {
+        return;
+    }
+
+    int result = fs_write(".history", (char *)command);
+    if (result == -2) {
+        fs_create(".history");
+        fs_write(".history", (char *)command);
+    }
+}
+
 int system_dogeshell_ex(char* command) {
     int handled = 1; 
     
-    char* help_command_array[16] = {
+    char* help_command_array[17] = {
         "print              | simply prints a piece of text",
         "clear              | clears the terminal screen",
         "dir                | list the contents of the current folder",
@@ -27,7 +39,8 @@ int system_dogeshell_ex(char* command) {
 		"time               | displays the time",
 		"ver                | shows version",
 		"fetch              | shows the system information",
-		"color              | changes color of text."
+		"color              | changes color of text.",
+		"history            | show command history from .history"
     };
 
     if (command == NULL || command[0] == '\0') {
@@ -129,8 +142,13 @@ int system_dogeshell_ex(char* command) {
         handled = 0;
     }
 
-    else if (str_strcmp(command, "dir") == 0) {
-        fs_list_dir();
+    else if (str_startswith(command, "dir")) {
+        char* argument = command + 4;
+        if (str_strcmp(argument, "--showhidden") == 0 || str_strcmp(argument, "-sh") == 0) {
+            fs_list_dir(1);
+        } else {
+            fs_list_dir(0);
+        }
         handled = 0;
     }
 
@@ -189,6 +207,24 @@ int system_dogeshell_ex(char* command) {
         }
 		handled = 0;
 	}
+
+    else if (str_strcmp(command, "history") == 0) {
+        static char output_buffer[8192];
+        int bytes_read = fs_read(".history", output_buffer, sizeof(output_buffer));
+        if (bytes_read < 0) {
+            dogeio_text_println("No history available.");
+        } else {
+            char *line = output_buffer;
+            size_t processed = 0;
+            while ((int)processed < bytes_read) {
+                dogeio_text_println(line);
+                size_t line_len = str_strlen(line);
+                processed += line_len + 1;
+                line += line_len + 1;
+            }
+        }
+        handled = 0;
+    }
 
 	else if (str_startswith(command, "deletefile")) {
         char* filename = command + 11;
@@ -280,6 +316,9 @@ void system_dogeshell() {
 		
 		dogeio_text_color_change(old);
         dogeio_text_input("> ", input, 256);
+        if (input[0] != '\0') {
+            append_history(input);
+        }
         status = system_dogeshell_ex(input);
     }
 }

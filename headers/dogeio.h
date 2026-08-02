@@ -34,6 +34,7 @@ int fs_delete(char* filename);
 int fs_delete_last_line(char* filename);
 int fs_read(char* filename, char* output_buffer, uint32_t max_size);
 int fs_write(char* filename, char* input_buffer);
-int fs_list_dir(void);
+int fs_exists(char* filename);
+int fs_list_dir(int show_hidden);
 
 #endif

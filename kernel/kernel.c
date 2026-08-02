@@ -57,6 +57,8 @@ void kernel_main(void) {
     log("WindogeOS has successfully booted. Start celebrating broski.");
     menubar_draw();
 
+
+
     const char* starting[6] = {
 		"================================================================================================================================================================",
 		"=                                                                                                                                                              =",
@@ -68,6 +70,10 @@ void kernel_main(void) {
 
     for (int i = 0; i < 6; i++) {
         dogeio_text_print(starting[i]);
+    }
+
+    if (!fs_exists(".history")) {
+        fs_create(".history");
     }
 
     log("Starting Dogeshell");
