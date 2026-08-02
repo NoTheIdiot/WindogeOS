@@ -54,10 +54,6 @@ void kernel_main(void) {
     }
     log("[Wow] Memory Map has been found.");
 
-    log("Formating ramisk, such patience");
-    system_fs_start_init();
-    log("[Wow] Format Sucess");
-
     log("WindogeOS has successfully booted. Start celebrating broski.");
     menubar_draw();
 

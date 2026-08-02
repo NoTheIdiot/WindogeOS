@@ -72,15 +72,8 @@ int fs_write(char* filename, char* input_buffer) {
 
     int inode_idx = find_inode_by_name(filename, NULL, NULL, NULL);
     if (inode_idx < 0) {
-        if (sfs_create(filename) < 0) {
-            log("vfs: cannot create file for write.");
-            return -1;
-        }
-        inode_idx = find_inode_by_name(filename, NULL, NULL, NULL);
-        if (inode_idx < 0) {
-            log("vfs: cannot locate newly created file.");
-            return -1;
-        }
+        log("vfs: file not found for write.");
+        return -2;
     }
 
     uint8_t input_u8[512];
@@ -93,7 +86,7 @@ int fs_write(char* filename, char* input_buffer) {
     if ((uint32_t)existing_size + input_length + 1 > sizeof(input_u8)) {
         if ((uint32_t)existing_size >= sizeof(input_u8)) {
             log("vfs: file is full, cannot append.");
-            return -1;
+            return 0;
         }
         input_length = sizeof(input_u8) - 1 - (uint32_t)existing_size;
     }
@@ -104,7 +97,14 @@ int fs_write(char* filename, char* input_buffer) {
     input_u8[input_length] = str_chartou8('\n');
     size_t write_length = input_length + 1;
 
-    return sfs_append(filename, input_u8, (uint32_t)write_length);
+    int append_result = sfs_append(filename, input_u8, (uint32_t)write_length);
+    if (append_result == 0) {
+        return 0;
+    }
+    if (append_result < 0) {
+        return -1;
+    }
+    return 1;
 }
 
 int fs_list_dir(void) {

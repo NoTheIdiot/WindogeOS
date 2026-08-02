@@ -51,7 +51,16 @@ void fstest_shell_ex(char* command) {
         dogeio_text_input("name: ", input_name, 32);
         dogeio_text_input("text: ", text, 256);
         
-        fs_write(input_name, text);
+        int result = fs_write(input_name, text);
+        if (result == 1) {
+            dogeio_text_println("write ok");
+        } else if (result == 0) {
+            dogeio_text_println("Error: disk full.");
+        } else if (result == -2) {
+            dogeio_text_println("Error: file not found.");
+        } else {
+            dogeio_text_println("Error: write failed.");
+        }
     }
 
     else if (str_strcmp(command, "r") == 0) {

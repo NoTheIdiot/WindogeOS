@@ -31,7 +31,7 @@ int system_bash_ex(char* command) {
     }
 
     else if (str_strcmp(command, "ls") == 0) {
-        system_fs_list();
+        fs_list_dir();
         handled = 0;
     }
 
@@ -97,25 +97,21 @@ int system_bash_ex(char* command) {
     }
 
     else if (str_startswith(command, "cat")) {
-        size_t len = str_strlen(command);
-        if (len >= 4 && command[3] == ' ') {
-            char* argument = command + 4;
-            char name[32] = {0};
-            char ext[8] = {0};
+        char* filename = command + 4;
+        static char output_buffer[8192];
 
-            if (str_strcmp(argument, "--help") == 0) {
-                dogeio_text_println("Usage: cat [filename.ext]");
-                dogeio_text_println("Outputs the contents of a file.");
-            } else {
-                str_split_filename(argument, name, ext);
-                if (name[0] != '\0') {
-                    system_fs_readfile(name, ext);
-                } else {
-                    dogeio_text_println("Error: Invalid filename.");
-                }
-            }
+        int bytes_read = fs_read(filename, output_buffer, sizeof(output_buffer));
+        if (bytes_read < 0) {
+            dogeio_text_println("Error: unable to read file.");
         } else {
-            dogeio_text_println("Usage: cat [filename.ext]");
+            char *line = output_buffer;
+            size_t processed = 0;
+            while ((int)processed < bytes_read) {
+                dogeio_text_println(line);
+                size_t line_len = str_strlen(line);
+                processed += line_len + 1;
+                line += line_len + 1;
+            }
         }
         handled = 0;
     }
@@ -136,56 +132,45 @@ int system_bash_ex(char* command) {
     }
 
     else if (str_startswith(command, "sed")) {
-        size_t len = str_strlen(command);
-        if (len >= 4 && command[3] == ' ') {
-            char* argument = command + 4;
-            char name[32] = {0};
-            char ext[8] = {0};
-
-            if (str_strcmp(argument, "--help") == 0) {
-                dogeio_text_println("Usage: sed [filename.ext]");
-                dogeio_text_println("Writes a str of text to the file specified.");
-            } else {
-                str_split_filename(argument, name, ext);
-                if (name[0] != '\0') {
-                    char input[256];
-                    dogeio_text_input("Text to Write:\n", input, 256);
-                    system_fs_writefile(name, ext, input);
-                } else {
-                    dogeio_text_println("Error: Invalid filename.");
-                }
-            }
+        char* filename = command + 4;
+        static char text[256];
+        
+        dogeio_text_input("text> ", text, 256);
+        
+        int result = fs_write(filename, text);
+        if (result == 1) {
+            dogeio_text_println("write ok");
+        } else if (result == 0) {
+            dogeio_text_println("Error: disk full.");
+        } else if (result == -2) {
+            dogeio_text_println("Error: file not found.");
         } else {
-            dogeio_text_println("Usage: sed [filename.ext]");
+            dogeio_text_println("Not Wow: Something went wrong.");
         }
         handled = 0;
     }
 
     else if (str_startswith(command, "touch")) {
-        char name[32] = {0};
-        char ext[8] = {0};
-        dogeio_text_input("name > ", name, 32);
-        dogeio_text_input("ext  > ", ext, 8);
-        if (name[0] != '\0' && ext[0] != '\0') {
-            system_fs_createfile(name, ext);
-        } else {
-            dogeio_text_println("Error: Name and extension cannot be empty.");
+        char* filename = command + 6;
+		int result = fs_create(filename);
+
+        if (result) {
+            dogeio_text_println("Not Wow: Failed to create file.");
+            dogeio_text_println("File name potentially invalid: nothing cant be a filename.");
         }
         handled = 0;
     }
 
     else if (str_startswith(command, "rm ")) {
-        size_t len = str_strlen(command);
-        if (len >= 4) {
-            char* argument = command + 3;
-            char name[32] = {0};
-            char ext[8] = {0};
-            str_split_filename(argument, name, ext);
-            if (name[0] != '\0') {
-                system_fs_delete_file(name, ext);
-            } else {
-                dogeio_text_println("Error: Invalid filename.");
-            }
+        char* filename = command + 3;
+
+        int result = fs_delete(filename);
+        if (!result) {
+            dogeio_text_println("Not Wow: File Not Found.");
+        } else if (result == -1) {
+            dogeio_text_println("Doge Sad: Something went wrong!");
+        } else if (result == -2) {
+            dogeio_text_println("Error: File does not exist.");
         }
         handled = 0;
     }

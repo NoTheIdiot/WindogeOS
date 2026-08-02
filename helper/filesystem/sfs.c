@@ -193,7 +193,7 @@ int sfs_write(const char *filename, const uint8_t *buffer, uint32_t count) {
     uint32_t target_lba, inner_offset;
     if (find_inode_by_name(filename, &target_lba, &inner_offset, NULL) < 0) {
         log("write err: file not found");
-        return -1;
+        return -2;
     }
 
     if (ata_ReadSector(target_lba, sector_buffer) != 0) {
@@ -248,7 +248,7 @@ int sfs_write(const char *filename, const uint8_t *buffer, uint32_t count) {
     ata_WriteSector((uint32_t)BITMAP_LBA, bitmap);
 
     log("write ok");
-    return (int)bytes_written;
+    return 1;
 }
 
 int sfs_append(const char *filename, const uint8_t *buffer, uint32_t count) {
@@ -274,7 +274,7 @@ int sfs_append(const char *filename, const uint8_t *buffer, uint32_t count) {
     uint32_t max_capacity = DIRECT_POINTERS * BLOCK_SIZE;
     if (old_size >= max_capacity) {
         log("append err: file is full");
-        return -1;
+        return 0;
     }
 
     if (old_size + count > max_capacity) {
@@ -302,7 +302,7 @@ int sfs_append(const char *filename, const uint8_t *buffer, uint32_t count) {
             int free_block = find_free_block(bitmap);
             if (free_block == -1) {
                 log("append err: disk full");
-                return -1;
+                return 0;
             }
             active_block = (uint32_t)free_block;
             file_inode->direct_blocks[current_block] = active_block;
@@ -372,7 +372,7 @@ int sfs_delete(const char *filename) {
     uint32_t target_lba, inner_offset;
     if (find_inode_by_name(filename, &target_lba, &inner_offset, NULL) < 0) {
         log("delete err: file not found");
-        return -1;
+        return 0;
     }
 
     if (ata_ReadSector(target_lba, inode_sector) != 0) {
@@ -413,7 +413,7 @@ int sfs_delete(const char *filename) {
     }
 
     log("delete ok");
-    return 0;
+    return 1;
 }
 
 int sfs_delete_last_line(const char *filename) {

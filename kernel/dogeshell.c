@@ -114,7 +114,7 @@ int system_dogeshell_ex(char* command) {
     }
 
     else if (str_strcmp(command, "dir") == 0) {
-        system_fs_list();
+        fs_list_dir();
         handled = 0;
     }
 
@@ -125,80 +125,67 @@ int system_dogeshell_ex(char* command) {
     }
 
     else if (str_startswith(command, "readfile")) {
-        size_t len = str_strlen(command);
-        if (len >= 9 && command[8] == ' ') {
-            char* argument = command + 9;
-	        char name[32];
-	      	char ext[8];
+        char* filename = command + 9;
+        static char output_buffer[8192];
 
-			str_split_filename(argument, name, ext);
-            if (str_strcmp(argument, "--help") == 0) {
-                dogeio_text_println("Usage: readfile [filename]");
-                dogeio_text_println("Outputs the contents of a file.");
-            } else {
-                system_fs_readfile(name, ext);
-            }
+        int bytes_read = fs_read(filename, output_buffer, sizeof(output_buffer));
+        if (bytes_read < 0) {
+            dogeio_text_println("Error: unable to read file.");
         } else {
-            dogeio_text_println("Usage: readfile [filename]");
+            char *line = output_buffer;
+            size_t processed = 0;
+            while ((int)processed < bytes_read) {
+                dogeio_text_println(line);
+                size_t line_len = str_strlen(line);
+                processed += line_len + 1;
+                line += line_len + 1;
+            }
         }
         handled = 0;
     }
 
     else if (str_startswith(command, "writefile")) {
-        size_t len = str_strlen(command);
-        if (len >= 10 && command[9] == ' ') {
-            char* argument = command + 10;
-			char name[32];
-			char ext[8];
-
-			str_split_filename(argument, name, ext);
-
-            if (str_strcmp(argument, "--help") == 0) {
-                dogeio_text_println("Usage: writefile [filename]");
-                dogeio_text_println("Writes a str of text to the file specified.");
-            } else if (str_strcmp(argument, "--delete") == 0) {
-
-			} else {
-                char input[256];
-                dogeio_text_input("Text to Write:\n", input, 256);
-                system_fs_writefile(name, ext, input);
-            }
+        char* filename = command + 10;
+        static char text[256];
+        
+        dogeio_text_input("text> ", text, 256);
+        
+        int result = fs_write(filename, text);
+        if (result == 1) {
+            dogeio_text_println("write ok");
+        } else if (result == 0) {
+            dogeio_text_println("Error: disk full.");
+        } else if (result == -2) {
+            dogeio_text_println("Error: file not found.");
         } else {
-            dogeio_text_println("Usage: writefile [filename]");
+            dogeio_text_println("Not Wow: Something went wrong.");
         }
         handled = 0;
     }
 
 	else if (str_startswith(command, "createfile")) {
-		char name[32];
-		char ext[8];
-		dogeio_text_input("name > ", name, 32);
-		dogeio_text_input("ext  > ", ext, 8);
-		system_fs_createfile(name, ext);
+        char* filename = command + 11;
+		int result = fs_create(filename);
+
+        if (result) {
+            dogeio_text_println("Not Wow: Failed to create file.");
+            dogeio_text_println("File name potentially invalid: nothing cant be a filename.");
+        }
 		handled = 0;
 	}
 
 	else if (str_startswith(command, "deletefile")) {
-		size_t len = str_strlen(command);
-        if (len >= 10 && command[9] == ' ') {
-            char* argument = command + 10;
-			char name[32];
-			char ext[8];
+        char* filename = command + 11;
 
-			str_split_filename(argument, name, ext);
-
-            if (str_strcmp(argument, "--help") == 0) {
-                dogeio_text_println("Usage: writefile [filename]");
-                dogeio_text_println("Writes a str of text to the file specified.");
-            } else if (str_strcmp(argument, "--delete") == 0) {
-
-			} else {
-				system_fs_delete_file(name, ext);
-            }
-        } else {
-            dogeio_text_println("Usage: writefile [filename]");
+        int result = fs_delete(filename);
+        if (!result) {
+            dogeio_text_println("Not Wow: File Not Found.");
+        } else if (result == -1) {
+            dogeio_text_println("Doge Sad: Something went wrong!");
+        } else if (result == -2) {
+            dogeio_text_println("Error: File does not exist.");
         }
-        handled = 0;
+		handled = 0;
 	}
 
     else if (str_strcmp(command, "help") == 0) {
