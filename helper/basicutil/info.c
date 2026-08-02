@@ -76,8 +76,18 @@ uint64_t get_ram(void) {
     return total_ram_bytes;
 }
 
+__attribute__((section(".limine_requests"))) static const uint8_t code_marker_start = 0;
+__attribute__((section(".bss")))             static uint8_t       code_marker_end;
+
+uint64_t get_used_ram(void) {
+    uint64_t binary_size = (uint64_t)&code_marker_end - (uint64_t)&code_marker_start;
+    return binary_size + (TERMINAL_ROWS * TERMINAL_COLS);
+}
+
+
 void system_fetch() {
     char ram_str[32]; 
+    char ram_used_str[32];
 
     for (int i = 0; i < 22; i++) {
         dogeio_text_print(doge_ascii[i]);
@@ -89,27 +99,30 @@ void system_fetch() {
             case 2:
                 dogeio_text_println("-----------------------------");
                 break;
-			case 3:
-				dogeio_text_print("Such User: ");
-				dogeio_text_println("wow");
-				break;
-			case 4:
-				dogeio_text_print("Version: ");
-				dogeio_text_println(windoge_version);
-				break;
+            case 3:
+                dogeio_text_print("Such User: ");
+                dogeio_text_println("wow");
+                break;
+            case 4:
+                dogeio_text_print("Version: ");
+                dogeio_text_println(windoge_version);
+                break;
             case 5:
                 dogeio_text_print("CPU: ");
                 dogeio_text_println(cpuid());
                 break;
             case 6:
                 dogeio_text_print("RAM: ");
-                str_itoa((int)(get_ram() / 1024 / 1024), ram_str); 
+                str_itoa((int)(get_used_ram() / 1024 / 1024), ram_used_str);
+                dogeio_text_print(ram_used_str);
+                dogeio_text_print(" MB");
+                dogeio_text_print(" / ");
+                str_itoa((int)(get_ram() / 1024 / 1024), ram_str);
                 dogeio_text_print(ram_str);
                 dogeio_text_println(" MB");
                 break;
             default:
-                dogeio_text_println(""); 
-                break;
+                dogeio_text_println("");
         }
     }
 }

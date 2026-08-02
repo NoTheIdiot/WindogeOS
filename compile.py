@@ -10,7 +10,7 @@ system = platform.system()
 if system == "Windows":
     linker = "ld.lld"
 else:
-    linker = "ld"
+    linker = "ld.lld"
 
 parser = argparse.ArgumentParser(description="WindogeOS Compile File, virtual machine not included.")
 parser.add_argument("-a", "--arch", default="x86_64", help="CPU architecture choice, if there is nothing then it's defaultly x86_64")

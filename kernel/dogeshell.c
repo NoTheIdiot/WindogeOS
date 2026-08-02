@@ -262,7 +262,7 @@ int system_dogeshell_ex(char* command) {
 		handled = 0;
 	}
 
-    else if (str_strcmp(command, "clear-history")) {
+    else if (str_strcmp(command, "clear-history") == 0) {
         fs_delete(".history");
         fs_create(".history");
         handled = 0;
