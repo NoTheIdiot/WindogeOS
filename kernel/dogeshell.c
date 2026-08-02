@@ -247,11 +247,6 @@ int system_dogeshell_ex(char* command) {
 		handled = 0;
 	}
 
-    else if (str_strcmp(command, "fdisk") == 0) {
-        fstest_shell();
-        handled = 0;
-    }
-
     if (handled == 1) {
         dogeio_text_print(command);
         dogeio_text_println(": command doesn't exist :(");
