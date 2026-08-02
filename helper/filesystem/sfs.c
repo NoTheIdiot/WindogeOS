@@ -136,12 +136,12 @@ int sfs_format(void) {
 
 int sfs_create(char* name) {
     if (!name || name[0] == '\0' || str_strlen(name) >= MAX_FILENAME) {
-        log("create err: invalid filename\n");
+        log("create err: invalid filename");
         return -1;
     }
 
     if (find_inode_by_name(name, NULL, NULL, NULL) >= 0) {
-        log("create err: file already exists\n");
+        log("create err: file already exists");
         return -1;
     }
 
@@ -151,7 +151,7 @@ int sfs_create(char* name) {
     for (uint32_t sec = 0; sec < total_inode_sectors; sec++) {
         uint32_t lba = (uint32_t)(INODE_START_LBA + sec);
         if (ata_ReadSector(lba, sector_buffer) != 0) {
-            log("create err: failed to read inode sector\n");
+            log("create err: failed to read inode sector");
             return -1;
         }
         struct sfs_inode *inodes = (struct sfs_inode *)sector_buffer;
@@ -192,12 +192,12 @@ int sfs_write(const char *filename, const uint8_t *buffer, uint32_t count) {
 
     uint32_t target_lba, inner_offset;
     if (find_inode_by_name(filename, &target_lba, &inner_offset, NULL) < 0) {
-        log("write err: file not found\n");
+        log("write err: file not found");
         return -1;
     }
 
     if (ata_ReadSector(target_lba, sector_buffer) != 0) {
-        log("write err: failed to read inode sector\n");
+        log("write err: failed to read inode sector");
         return -1;
     }
     struct sfs_inode *file_inode = &((struct sfs_inode *)sector_buffer)[inner_offset];
@@ -206,7 +206,7 @@ int sfs_write(const char *filename, const uint8_t *buffer, uint32_t count) {
     if (count > max_capacity) count = max_capacity;
 
     if (ata_ReadSector((uint32_t)BITMAP_LBA, bitmap) != 0) {
-        log("write err: failed to read bitmap\n");
+        log("write err: failed to read bitmap");
         return -1;
     }
 
@@ -224,7 +224,7 @@ int sfs_write(const char *filename, const uint8_t *buffer, uint32_t count) {
     while (bytes_written < count && block_index < DIRECT_POINTERS) {
         int free_block = find_free_block(bitmap);
         if (free_block == -1) {
-            log("write err: disk full\n");
+            log("write err: disk full");
             break;
         }
 
@@ -235,7 +235,7 @@ int sfs_write(const char *filename, const uint8_t *buffer, uint32_t count) {
         memcpy(data_sector, buffer + bytes_written, chunk);
 
         if (ata_WriteSector((uint32_t)free_block, data_sector) != 0) {
-            log("write err: failed to write data block\n");
+            log("write err: failed to write data block");
             return -1;
         }
         
@@ -247,8 +247,220 @@ int sfs_write(const char *filename, const uint8_t *buffer, uint32_t count) {
     ata_WriteSector(target_lba, sector_buffer);
     ata_WriteSector((uint32_t)BITMAP_LBA, bitmap);
 
-    log("write ok\n");
+    log("write ok");
     return (int)bytes_written;
+}
+
+int sfs_append(const char *filename, const uint8_t *buffer, uint32_t count) {
+    if (count == 0) return 0;
+
+    uint8_t inode_sector[BLOCK_SIZE];
+    uint8_t bitmap[BLOCK_SIZE];
+    uint8_t data_sector[BLOCK_SIZE];
+
+    uint32_t target_lba, inner_offset;
+    if (find_inode_by_name(filename, &target_lba, &inner_offset, NULL) < 0) {
+        log("append err: file not found");
+        return -1;
+    }
+
+    if (ata_ReadSector(target_lba, inode_sector) != 0) {
+        log("append err: failed to read inode sector");
+        return -1;
+    }
+    struct sfs_inode *file_inode = &((struct sfs_inode *)inode_sector)[inner_offset];
+
+    uint32_t old_size = file_inode->size;
+    uint32_t max_capacity = DIRECT_POINTERS * BLOCK_SIZE;
+    if (old_size >= max_capacity) {
+        log("append err: file is full");
+        return -1;
+    }
+
+    if (old_size + count > max_capacity) {
+        count = max_capacity - old_size;
+    }
+
+    if (ata_ReadSector((uint32_t)BITMAP_LBA, bitmap) != 0) {
+        log("append err: failed to read bitmap");
+        return -1;
+    }
+
+    uint32_t bytes_written = 0;
+    uint32_t start_block = old_size / BLOCK_SIZE;
+    uint32_t offset_in_block = old_size % BLOCK_SIZE;
+    uint32_t current_block = start_block;
+
+    if (offset_in_block != 0 && bytes_written < count) {
+        if (current_block >= DIRECT_POINTERS) {
+            log("append err: file is full");
+            return -1;
+        }
+
+        uint32_t active_block = file_inode->direct_blocks[current_block];
+        if (active_block == 0) {
+            int free_block = find_free_block(bitmap);
+            if (free_block == -1) {
+                log("append err: disk full");
+                return -1;
+            }
+            active_block = (uint32_t)free_block;
+            file_inode->direct_blocks[current_block] = active_block;
+        }
+
+        if (ata_ReadSector(active_block, data_sector) != 0) {
+            log("append err: failed to read data block");
+            return -1;
+        }
+
+        uint32_t chunk = BLOCK_SIZE - offset_in_block;
+        if (chunk > count) chunk = count;
+        memcpy(data_sector + offset_in_block, buffer + bytes_written, chunk);
+        if (ata_WriteSector(active_block, data_sector) != 0) {
+            log("append err: failed to write data block");
+            return -1;
+        }
+
+        bytes_written += chunk;
+        current_block++;
+    }
+
+    while (bytes_written < count && current_block < DIRECT_POINTERS) {
+        int free_block = find_free_block(bitmap);
+        if (free_block == -1) {
+            log("append err: disk full");
+            break;
+        }
+
+        file_inode->direct_blocks[current_block] = (uint32_t)free_block;
+        memset(data_sector, 0, BLOCK_SIZE);
+
+        uint32_t chunk = (count - bytes_written > BLOCK_SIZE) ? BLOCK_SIZE : (count - bytes_written);
+        memcpy(data_sector, buffer + bytes_written, chunk);
+
+        if (ata_WriteSector((uint32_t)free_block, data_sector) != 0) {
+            log("append err: failed to write data block");
+            return -1;
+        }
+
+        bytes_written += chunk;
+        current_block++;
+    }
+
+    if (bytes_written == 0) {
+        return 0;
+    }
+
+    file_inode->size = old_size + bytes_written;
+    if (ata_WriteSector(target_lba, inode_sector) != 0) {
+        log("append err: failed to write inode sector");
+        return -1;
+    }
+    if (ata_WriteSector((uint32_t)BITMAP_LBA, bitmap) != 0) {
+        log("append err: failed to write bitmap");
+        return -1;
+    }
+
+    log("append ok");
+    return (int)bytes_written;
+}
+
+int sfs_delete(const char *filename) {
+    uint8_t inode_sector[BLOCK_SIZE];
+    uint8_t bitmap[BLOCK_SIZE];
+
+    uint32_t target_lba, inner_offset;
+    if (find_inode_by_name(filename, &target_lba, &inner_offset, NULL) < 0) {
+        log("delete err: file not found");
+        return -1;
+    }
+
+    if (ata_ReadSector(target_lba, inode_sector) != 0) {
+        log("delete err: failed to read inode sector");
+        return -1;
+    }
+
+    struct sfs_inode *file_inode = &((struct sfs_inode *)inode_sector)[inner_offset];
+    if (!file_inode->used) {
+        log("delete err: file not used");
+        return -1;
+    }
+
+    if (ata_ReadSector((uint32_t)BITMAP_LBA, bitmap) != 0) {
+        log("delete err: failed to read bitmap");
+        return -1;
+    }
+
+    for (int i = 0; i < DIRECT_POINTERS; i++) {
+        uint32_t block = file_inode->direct_blocks[i];
+        if (block > 0 && block < TOTAL_BLOCKS) {
+            bitmap[block / 8] &= (uint8_t)~(1U << (block % 8));
+            file_inode->direct_blocks[i] = 0;
+        }
+    }
+
+    file_inode->used = 0;
+    file_inode->size = 0;
+    file_inode->filename[0] = '\0';
+
+    if (ata_WriteSector(target_lba, inode_sector) != 0) {
+        log("delete err: failed to write inode sector");
+        return -1;
+    }
+    if (ata_WriteSector((uint32_t)BITMAP_LBA, bitmap) != 0) {
+        log("delete err: failed to write bitmap");
+        return -1;
+    }
+
+    log("delete ok");
+    return 0;
+}
+
+int sfs_delete_last_line(const char *filename) {
+    uint32_t target_lba, inner_offset;
+    if (find_inode_by_name(filename, &target_lba, &inner_offset, NULL) < 0) {
+        log("delete last line err: file not found");
+        return -1;
+    }
+
+    int inode_idx = find_inode_by_name(filename, NULL, NULL, NULL);
+    if (inode_idx < 0) {
+        log("delete last line err: file not found");
+        return -1;
+    }
+
+    uint8_t buffer[DIRECT_POINTERS * BLOCK_SIZE];
+    int bytes_read = sfs_read(inode_idx, buffer, sizeof(buffer));
+    if (bytes_read < 0) {
+        log("delete last line err: failed to read file");
+        return -1;
+    }
+
+    if (bytes_read == 0) {
+        return 0;
+    }
+
+    int end = bytes_read - 1;
+    while (end >= 0 && buffer[end] == '\n') {
+        end--;
+    }
+
+    int last_newline = -1;
+    for (int i = end; i >= 0; i--) {
+        if (buffer[i] == '\n') {
+            last_newline = i;
+            break;
+        }
+    }
+
+    int new_size = (last_newline >= 0) ? (last_newline + 1) : 0;
+    if (sfs_write(filename, buffer, (uint32_t)new_size) < 0) {
+        log("delete last line err: failed to truncate file");
+        return -1;
+    }
+
+    log("delete last line ok");
+    return new_size;
 }
 
 int sfs_read(int inode_idx, uint8_t *output_buffer, uint32_t max_bytes) {
@@ -259,7 +471,7 @@ int sfs_read(int inode_idx, uint8_t *output_buffer, uint32_t max_bytes) {
     uint32_t offset = (uint32_t)((uint32_t)inode_idx % INODES_PER_SECTOR);
 
     if (ata_ReadSector(target_lba, inode_sector) != 0) {
-        log("read err: failed to read inode sector\n");
+        log("read err: failed to read inode sector");
         return -1;
     }
     struct sfs_inode *file_inode = &((struct sfs_inode *)inode_sector)[offset];
@@ -274,7 +486,7 @@ int sfs_read(int inode_idx, uint8_t *output_buffer, uint32_t max_bytes) {
         if (active_block == 0 || active_block >= TOTAL_BLOCKS) break;
 
         if (ata_ReadSector(active_block, data_sector) != 0) {
-            log("read err: failed to read data block\n");
+            log("read err: failed to read data block");
             return -1;
         }
 

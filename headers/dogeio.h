@@ -30,7 +30,9 @@ void dogeio_text_clear_raw();
 // file system stuff
 int fs_format(void);
 int fs_create(char* filename);
-int fs_read(char* filename, char* output_buffer);
+int fs_delete(char* filename);
+int fs_delete_last_line(char* filename);
+int fs_read(char* filename, char* output_buffer, uint32_t max_size);
 int fs_write(char* filename, char* input_buffer);
 int fs_list_dir(void);
 

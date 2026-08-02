@@ -39,6 +39,11 @@ void fstest_shell_ex(char* command) {
         dogeio_text_input("name: ", input_name, 32);
         fs_create(input_name);
     }
+    else if (str_strcmp(command, "d") == 0) {
+        char input_name[32];
+        dogeio_text_input("name: ", input_name, 32);
+        fs_delete(input_name);
+    }
     else if (str_strcmp(command, "w") == 0) {
         char input_name[32];
         static char text[256];
@@ -51,14 +56,21 @@ void fstest_shell_ex(char* command) {
 
     else if (str_strcmp(command, "r") == 0) {
         char input_name[32];
-        char output_buffer[512] = {0};
+        static char output_buffer[8192];
         dogeio_text_input("name: ", input_name, 32);
 
-        int bytes_read = fs_read(input_name, output_buffer);
+        int bytes_read = fs_read(input_name, output_buffer, sizeof(output_buffer));
         if (bytes_read < 0) {
             dogeio_text_println("Error: unable to read file.");
         } else {
-            dogeio_text_println(output_buffer);
+            char *line = output_buffer;
+            size_t processed = 0;
+            while ((int)processed < bytes_read) {
+                dogeio_text_println(line);
+                size_t line_len = str_strlen(line);
+                processed += line_len + 1;
+                line += line_len + 1;
+            }
         }
     }
 
