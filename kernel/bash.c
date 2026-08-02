@@ -126,7 +126,10 @@ int system_bash_ex(char* command) {
             } else {
                 dogeio_text_println("Not Wow: Something Went Wrong.");
             }
+        } else {
+            dogeio_text_println("Format skipped.");
         }
+        handled = 0;
     }
 
     else if (str_strcmp(command, "fetch") == 0) {
