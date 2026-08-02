@@ -13,4 +13,6 @@ void system_fetch();
 extern char* windoge_version;
 extern uint32_t old;
 
+void editor(char* filename);
+
 #endif

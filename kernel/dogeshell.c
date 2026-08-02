@@ -23,7 +23,7 @@ static void append_history(const char* command) {
 int system_dogeshell_ex(char* command) {
     int handled = 1; 
     
-    char* help_command_array[18] = {
+    char* help_command_array[19] = {
         "print              | simply prints a piece of text",
         "clear              | clears the terminal screen",
         "dir                | list the contents of the current folder",
@@ -41,7 +41,8 @@ int system_dogeshell_ex(char* command) {
 		"fetch              | shows the system information",
 		"color              | changes color of text.",
 		"history            | show command history from .history",
-        "clear-history      | clears history, saves space."
+        "clear-history      | clears history, saves space.",
+        "edit               | shows the very basic code editor"
     };
 
     if (command == NULL || command[0] == '\0') {
@@ -179,6 +180,27 @@ int system_dogeshell_ex(char* command) {
         handled = 0;
     }
 
+    else if (str_startswith(command, "edit")) {
+        char* filename = command + 5;
+
+        size_t len = str_strlen(filename);
+        while (len > 0 && (filename[len - 1] == '\n' || filename[len - 1] == '\r' || filename[len - 1] == ' ')) {
+            filename[len - 1] = '\0';
+            len--;
+        }
+
+        if (!fs_exists(filename)) {
+            fs_create(filename);
+        }
+
+        if (str_strlen(filename) == 0) {
+            dogeio_text_println("Error: No filename specified.");
+        } else {
+            editor(filename);
+        }
+        handled = 0;
+    }
+
     else if (str_startswith(command, "writefile")) {
         char* filename = command + 10;
         static char text[256];
@@ -250,7 +272,7 @@ int system_dogeshell_ex(char* command) {
 	}
 
     else if (str_strcmp(command, "help") == 0) {
-        for (int i = 0; i < 18; i++) {
+        for (int i = 0; i < 19; i++) {
             dogeio_text_println(help_command_array[i]);
         }
         handled = 0;

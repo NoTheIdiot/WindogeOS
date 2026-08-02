@@ -228,6 +228,28 @@ int system_bash_ex(char* command) {
 		handled = 0;
 	}
 
+    else if (str_startswith(command, "edit")) {
+        char* filename = command + 5;
+
+        size_t len = str_strlen(filename);
+        while (len > 0 && (filename[len - 1] == '\n' || filename[len - 1] == '\r' || filename[len - 1] == ' ')) {
+            filename[len - 1] = '\0';
+            len--;
+        }
+
+        if (fs_exists(filename)) {
+            fs_create(filename);
+        }
+
+        if (str_strlen(filename) == 0) {
+            dogeio_text_println("Error: No filename specified.");
+        } else {
+            editor(filename);
+        }
+        handled = 0;
+    }
+
+
     if (handled == 1) {
         dogeio_text_print(command);
         dogeio_text_println(": command not found");

@@ -18,7 +18,7 @@ void menubar_draw() {
     cursor_x = 0;
     cursor_y = 0;
 
-    dogeio_text_print(" WindogeOS v0.0.3");
+    dogeio_text_print(" WindogeOS v0.0.4");
 
     char* current_time = time_get();
     int time_len = 0;
