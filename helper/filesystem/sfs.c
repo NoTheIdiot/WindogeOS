@@ -17,7 +17,7 @@
 #define ATA_STATUS       0x1F7
 
 #ifndef FS_BASE_LBA
-#define FS_BASE_LBA      12288
+#define FS_BASE_LBA      4096
 #endif
 
 #ifndef BLOCK_SIZE
