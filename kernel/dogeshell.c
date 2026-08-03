@@ -348,20 +348,20 @@ void system_dogeshell() {
         }
 
         if (status == 1) {
-			dogeio_text_color_change(0x0000FF00);
+            dogeio_text_color_change(0xFF00FF00);
             dogeio_text_print("wow");
-			dogeio_text_color_change(old);
-			dogeio_text_print(" (root) ");
-			dogeio_text_color_change(0x00FF0000);
-			dogeio_text_print("[1] ");
+            dogeio_text_color_change(old);
+            dogeio_text_print(" (root) ");
+            dogeio_text_color_change(0xFFFF0000);
+            dogeio_text_print("[1] ");
         } else {
-            dogeio_text_color_change(0x0000FF00);
+            dogeio_text_color_change(0xFF00FF00);
             dogeio_text_print("wow");
-			dogeio_text_color_change(old);
-			dogeio_text_print(" (root) ");
+            dogeio_text_color_change(old);
+            dogeio_text_print(" (root) ");
         }
 		
-		dogeio_text_color_change(old);
+        dogeio_text_color_change(old);
         dogeio_text_input("> ", input, 256);
         if (input[0] != '\0') {
             append_history(input);
@@ -369,3 +369,4 @@ void system_dogeshell() {
         status = system_dogeshell_ex(input);
     }
 }
+

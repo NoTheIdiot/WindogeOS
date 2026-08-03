@@ -57,51 +57,8 @@ void kernel_main(void) {
     log("WindogeOS has successfully booted. Start celebrating broski.");
     menubar_draw();
 
-    if (!fs_exists(".settings_color")) {
-        fs_create(".settings_color");
-    }
-
     if (!fs_exists(".settings")) {
         fs_create(".settings");
-    }
-
-    char saved_color[16];
-    fs_read(".settings_color", saved_color, 16);
-
-    if (str_strcmp(saved_color, "black") == 0) {
-        dogeio_text_color = 0xFF000000;
-    } else if (str_strcmp(saved_color, "white") == 0) {
-        dogeio_text_color = 0xFFFFFFFF;
-    } else if (str_strcmp(saved_color, "grey") == 0) {
-        dogeio_text_color = 0xFF808080;
-    } else if (str_strcmp(saved_color, "dark_grey") == 0) {
-        dogeio_text_color = 0xFF404040;
-    } else if (str_strcmp(saved_color, "red") == 0) {
-        dogeio_text_color = 0xFFFF0000;
-    } else if (str_strcmp(saved_color, "green") == 0) {
-        dogeio_text_color = 0xFF00FF00;
-    } else if (str_strcmp(saved_color, "blue") == 0) {
-        dogeio_text_color = 0xFF0000FF;
-    } else if (str_strcmp(saved_color, "yellow") == 0) {
-        dogeio_text_color = 0xFFFFFF00;
-    } else if (str_strcmp(saved_color, "cyan") == 0) {
-        dogeio_text_color = 0xFF00FFFF;
-    } else if (str_strcmp(saved_color, "magenta") == 0) {
-        dogeio_text_color = 0xFFFF00FF;
-    } else if (str_strcmp(saved_color, "navy") == 0) {
-        dogeio_text_color = 0xFF000080;
-    } else if (str_strcmp(saved_color, "maroon") == 0) {
-        dogeio_text_color = 0xFF800000;
-    } else if (str_strcmp(saved_color, "teal") == 0) {
-        dogeio_text_color = 0xFF008080;
-    } else if (str_strcmp(saved_color, "olive") == 0) {
-        dogeio_text_color = 0xFF808000;
-    } else if (str_strcmp(saved_color, "doge_gold") == 0) {
-        dogeio_text_color = 0xFFE1B857;
-    } else if (str_strcmp(saved_color, "doge_tan") == 0) {
-        dogeio_text_color = 0xFFF4DFB1;
-    } else {
-        dogeio_text_color = 0xFFFFFFFF;
     }
 
     const char* starting[6] = {
