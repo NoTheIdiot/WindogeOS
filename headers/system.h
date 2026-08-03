@@ -14,5 +14,6 @@ extern char* windoge_version;
 extern uint32_t old;
 
 void editor(char* filename);
+void system_settings();
 
 #endif

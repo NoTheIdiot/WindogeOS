@@ -105,7 +105,7 @@ int system_bash_ex(char* command) {
         } else {
             dogeio_text_println("unknown colorpreset.");
         }
-        handled = 1;
+        handled = 0;
     }
 
     else if (str_startswith(command, "cat")) {
@@ -249,6 +249,10 @@ int system_bash_ex(char* command) {
         handled = 0;
     }
 
+    else if (str_strcmp(command, "settings") == 0) {
+        system_settings();
+        handled = 0;
+    }
 
     if (handled == 1) {
         dogeio_text_print(command);

@@ -23,7 +23,7 @@ static void append_history(const char* command) {
 int system_dogeshell_ex(char* command) {
     int handled = 1; 
     
-    char* help_command_array[19] = {
+    char* help_command_array[20] = {
         "print              | simply prints a piece of text",
         "clear              | clears the terminal screen",
         "dir                | list the contents of the current folder",
@@ -42,7 +42,8 @@ int system_dogeshell_ex(char* command) {
 		"color              | changes color of text.",
 		"history            | show command history from .history",
         "clear-history      | clears history, saves space.",
-        "edit               | shows the very basic code editor"
+        "edit               | shows the very basic code editor",
+        "settings           | edit the settings of the system."
     };
 
     if (command == NULL || command[0] == '\0') {
@@ -272,9 +273,14 @@ int system_dogeshell_ex(char* command) {
 	}
 
     else if (str_strcmp(command, "help") == 0) {
-        for (int i = 0; i < 19; i++) {
+        for (int i = 0; i < 20; i++) {
             dogeio_text_println(help_command_array[i]);
         }
+        handled = 0;
+    }
+
+    else if (str_strcmp(command, "settings") == 0) {
+        system_settings();
         handled = 0;
     }
 
