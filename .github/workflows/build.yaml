@@ -9,8 +9,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
+    - name: Checkout Code I Guess
+      uses: actions/checkout@v4.1.7
 
     - name: Install Dependencies
       run: |
@@ -19,3 +19,12 @@ jobs:
 
     - name: Compile OS
       run: python3 compile.py
+
+    - name: Upload Disk Image
+      uses: actions/upload-artifact@v4
+      with:
+        name: windoge-os-image
+        path: |
+          *.img
+          *.iso
+          *.bin
