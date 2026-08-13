@@ -20,7 +20,7 @@ uint32_t bg_color_grid[TERMINAL_ROWS * TERMINAL_COLS];
 uint32_t cursor_x = 0;
 uint32_t cursor_y = 1;
 uint32_t dogeio_background_color = 0x000000;
-uint32_t dogeio_text_color       = 0xffffff;
+uint32_t dogeio_text_color       = 0xFFCCCCCC;
 
 // place a char, obviously.
 void dogeio_text_putchar(char c, uint32_t x, uint32_t y) {

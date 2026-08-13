@@ -102,6 +102,9 @@ int system_bash_ex(char* command) {
         } else if (str_strcmp(arg, "doge_tan") == 0) {
             dogeio_text_color = 0xFFF4DFB1;
             dogeio_text_clear();
+        } else if (str_strcmp(arg, "gray") == 0) {
+            dogeio_text_color = 0xFFCCCCCC;
+            dogeio_text_clear();
         } else {
             dogeio_text_println("unknown colorpreset.");
         }
@@ -246,11 +249,6 @@ int system_bash_ex(char* command) {
         } else {
             editor(filename);
         }
-        handled = 0;
-    }
-
-    else if (str_strcmp(command, "settings") == 0) {
-        system_settings();
         handled = 0;
     }
 

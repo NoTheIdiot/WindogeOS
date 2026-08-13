@@ -57,8 +57,9 @@ void kernel_main(void) {
     log("WindogeOS has successfully booted. Start celebrating broski.");
     menubar_draw();
 
-    if (!fs_exists(".settings")) {
-        fs_create(".settings");
+    if (!fs_exists(".windoge")) {
+        fs_format();
+        fs_create(".windoge");
     }
 
     const char* starting[6] = {
@@ -75,7 +76,6 @@ void kernel_main(void) {
     }
 
     char shell[32];
-    fs_read(".settings", shell, 32);
 
     if (str_strcmp(shell, "dogeshell") == 0) {
         log("Starting Dogeshell");

@@ -12,13 +12,13 @@ void menubar_draw() {
     uint32_t old_cursor_x = cursor_x;
     uint32_t old_cursor_y = cursor_y;
 
-    dogeio_text_color_change(0x000000);
-    dogeio_text_background_change(old);
+    dogeio_text_color_change(0xFFFFFF);
+    dogeio_text_background_change(0x282828);
     
     cursor_x = 0;
     cursor_y = 0;
 
-    dogeio_text_print(" WindogeOS v0.0.4");
+    dogeio_text_print(" WindogeOS v0.0.5");
 
     char* current_time = time_get();
     int time_len = 0;

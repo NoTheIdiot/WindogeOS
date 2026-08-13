@@ -22,16 +22,16 @@ void menubar_draw();
 #define DATA_START_LBA   (INODE_START_LBA + ((MAX_FILES + INODES_PER_SECTOR - 1) / INODES_PER_SECTOR))
 
 struct sfs_superblock {
-    uint32_t magic;
-    uint32_t total_blocks;
-    uint32_t inode_count;
+    uint64_t magic;
+    uint64_t total_blocks;
+    uint64_t inode_count;
 };
 
 struct sfs_inode {
     uint8_t  used;
     char     filename[MAX_FILENAME];
-    uint32_t size;
-    uint32_t direct_blocks[DIRECT_POINTERS]; 
+    uint64_t size;
+    uint64_t direct_blocks[DIRECT_POINTERS]; 
 };
 
 typedef struct {
@@ -44,12 +44,12 @@ extern int next_empty_file;
 
 int sfs_format(void);
 int sfs_create(char *name);
-int sfs_write(const char *filename, const uint8_t *buffer, uint32_t count);
-int sfs_append(const char *filename, const uint8_t *buffer, uint32_t count);
 int sfs_delete(const char *filename);
 int sfs_delete_last_line(const char *filename);
-int sfs_read(int inode_idx, uint8_t *output_buffer, uint32_t max_bytes);
 int sfs_list_directory(int show_hidden);
-int find_inode_by_name(const char *name, uint32_t *out_lba, uint32_t *out_offset, struct sfs_inode *out_inode);
+int sfs_write(const char *filename, const uint8_t *buffer, uint64_t count);
+int sfs_append(const char *filename, const uint8_t *buffer, uint64_t count);
+int sfs_read(int inode_idx, uint8_t *output_buffer, uint64_t max_bytes);
+int find_inode_by_name(const char *name, uint64_t *out_lba, uint64_t *out_offset, struct sfs_inode *out_inode);
 
 #endif
