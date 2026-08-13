@@ -13,6 +13,22 @@ int str_strcmp(const char* str1, const char *str2) {
     return *(const unsigned char*)str1 - *(const unsigned char*)str2;
 }
 
+void str_pad(char *dest, const char *src, int target_len, char pad_char) {
+    int i = 0;
+    while (src[i] != '\0' && i < target_len) {
+        dest[i] = src[i];
+        i++;
+    }
+
+    while (i < target_len) {
+        dest[i] = pad_char;
+        i++;
+    }
+
+    dest[i] = '\0';
+}
+
+
 size_t str_strlen(const char *str) {
     if (!str) return 0;
     size_t counter = 0;

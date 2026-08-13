@@ -1,0 +1,21 @@
+name: OS Build CI
+
+on:
+  push:
+    branches: [ "main", "new" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang lld nasm mtools python3
+
+    - name: Compile OS
+      run: python3 compile.py

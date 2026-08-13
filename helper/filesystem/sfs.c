@@ -528,8 +528,13 @@ int sfs_list_directory(int show_hidden) {
                     continue;
                 }
                 dogeio_text_print("FILE         ");
-                dogeio_text_print(inodes[i].filename[0] != '\0' ? inodes[i].filename : "empty");
-                dogeio_text_print("            | ");
+                
+                char padded_name[17];
+                const char *name = (inodes[i].filename[0] != '\0') ? inodes[i].filename : "empty";
+                str_pad(padded_name, name, 16, ' ');
+                dogeio_text_print(padded_name);
+                
+                dogeio_text_print(" | ");
                 
                 char num_buf[16];
                 str_itoa((int)inodes[i].size, num_buf); 
