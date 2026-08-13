@@ -174,3 +174,26 @@ int fs_rename(char* filename, char* newname) {
 
     return 1;
 }
+
+void fs_copy(char* source, char* dest) {
+    uint8_t raw_buffer[DIRECT_POINTERS * BLOCK_SIZE];
+    
+    int inode_idx = find_inode_by_name(source, NULL, NULL, NULL);
+    if (inode_idx < 0) {
+        log("vfs: copy source file not found.");
+        return;
+    }
+
+    int bytes_read = sfs_read(inode_idx, raw_buffer, sizeof(raw_buffer));
+    if (bytes_read < 0) {
+        log("vfs: error reading source for copy.");
+        return;
+    }
+
+    if (fs_exists(dest)) {
+        fs_delete(dest);
+    }
+    fs_create(dest);
+
+    sfs_write(dest, raw_buffer, (uint32_t)bytes_read);
+}
