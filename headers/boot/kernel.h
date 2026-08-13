@@ -14,6 +14,8 @@ void menubar_draw();
 #define TOTAL_BLOCKS     4096        
 #define DIRECT_POINTERS  12          
 
+#define POINTERS_PER_BLOCK (BLOCK_SIZE / sizeof(uint64_t))
+
 #define SUPERBLOCK_LBA   0
 #define BITMAP_LBA       1
 #define INODE_START_LBA  2
@@ -32,6 +34,7 @@ struct sfs_inode {
     char     filename[MAX_FILENAME];
     uint64_t size;
     uint64_t direct_blocks[DIRECT_POINTERS]; 
+    uint64_t indirect_block;
 };
 
 typedef struct {

@@ -83,21 +83,10 @@ int fs_write(char* filename, char* input_buffer) {
 
     uint8_t input_u8[512];
     int existing_size = sfs_read(inode_idx, input_u8, (uint32_t)sizeof(input_u8));
-    if (existing_size < 0) {
-        existing_size = 0;
-    }
 
     size_t input_length = 0;
     while (input_buffer[input_length] != '\0' && input_length < sizeof(input_u8) - 1) {
         input_length++;
-    }
-
-    if ((uint32_t)existing_size + input_length + 1 > sizeof(input_u8)) {
-        if ((uint32_t)existing_size >= sizeof(input_u8)) {
-            log("vfs: file is full, cannot append.");
-            return 0;
-        }
-        input_length = sizeof(input_u8) - 1 - (uint32_t)existing_size;
     }
 
     for (size_t i = 0; i < input_length; i++) {

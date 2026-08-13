@@ -1,10 +1,15 @@
-#include <dogeio.h>
+/*
+  a vfs so everything is easier later
+  Updated with Single Indirect Block support
+*/
+
 #include <boot/kernel.h>
+#include <dogeio.h>
+#include <basicutil.h>
 #include <stdint.h>
 #include <string.h>
-#include <bool.h>
 #include <stddef.h>
-#include <basicutil.h>
+#include <bool.h>
 
 #define ATA_DATA         0x1F0
 #define ATA_FEATURES     0x1F1
@@ -23,6 +28,8 @@
 #ifndef BLOCK_SIZE
 #define BLOCK_SIZE       512
 #endif
+
+#define POINTERS_PER_BLOCK (BLOCK_SIZE / sizeof(uint64_t))
 
 extern void log(const char* message);
 
@@ -126,7 +133,6 @@ int sfs_format(void) {
     }
     if (ata_WriteSector((uint64_t)BITMAP_LBA, sector_buffer) != 0) return -1;
 
-
     uint64_t total_inode_sectors = (MAX_FILES + INODES_PER_SECTOR - 1) / INODES_PER_SECTOR;
     for (uint64_t i = 0; i < total_inode_sectors; i++) {
         memset(sector_buffer, 0, BLOCK_SIZE);
@@ -138,6 +144,7 @@ int sfs_format(void) {
             inodes[j].size = 0;
             inodes[j].filename[0] = '\0';
             memset(inodes[j].direct_blocks, 0, sizeof(inodes[j].direct_blocks));
+            inodes[j].indirect_block = 0;
         }
 
         if (ata_WriteSector((uint64_t)(INODE_START_LBA + i), sector_buffer) != 0) return -1;
@@ -174,6 +181,7 @@ int sfs_create(char* name) {
                 inodes[i].used = 1;
                 inodes[i].size = 0;
                 memset(inodes[i].direct_blocks, 0, sizeof(inodes[i].direct_blocks));
+                inodes[i].indirect_block = 0;
                 
                 str_strncpy(inodes[i].filename, name, MAX_FILENAME - 1);
                 inodes[i].filename[MAX_FILENAME - 1] = '\0';
@@ -200,6 +208,7 @@ int sfs_write(const char *filename, const uint8_t *buffer, uint64_t count) {
     uint8_t sector_buffer[BLOCK_SIZE];
     uint8_t bitmap[BLOCK_SIZE];
     uint8_t data_sector[BLOCK_SIZE];
+    uint8_t indirect_sector[BLOCK_SIZE];
 
     uint64_t target_lba, inner_offset;
     if (find_inode_by_name(filename, &target_lba, &inner_offset, NULL) < 0) {
@@ -213,7 +222,7 @@ int sfs_write(const char *filename, const uint8_t *buffer, uint64_t count) {
     }
     struct sfs_inode *file_inode = &((struct sfs_inode *)sector_buffer)[inner_offset];
 
-    uint64_t max_capacity = DIRECT_POINTERS * BLOCK_SIZE;
+    uint64_t max_capacity = (DIRECT_POINTERS + POINTERS_PER_BLOCK) * BLOCK_SIZE;
     if (count > max_capacity) count = max_capacity;
 
     if (ata_ReadSector((uint64_t)BITMAP_LBA, bitmap) != 0) {
@@ -221,6 +230,7 @@ int sfs_write(const char *filename, const uint8_t *buffer, uint64_t count) {
         return -1;
     }
 
+    // Free existing direct blocks
     for (int b = 0; b < DIRECT_POINTERS; b++) {
         uint64_t old_block = file_inode->direct_blocks[b];
         if (old_block > 0 && old_block < TOTAL_BLOCKS) {
@@ -229,29 +239,68 @@ int sfs_write(const char *filename, const uint8_t *buffer, uint64_t count) {
         }
     }
 
+    // Free existing indirect blocks and their contents
+    if (file_inode->indirect_block > 0 && file_inode->indirect_block < TOTAL_BLOCKS) {
+        if (ata_ReadSector(file_inode->indirect_block, indirect_sector) == 0) {
+            uint64_t *pointers = (uint64_t *)indirect_sector;
+            for (int i = 0; i < (int)POINTERS_PER_BLOCK; i++) {
+                uint64_t block = pointers[i];
+                if (block > 0 && block < TOTAL_BLOCKS) {
+                    bitmap[block / 8] &= (uint8_t)~(1U << (block % 8));
+                }
+            }
+        }
+        bitmap[file_inode->indirect_block / 8] &= (uint8_t)~(1U << (file_inode->indirect_block % 8));
+        file_inode->indirect_block = 0;
+    }
+
     uint64_t bytes_written = 0;
     uint64_t block_index = 0;
+    bool indirect_dirty = false;
+    memset(indirect_sector, 0, BLOCK_SIZE);
 
-    while (bytes_written < count && block_index < DIRECT_POINTERS) {
+    while (bytes_written < count && block_index < (DIRECT_POINTERS + POINTERS_PER_BLOCK)) {
         int free_block = find_free_block(bitmap);
         if (free_block == -1) {
             log("write err: disk full");
             break;
         }
 
-        file_inode->direct_blocks[block_index] = (uint64_t)free_block;
+        uint64_t new_block = (uint64_t)free_block;
         memset(data_sector, 0, BLOCK_SIZE);
 
         uint64_t chunk = (count - bytes_written > BLOCK_SIZE) ? BLOCK_SIZE : (count - bytes_written);
         memcpy(data_sector, buffer + bytes_written, chunk);
 
-        if (ata_WriteSector((uint64_t)free_block, data_sector) != 0) {
+        if (ata_WriteSector(new_block, data_sector) != 0) {
             log("write err: failed to write data block");
             return -1;
         }
-        
+
+        if (block_index < DIRECT_POINTERS) {
+            file_inode->direct_blocks[block_index] = new_block;
+        } else {
+            if (file_inode->indirect_block == 0) {
+                int free_ind = find_free_block(bitmap);
+                if (free_ind == -1) {
+                    log("write err: disk full (cannot allocate indirect block)");
+                    bitmap[new_block / 8] &= ~(1U << (new_block % 8));
+                    break;
+                }
+                file_inode->indirect_block = (uint64_t)free_ind;
+            }
+            uint64_t idx = block_index - DIRECT_POINTERS;
+            uint64_t *pointers = (uint64_t *)indirect_sector;
+            pointers[idx] = new_block;
+            indirect_dirty = true;
+        }
+
         bytes_written += chunk;
         block_index++;
+    }
+
+    if (file_inode->indirect_block != 0 && indirect_dirty) {
+        ata_WriteSector(file_inode->indirect_block, indirect_sector);
     }
 
     file_inode->size = bytes_written;
@@ -268,6 +317,7 @@ int sfs_append(const char *filename, const uint8_t *buffer, uint64_t count) {
     uint8_t inode_sector[BLOCK_SIZE];
     uint8_t bitmap[BLOCK_SIZE];
     uint8_t data_sector[BLOCK_SIZE];
+    uint8_t indirect_sector[BLOCK_SIZE];
 
     uint64_t target_lba, inner_offset;
     if (find_inode_by_name(filename, &target_lba, &inner_offset, NULL) < 0) {
@@ -282,7 +332,7 @@ int sfs_append(const char *filename, const uint8_t *buffer, uint64_t count) {
     struct sfs_inode *file_inode = &((struct sfs_inode *)inode_sector)[inner_offset];
 
     uint64_t old_size = file_inode->size;
-    uint64_t max_capacity = DIRECT_POINTERS * BLOCK_SIZE;
+    uint64_t max_capacity = (DIRECT_POINTERS + POINTERS_PER_BLOCK) * BLOCK_SIZE;
     if (old_size >= max_capacity) {
         log("append err: file is full");
         return 0;
@@ -298,64 +348,82 @@ int sfs_append(const char *filename, const uint8_t *buffer, uint64_t count) {
     }
 
     uint64_t bytes_written = 0;
-    uint64_t start_block = old_size / BLOCK_SIZE;
+    uint64_t current_block_idx = old_size / BLOCK_SIZE;
     uint64_t offset_in_block = old_size % BLOCK_SIZE;
-    uint64_t current_block = start_block;
 
-    if (offset_in_block != 0 && bytes_written < count) {
-        if (current_block >= DIRECT_POINTERS) {
-            log("append err: file is full");
-            return -1;
-        }
-
-        uint64_t active_block = file_inode->direct_blocks[current_block];
-        if (active_block == 0) {
-            int free_block = find_free_block(bitmap);
-            if (free_block == -1) {
-                log("append err: disk full");
-                return 0;
-            }
-            active_block = (uint64_t)free_block;
-            file_inode->direct_blocks[current_block] = active_block;
-        }
-
-        if (ata_ReadSector(active_block, data_sector) != 0) {
-            log("append err: failed to read data block");
-            return -1;
-        }
-
-        uint64_t chunk = BLOCK_SIZE - offset_in_block;
-        if (chunk > count) chunk = count;
-        memcpy(data_sector + offset_in_block, buffer + bytes_written, chunk);
-        if (ata_WriteSector(active_block, data_sector) != 0) {
-            log("append err: failed to write data block");
-            return -1;
-        }
-
-        bytes_written += chunk;
-        current_block++;
+    bool indirect_dirty = false;
+    if (file_inode->indirect_block != 0) {
+        ata_ReadSector(file_inode->indirect_block, indirect_sector);
+    } else {
+        memset(indirect_sector, 0, BLOCK_SIZE);
     }
 
-    while (bytes_written < count && current_block < DIRECT_POINTERS) {
+    if (offset_in_block != 0 && bytes_written < count) {
+        uint64_t active_block = 0;
+        if (current_block_idx < DIRECT_POINTERS) {
+            active_block = file_inode->direct_blocks[current_block_idx];
+        } else {
+            uint64_t idx = current_block_idx - DIRECT_POINTERS;
+            uint64_t *pointers = (uint64_t *)indirect_sector;
+            active_block = pointers[idx];
+        }
+
+        if (active_block != 0) {
+            ata_ReadSector(active_block, data_sector);
+            uint64_t chunk = BLOCK_SIZE - offset_in_block;
+            if (chunk > count) chunk = count;
+            memcpy(data_sector + offset_in_block, buffer + bytes_written, chunk);
+            ata_WriteSector(active_block, data_sector);
+
+            bytes_written += chunk;
+            current_block_idx++;
+        }
+    }
+
+    while (bytes_written < count && current_block_idx < (DIRECT_POINTERS + POINTERS_PER_BLOCK)) {
         int free_block = find_free_block(bitmap);
         if (free_block == -1) {
             log("append err: disk full");
             break;
         }
 
-        file_inode->direct_blocks[current_block] = (uint64_t)free_block;
+        uint64_t new_block = (uint64_t)free_block;
         memset(data_sector, 0, BLOCK_SIZE);
 
         uint64_t chunk = (count - bytes_written > BLOCK_SIZE) ? BLOCK_SIZE : (count - bytes_written);
         memcpy(data_sector, buffer + bytes_written, chunk);
+        ata_WriteSector(new_block, data_sector);
 
-        if (ata_WriteSector((uint64_t)free_block, data_sector) != 0) {
-            log("append err: failed to write data block");
-            return -1;
+        if (current_block_idx < DIRECT_POINTERS) {
+            file_inode->direct_blocks[current_block_idx] = new_block;
+        } else {
+            if (file_inode->indirect_block == 0) {
+                int free_ind = find_free_block(bitmap);
+                if (free_ind == -1) {
+                    log("append err: disk full (cannot allocate indirect block)");
+                    bitmap[new_block / 8] &= ~(1U << (new_block % 8));
+                    break;
+                }
+                file_inode->indirect_block = (uint64_t)free_ind;
+                memset(indirect_sector, 0, BLOCK_SIZE);
+            }
+
+            uint64_t idx = current_block_idx - DIRECT_POINTERS;
+            if (idx >= POINTERS_PER_BLOCK) {
+                bitmap[new_block / 8] &= ~(1U << (new_block % 8));
+                break;
+            }
+            uint64_t *pointers = (uint64_t *)indirect_sector;
+            pointers[idx] = new_block;
+            indirect_dirty = true;
         }
 
         bytes_written += chunk;
-        current_block++;
+        current_block_idx++;
+    }
+
+    if (file_inode->indirect_block != 0 && indirect_dirty) {
+        ata_WriteSector(file_inode->indirect_block, indirect_sector);
     }
 
     if (bytes_written == 0) {
@@ -363,14 +431,8 @@ int sfs_append(const char *filename, const uint8_t *buffer, uint64_t count) {
     }
 
     file_inode->size = old_size + bytes_written;
-    if (ata_WriteSector(target_lba, inode_sector) != 0) {
-        log("append err: failed to write inode sector");
-        return -1;
-    }
-    if (ata_WriteSector((uint64_t)BITMAP_LBA, bitmap) != 0) {
-        log("append err: failed to write bitmap");
-        return -1;
-    }
+    ata_WriteSector(target_lba, inode_sector);
+    ata_WriteSector((uint64_t)BITMAP_LBA, bitmap);
 
     log("append ok");
     return (int)bytes_written;
@@ -379,6 +441,7 @@ int sfs_append(const char *filename, const uint8_t *buffer, uint64_t count) {
 int sfs_delete(const char *filename) {
     uint8_t inode_sector[BLOCK_SIZE];
     uint8_t bitmap[BLOCK_SIZE];
+    uint8_t indirect_sector[BLOCK_SIZE];
 
     uint64_t target_lba, inner_offset;
     if (find_inode_by_name(filename, &target_lba, &inner_offset, NULL) < 0) {
@@ -408,6 +471,20 @@ int sfs_delete(const char *filename) {
             bitmap[block / 8] &= (uint8_t)~(1U << (block % 8));
             file_inode->direct_blocks[i] = 0;
         }
+    }
+
+    if (file_inode->indirect_block > 0 && file_inode->indirect_block < TOTAL_BLOCKS) {
+        if (ata_ReadSector(file_inode->indirect_block, indirect_sector) == 0) {
+            uint64_t *pointers = (uint64_t *)indirect_sector;
+            for (int i = 0; i < (int)POINTERS_PER_BLOCK; i++) {
+                uint64_t block = pointers[i];
+                if (block > 0 && block < TOTAL_BLOCKS) {
+                    bitmap[block / 8] &= (uint8_t)~(1U << (block % 8));
+                }
+            }
+        }
+        bitmap[file_inode->indirect_block / 8] &= (uint8_t)~(1U << (file_inode->indirect_block % 8));
+        file_inode->indirect_block = 0;
     }
 
     file_inode->used = 0;
@@ -440,7 +517,7 @@ int sfs_delete_last_line(const char *filename) {
         return -1;
     }
 
-    uint8_t buffer[DIRECT_POINTERS * BLOCK_SIZE];
+    uint8_t buffer[(DIRECT_POINTERS + POINTERS_PER_BLOCK) * BLOCK_SIZE];
     int bytes_read = sfs_read(inode_idx, buffer, sizeof(buffer));
     if (bytes_read < 0) {
         log("delete last line err: failed to read file");
@@ -491,9 +568,34 @@ int sfs_read(int inode_idx, uint8_t *output_buffer, uint64_t max_bytes) {
     uint64_t bytes_to_read = (file_inode->size < max_bytes) ? file_inode->size : max_bytes;
     uint64_t bytes_read = 0;
     uint8_t data_sector[BLOCK_SIZE];
+    uint8_t indirect_sector[BLOCK_SIZE];
+    bool indirect_loaded = false;
 
-    for (uint64_t block_index = 0; block_index < DIRECT_POINTERS && bytes_read < bytes_to_read; block_index++) {
-        uint64_t active_block = file_inode->direct_blocks[block_index];
+    uint64_t total_blocks_needed = (bytes_to_read + BLOCK_SIZE - 1) / BLOCK_SIZE;
+
+    for (uint64_t block_index = 0; block_index < total_blocks_needed && bytes_read < bytes_to_read; block_index++) {
+        uint64_t active_block = 0;
+
+        if (block_index < DIRECT_POINTERS) {
+            active_block = file_inode->direct_blocks[block_index];
+        } else {
+            if (file_inode->indirect_block == 0) break;
+            
+            if (!indirect_loaded) {
+                if (ata_ReadSector(file_inode->indirect_block, indirect_sector) != 0) {
+                    log("read err: failed to read indirect block");
+                    return -1;
+                }
+                indirect_loaded = true;
+            }
+            
+            uint64_t indirect_index = block_index - DIRECT_POINTERS;
+            if (indirect_index >= POINTERS_PER_BLOCK) break;
+            
+            uint64_t *pointers = (uint64_t *)indirect_sector;
+            active_block = pointers[indirect_index];
+        }
+
         if (active_block == 0 || active_block >= TOTAL_BLOCKS) break;
 
         if (ata_ReadSector(active_block, data_sector) != 0) {
@@ -503,7 +605,6 @@ int sfs_read(int inode_idx, uint8_t *output_buffer, uint64_t max_bytes) {
 
         uint64_t chunk = (bytes_to_read - bytes_read > BLOCK_SIZE) ? BLOCK_SIZE : (bytes_to_read - bytes_read);
         memcpy(output_buffer + bytes_read, data_sector, chunk);
-
         bytes_read += chunk;
     }
     return (int)bytes_read;
@@ -527,7 +628,7 @@ int sfs_list_directory(int show_hidden) {
                 if (inodes[i].filename[0] == '.' && !show_hidden) {
                     continue;
                 }
-                dogeio_text_print("FILE         ");
+                dogeio_text_print("FILE        ");
                 
                 char padded_name[17];
                 const char *name = (inodes[i].filename[0] != '\0') ? inodes[i].filename : "empty";
