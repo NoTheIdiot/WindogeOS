@@ -191,6 +191,9 @@ int sfs_create(char* name, int is_directory) {
 
                     ata_WriteSector(lba, sector_buffer);
                     return (int)((sec * INODES_PER_SECTOR) + i); 
+                } else if (inodes[i].location != current_directory_id) {
+                    continue;
+                
                 } else {
                     inodes[i].used = 1;             // to tell the file system that the file exists
                     inodes[i].size = 0;             // set the size to 0

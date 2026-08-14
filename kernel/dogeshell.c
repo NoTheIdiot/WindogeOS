@@ -122,6 +122,11 @@ int system_dogeshell_ex(char* command) {
         handled = 0;
     }
 
+    else if (str_startswith(command, "cd")) {
+        log("hey dumbass cd isn't here");
+        handled = 0;
+    }
+
     else if (str_strcmp(command, "format") == 0) {
         char r_u_sure[4];
         dogeio_text_input("Are You Sure? (yes/no)\nMUCH WARNING: THIS WILL ERASE THE DISK.\n", r_u_sure, 4);
