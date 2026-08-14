@@ -82,16 +82,15 @@ int fs_write(char* filename, char* input_buffer) {
     }
 
     uint8_t input_u8[512];
-    int existing_size = sfs_read(inode_idx, input_u8, (uint32_t)sizeof(input_u8));
-
     size_t input_length = 0;
-    while (input_buffer[input_length] != '\0' && input_length < sizeof(input_u8) - 1) {
+    while (input_buffer[input_length] != '\0' && input_length < sizeof(input_u8) - 2) {
         input_length++;
     }
 
     for (size_t i = 0; i < input_length; i++) {
         input_u8[i] = str_chartou8(input_buffer[i]);
     }
+    
     input_u8[input_length] = str_chartou8('\n');
     size_t write_length = input_length + 1;
 
@@ -102,8 +101,10 @@ int fs_write(char* filename, char* input_buffer) {
     if (append_result < 0) {
         return -1;
     }
+    
     return 1;
 }
+
 
 int fs_exists(char* filename) {
     if (!filename || filename[0] == '\0') {

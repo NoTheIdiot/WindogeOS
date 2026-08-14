@@ -85,7 +85,7 @@ set -e
 create_img_script_x86_64 = f"""
 set -e
 rm -f {img_file};
-dd if=/dev/zero bs=1M count=0 seek=16 of={img_file};
+dd if=/dev/zero bs=1M count=0 seek=8 of={img_file};
 PATH=$PATH:/usr/sbin:/sbin sgdisk {img_file} -n 1:2048 -t 1:ef00 -m 1;
 ./binaries/limine bios-install {img_file};
 mformat -i {img_file}@@1M;
