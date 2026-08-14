@@ -6,6 +6,8 @@
 
 #define TERMINAL_COLS 160
 
+void str_pad(char *dest, const char *src, int target_len, char pad_char);
+
 void menubar_draw() {
     uint32_t old_text_color = dogeio_text_color;
     uint32_t old_bg_color = dogeio_background_color;
@@ -18,7 +20,7 @@ void menubar_draw() {
     cursor_x = 0;
     cursor_y = 0;
 
-    dogeio_text_print(" WindogeOS v0.0.5");
+    char menu_buffer[TERMINAL_COLS + 1];
 
     char* current_time = time_get();
     int time_len = 0;
@@ -26,13 +28,12 @@ void menubar_draw() {
         time_len++;
     }
 
-    int title_len = 17;
-    int padding = TERMINAL_COLS - title_len - time_len - 1;
+    int left_section_target_len = TERMINAL_COLS - time_len - 1;
 
-    for (int i = 0; i < padding; i++) {
-        dogeio_text_print(" ");
-    }
+    dogeio_text_print(" ");
+    str_pad(menu_buffer, windoge_version, left_section_target_len - 1, ' ');
 
+    dogeio_text_print(menu_buffer);
     dogeio_text_print(current_time);
     dogeio_text_print(" ");
 
