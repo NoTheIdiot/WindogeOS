@@ -37,6 +37,7 @@ int fs_write(char* filename, char* input_buffer);
 int fs_exists(char* filename);
 void fs_copy(char* source, char* dest);
 int fs_list_dir(int show_hidden);
+int fs_mkdir(char* foldername);
 int fs_rename(char* filename, char* newname);
 
 #endif

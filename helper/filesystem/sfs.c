@@ -33,6 +33,9 @@
 
 extern void log(const char* message);
 
+// 0 is root
+int current_directory_id = 0;
+
 static int ata_Ready(void) {
     for (volatile int i = 0; i < 4; i++) {
         ports_inb(ATA_STATUS);
@@ -152,7 +155,7 @@ int sfs_format(void) {
     return 1;
 }
 
-int sfs_create(char* name) {
+int sfs_create(char* name, int is_directory) {
     if (!name || name[0] == '\0' || str_strlen(name) >= MAX_FILENAME) {
         log("create err: invalid filename");
         return -1;
@@ -178,16 +181,27 @@ int sfs_create(char* name) {
             if ((sec * INODES_PER_SECTOR) + i >= (uint64_t)MAX_FILES) break;
             
             if (!inodes[i].used) {
-                inodes[i].used = 1;
-                inodes[i].size = 0;
-                memset(inodes[i].direct_blocks, 0, sizeof(inodes[i].direct_blocks));
-                inodes[i].indirect_block = 0;
-                
-                str_strncpy(inodes[i].filename, name, MAX_FILENAME - 1);
-                inodes[i].filename[MAX_FILENAME - 1] = '\0';
+                if (is_directory) {
+                    inodes[i].used = 1;             // to tell the file system that the file exists
+                    inodes[i].size = 0;             // set the size to 0
+                    inodes[i].is_directory = 1;     // to tell the file system that it's a dir
+                    str_strcpy(inodes[i].filename, name);
+                    memset(inodes[i].direct_blocks, 0, sizeof(inodes[i].direct_blocks));
+                    inodes[i].indirect_block = 0;
 
-                ata_WriteSector(lba, sector_buffer);
-                return (int)((sec * INODES_PER_SECTOR) + i); 
+                    ata_WriteSector(lba, sector_buffer);
+                    return (int)((sec * INODES_PER_SECTOR) + i); 
+                } else {
+                    inodes[i].used = 1;             // to tell the file system that the file exists
+                    inodes[i].size = 0;             // set the size to 0
+                    inodes[i].is_directory = 0;     // to tell the file system that it's a file instead
+                    str_strcpy(inodes[i].filename, name);
+                    memset(inodes[i].direct_blocks, 0, sizeof(inodes[i].direct_blocks));
+                    inodes[i].indirect_block = 0;
+
+                    ata_WriteSector(lba, sector_buffer);
+                    return (int)((sec * INODES_PER_SECTOR) + i); 
+                }
             }
         }
     }
@@ -628,21 +642,46 @@ int sfs_list_directory(int show_hidden) {
                 if (inodes[i].filename[0] == '.' && !show_hidden) {
                     continue;
                 }
-                dogeio_text_print("FILE        ");
                 
-                char padded_name[17];
-                const char *name = (inodes[i].filename[0] != '\0') ? inodes[i].filename : "empty";
-                str_pad(padded_name, name, 16, ' ');
-                dogeio_text_print(padded_name);
+                if (inodes[i].is_directory) {
+                    dogeio_text_print("DIR         ");
+                    uint32_t thing = dogeio_text_color;
+                    dogeio_text_color_change(0xADD8E6);
+                    char padded_name[17];
+                    const char *name = (inodes[i].filename[0] != '\0') ? inodes[i].filename : "empty";
+                    str_pad(padded_name, name, 16, ' ');
+                    dogeio_text_print(padded_name);
+
+                    dogeio_text_color_change(thing);
                 
-                dogeio_text_print(" | ");
+                    dogeio_text_print(" | ");
                 
-                char num_buf[16];
-                str_itoa((int)inodes[i].size, num_buf); 
-                dogeio_text_print(num_buf);
+                    char num_buf[16];
+                    str_itoa((int)inodes[i].size, num_buf); 
+                    dogeio_text_print(num_buf);
                 
-                dogeio_text_println(" bytes");
-                files_found++;
+                    dogeio_text_println(" bytes");
+                    files_found++;
+                } else if (!inodes[i].is_directory) {
+                    dogeio_text_print("FILE        ");
+                
+                    char padded_name[17];
+                    const char *name = (inodes[i].filename[0] != '\0') ? inodes[i].filename : "empty";
+                    str_pad(padded_name, name, 16, ' ');
+                    dogeio_text_print(padded_name);
+                
+                    dogeio_text_print(" | ");
+                
+                    char num_buf[16];
+                    str_itoa((int)inodes[i].size, num_buf); 
+                    dogeio_text_print(num_buf);
+                
+                    dogeio_text_println(" bytes");
+                    files_found++;
+                } else {
+                    log("FsList: please use 1 or 0");
+                    return 0;
+                }
             }
         }
     }

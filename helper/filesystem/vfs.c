@@ -14,7 +14,11 @@ int fs_format(void) {
 }
 
 int fs_create(char* filename) {
-    return sfs_create(filename);
+    return sfs_create(filename, 0);
+}
+
+int fs_mkdir(char* foldername) {
+    return sfs_create(foldername, 1); 
 }
 
 int fs_delete(char* filename) {

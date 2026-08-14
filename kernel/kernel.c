@@ -75,18 +75,8 @@ void kernel_main(void) {
         dogeio_text_print(starting[i]);
     }
 
-    char shell[32];
-
-    if (str_strcmp(shell, "dogeshell") == 0) {
-        log("Starting Dogeshell");
-        system_dogeshell();
-    } else if (str_strcmp(shell, "sbash") == 0) {
-        log("Starting bash");
-        system_bash();
-    } else {
-        log("Starting Dogeshell");
-        system_dogeshell();
-    }
+    log("Starting Dogeshell");
+    system_dogeshell();
 
     halt();
 }

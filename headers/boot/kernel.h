@@ -9,7 +9,7 @@ void menubar_draw();
 // file system items
 #define SFS_MAGIC        0x53465321  
 #define BLOCK_SIZE       512
-#define MAX_FILENAME     32
+#define MAX_FILENAME     37
 #define MAX_FILES        64
 #define TOTAL_BLOCKS     4096        
 #define DIRECT_POINTERS  12          
@@ -33,6 +33,8 @@ struct sfs_inode {
     uint8_t  used;
     char     filename[MAX_FILENAME];
     uint64_t size;
+    uint8_t  location;
+    uint8_t  is_directory;
     uint64_t direct_blocks[DIRECT_POINTERS]; 
     uint64_t indirect_block;
 };
@@ -42,11 +44,16 @@ typedef struct {
     int id;
 } fs_t;
 
+typedef struct {
+    char filename[32];
+    uint64_t inode_idx;
+} fs_dir_t;
+
 extern fs_t fs_index[MAX_FILES];
 extern int next_empty_file;
 
 int sfs_format(void);
-int sfs_create(char *name);
+int sfs_create(char *name, int is_directory);
 int sfs_delete(const char *filename);
 int sfs_delete_last_line(const char *filename);
 int sfs_list_directory(int show_hidden);
