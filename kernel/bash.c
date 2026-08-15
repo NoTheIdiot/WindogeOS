@@ -42,6 +42,21 @@ int system_bash_ex(char* command) {
         handled = 0;
     }
 
+    else if (str_startswith(command, "cd")) {
+        int result = fs_chdir(command + 3);
+        if (result == -2) {
+            dogeio_text_println("Much Error: Not a Folder.");
+        } else if (result == -1) {
+            dogeio_text_println("Such Error: Folder not existing :(");
+        }
+        handled = 0;
+    }
+
+    else if (str_startswith(command, "mkdir")) {
+        fs_mkdir(command + 6);
+        handled = 0;
+    }
+
     else if (str_strcmp(command, "ls") == 0) {
         fs_list_dir(0);
         handled = 0;
@@ -275,7 +290,16 @@ void system_bash() {
         dogeio_text_color_change(0x0000FF00);
         dogeio_text_print("wow");
         dogeio_text_color_change(0x000000FF);
-        dogeio_text_print(":/");
+        dogeio_text_print(":");
+        char* dir;
+        dir = fs_dirname();
+
+        if (str_strcmp(dir, "root") == 0) {
+            dir = "";
+        }
+
+        dogeio_text_print(dir);
+        dogeio_text_print("/");
 
         dogeio_text_color_change(0xFFFFFFFF);
         dogeio_text_input("$ ", input, 256);
