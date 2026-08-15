@@ -175,7 +175,7 @@ int sfs_create(char* name, int is_directory) {
         uint64_t lba = (uint64_t)(INODE_START_LBA + sec);
         if (ata_ReadSector(lba, sector_buffer) != 0) {
             log("fs (create): failed to read inode sector");
-            log("             you may want to try creating again.")
+            log("             you may want to try creating again.");
             return -1;
         }
         struct sfs_inode *inodes = (struct sfs_inode *)sector_buffer;
