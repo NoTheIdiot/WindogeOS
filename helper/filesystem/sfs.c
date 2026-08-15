@@ -113,6 +113,7 @@ int find_inode_by_name(const char *name, uint64_t *out_lba, uint64_t *out_offset
                 if (out_lba) *out_lba = current_lba;
                 if (out_offset) *out_offset = i;
                 if (out_inode) *out_inode = inodes[i];
+                log("Fs: Inode Found");
                 return (int)idx;
             }
         }
@@ -152,17 +153,18 @@ int sfs_format(void) {
 
         if (ata_WriteSector((uint64_t)(INODE_START_LBA + i), sector_buffer) != 0) return -1;
     }
+    log("Fs: disk formated");
     return 1;
 }
 
 int sfs_create(char* name, int is_directory) {
     if (!name || name[0] == '\0' || str_strlen(name) >= MAX_FILENAME) {
-        log("create err: invalid filename");
+        log("fs (create): invalid filename");
         return -1;
     }
 
     if (find_inode_by_name(name, NULL, NULL, NULL) >= 0) {
-        log("create err: file already exists");
+        log("fs (create): file already exists");
         return -1;
     }
 
@@ -172,7 +174,8 @@ int sfs_create(char* name, int is_directory) {
     for (uint64_t sec = 0; sec < total_inode_sectors; sec++) {
         uint64_t lba = (uint64_t)(INODE_START_LBA + sec);
         if (ata_ReadSector(lba, sector_buffer) != 0) {
-            log("create err: failed to read inode sector");
+            log("fs (create): failed to read inode sector");
+            log("             you may want to try creating again.")
             return -1;
         }
         struct sfs_inode *inodes = (struct sfs_inode *)sector_buffer;
@@ -190,6 +193,10 @@ int sfs_create(char* name, int is_directory) {
                 inodes[i].indirect_block = 0;
 
                 ata_WriteSector(lba, sector_buffer);
+
+                if (is_directory == 0) log("Fs: file created");
+                else log("Fs: directory created");
+
                 return (int)((sec * INODES_PER_SECTOR) + i);
             }
         }
@@ -215,12 +222,13 @@ int sfs_write(const char *filename, const uint8_t *buffer, uint64_t count) {
 
     uint64_t target_lba, inner_offset;
     if (find_inode_by_name(filename, &target_lba, &inner_offset, NULL) < 0) {
-        log("write err: file not found");
+        log("fs (write): file not found");
         return -2;
     }
 
     if (ata_ReadSector(target_lba, sector_buffer) != 0) {
-        log("write err: failed to read inode sector");
+        log("fs (write): failed to read inode sector");
+        log("            you may want to try again.");
         return -1;
     }
     struct sfs_inode *file_inode = &((struct sfs_inode *)sector_buffer)[inner_offset];
@@ -229,7 +237,7 @@ int sfs_write(const char *filename, const uint8_t *buffer, uint64_t count) {
     if (count > max_capacity) count = max_capacity;
 
     if (ata_ReadSector((uint64_t)BITMAP_LBA, bitmap) != 0) {
-        log("write err: failed to read bitmap");
+        log("fs (write): failed to read bitmap");
         return -1;
     }
 
@@ -324,7 +332,7 @@ int sfs_append(const char *filename, const uint8_t *buffer, uint64_t count) {
 
     uint64_t target_lba, inner_offset;
     if (find_inode_by_name(filename, &target_lba, &inner_offset, NULL) < 0) {
-        log("append err: file not found");
+        log("fs (append): file not found");
         return -1;
     }
 
