@@ -179,36 +179,22 @@ int sfs_create(char* name, int is_directory) {
 
         for (uint64_t i = 0; i < INODES_PER_SECTOR; i++) {
             if ((sec * INODES_PER_SECTOR) + i >= (uint64_t)MAX_FILES) break;
-            
+
             if (!inodes[i].used) {
-                if (is_directory) {
-                    inodes[i].used = 1;             // to tell the file system that the file exists
-                    inodes[i].size = 0;             // set the size to 0
-                    inodes[i].is_directory = 1;     // to tell the file system that it's a dir
-                    str_strcpy(inodes[i].filename, name);
-                    memset(inodes[i].direct_blocks, 0, sizeof(inodes[i].direct_blocks));
-                    inodes[i].indirect_block = 0;
+                inodes[i].used = 1;
+                inodes[i].size = 0;
+                inodes[i].is_directory = is_directory ? 1 : 0;
+                inodes[i].location = (uint8_t)current_directory_id;   // always set parent
+                str_strcpy(inodes[i].filename, name);
+                memset(inodes[i].direct_blocks, 0, sizeof(inodes[i].direct_blocks));
+                inodes[i].indirect_block = 0;
 
-                    ata_WriteSector(lba, sector_buffer);
-                    return (int)((sec * INODES_PER_SECTOR) + i); 
-                } else if (inodes[i].location != current_directory_id) {
-                    continue;
-                
-                } else {
-                    inodes[i].used = 1;             // to tell the file system that the file exists
-                    inodes[i].size = 0;             // set the size to 0
-                    inodes[i].is_directory = 0;     // to tell the file system that it's a file instead
-                    str_strcpy(inodes[i].filename, name);
-                    memset(inodes[i].direct_blocks, 0, sizeof(inodes[i].direct_blocks));
-                    inodes[i].indirect_block = 0;
-
-                    ata_WriteSector(lba, sector_buffer);
-                    return (int)((sec * INODES_PER_SECTOR) + i); 
-                }
+                ata_WriteSector(lba, sector_buffer);
+                return (int)((sec * INODES_PER_SECTOR) + i);
             }
         }
     }
-    return -1; 
+    return -1;
 }
 
 static int find_free_block(uint8_t *bitmap) {
@@ -634,18 +620,31 @@ int sfs_list_directory(int show_hidden) {
 
     dogeio_text_println("------ In Current Folder -----");
 
+    if (current_directory_id != 0) {
+        dogeio_text_print("DIR         ");
+        uint32_t thing = dogeio_text_color;
+        dogeio_text_color_change(0xADD8E6);
+        char padded_name[17];
+        str_pad(padded_name, "..", 16, ' ');
+        dogeio_text_print(padded_name);
+        dogeio_text_color_change(thing);
+        dogeio_text_println(" | 0 bytes");
+        files_found++;
+    }
+
     for (uint64_t sec = 0; sec < total_inode_sectors; sec++) {
         if (ata_ReadSector((uint64_t)(INODE_START_LBA + sec), sector_buffer) != 0) continue;
         struct sfs_inode *inodes = (struct sfs_inode *)sector_buffer;
 
         for (uint64_t i = 0; i < INODES_PER_SECTOR; i++) {
-            if ((sec * INODES_PER_SECTOR) + i >= (uint64_t)MAX_FILES) break;
+            uint64_t idx = (sec * INODES_PER_SECTOR) + i;
+            if (idx >= (uint64_t)MAX_FILES) break;
 
-            if (inodes[i].used) {
+            if (inodes[i].used && inodes[i].location == current_directory_id) {
                 if (inodes[i].filename[0] == '.' && !show_hidden) {
                     continue;
                 }
-                
+
                 if (inodes[i].is_directory) {
                     dogeio_text_print("DIR         ");
                     uint32_t thing = dogeio_text_color;
@@ -654,39 +653,77 @@ int sfs_list_directory(int show_hidden) {
                     const char *name = (inodes[i].filename[0] != '\0') ? inodes[i].filename : "empty";
                     str_pad(padded_name, name, 16, ' ');
                     dogeio_text_print(padded_name);
-
                     dogeio_text_color_change(thing);
-                
-                    dogeio_text_print(" | ");
-                
-                    char num_buf[16];
-                    str_itoa((int)inodes[i].size, num_buf); 
-                    dogeio_text_print(num_buf);
-                
-                    dogeio_text_println(" bytes");
-                    files_found++;
-                } else if (!inodes[i].is_directory) {
+                } else {
                     dogeio_text_print("FILE        ");
-                
                     char padded_name[17];
                     const char *name = (inodes[i].filename[0] != '\0') ? inodes[i].filename : "empty";
                     str_pad(padded_name, name, 16, ' ');
                     dogeio_text_print(padded_name);
-                
-                    dogeio_text_print(" | ");
-                
-                    char num_buf[16];
-                    str_itoa((int)inodes[i].size, num_buf); 
-                    dogeio_text_print(num_buf);
-                
-                    dogeio_text_println(" bytes");
-                    files_found++;
-                } else {
-                    log("FsList: please use 1 or 0");
-                    return 0;
                 }
+
+                dogeio_text_print(" | ");
+                char num_buf[16];
+                str_itoa((int)inodes[i].size, num_buf); 
+                dogeio_text_print(num_buf);
+                dogeio_text_println(" bytes");
+
+                files_found++;
             }
         }
     }
     return files_found;
+}
+
+int sfs_chdir(char* foldername) {
+    if (str_strcmp(foldername, "..") == 0) {
+        uint8_t sector_buffer[BLOCK_SIZE];
+        uint64_t target_lba = INODE_START_LBA + ((uint64_t)current_directory_id / INODES_PER_SECTOR);
+        uint64_t offset     = (uint64_t)current_directory_id % INODES_PER_SECTOR;
+
+        if (ata_ReadSector(target_lba, sector_buffer) == 0) {
+            struct sfs_inode *inode = &((struct sfs_inode *)sector_buffer)[offset];
+            current_directory_id = inode->location;  // go back to parent
+            log("chdir ok (..)");
+            return 1;
+        }
+        return -1;
+    }
+
+    // normal cd
+    uint64_t target_lba, inner_offset;
+    struct sfs_inode inode;
+    int inode_idx = find_inode_by_name(foldername, &target_lba, &inner_offset, &inode);
+    if (inode_idx < 0) {
+        log("chdir err: folder not found");
+        return -1;
+    }
+    if (!inode.is_directory) {
+        log("chdir err: not a directory");
+        return -2;
+    }
+    current_directory_id = inode_idx;
+    log("chdir ok");
+    return 1;
+}
+
+
+char* sfs_get_current_directory_name(void) {
+    static char name[MAX_FILENAME];
+    uint8_t sector_buffer[BLOCK_SIZE];
+
+    uint64_t target_lba = INODE_START_LBA + ((uint64_t)current_directory_id / INODES_PER_SECTOR);
+    uint64_t offset     = (uint64_t)current_directory_id % INODES_PER_SECTOR;
+
+    if (ata_ReadSector(target_lba, sector_buffer) != 0) {
+        return "unknown";
+    }
+
+    struct sfs_inode *inode = &((struct sfs_inode *)sector_buffer)[offset];
+    if (inode->used && inode->is_directory) {
+        str_strcpy(name, inode->filename);
+        return name;
+    }
+
+    return "root";
 }

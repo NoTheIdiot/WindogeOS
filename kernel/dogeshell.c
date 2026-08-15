@@ -123,7 +123,18 @@ int system_dogeshell_ex(char* command) {
     }
 
     else if (str_startswith(command, "cd")) {
-        log("hey dumbass cd isn't here");
+        int result = fs_chdir(command + 3);
+        if (result == -2) {
+            dogeio_text_println("Much Error: Not a Folder.");
+        } else if (result == -1) {
+            dogeio_text_println("Such Error: Folder not existing :(");
+        }
+        handled = 0;
+    }
+
+    else if (str_startswith(command, "mkdir") || str_startswith(command, "make-folder")) {
+        char* argument = str_startswith(command, "make-folder") ? (command + 12) : (command + 6);
+        fs_mkdir(argument);
         handled = 0;
     }
 
@@ -349,24 +360,18 @@ void system_dogeshell() {
     }
 
     while (true) {
-        for (int i = 0; i < 256; i++) {
-            input[i] = '\0';
-        }
+        dogeio_text_color_change(0xFF00FF00);
+        dogeio_text_print("wow");
+        dogeio_text_color_change(old);
+        dogeio_text_print(" (");
+        dogeio_text_print(fs_dirname());
+        dogeio_text_print(") ");
 
         if (status == 1) {
-            dogeio_text_color_change(0xFF00FF00);
-            dogeio_text_print("wow");
-            dogeio_text_color_change(old);
-            dogeio_text_print(" (root) ");
             dogeio_text_color_change(0xFFFF0000);
             dogeio_text_print("[1] ");
-        } else {
-            dogeio_text_color_change(0xFF00FF00);
-            dogeio_text_print("wow");
-            dogeio_text_color_change(old);
-            dogeio_text_print(" (root) ");
         }
-        
+
         dogeio_text_color_change(old);
         dogeio_text_input("> ", input, 256);
         if (input[0] != '\0') {

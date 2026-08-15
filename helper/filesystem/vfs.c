@@ -191,3 +191,11 @@ void fs_copy(char* source, char* dest) {
 
     sfs_write(dest, raw_buffer, (uint32_t)bytes_read);
 }
+
+int fs_chdir(char* folder) {
+    return sfs_chdir(folder);
+}
+
+char* fs_dirname(void) {
+    return sfs_get_current_directory_name();
+}

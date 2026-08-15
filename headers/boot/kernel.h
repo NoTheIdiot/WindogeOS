@@ -60,6 +60,8 @@ int sfs_list_directory(int show_hidden);
 int sfs_write(const char *filename, const uint8_t *buffer, uint64_t count);
 int sfs_append(const char *filename, const uint8_t *buffer, uint64_t count);
 int sfs_read(int inode_idx, uint8_t *output_buffer, uint64_t max_bytes);
+int sfs_chdir(char* foldername);
+char* sfs_get_current_directory_name(void);
 int find_inode_by_name(const char *name, uint64_t *out_lba, uint64_t *out_offset, struct sfs_inode *out_inode);
 
 #endif

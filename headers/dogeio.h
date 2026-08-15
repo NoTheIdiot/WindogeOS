@@ -38,6 +38,8 @@ int fs_exists(char* filename);
 void fs_copy(char* source, char* dest);
 int fs_list_dir(int show_hidden);
 int fs_mkdir(char* foldername);
+int fs_chdir(char* folder);
+char* fs_dirname(void);
 int fs_rename(char* filename, char* newname);
 
 #endif
