@@ -75,6 +75,16 @@ void kernel_main(void) {
         dogeio_text_print(starting[i]);
     }
 
+    // testing image generation
+    char *filename = "image.tga";
+
+    sfs_create(filename, 0);
+    uint8_t blue_pixel[3] = {0, 0, 255};
+
+    for (int i = 0; i < 6400; i++) {
+        sfs_append(filename, blue_pixel, 3);
+    }
+
     log("Starting Dogeshell");
     system_dogeshell();
 

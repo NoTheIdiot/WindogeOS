@@ -4,6 +4,7 @@
 #include <basicutil.h>
 #include <system.h>
 #include <time.h>
+#include <image.h>
 
 uint32_t old = 0xFFCCCCCC;
 extern void fstest_shell();
@@ -135,6 +136,12 @@ int system_dogeshell_ex(char* command) {
     else if (str_startswith(command, "mkdir") || str_startswith(command, "make-folder")) {
         char* argument = str_startswith(command, "make-folder") ? (command + 12) : (command + 6);
         fs_mkdir(argument);
+        handled = 0;
+    }
+
+    // to test 
+    else if (str_strcmp(command, "testimage") == 0) {
+        system_parse_tga("image.tga");
         handled = 0;
     }
 

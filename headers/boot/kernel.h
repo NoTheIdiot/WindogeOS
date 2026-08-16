@@ -8,11 +8,11 @@ void menubar_draw();
 
 // file system items
 #define SFS_MAGIC        0x53465321  
-#define BLOCK_SIZE       512
+#define BLOCK_SIZE       4096
 #define MAX_FILENAME     37
 #define MAX_FILES        64
-#define TOTAL_BLOCKS     4096        
-#define DIRECT_POINTERS  12          
+#define TOTAL_BLOCKS     512      
+#define DIRECT_POINTERS  12
 
 #define POINTERS_PER_BLOCK (BLOCK_SIZE / sizeof(uint64_t))
 
@@ -63,5 +63,9 @@ int sfs_read(int inode_idx, uint8_t *output_buffer, uint64_t max_bytes);
 int sfs_chdir(char* foldername);
 char* sfs_get_current_directory_name(void);
 int find_inode_by_name(const char *name, uint64_t *out_lba, uint64_t *out_offset, struct sfs_inode *out_inode);
+
+// image rendering stuff
+void put_pixel(uint64_t x, uint64_t y, uint32_t color);
+uint32_t rgb_to_u32(uint8_t red, uint8_t green, uint8_t blue);
 
 #endif
