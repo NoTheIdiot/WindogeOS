@@ -21,8 +21,33 @@ int fs_mkdir(char* foldername) {
     return sfs_create(foldername, 1); 
 }
 
+// 1 for success, 0 for file not exist, -1 for something exploded
+// how does it not find an inode?
 int fs_delete(char* filename) {
-    return sfs_delete(filename);
+    uint64_t target_lba, inner_offset;
+    // i could have used typedef but it will break everything anyway
+    struct sfs_inode inode;
+    int inode_idx;
+
+    // checking if the file actually exists
+    if (fs_exists(filename)) {
+        inode_idx = find_inode_by_name(filename, &target_lba, &inner_offset, &inode);
+        log("fs (delete): file exists");
+    } else {
+        log("fs (delete): file does not exist");
+        return 0;
+    }
+
+    if (inode_idx < 0) {
+        log("fs (delete): can't find inode id somehow...");
+        return -1;
+    } else {
+        log("fs (delete): file id found");
+        // tell the filesystem that the file does not exist anymore
+        // just like the twin towers at setember 11 2009
+        inode.used = 0;
+        return 1;
+    }
 }
 
 int fs_delete_last_line(char* filename) {
