@@ -1,708 +1,580 @@
-/*
-  a vfs so everything is easier later
-  Updated with Single Indirect Block support
-*/
-
 #include <boot/kernel.h>
+#include <boot/limine.h>
 #include <dogeio.h>
-#include <basicutil.h>
 #include <stdint.h>
-#include <string.h>
 #include <stddef.h>
+#include <string.h>
+#include <basicutil.h>
 #include <bool.h>
 
-#define ATA_DATA         0x1F0
-#define ATA_FEATURES     0x1F1
-#define ATA_SECTOR_CNT   0x1F2
-#define ATA_LBA_LOW      0x1F3
-#define ATA_LBA_MID      0x1F4
-#define ATA_LBA_HIGH     0x1F5
-#define ATA_DRIVE_HEAD   0x1F6
-#define ATA_COMMAND      0x1F7
-#define ATA_STATUS       0x1F7
+#define ATA_STATUS     0x1F7
+#define ATA_DRIVE_HEAD 0x1F6
+#define ATA_SECTOR_CNT 0x1F2
+#define ATA_LBA_LOW    0x1F3
+#define ATA_LBA_MID    0x1F4
+#define ATA_LBA_HIGH   0x1F5
+#define ATA_COMMAND    0x1F7
+#define ATA_DATA       0x1F0
 
-#ifndef FS_BASE_LBA
-#define FS_BASE_LBA      4096
-#endif
+#define EXFAT_PARTITION_LBA 4096
+#define EXFAT_TOTAL_SECTORS 2097152
 
-#ifndef BLOCK_SIZE
-#define BLOCK_SIZE       512
-#endif
+#define EXFAT_TYPE_BITMAP 0x81
+#define EXFAT_TYPE_UPCASE 0x82
+#define EXFAT_TYPE_FILE   0x85
+#define EXFAT_TYPE_STREAM 0xC0
+#define EXFAT_TYPE_NAME   0xC1
 
-#define POINTERS_PER_BLOCK (BLOCK_SIZE / sizeof(uint64_t))
+typedef struct __attribute__((packed)) {
+    uint8_t  jump_boot[3];
+    uint8_t  fs_name[8];
+    uint8_t  zero[53];
+    uint64_t partition_offset;
+    uint64_t volume_length;
+    uint32_t fat_offset;
+    uint32_t fat_length;
+    uint32_t cluster_heap_offset;
+    uint32_t cluster_count;
+    uint32_t root_dir_cluster;
+    uint32_t volume_serial;
+    uint16_t fs_revision;
+    uint16_t volume_flags;
+    uint8_t  bytes_per_sector_shift;
+    uint8_t  sectors_per_cluster_shift;
+    uint8_t  num_fats;
+    uint8_t  drive_select;
+    uint8_t  percent_in_use;
+    uint8_t  reserved[7];
+    uint8_t  boot_code[390];
+    uint16_t boot_signature;
+} exfat_header_t;
 
-extern void log(const char* message);
+typedef struct __attribute__((packed)) {
+    uint8_t  entry_type;
+    uint8_t  secondary_count;
+    uint16_t set_checksum;
+    uint16_t file_attributes;
+    uint16_t reserved1;
+    uint32_t create_time;
+    uint32_t last_mod_time;
+    uint32_t last_access_time;
+    uint8_t  create_10ms;
+    uint8_t  last_mod_10ms;
+    uint8_t  create_tz;
+    uint8_t  last_mod_tz;
+    uint8_t  last_access_tz;
+    uint8_t  reserved2[7];
+} exfat_dentry_file_t;
 
-// 0 is root
-int current_directory_id = 0;
+typedef struct __attribute__((packed)) {
+    uint8_t  entry_type;
+    uint8_t  flags;
+    uint8_t  reserved1;
+    uint8_t  name_length;
+    uint16_t name_hash;
+    uint16_t reserved2;
+    uint64_t valid_data_length;
+    uint32_t reserved3;
+    uint32_t first_cluster;
+    uint64_t data_length;
+} exfat_dentry_stream_t;
 
-static int ata_Ready(void) {
-    for (volatile int i = 0; i < 4; i++) {
-        ports_inb(ATA_STATUS);
-    }
+typedef struct __attribute__((packed)) {
+    uint8_t  entry_type;
+    uint8_t  flags;
+    uint16_t unicode_name[15];
+} exfat_dentry_name_t;
+
+typedef struct {
+    uint32_t cluster;
+    uint64_t size;
+    bool     is_dir;
+    uint64_t entry_lba;
+    uint64_t entry_offset;
+} exfat_target_t;
+
+static uint32_t g_current_cluster = 4;
+static char     g_current_path[256] = "/";
+
+static const uint8_t exfat_upcase_default[128] = {
+    0x61, 0x00, 0x00, 0x00, 0x1A, 0x00, 0x41, 0x00
+};
+
+static inline int exfat_hw_ready(void) {
+    for (volatile int i = 0; i < 4; i++) ports_inb(ATA_STATUS);
     uint8_t status;
     do {
         status = ports_inb(ATA_STATUS);
-        if (status & 0x01) return -1;
-        if (status & 0x20) break;
+        if (status & 0x21) return -1;
     } while ((status & 0x80) || !(status & 0x08));
     return 0;
 }
 
-static int ata_ReadSector(uint64_t lba, uint8_t *buffer) {
-    uint64_t target_lba = lba + FS_BASE_LBA;
-    ports_outb(ATA_DRIVE_HEAD, 0xE0 | ((target_lba >> 24) & 0x0F));
+static int exfat_sector_read(uint64_t lba, uint8_t *buffer) {
+    if (lba > 0x0FFFFFFF) return -1;
+
+    ports_outb(ATA_DRIVE_HEAD, 0xE0 | ((lba >> 24) & 0x0F));
     for (volatile int i = 0; i < 4; i++) ports_inb(ATA_STATUS);
 
     ports_outb(ATA_SECTOR_CNT, 1);
-    ports_outb(ATA_LBA_LOW,  (uint8_t)target_lba);
-    ports_outb(ATA_LBA_MID,  (uint8_t)(target_lba >> 8));
-    ports_outb(ATA_LBA_HIGH, (uint8_t)(target_lba >> 16));
+    ports_outb(ATA_LBA_LOW,  (uint8_t)lba);
+    ports_outb(ATA_LBA_MID,  (uint8_t)(lba >> 8));
+    ports_outb(ATA_LBA_HIGH, (uint8_t)(lba >> 16));
     ports_outb(ATA_COMMAND,  0x20);
 
-    if (ata_Ready() != 0) return -1;
-    uint16_t* ptr = (uint16_t*)buffer;
-    for (int i = 0; i < 256; i++) {
-        ptr[i] = ports_inw(ATA_DATA);
-    }
+    if (exfat_hw_ready() != 0) return -1;
+
+    uint16_t *ptr = (uint16_t *)buffer;
+    for (int i = 0; i < 256; i++) ptr[i] = ports_inw(ATA_DATA);
     return 0;
 }
 
-static int ata_WriteSector(uint64_t lba, const uint8_t *buffer) {
-    uint64_t target_lba = lba + FS_BASE_LBA;
-    
-    ports_outb(ATA_DRIVE_HEAD, 0xE0 | ((target_lba >> 24) & 0x0F));
+static int exfat_sector_write(uint64_t lba, const uint8_t *buffer) {
+    if (lba > 0x0FFFFFFF) return -1;
+
+    ports_outb(ATA_DRIVE_HEAD, 0xE0 | ((lba >> 24) & 0x0F));
     for (volatile int i = 0; i < 4; i++) ports_inb(ATA_STATUS);
 
     ports_outb(ATA_SECTOR_CNT, 1);
-    ports_outb(ATA_LBA_LOW,  (uint8_t)target_lba);
-    ports_outb(ATA_LBA_MID,  (uint8_t)(target_lba >> 8));
-    ports_outb(ATA_LBA_HIGH, (uint8_t)(target_lba >> 16));
-    ports_outb(ATA_COMMAND,  0x30); 
+    ports_outb(ATA_LBA_LOW,  (uint8_t)lba);
+    ports_outb(ATA_LBA_MID,  (uint8_t)(lba >> 8));
+    ports_outb(ATA_LBA_HIGH, (uint8_t)(lba >> 16));
+    ports_outb(ATA_COMMAND,  0x30);
 
-    if (ata_Ready() != 0) return -1;
+    if (exfat_hw_ready() != 0) return -1;
 
-    uint16_t *ptr = (uint16_t *)buffer;
-    for (int i = 0; i < 256; i++) {
-        ports_outw(ATA_DATA, ptr[i]);
-    }
-    
-    ports_outb(ATA_COMMAND, 0xE7); 
+    const uint16_t *ptr = (const uint16_t *)buffer;
+    for (int i = 0; i < 256; i++) ports_outw(ATA_DATA, ptr[i]);
+
+    for (volatile int i = 0; i < 4; i++) ports_inb(ATA_STATUS);
+    while (ports_inb(ATA_STATUS) & 0x80);
+
+    ports_outb(ATA_COMMAND, 0xE7);
     uint8_t status;
     do {
         status = ports_inb(ATA_STATUS);
-        if (status & 0x01) return -1;
+        if (status & 0x21) return -1;
     } while (status & 0x80);
+
     return 0;
 }
 
-int find_inode_by_name(const char *name, uint64_t *out_lba, uint64_t *out_offset, struct sfs_inode *out_inode) {
-    uint8_t sector_buffer[BLOCK_SIZE];
-    uint64_t total_inode_sectors = (MAX_FILES + INODES_PER_SECTOR - 1) / INODES_PER_SECTOR;
+static inline uint64_t exfat_cluster_lba(uint32_t cluster) {
+    return EXFAT_PARTITION_LBA + 2048 + ((uint64_t)(cluster - 2) * 8);
+}
 
-    for (uint64_t sec = 0; sec < total_inode_sectors; sec++) {
-        uint64_t current_lba = (uint64_t)(INODE_START_LBA + sec);
-        if (ata_ReadSector(current_lba, sector_buffer) != 0) return -1;
-        struct sfs_inode *inodes = (struct sfs_inode *)sector_buffer;
+static uint32_t exfat_calc_boot_crc(const uint8_t *sector, size_t bytes, uint32_t crc, bool is_vbr) {
+    for (size_t i = 0; i < bytes; i++) {
+        if (is_vbr && (i == 106 || i == 107 || i == 112)) continue;
+        crc = ((crc & 1) ? 0x80000000 : 0) + (crc >> 1) + (uint32_t)sector[i];
+    }
+    return crc;
+}
 
-        for (uint64_t i = 0; i < INODES_PER_SECTOR; i++) {
-            uint64_t idx = (sec * INODES_PER_SECTOR) + i;
-            if (idx >= (uint64_t)MAX_FILES) break;
+static uint16_t exfat_calc_entry_crc(const uint8_t *entries, uint8_t count) {
+    uint16_t crc = 0;
+    size_t len = (size_t)count * 32;
+    for (size_t i = 0; i < len; i++) {
+        if (i == 2 || i == 3) continue;
+        crc = ((crc & 1) ? 0x8000 : 0) + (crc >> 1) + (uint16_t)entries[i];
+    }
+    return crc;
+}
 
-            if (inodes[i].used) {
-                if (str_strcmp(inodes[i].filename, (char*)name) == 0 || 
-                    __builtin_memcmp(inodes[i].filename, name, MAX_FILENAME) == 0) {
-                    
-                    if ((int)inodes[i].location == current_directory_id) {
-                        if (out_lba) *out_lba = current_lba;
-                        if (out_offset) *out_offset = i;
-                        if (out_inode) *out_inode = inodes[i];
-                        return (int)idx;
+static uint16_t exfat_calc_name_hash(const uint16_t *name, uint8_t len) {
+    uint16_t hash = 0;
+    for (uint8_t i = 0; i < len; i++) {
+        uint16_t ch = name[i];
+        if (ch >= 'a' && ch <= 'z') ch -= 32;
+        hash = ((hash & 1) ? 0x8000 : 0) + (hash >> 1) + (uint16_t)(ch & 0xFF);
+        hash = ((hash & 1) ? 0x8000 : 0) + (hash >> 1) + (uint16_t)((ch >> 8) & 0xFF);
+    }
+    return hash;
+}
+
+static uint32_t exfat_alloc_block(void) {
+    uint8_t sector[512];
+    uint64_t bitmap_lba = exfat_cluster_lba(2);
+
+    if (exfat_sector_read(bitmap_lba, sector) != 0) return 0;
+
+    for (int i = 0; i < 512; i++) {
+        if (sector[i] != 0xFF) {
+            for (int bit = 0; bit < 8; bit++) {
+                if (!(sector[i] & (1 << bit))) {
+                    sector[i] |= (1 << bit);
+                    exfat_sector_write(bitmap_lba, sector);
+                    return (i * 8) + bit + 2;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+static void exfat_free_block(uint32_t cluster) {
+    if (cluster < 2) return;
+    uint8_t sector[512];
+    uint64_t bitmap_lba = exfat_cluster_lba(2);
+
+    if (exfat_sector_read(bitmap_lba, sector) != 0) return;
+
+    uint32_t index = cluster - 2;
+    uint32_t byte_pos = index / 8;
+    uint8_t bit_pos = index % 8;
+
+    if (byte_pos < 512) {
+        sector[byte_pos] &= ~(1 << bit_pos);
+        exfat_sector_write(bitmap_lba, sector);
+    }
+}
+
+static int exfat_resolve_entry(const char *target_name, exfat_target_t *out) {
+    uint8_t sector[512];
+    uint64_t base_lba = exfat_cluster_lba(g_current_cluster);
+
+    for (uint32_t s = 0; s < 8; s++) {
+        if (exfat_sector_read(base_lba + s, sector) != 0) return -1;
+
+        for (int i = 0; i < 512; i += 32) {
+            if (sector[i] == 0x00) return -1;
+
+            if (sector[i] == EXFAT_TYPE_FILE) {
+                exfat_dentry_file_t *file = (exfat_dentry_file_t *)&sector[i];
+                exfat_dentry_stream_t *stream = (exfat_dentry_stream_t *)&sector[i + 32];
+
+                char name_buf[256] = {0};
+                int pos = 0;
+
+                for (uint8_t sec = 2; sec <= file->secondary_count; sec++) {
+                    exfat_dentry_name_t *name_ent = (exfat_dentry_name_t *)&sector[i + sec * 32];
+                    if (name_ent->entry_type == EXFAT_TYPE_NAME) {
+                        for (int c = 0; c < 15; c++) {
+                            uint16_t ch = name_ent->unicode_name[c];
+                            if (ch == 0) break;
+                            if (pos < 255) name_buf[pos++] = (char)ch;
+                        }
                     }
                 }
-            }
-        }
-    }
-    return -1;
-}
 
-int sfs_format(void) {
-    uint8_t sector_buffer[BLOCK_SIZE];
-    memset(sector_buffer, 0, BLOCK_SIZE);
-
-    struct sfs_superblock *sb = (struct sfs_superblock*)sector_buffer;
-    sb->magic = SFS_MAGIC;
-    sb->total_blocks = TOTAL_BLOCKS;
-    sb->inode_count = MAX_FILES;
-    if (ata_WriteSector((uint64_t)SUPERBLOCK_LBA, sector_buffer) != 0) return -1;
-
-    memset(sector_buffer, 0, BLOCK_SIZE);
-    for (uint64_t b = 0; b < DATA_START_LBA; b++) {
-        sector_buffer[b / 8] |= (uint8_t)(1U << (b % 8));
-    }
-    if (ata_WriteSector((uint64_t)BITMAP_LBA, sector_buffer) != 0) return -1;
-
-    uint64_t total_inode_sectors = (MAX_FILES + INODES_PER_SECTOR - 1) / INODES_PER_SECTOR;
-    for (uint64_t i = 0; i < total_inode_sectors; i++) {
-        memset(sector_buffer, 0, BLOCK_SIZE);
-        struct sfs_inode *inodes = (struct sfs_inode *)sector_buffer;
-        
-        for (uint64_t j = 0; j < INODES_PER_SECTOR; j++) {
-            if ((i * INODES_PER_SECTOR) + j >= MAX_FILES) break;
-            inodes[j].used = 0;
-            inodes[j].size = 0;
-            inodes[j].filename[0] = '\0';
-            memset(inodes[j].direct_blocks, 0, sizeof(inodes[j].direct_blocks));
-            inodes[j].indirect_block = 0;
-        }
-
-        if (ata_WriteSector((uint64_t)(INODE_START_LBA + i), sector_buffer) != 0) return -1;
-    }
-    return 1;
-}
-
-int sfs_create(char* name, int is_directory) {
-    if (!name || name[0] == '\0' || str_strlen(name) >= MAX_FILENAME) {
-        log("create err: invalid filename");
-        return -1;
-    }
-
-    if (find_inode_by_name(name, NULL, NULL, NULL) >= 0) {
-        log("create err: file already exists");
-        return -1;
-    }
-
-    uint8_t sector_buffer[BLOCK_SIZE];
-    uint64_t total_inode_sectors = (MAX_FILES + INODES_PER_SECTOR - 1) / INODES_PER_SECTOR;
-
-    for (uint64_t sec = 0; sec < total_inode_sectors; sec++) {
-        uint64_t lba = (uint64_t)(INODE_START_LBA + sec);
-        if (ata_ReadSector(lba, sector_buffer) != 0) {
-            log("create err: failed to read inode sector");
-            return -1;
-        }
-        struct sfs_inode *inodes = (struct sfs_inode *)sector_buffer;
-
-        for (uint64_t i = 0; i < INODES_PER_SECTOR; i++) {
-            if ((sec * INODES_PER_SECTOR) + i >= (uint64_t)MAX_FILES) break;
-
-            if (!inodes[i].used) {
-                inodes[i].used = 1;
-                inodes[i].size = 0;
-                inodes[i].is_directory = is_directory ? 1 : 0;
-                inodes[i].location = (uint8_t)current_directory_id;
-                str_strcpy(inodes[i].filename, name);
-                memset(inodes[i].direct_blocks, 0, sizeof(inodes[i].direct_blocks));
-                inodes[i].indirect_block = 0;
-
-                ata_WriteSector(lba, sector_buffer);
-                return (int)((sec * INODES_PER_SECTOR) + i);
-            }
-        }
-    }
-    return -1;
-}
-
-static int find_free_block(uint8_t *bitmap) {
-    for (uint64_t b = DATA_START_LBA; b < (uint64_t)TOTAL_BLOCKS; b++) {
-        if (!(bitmap[b / 8] & (1U << (b % 8)))) {
-            bitmap[b / 8] |= (uint8_t)(1U << (b % 8));
-            return (int)b;
-        }
-    }
-    return -1;
-}
-
-int sfs_write(const char *filename, const uint8_t *buffer, uint64_t count) {
-    uint8_t sector_buffer[BLOCK_SIZE];
-    uint8_t bitmap[BLOCK_SIZE];
-    uint8_t data_sector[BLOCK_SIZE];
-    uint8_t indirect_sector[BLOCK_SIZE];
-
-    uint64_t target_lba, inner_offset;
-    if (find_inode_by_name(filename, &target_lba, &inner_offset, NULL) < 0) {
-        log("write err: file not found");
-        return -2;
-    }
-
-    if (ata_ReadSector(target_lba, sector_buffer) != 0) {
-        log("write err: failed to read inode sector");
-        return -1;
-    }
-    struct sfs_inode *file_inode = &((struct sfs_inode *)sector_buffer)[inner_offset];
-
-    uint64_t max_capacity = (DIRECT_POINTERS + POINTERS_PER_BLOCK) * BLOCK_SIZE;
-    if (count > max_capacity) count = max_capacity;
-
-    if (ata_ReadSector((uint64_t)BITMAP_LBA, bitmap) != 0) {
-        log("write err: failed to read bitmap");
-        return -1;
-    }
-
-    // Free existing direct blocks safely (must be >= DATA_START_LBA)
-    for (int b = 0; b < DIRECT_POINTERS; b++) {
-        uint64_t old_block = file_inode->direct_blocks[b];
-        if (old_block >= DATA_START_LBA && old_block < (uint64_t)TOTAL_BLOCKS) {
-            bitmap[old_block / 8] &= (uint8_t)~(1U << (old_block % 8));
-            file_inode->direct_blocks[b] = 0;
-        }
-    }
-
-    // Free existing indirect blocks and contents safely
-    if (file_inode->indirect_block >= DATA_START_LBA && file_inode->indirect_block < (uint64_t)TOTAL_BLOCKS) {
-        if (ata_ReadSector(file_inode->indirect_block, indirect_sector) == 0) {
-            uint64_t *pointers = (uint64_t *)indirect_sector;
-            for (int i = 0; i < (int)POINTERS_PER_BLOCK; i++) {
-                uint64_t block = pointers[i];
-                if (block >= DATA_START_LBA && block < (uint64_t)TOTAL_BLOCKS) {
-                    bitmap[block / 8] &= (uint8_t)~(1U << (block % 8));
-                }
-            }
-        }
-        bitmap[file_inode->indirect_block / 8] &= (uint8_t)~(1U << (file_inode->indirect_block % 8));
-        file_inode->indirect_block = 0;
-    }
-
-    uint64_t bytes_written = 0;
-    uint64_t block_index = 0;
-    bool indirect_dirty = false;
-    memset(indirect_sector, 0, BLOCK_SIZE);
-
-    while (bytes_written < count && block_index < (DIRECT_POINTERS + POINTERS_PER_BLOCK)) {
-        int free_block = find_free_block(bitmap);
-        if (free_block == -1) {
-            log("write err: disk full");
-            break;
-        }
-
-        uint64_t new_block = (uint64_t)free_block;
-        memset(data_sector, 0, BLOCK_SIZE);
-
-        uint64_t chunk = (count - bytes_written > BLOCK_SIZE) ? BLOCK_SIZE : (count - bytes_written);
-        memcpy(data_sector, buffer + bytes_written, chunk);
-
-        if (ata_WriteSector(new_block, data_sector) != 0) {
-            log("write err: failed to write data block");
-            return -1;
-        }
-
-        if (block_index < DIRECT_POINTERS) {
-            file_inode->direct_blocks[block_index] = new_block;
-        } else {
-            if (file_inode->indirect_block == 0) {
-                int free_ind = find_free_block(bitmap);
-                if (free_ind == -1) {
-                    log("write err: disk full (cannot allocate indirect block)");
-                    bitmap[new_block / 8] &= ~(1U << (new_block % 8));
-                    break;
-                }
-                file_inode->indirect_block = (uint64_t)free_ind;
-            }
-            uint64_t idx = block_index - DIRECT_POINTERS;
-            uint64_t *pointers = (uint64_t *)indirect_sector;
-            pointers[idx] = new_block;
-            indirect_dirty = true;
-        }
-
-        bytes_written += chunk;
-        block_index++;
-    }
-
-    if (file_inode->indirect_block != 0 && indirect_dirty) {
-        ata_WriteSector(file_inode->indirect_block, indirect_sector);
-    }
-
-    file_inode->size = bytes_written;
-    ata_WriteSector(target_lba, sector_buffer);
-    ata_WriteSector((uint64_t)BITMAP_LBA, bitmap);
-
-    log("write ok");
-    return 1;
-}
-
-int sfs_append(const char *filename, const uint8_t *buffer, uint64_t count) {
-    if (count == 0) return 0;
-
-    uint8_t inode_sector[BLOCK_SIZE];
-    uint8_t bitmap[BLOCK_SIZE];
-    uint8_t data_sector[BLOCK_SIZE];
-    uint8_t indirect_sector[BLOCK_SIZE];
-
-    uint64_t target_lba, inner_offset;
-    if (find_inode_by_name(filename, &target_lba, &inner_offset, NULL) < 0) {
-        log("append err: file not found");
-        return -1;
-    }
-
-    if (ata_ReadSector(target_lba, inode_sector) != 0) {
-        log("append err: failed to read inode sector");
-        return -1;
-    }
-    struct sfs_inode *file_inode = &((struct sfs_inode *)inode_sector)[inner_offset];
-
-    uint64_t old_size = file_inode->size;
-    uint64_t max_capacity = (DIRECT_POINTERS + POINTERS_PER_BLOCK) * BLOCK_SIZE;
-    if (old_size >= max_capacity) {
-        log("append err: file is full");
-        return 0;
-    }
-
-    if (old_size + count > max_capacity) {
-        count = max_capacity - old_size;
-    }
-
-    if (ata_ReadSector((uint64_t)BITMAP_LBA, bitmap) != 0) {
-        log("append err: failed to read bitmap");
-        return -1;
-    }
-
-    uint64_t bytes_written = 0;
-    uint64_t current_block_idx = old_size / BLOCK_SIZE;
-    uint64_t offset_in_block = old_size % BLOCK_SIZE;
-
-    bool indirect_dirty = false;
-    if (file_inode->indirect_block >= DATA_START_LBA && file_inode->indirect_block < (uint64_t)TOTAL_BLOCKS) {
-        ata_ReadSector(file_inode->indirect_block, indirect_sector);
-    } else {
-        memset(indirect_sector, 0, BLOCK_SIZE);
-    }
-
-    if (offset_in_block != 0 && bytes_written < count) {
-        uint64_t active_block = 0;
-        if (current_block_idx < DIRECT_POINTERS) {
-            active_block = file_inode->direct_blocks[current_block_idx];
-        } else {
-            uint64_t idx = current_block_idx - DIRECT_POINTERS;
-            uint64_t *pointers = (uint64_t *)indirect_sector;
-            active_block = pointers[idx];
-        }
-
-        if (active_block >= DATA_START_LBA && active_block < (uint64_t)TOTAL_BLOCKS) {
-            ata_ReadSector(active_block, data_sector);
-            uint64_t chunk = BLOCK_SIZE - offset_in_block;
-            if (chunk > count) chunk = count;
-            memcpy(data_sector + offset_in_block, buffer + bytes_written, chunk);
-            ata_WriteSector(active_block, data_sector);
-
-            bytes_written += chunk;
-            current_block_idx++;
-        }
-    }
-
-    while (bytes_written < count && current_block_idx < (DIRECT_POINTERS + POINTERS_PER_BLOCK)) {
-        int free_block = find_free_block(bitmap);
-        if (free_block == -1) {
-            log("append err: disk full");
-            break;
-        }
-
-        uint64_t new_block = (uint64_t)free_block;
-        memset(data_sector, 0, BLOCK_SIZE);
-
-        uint64_t chunk = (count - bytes_written > BLOCK_SIZE) ? BLOCK_SIZE : (count - bytes_written);
-        memcpy(data_sector, buffer + bytes_written, chunk);
-        ata_WriteSector(new_block, data_sector);
-
-        if (current_block_idx < DIRECT_POINTERS) {
-            file_inode->direct_blocks[current_block_idx] = new_block;
-        } else {
-            if (file_inode->indirect_block == 0) {
-                int free_ind = find_free_block(bitmap);
-                if (free_ind == -1) {
-                    log("append err: disk full (cannot allocate indirect block)");
-                    bitmap[new_block / 8] &= ~(1U << (new_block % 8));
-                    break;
-                }
-                file_inode->indirect_block = (uint64_t)free_ind;
-                memset(indirect_sector, 0, BLOCK_SIZE);
-            }
-
-            uint64_t idx = current_block_idx - DIRECT_POINTERS;
-            if (idx >= POINTERS_PER_BLOCK) {
-                bitmap[new_block / 8] &= ~(1U << (new_block % 8));
-                break;
-            }
-            uint64_t *pointers = (uint64_t *)indirect_sector;
-            pointers[idx] = new_block;
-            indirect_dirty = true;
-        }
-
-        bytes_written += chunk;
-        current_block_idx++;
-    }
-
-    if (file_inode->indirect_block >= DATA_START_LBA && indirect_dirty) {
-        ata_WriteSector(file_inode->indirect_block, indirect_sector);
-    }
-
-    if (bytes_written == 0) {
-        return 0;
-    }
-
-    file_inode->size = old_size + bytes_written;
-    ata_WriteSector(target_lba, inode_sector);
-    ata_WriteSector((uint64_t)BITMAP_LBA, bitmap);
-
-    log("append ok");
-    return (int)bytes_written;
-}
-
-int sfs_delete(const char *filename) {
-    uint8_t sector[BLOCK_SIZE], bitmap[BLOCK_SIZE];
-    uint64_t total_sec = (MAX_FILES + INODES_PER_SECTOR - 1) / INODES_PER_SECTOR;
-
-    for (uint64_t sec = 0; sec < total_sec; sec++) {
-        uint64_t lba = INODE_START_LBA + sec;
-        if (ata_ReadSector(lba, sector) != 0) continue;
-        
-        struct sfs_inode *inodes = (struct sfs_inode *)sector;
-        for (uint64_t i = 0; i < INODES_PER_SECTOR; i++) {
-            uint64_t idx = (sec * INODES_PER_SECTOR) + i;
-            if (idx >= MAX_FILES) break;
-
-            // Match if used, matches filename, and matches current directory
-            if (inodes[i].used && 
-                inodes[i].location == (uint8_t)current_directory_id &&
-                (str_strcmp(inodes[i].filename, (char*)filename) == 0 || 
-                 __builtin_memcmp(inodes[i].filename, filename, MAX_FILENAME) == 0)) {
-                inodes[i].used = 0;
-                inodes[i].filename[0] = '\0';
-                if (ata_ReadSector(BITMAP_LBA, bitmap) == 0) {
-                    for (int b = 0; b < DIRECT_POINTERS; b++) {
-                        uint64_t blk = inodes[i].direct_blocks[b];
-                        if (blk >= DATA_START_LBA && blk < TOTAL_BLOCKS)
-                            bitmap[blk / 8] &= ~(1U << (blk % 8));
+                if (str_strcmp(name_buf, target_name) == 0) {
+                    if (out) {
+                        out->entry_lba = base_lba + s;
+                        out->entry_offset = i;
+                        out->cluster = stream->first_cluster;
+                        out->size = stream->data_length;
+                        out->is_dir = (file->file_attributes & 0x10) != 0;
                     }
-                    ata_WriteSector(BITMAP_LBA, bitmap);
+                    return 0;
                 }
-
-                inodes[i].indirect_block = 0;
-                memset(inodes[i].direct_blocks, 0, sizeof(inodes[i].direct_blocks));
-                
-                ata_WriteSector(lba, sector);
-                log("delete ok");
-                return 1;
+                i += file->secondary_count * 32;
             }
         }
     }
-
-    log("delete err: file not found");
     return -1;
 }
 
-int sfs_delete_last_line(const char *filename) {
-    uint64_t target_lba, inner_offset;
-    struct sfs_inode inode;
-    int inode_idx = find_inode_by_name(filename, &target_lba, &inner_offset, &inode);
-    if (inode_idx < 0) {
-        log("delete last line err: file not found");
-        return -1;
+static void exfat_num_to_str(uint32_t num, char *out) {
+    if (num == 0) { out[0] = '0'; out[1] = '\0'; return; }
+    char tmp[16]; int i = 0;
+    while (num > 0) { tmp[i++] = '0' + (num % 10); num /= 10; }
+    int j = 0;
+    while (i > 0) { out[j++] = tmp[--i]; }
+    out[j] = '\0';
+}
+
+int exfat_wipe_and_format(void) {
+    uint8_t sector[512];
+    memset(sector, 0, 512);
+
+    uint32_t heap_offset = 2048;
+    uint32_t cluster_cnt = (EXFAT_TOTAL_SECTORS - heap_offset) / 8;
+    uint32_t fat_len = ((cluster_cnt + 2) * 4 + 511) / 512;
+
+    exfat_header_t *vbr = (exfat_header_t *)sector;
+    vbr->jump_boot[0] = 0xEB; vbr->jump_boot[1] = 0x76; vbr->jump_boot[2] = 0x90;
+    memcpy(vbr->fs_name, "EXFAT   ", 8);
+    vbr->partition_offset = EXFAT_PARTITION_LBA;
+    vbr->volume_length = EXFAT_TOTAL_SECTORS;
+    vbr->fat_offset = 128;
+    vbr->fat_length = fat_len;
+    vbr->cluster_heap_offset = heap_offset;
+    vbr->cluster_count = cluster_cnt;
+    vbr->root_dir_cluster = 4;
+    vbr->volume_serial = 0x87654321;
+    vbr->fs_revision = 0x0100;
+    vbr->bytes_per_sector_shift = 9;
+    vbr->sectors_per_cluster_shift = 3;
+    vbr->num_fats = 1;
+    vbr->drive_select = 0x80;
+    vbr->boot_signature = 0xAA55;
+
+    uint32_t crc = exfat_calc_boot_crc(sector, 512, 0, true);
+    exfat_sector_write(EXFAT_PARTITION_LBA + 0, sector);
+    exfat_sector_write(EXFAT_PARTITION_LBA + 12, sector);
+
+    uint8_t zero_sector[512] = {0};
+    for (int i = 1; i <= 10; i++) {
+        crc = exfat_calc_boot_crc(zero_sector, 512, crc, false);
+        exfat_sector_write(EXFAT_PARTITION_LBA + i, zero_sector);
+        exfat_sector_write(EXFAT_PARTITION_LBA + 12 + i, zero_sector);
     }
 
-    uint8_t buffer[(DIRECT_POINTERS + POINTERS_PER_BLOCK) * BLOCK_SIZE];
-    int bytes_read = sfs_read(inode_idx, buffer, sizeof(buffer));
-    if (bytes_read < 0) {
-        log("delete last line err: failed to read file");
-        return -1;
-    }
+    uint32_t crc_table[128];
+    for (int i = 0; i < 128; i++) crc_table[i] = crc;
+    exfat_sector_write(EXFAT_PARTITION_LBA + 11, (uint8_t*)crc_table);
+    exfat_sector_write(EXFAT_PARTITION_LBA + 23, (uint8_t*)crc_table);
 
-    if (bytes_read == 0) {
-        return 0;
-    }
+    memset(sector, 0, 512);
+    uint32_t *fat = (uint32_t *)sector;
+    fat[0] = 0xFFFFFFF8; fat[1] = 0xFFFFFFFF;
+    fat[2] = 0xFFFFFFFF; fat[3] = 0xFFFFFFFF; fat[4] = 0xFFFFFFFF;
+    exfat_sector_write(EXFAT_PARTITION_LBA + 128, sector);
 
-    int end = bytes_read - 1;
-    while (end >= 0 && buffer[end] == '\n') {
-        end--;
-    }
+    memset(sector, 0, 512); sector[0] = 0x07;
+    exfat_sector_write(EXFAT_PARTITION_LBA + heap_offset + (0 * 8), sector);
 
-    int last_newline = -1;
-    for (int i = end; i >= 0; i--) {
-        if (buffer[i] == '\n') {
-            last_newline = i;
+    memset(sector, 0, 512);
+    memcpy(sector, exfat_upcase_default, sizeof(exfat_upcase_default));
+    exfat_sector_write(EXFAT_PARTITION_LBA + heap_offset + (1 * 8), sector);
+
+    memset(sector, 0, 512);
+    sector[0] = EXFAT_TYPE_BITMAP;
+    *(uint32_t *)&sector[20] = 2;
+    *(uint64_t *)&sector[24] = (cluster_cnt + 7) / 8;
+
+    sector[32] = EXFAT_TYPE_UPCASE;
+    *(uint32_t *)&sector[32 + 4] = 0xE6163351;
+    *(uint32_t *)&sector[32 + 20] = 3;
+    *(uint64_t *)&sector[32 + 24] = sizeof(exfat_upcase_default);
+
+    exfat_sector_write(EXFAT_PARTITION_LBA + heap_offset + (2 * 8), sector);
+
+    g_current_cluster = 4;
+    str_strcpy(g_current_path, "/");
+    return 0;
+}
+
+int exfat_create_node(const char *name, bool is_dir) {
+    uint8_t sector[512];
+    uint64_t lba = exfat_cluster_lba(g_current_cluster);
+
+    if (exfat_sector_read(lba, sector) != 0) return -1;
+
+    int slot = -1;
+    for (int i = 0; i <= 512 - 96; i += 32) {
+        if ((sector[i] & 0x80) == 0 || sector[i] == 0x00) {
+            slot = i;
             break;
         }
     }
+    if (slot == -1) return -1;
 
-    int new_size = (last_newline >= 0) ? (last_newline + 1) : 0;
-    if (sfs_write(filename, buffer, (uint64_t)new_size) < 0) {
-        log("delete last line err: failed to truncate file");
-        return -1;
-    }
+    uint32_t new_cluster = exfat_alloc_block();
+    if (new_cluster == 0) return -1;
 
-    log("delete last line ok");
-    return new_size;
+    uint8_t len = (uint8_t)str_strlen(name);
+    if (len > 15) len = 15;
+
+    memset(&sector[slot], 0, 96);
+
+    exfat_dentry_file_t *file = (exfat_dentry_file_t *)&sector[slot];
+    file->entry_type = EXFAT_TYPE_FILE;
+    file->secondary_count = 2;
+    file->file_attributes = is_dir ? 0x10 : 0x20;
+
+    exfat_dentry_stream_t *stream = (exfat_dentry_stream_t *)&sector[slot + 32];
+    stream->entry_type = EXFAT_TYPE_STREAM;
+    stream->flags = 0x03;
+    stream->name_length = len;
+    stream->first_cluster = new_cluster;
+
+    exfat_dentry_name_t *fname = (exfat_dentry_name_t *)&sector[slot + 64];
+    fname->entry_type = EXFAT_TYPE_NAME;
+    for (uint8_t i = 0; i < len; i++) fname->unicode_name[i] = (uint16_t)name[i];
+
+    stream->name_hash = exfat_calc_name_hash(fname->unicode_name, len);
+    file->set_checksum = exfat_calc_entry_crc(&sector[slot], 3);
+
+    return exfat_sector_write(lba, sector);
 }
 
-int sfs_read(int inode_idx, uint8_t *output_buffer, uint64_t max_bytes) {
-    if (inode_idx < 0 || (uint64_t)inode_idx >= MAX_FILES) return -1;
+int exfat_write_file(const char *name, const uint8_t *data, uint64_t count) {
+    exfat_target_t target;
+    if (exfat_resolve_entry(name, &target) != 0) return -1;
 
-    uint8_t inode_sector[BLOCK_SIZE];
-    uint64_t target_lba = (uint64_t)(INODE_START_LBA + ((uint64_t)inode_idx / INODES_PER_SECTOR));
-    uint64_t offset = (uint64_t)((uint64_t)inode_idx % INODES_PER_SECTOR);
+    uint8_t sector[512];
+    uint64_t base_lba = exfat_cluster_lba(target.cluster);
+    uint32_t sectors_needed = (count + 511) / 512;
 
-    if (ata_ReadSector(target_lba, inode_sector) != 0) {
-        log("read err: failed to read inode sector");
-        return -1;
+    if (sectors_needed > 8) return -1;
+
+    for (uint32_t i = 0; i < sectors_needed; i++) {
+        memset(sector, 0, 512);
+        uint32_t chunk = (count - (i * 512) > 512) ? 512 : (uint32_t)(count - (i * 512));
+        memcpy(sector, data + (i * 512), chunk);
+        if (exfat_sector_write(base_lba + i, sector) != 0) return -1;
     }
-    struct sfs_inode *file_inode = &((struct sfs_inode *)inode_sector)[offset];
-    if (!file_inode->used) return -1;
 
-    uint64_t bytes_to_read = (file_inode->size < max_bytes) ? file_inode->size : max_bytes;
-    uint64_t bytes_read = 0;
-    uint8_t data_sector[BLOCK_SIZE];
-    uint8_t indirect_sector[BLOCK_SIZE];
-    bool indirect_loaded = false;
+    if (exfat_sector_read(target.entry_lba, sector) != 0) return -1;
+    exfat_dentry_file_t *file = (exfat_dentry_file_t *)&sector[target.entry_offset];
+    exfat_dentry_stream_t *stream = (exfat_dentry_stream_t *)&sector[target.entry_offset + 32];
 
-    uint64_t total_blocks_needed = (bytes_to_read + BLOCK_SIZE - 1) / BLOCK_SIZE;
+    stream->data_length = count;
+    stream->valid_data_length = count;
+    file->set_checksum = exfat_calc_entry_crc(&sector[target.entry_offset], file->secondary_count + 1);
 
-    for (uint64_t block_index = 0; block_index < total_blocks_needed && bytes_read < bytes_to_read; block_index++) {
-        uint64_t active_block = 0;
-
-        if (block_index < DIRECT_POINTERS) {
-            active_block = file_inode->direct_blocks[block_index];
-        } else {
-            if (file_inode->indirect_block == 0) break;
-            
-            if (!indirect_loaded) {
-                if (ata_ReadSector(file_inode->indirect_block, indirect_sector) != 0) {
-                    log("read err: failed to read indirect block");
-                    return -1;
-                }
-                indirect_loaded = true;
-            }
-            
-            uint64_t indirect_index = block_index - DIRECT_POINTERS;
-            if (indirect_index >= POINTERS_PER_BLOCK) break;
-            
-            uint64_t *pointers = (uint64_t *)indirect_sector;
-            active_block = pointers[indirect_index];
-        }
-
-        if (active_block == 0 || active_block >= TOTAL_BLOCKS) break;
-
-        if (ata_ReadSector(active_block, data_sector) != 0) {
-            log("read err: failed to read data block");
-            return -1;
-        }
-
-        uint64_t chunk = (bytes_to_read - bytes_read > BLOCK_SIZE) ? BLOCK_SIZE : (bytes_to_read - bytes_read);
-        memcpy(output_buffer + bytes_read, data_sector, chunk);
-        bytes_read += chunk;
-    }
-    return (int)bytes_read;
+    return exfat_sector_write(target.entry_lba, sector);
 }
 
-int sfs_list_directory(int show_hidden) {
-    uint8_t sector_buffer[BLOCK_SIZE];
-    int files_found = 0;
-    uint64_t total_inode_sectors = (MAX_FILES + INODES_PER_SECTOR - 1) / INODES_PER_SECTOR;
+int exfat_append_file(const char *name, const uint8_t *data, uint64_t count) {
+    exfat_target_t target;
+    if (exfat_resolve_entry(name, &target) != 0) return -1;
+    if (target.size + count > 4096) return -1;
 
-    dogeio_text_println("------ In Current Folder -----");
+    uint8_t buffer[4096];
+    uint64_t base_lba = exfat_cluster_lba(target.cluster);
 
-    if (current_directory_id != 0) {
-        dogeio_text_print("DIR         ");
-        uint32_t thing = dogeio_text_color;
-        dogeio_text_color_change(0xADD8E6);
-        char padded_name[17];
-        str_pad(padded_name, "..", 16, ' ');
-        dogeio_text_print(padded_name);
-        dogeio_text_color_change(thing);
-        dogeio_text_println(" | 0 bytes");
-        files_found++;
+    uint32_t existing = (target.size + 511) / 512;
+    for (uint32_t i = 0; i < existing; i++) {
+        exfat_sector_read(base_lba + i, buffer + (i * 512));
     }
 
-    for (uint64_t sec = 0; sec < total_inode_sectors; sec++) {
-        if (ata_ReadSector((uint64_t)(INODE_START_LBA + sec), sector_buffer) != 0) continue;
-        struct sfs_inode *inodes = (struct sfs_inode *)sector_buffer;
+    memcpy(buffer + target.size, data, count);
+    return exfat_write_file(name, buffer, target.size + count);
+}
 
-        for (uint64_t i = 0; i < INODES_PER_SECTOR; i++) {
-            uint64_t idx = (sec * INODES_PER_SECTOR) + i;
-            if (idx >= (uint64_t)MAX_FILES) break;
+int exfat_read_file(const char *name, uint8_t *out_buf, uint64_t max_bytes) {
+    exfat_target_t target;
+    if (exfat_resolve_entry(name, &target) != 0) return -1;
 
-            if (inodes[i].used && inodes[i].location == current_directory_id) {
-                if (inodes[i].filename[0] == '.' && !show_hidden) {
-                    continue;
+    uint8_t sector[512];
+    uint64_t base_lba = exfat_cluster_lba(target.cluster);
+    uint64_t bytes_to_read = (target.size < max_bytes) ? target.size : max_bytes;
+
+    uint8_t *dst = out_buf;
+    uint64_t left = bytes_to_read;
+
+    for (uint32_t s = 0; s < 8 && left > 0; s++) {
+        if (exfat_sector_read(base_lba + s, sector) != 0) return -1;
+        uint32_t chunk = (left > 512) ? 512 : (uint32_t)left;
+        memcpy(dst, sector, chunk);
+        dst += chunk;
+        left -= chunk;
+    }
+
+    return (int)bytes_to_read;
+}
+
+int exfat_delete_node(const char *name) {
+    exfat_target_t target;
+    if (exfat_resolve_entry(name, &target) != 0) return -1;
+
+    exfat_free_block(target.cluster);
+
+    uint8_t sector[512];
+    if (exfat_sector_read(target.entry_lba, sector) != 0) return -1;
+
+    exfat_dentry_file_t *file = (exfat_dentry_file_t *)&sector[target.entry_offset];
+    uint8_t total = file->secondary_count + 1;
+
+    for (uint8_t i = 0; i < total; i++) {
+        sector[target.entry_offset + (i * 32)] &= 0x7F;
+    }
+
+    return exfat_sector_write(target.entry_lba, sector);
+}
+
+int exfat_truncate_last_line(const char *name) {
+    exfat_target_t target;
+    if (exfat_resolve_entry(name, &target) != 0 || target.size == 0) return -1;
+
+    uint8_t buffer[4096];
+    uint64_t base_lba = exfat_cluster_lba(target.cluster);
+
+    uint32_t sectors = (target.size + 511) / 512;
+    for (uint32_t i = 0; i < sectors; i++) {
+        exfat_sector_read(base_lba + i, buffer + (i * 512));
+    }
+
+    int64_t new_len = target.size - 1;
+    if (buffer[new_len] == '\n') new_len--;
+
+    while (new_len >= 0 && buffer[new_len] != '\n') {
+        new_len--;
+    }
+
+    new_len++;
+    if (new_len < 0) new_len = 0;
+
+    return exfat_write_file(name, buffer, (uint64_t)new_len);
+}
+
+int exfat_print_directory(void) {
+    uint8_t sector[512];
+    uint64_t base_lba = exfat_cluster_lba(g_current_cluster);
+
+    for (uint32_t s = 0; s < 8; s++) {
+        if (exfat_sector_read(base_lba + s, sector) != 0) return -1;
+
+        for (int i = 0; i < 512; i += 32) {
+            if (sector[i] == 0x00) return 0;
+
+            if (sector[i] == EXFAT_TYPE_FILE) {
+                exfat_dentry_file_t *file = (exfat_dentry_file_t *)&sector[i];
+                exfat_dentry_stream_t *stream = (exfat_dentry_stream_t *)&sector[i + 32];
+
+                char name_buf[256] = {0};
+                int pos = 0;
+
+                for (uint8_t sec = 2; sec <= file->secondary_count; sec++) {
+                    exfat_dentry_name_t *name_ent = (exfat_dentry_name_t *)&sector[i + sec * 32];
+                    if (name_ent->entry_type == EXFAT_TYPE_NAME) {
+                        for (int c = 0; c < 15; c++) {
+                            uint16_t ch = name_ent->unicode_name[c];
+                            if (ch == 0) break;
+                            if (pos < 255) name_buf[pos++] = (char)ch;
+                        }
+                    }
                 }
 
-                if (inodes[i].is_directory) {
-                    dogeio_text_print("DIR         ");
-                    uint32_t thing = dogeio_text_color;
-                    dogeio_text_color_change(0xADD8E6);
-                    char padded_name[17];
-                    const char *name = (inodes[i].filename[0] != '\0') ? inodes[i].filename : "empty";
-                    str_pad(padded_name, name, 16, ' ');
-                    dogeio_text_print(padded_name);
-                    dogeio_text_color_change(thing);
+                if (file->file_attributes & 0x10) {
+                    dogeio_text_print("[DIR]  ");
+                    dogeio_text_println(name_buf);
                 } else {
-                    dogeio_text_print("FILE        ");
-                    char padded_name[17];
-                    const char *name = (inodes[i].filename[0] != '\0') ? inodes[i].filename : "empty";
-                    str_pad(padded_name, name, 16, ' ');
-                    dogeio_text_print(padded_name);
+                    char size_str[16];
+                    exfat_num_to_str((uint32_t)stream->data_length, size_str);
+
+                    dogeio_text_print("[FILE] ");
+                    dogeio_text_print(name_buf);
+                    dogeio_text_print(" (");
+                    dogeio_text_print(size_str);
+                    dogeio_text_println(" bytes)");
                 }
 
-                dogeio_text_print(" | ");
-                char num_buf[16];
-                str_itoa((int)inodes[i].size, num_buf); 
-                dogeio_text_print(num_buf);
-                dogeio_text_println(" bytes");
-
-                files_found++;
+                i += file->secondary_count * 32;
             }
         }
     }
-    return files_found;
+    return 0;
 }
 
-int sfs_chdir(char* foldername) {
-    if (str_strcmp(foldername, "..") == 0) {
-        uint8_t sector_buffer[BLOCK_SIZE];
-        uint64_t target_lba = INODE_START_LBA + ((uint64_t)current_directory_id / INODES_PER_SECTOR);
-        uint64_t offset     = (uint64_t)current_directory_id % INODES_PER_SECTOR;
-
-        if (ata_ReadSector(target_lba, sector_buffer) == 0) {
-            struct sfs_inode *inode = &((struct sfs_inode *)sector_buffer)[offset];
-            current_directory_id = inode->location;  // go back to parent
-            log("chdir ok (..)");
-            return 1;
-        }
-        return -1;
+int exfat_change_directory(const char *path) {
+    if (strcmp(path, "/") == 0 || strcmp(path, "..") == 0) {
+        g_current_cluster = 4;
+        str_strcpy(g_current_path, "/");
+        return 0;
     }
 
-    // normal cd
-    uint64_t target_lba, inner_offset;
-    struct sfs_inode inode;
-    int inode_idx = find_inode_by_name(foldername, &target_lba, &inner_offset, &inode);
-    if (inode_idx < 0) {
-        log("chdir err: folder not found");
-        return -1;
+    exfat_target_t target;
+    if (exfat_resolve_entry(path, &target) == 0 && target.is_dir) {
+        g_current_cluster = target.cluster;
+        str_strcpy(g_current_path, path);
+        return 0;
     }
-    if (!inode.is_directory) {
-        log("chdir err: not a directory");
-        return -2;
-    }
-    current_directory_id = inode_idx;
-    log("chdir ok");
-    return 1;
+    return -1;
 }
 
-
-char* sfs_get_current_directory_name(void) {
-    static char name[MAX_FILENAME];
-    uint8_t sector_buffer[BLOCK_SIZE];
-
-    uint64_t target_lba = INODE_START_LBA + ((uint64_t)current_directory_id / INODES_PER_SECTOR);
-    uint64_t offset     = (uint64_t)current_directory_id % INODES_PER_SECTOR;
-
-    if (ata_ReadSector(target_lba, sector_buffer) != 0) {
-        return "unknown";
-    }
-
-    struct sfs_inode *inode = &((struct sfs_inode *)sector_buffer)[offset];
-    if (inode->used && inode->is_directory) {
-        str_strcpy(name, inode->filename);
-        return name;
-    }
-
-    return "root";
+const char* exfat_get_working_dir(void) {
+    return g_current_path;
 }
