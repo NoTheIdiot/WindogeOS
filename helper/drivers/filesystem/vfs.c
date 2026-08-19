@@ -1,76 +1,59 @@
-/*
-a vfs so everything is easier later
-*/
-
 #include <boot/kernel.h>
 #include <dogeio.h>
 #include <basicutil.h>
 #include <stdint.h>
 #include <string.h>
 #include <stddef.h>
+#include <stdbool.h>
 
 int fs_format(void) {
-    return sfs_format();
+    return exfat_wipe_and_format();
 }
 
 int fs_create(char* filename) {
-    return sfs_create(filename, 0);
+    return exfat_create_node(filename, false);
 }
 
 int fs_mkdir(char* foldername) {
-    return sfs_create(foldername, 1); 
+    return exfat_create_node(foldername, true); 
 }
 
-// 1 for success, 0 for file not exist, -1 for something exploded
-// how does it not find an inode?
-int fs_delete(char* filename) {
-    uint64_t target_lba, inner_offset;
-    // i could have used typedef but it will break everything anyway
-    struct sfs_inode inode;
-    int inode_idx;
+int fs_exists(char* filename) {
+    if (!filename || filename[0] == '\0') {
+        return 0;
+    }
+    uint8_t dummy[1];
+    return exfat_read_file(filename, dummy, 0) >= 0 ? 1 : 0;
+}
 
-    // checking if the file actually exists
-    if (fs_exists(filename)) {
-        inode_idx = find_inode_by_name(filename, &target_lba, &inner_offset, &inode);
-        log("fs (delete): file exists");
-    } else {
-        log("fs (delete): file does not exist");
+int fs_delete(char* filename) {
+    if (!fs_exists(filename)) {
+        dogeio_text_println("fs (delete): file does not exist");
         return 0;
     }
 
-    if (inode_idx < 0) {
-        log("fs (delete): can't find inode id somehow...");
-        return -1;
-    } else {
-        log("fs (delete): file id found");
-        // tell the filesystem that the file does not exist anymore
-        // just like the twin towers at setember 11 2009
-        inode.used = 0;
+    if (exfat_delete_node(filename) == 0) {
+        dogeio_text_println("fs (delete): file deleted");
         return 1;
     }
+
+    dogeio_text_println("fs (delete): error deleting file");
+    return -1;
 }
 
 int fs_delete_last_line(char* filename) {
-    return sfs_delete_last_line(filename);
+    return exfat_truncate_last_line(filename);
 }
 
 int fs_read(char* filename, char* output_buffer, uint32_t max_size) {
-    uint8_t output_u8[6144];
-
-    if (max_size == 0) {
+    if (max_size == 0 || !output_buffer) {
         return -1;
     }
 
-    int inode_idx = find_inode_by_name(filename, NULL, NULL, NULL);
-    if (inode_idx < 0) {
-        log("vfs: file not found.");
-        return -1;
-    }
-
-    uint32_t buffer_size = (uint32_t)sizeof(output_u8);
-    int bytes_read = sfs_read(inode_idx, output_u8, buffer_size);
+    uint8_t raw_buffer[4096];
+    int bytes_read = exfat_read_file(filename, raw_buffer, sizeof(raw_buffer));
     if (bytes_read < 0) {
-        log("vfs: error during reading file.");
+        dogeio_text_println("vfs: file not found or read error.");
         return -1;
     }
 
@@ -81,7 +64,7 @@ int fs_read(char* filename, char* output_buffer, uint32_t max_size) {
 
     uint32_t out_index = 0;
     for (uint32_t i = 0; i < copy_size; i++) {
-        char c = (char)output_u8[i];
+        char c = (char)raw_buffer[i];
         if (c == '\n') {
             output_buffer[out_index++] = '\0';
         } else {
@@ -95,56 +78,40 @@ int fs_read(char* filename, char* output_buffer, uint32_t max_size) {
 
 int fs_write(char* filename, char* input_buffer) {
     if (!filename || filename[0] == '\0') {
-        log("vfs: invalid filename for write.");
+        dogeio_text_println("vfs: invalid filename for write.");
         return -1;
     }
 
     if (!input_buffer || input_buffer[0] == '\0') {
-        log("vfs: invalid input buffer for write.");
+        dogeio_text_println("vfs: invalid input buffer for write.");
         return -1;
     }
 
-    int inode_idx = find_inode_by_name(filename, NULL, NULL, NULL);
-    if (inode_idx < 0) {
-        log("vfs: file not found for write.");
+    if (!fs_exists(filename)) {
+        dogeio_text_println("vfs: file not found for write.");
         return -2;
     }
 
     uint8_t input_u8[512];
-    size_t input_length = 0;
-    while (input_buffer[input_length] != '\0' && input_length < sizeof(input_u8) - 2) {
-        input_length++;
+    size_t input_length = strlen(input_buffer);
+    if (input_length > sizeof(input_u8) - 2) {
+        input_length = sizeof(input_u8) - 2;
     }
 
-    for (size_t i = 0; i < input_length; i++) {
-        input_u8[i] = str_chartou8(input_buffer[i]);
-    }
-    
-    input_u8[input_length] = str_chartou8('\n');
+    memcpy(input_u8, input_buffer, input_length);
+    input_u8[input_length] = '\n';
     size_t write_length = input_length + 1;
 
-    int append_result = sfs_append(filename, input_u8, (uint32_t)write_length);
+    int append_result = exfat_append_file(filename, input_u8, (uint64_t)write_length);
     if (append_result == 0) {
         return 0;
     }
-    if (append_result < 0) {
-        return -1;
-    }
-    
-    return 1;
-}
-
-
-int fs_exists(char* filename) {
-    if (!filename || filename[0] == '\0') {
-        return 0;
-    }
-
-    return find_inode_by_name(filename, NULL, NULL, NULL) >= 0 ? 1 : 0;
+    return -1;
 }
 
 int fs_list_dir(int hidden) {
-    return sfs_list_directory(hidden);
+    (void)hidden;
+    return exfat_print_directory();
 }
 
 int fs_rename(char* filename, char* newname) {
@@ -168,21 +135,15 @@ int fs_rename(char* filename, char* newname) {
         return 0;
     }
 
-    uint8_t raw_buffer[DIRECT_POINTERS * BLOCK_SIZE];
-    int inode_idx = find_inode_by_name(filename, NULL, NULL, NULL);
-    if (inode_idx < 0) {
-        dogeio_text_println("Error: unable to locate source file.");
-        return 0;
-    }
-
-    int bytes_read = sfs_read(inode_idx, raw_buffer, sizeof(raw_buffer));
+    uint8_t raw_buffer[4096];
+    int bytes_read = exfat_read_file(filename, raw_buffer, sizeof(raw_buffer));
     if (bytes_read < 0) {
         dogeio_text_println("Error: unable to read source file.");
         return 0;
     }
 
-    int write_result = sfs_write(newname, raw_buffer, (uint32_t)bytes_read);
-    if (write_result != 1) {
+    int write_result = exfat_write_file(newname, raw_buffer, (uint64_t)bytes_read);
+    if (write_result != 0) {
         dogeio_text_println("Error: unable to write renamed file.");
         return 0;
     }
@@ -195,17 +156,10 @@ int fs_rename(char* filename, char* newname) {
 }
 
 void fs_copy(char* source, char* dest) {
-    uint8_t raw_buffer[DIRECT_POINTERS * BLOCK_SIZE];
-    
-    int inode_idx = find_inode_by_name(source, NULL, NULL, NULL);
-    if (inode_idx < 0) {
-        log("vfs: copy source file not found.");
-        return;
-    }
-
-    int bytes_read = sfs_read(inode_idx, raw_buffer, sizeof(raw_buffer));
+    uint8_t raw_buffer[4096];
+    int bytes_read = exfat_read_file(source, raw_buffer, sizeof(raw_buffer));
     if (bytes_read < 0) {
-        log("vfs: error reading source for copy.");
+        dogeio_text_println("vfs: copy source file not found or unreadable.");
         return;
     }
 
@@ -214,13 +168,13 @@ void fs_copy(char* source, char* dest) {
     }
     fs_create(dest);
 
-    sfs_write(dest, raw_buffer, (uint32_t)bytes_read);
+    exfat_write_file(dest, raw_buffer, (uint64_t)bytes_read);
 }
 
 int fs_chdir(char* folder) {
-    return sfs_chdir(folder);
+    return exfat_change_directory(folder);
 }
 
 char* fs_dirname(void) {
-    return sfs_get_current_directory_name();
+    return (char*)exfat_get_working_dir();
 }
