@@ -65,7 +65,7 @@ void kernel_main(void) {
     const char* starting[6] = {
 		"================================================================================================================================================================",
 		"=                                                                                                                                                              =",
-		"=                                                              Welcome to WindogeOS v0.0.5-Build2!                                                             =",
+		"=                                                              Welcome to WindogeOS v0.0.5-Build3!                                                             =",
 		"=                                                          Type 'help' for more help in the dogeshell                                                          =",
 		"=                                                                                                                                                              =",
 		"================================================================================================================================================================"
@@ -78,11 +78,15 @@ void kernel_main(void) {
     // testing image generation
     char *filename = "image.tga";
 
-    sfs_create(filename, 0);
-    uint8_t blue_pixel[3] = {0, 0, 255};
+    if (fs_exists(filename)) {
+        fs_delete(filename);
+    }
+    fs_create(filename);
+
+    char blue_pixel[4] = {1, 1, (char)255, '\0'};
 
     for (int i = 0; i < 6400; i++) {
-        sfs_append(filename, blue_pixel, 3);
+        fs_write(filename, blue_pixel);
     }
 
     log("Starting Dogeshell");

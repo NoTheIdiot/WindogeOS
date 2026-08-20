@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stddef.h>
-#include <stdbool.h>
+#include <bool.h>
 
 int fs_format(void) {
     return exfat_wipe_and_format();
@@ -93,7 +93,7 @@ int fs_write(char* filename, char* input_buffer) {
     }
 
     uint8_t input_u8[512];
-    size_t input_length = strlen(input_buffer);
+    size_t input_length = str_strlen(input_buffer);
     if (input_length > sizeof(input_u8) - 2) {
         input_length = sizeof(input_u8) - 2;
     }

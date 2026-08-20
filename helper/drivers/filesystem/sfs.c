@@ -100,18 +100,38 @@ static const uint8_t exfat_upcase_default[128] = {
     0x61, 0x00, 0x00, 0x00, 0x1A, 0x00, 0x41, 0x00
 };
 
+static void exfat_strcat(char *dest, const char *src) {
+    while (*dest) dest++;
+    while ((*dest++ = *src++));
+}
+
+static void exfat_num_to_str(uint32_t num, char *out) {
+    if (num == 0) { out[0] = '0'; out[1] = '\0'; return; }
+    char tmp[16]; int i = 0;
+    while (num > 0) { tmp[i++] = '0' + (num % 10); num /= 10; }
+    int j = 0;
+    while (i > 0) { out[j++] = tmp[--i]; }
+    out[j] = '\0';
+}
+
 static inline int exfat_hw_ready(void) {
     for (volatile int i = 0; i < 4; i++) ports_inb(ATA_STATUS);
     uint8_t status;
     do {
         status = ports_inb(ATA_STATUS);
-        if (status & 0x21) return -1;
+        if (status & 0x21) {
+            log("fs (err) ATA status hardware fault!");
+            return -1;
+        }
     } while ((status & 0x80) || !(status & 0x08));
     return 0;
 }
 
 static int exfat_sector_read(uint64_t lba, uint8_t *buffer) {
-    if (lba > 0x0FFFFFFF) return -1;
+    if (lba > 0x0FFFFFFF) {
+        log("fs (err) Read LBA out of 28-bit bounds");
+        return -1;
+    }
 
     ports_outb(ATA_DRIVE_HEAD, 0xE0 | ((lba >> 24) & 0x0F));
     for (volatile int i = 0; i < 4; i++) ports_inb(ATA_STATUS);
@@ -130,7 +150,10 @@ static int exfat_sector_read(uint64_t lba, uint8_t *buffer) {
 }
 
 static int exfat_sector_write(uint64_t lba, const uint8_t *buffer) {
-    if (lba > 0x0FFFFFFF) return -1;
+    if (lba > 0x0FFFFFFF) {
+        log("fs (err) Write LBA out of 28-bit bounds");
+        return -1;
+    }
 
     ports_outb(ATA_DRIVE_HEAD, 0xE0 | ((lba >> 24) & 0x0F));
     for (volatile int i = 0; i < 4; i++) ports_inb(ATA_STATUS);
@@ -153,7 +176,10 @@ static int exfat_sector_write(uint64_t lba, const uint8_t *buffer) {
     uint8_t status;
     do {
         status = ports_inb(ATA_STATUS);
-        if (status & 0x21) return -1;
+        if (status & 0x21) {
+            log("fs (err) Cache flush failed after write");
+            return -1;
+        }
     } while (status & 0x80);
 
     return 0;
@@ -192,41 +218,77 @@ static uint16_t exfat_calc_name_hash(const uint16_t *name, uint8_t len) {
     return hash;
 }
 
-static uint32_t exfat_alloc_block(void) {
+static uint32_t exfat_alloc_blocks(uint32_t count) {
+    if (count == 0) return 0;
     uint8_t sector[512];
-    uint64_t bitmap_lba = exfat_cluster_lba(2);
+    uint64_t bitmap_base_lba = exfat_cluster_lba(2);
+    uint32_t total_clusters = (EXFAT_TOTAL_SECTORS - 2048) / 8;
+    uint32_t bitmap_sectors = (total_clusters + 4095) / 4096;
 
-    if (exfat_sector_read(bitmap_lba, sector) != 0) return 0;
+    uint32_t consecutive = 0;
+    uint32_t start_cluster = 0;
 
-    for (int i = 0; i < 512; i++) {
-        if (sector[i] != 0xFF) {
-            for (int bit = 0; bit < 8; bit++) {
-                if (!(sector[i] & (1 << bit))) {
-                    sector[i] |= (1 << bit);
-                    exfat_sector_write(bitmap_lba, sector);
-                    return (i * 8) + bit + 2;
+    for (uint32_t s = 0; s < bitmap_sectors; s++) {
+        if (exfat_sector_read(bitmap_base_lba + s, sector) != 0) {
+            log("fs (err) alloc_blocks failed reading bitmap sector");
+            return 0;
+        }
+
+        for (uint32_t bit = 0; bit < 4096; bit++) {
+            uint32_t current_idx = s * 4096 + bit;
+            if (current_idx >= total_clusters) break;
+
+            uint32_t byte_idx = bit / 8;
+            uint8_t bit_idx = bit % 8;
+
+            if (!(sector[byte_idx] & (1 << bit_idx))) {
+                if (consecutive == 0) start_cluster = current_idx;
+                consecutive++;
+                if (consecutive == count) {
+                    for (uint32_t i = start_cluster; i < start_cluster + count; i++) {
+                        uint32_t target_sec = i / 4096;
+                        uint32_t target_bit = i % 4096;
+
+                        uint8_t sec_buf[512];
+                        if (exfat_sector_read(bitmap_base_lba + target_sec, sec_buf) != 0) return 0;
+
+                        sec_buf[target_bit / 8] |= (1 << (target_bit % 8));
+                        if (exfat_sector_write(bitmap_base_lba + target_sec, sec_buf) != 0) return 0;
+                    }
+                    return start_cluster + 2;
                 }
+            } else {
+                consecutive = 0;
             }
         }
     }
+    log("fs (err) Bitmap full or no contiguous space large enough");
     return 0;
 }
 
-static void exfat_free_block(uint32_t cluster) {
-    if (cluster < 2) return;
-    uint8_t sector[512];
-    uint64_t bitmap_lba = exfat_cluster_lba(2);
+static uint32_t exfat_alloc_block(void) {
+    return exfat_alloc_blocks(1);
+}
 
-    if (exfat_sector_read(bitmap_lba, sector) != 0) return;
+static void exfat_free_blocks(uint32_t cluster, uint32_t count) {
+    if (cluster < 2 || count == 0) return;
+    uint64_t bitmap_base_lba = exfat_cluster_lba(2);
 
-    uint32_t index = cluster - 2;
-    uint32_t byte_pos = index / 8;
-    uint8_t bit_pos = index % 8;
+    uint32_t start_idx = cluster - 2;
+    for (uint32_t i = start_idx; i < start_idx + count; i++) {
+        uint32_t sec_idx = i / 4096;
+        uint32_t bit_idx = i % 4096;
 
-    if (byte_pos < 512) {
-        sector[byte_pos] &= ~(1 << bit_pos);
-        exfat_sector_write(bitmap_lba, sector);
+        uint8_t sector[512];
+        if (exfat_sector_read(bitmap_base_lba + sec_idx, sector) == 0) {
+            sector[bit_idx / 8] &= ~(1 << (bit_idx % 8));
+            exfat_sector_write(bitmap_base_lba + sec_idx, sector);
+        }
     }
+}
+
+static void exfat_free_block(uint32_t cluster) {
+    exfat_free_blocks(cluster, 1);
 }
 
 static int exfat_resolve_entry(const char *target_name, exfat_target_t *out) {
@@ -260,7 +322,7 @@ static int exfat_resolve_entry(const char *target_name, exfat_target_t *out) {
                 if (str_strcmp(name_buf, target_name) == 0) {
                     if (out) {
                         out->entry_lba = base_lba + s;
-                        out->entry_offset = i;
+                        out->entry_offset = (uint64_t)i;
                         out->cluster = stream->first_cluster;
                         out->size = stream->data_length;
                         out->is_dir = (file->file_attributes & 0x10) != 0;
@@ -274,16 +336,8 @@ static int exfat_resolve_entry(const char *target_name, exfat_target_t *out) {
     return -1;
 }
 
-static void exfat_num_to_str(uint32_t num, char *out) {
-    if (num == 0) { out[0] = '0'; out[1] = '\0'; return; }
-    char tmp[16]; int i = 0;
-    while (num > 0) { tmp[i++] = '0' + (num % 10); num /= 10; }
-    int j = 0;
-    while (i > 0) { out[j++] = tmp[--i]; }
-    out[j] = '\0';
-}
-
 int exfat_wipe_and_format(void) {
+    log("fs (log) Formatting volume...");
     uint8_t sector[512];
     memset(sector, 0, 512);
 
@@ -310,14 +364,14 @@ int exfat_wipe_and_format(void) {
     vbr->boot_signature = 0xAA55;
 
     uint32_t crc = exfat_calc_boot_crc(sector, 512, 0, true);
-    exfat_sector_write(EXFAT_PARTITION_LBA + 0, sector);
+    if (exfat_sector_write(EXFAT_PARTITION_LBA + 0, sector) != 0) return -1;
     exfat_sector_write(EXFAT_PARTITION_LBA + 12, sector);
 
     uint8_t zero_sector[512] = {0};
     for (int i = 1; i <= 10; i++) {
         crc = exfat_calc_boot_crc(zero_sector, 512, crc, false);
-        exfat_sector_write(EXFAT_PARTITION_LBA + i, zero_sector);
-        exfat_sector_write(EXFAT_PARTITION_LBA + 12 + i, zero_sector);
+        exfat_sector_write(EXFAT_PARTITION_LBA + (uint64_t)i, zero_sector);
+        exfat_sector_write(EXFAT_PARTITION_LBA + (uint64_t)12 + (uint64_t)i, zero_sector);
     }
 
     uint32_t crc_table[128];
@@ -352,6 +406,7 @@ int exfat_wipe_and_format(void) {
 
     g_current_cluster = 4;
     str_strcpy(g_current_path, "/");
+    log("fs (log) Format complete.");
     return 0;
 }
 
@@ -403,23 +458,34 @@ int exfat_write_file(const char *name, const uint8_t *data, uint64_t count) {
     exfat_target_t target;
     if (exfat_resolve_entry(name, &target) != 0) return -1;
 
+    uint32_t old_clusters = (target.size == 0) ? 1 : (uint32_t)((target.size + 4095) / 4096);
+    uint32_t new_clusters = (count == 0) ? 1 : (uint32_t)((count + 4095) / 4096);
+    uint32_t active_cluster = target.cluster;
+
+    if (new_clusters != old_clusters) {
+        uint32_t allocated = exfat_alloc_blocks(new_clusters);
+        if (allocated == 0) return -1;
+        exfat_free_blocks(target.cluster, old_clusters);
+        active_cluster = allocated;
+    }
+
     uint8_t sector[512];
-    uint64_t base_lba = exfat_cluster_lba(target.cluster);
-    uint32_t sectors_needed = (count + 511) / 512;
+    uint64_t base_lba = exfat_cluster_lba(active_cluster);
+    uint64_t sectors_needed = (count + 511) / 512;
 
-    if (sectors_needed > 8) return -1;
-
-    for (uint32_t i = 0; i < sectors_needed; i++) {
+    for (uint64_t i = 0; i < sectors_needed; i++) {
         memset(sector, 0, 512);
-        uint32_t chunk = (count - (i * 512) > 512) ? 512 : (uint32_t)(count - (i * 512));
+        uint64_t chunk = (count - (i * 512) > 512) ? 512 : (count - (i * 512));
         memcpy(sector, data + (i * 512), chunk);
         if (exfat_sector_write(base_lba + i, sector) != 0) return -1;
     }
 
     if (exfat_sector_read(target.entry_lba, sector) != 0) return -1;
+
     exfat_dentry_file_t *file = (exfat_dentry_file_t *)&sector[target.entry_offset];
     exfat_dentry_stream_t *stream = (exfat_dentry_stream_t *)&sector[target.entry_offset + 32];
 
+    stream->first_cluster = active_cluster;
     stream->data_length = count;
     stream->valid_data_length = count;
     file->set_checksum = exfat_calc_entry_crc(&sector[target.entry_offset], file->secondary_count + 1);
@@ -430,18 +496,69 @@ int exfat_write_file(const char *name, const uint8_t *data, uint64_t count) {
 int exfat_append_file(const char *name, const uint8_t *data, uint64_t count) {
     exfat_target_t target;
     if (exfat_resolve_entry(name, &target) != 0) return -1;
-    if (target.size + count > 4096) return -1;
+    if (count == 0) return 0;
 
-    uint8_t buffer[4096];
-    uint64_t base_lba = exfat_cluster_lba(target.cluster);
+    uint64_t new_total = target.size + count;
+    uint32_t old_clusters = (target.size == 0) ? 1 : (uint32_t)((target.size + 4095) / 4096);
+    uint32_t new_clusters = (uint32_t)((new_total + 4095) / 4096);
+    uint32_t active_cluster = target.cluster;
 
-    uint32_t existing = (target.size + 511) / 512;
-    for (uint32_t i = 0; i < existing; i++) {
-        exfat_sector_read(base_lba + i, buffer + (i * 512));
+    if (new_clusters > old_clusters) {
+        uint32_t allocated = exfat_alloc_blocks(new_clusters);
+        if (allocated == 0) return -1;
+
+        uint8_t temp[512];
+        uint64_t old_lba = exfat_cluster_lba(target.cluster);
+        uint64_t new_lba = exfat_cluster_lba(allocated);
+        uint64_t old_sectors = (target.size + 511) / 512;
+
+        for (uint64_t s = 0; s < old_sectors; s++) {
+            if (exfat_sector_read(old_lba + s, temp) != 0 ||
+                exfat_sector_write(new_lba + s, temp) != 0) return -1;
+        }
+
+        exfat_free_blocks(target.cluster, old_clusters);
+        active_cluster = allocated;
     }
 
-    memcpy(buffer + target.size, data, count);
-    return exfat_write_file(name, buffer, target.size + count);
+    uint64_t start_lba = exfat_cluster_lba(active_cluster);
+    uint64_t current_offset = target.size;
+    uint64_t remaining = count;
+    const uint8_t *src = data;
+
+    while (remaining > 0) {
+        uint64_t sec_index = current_offset / 512;
+        uint32_t sec_offset = (uint32_t)(current_offset % 512);
+        uint32_t write_len = 512 - sec_offset;
+        if (write_len > remaining) write_len = (uint32_t)remaining;
+
+        uint8_t temp[512];
+        memset(temp, 0, 512);
+
+        if (sec_offset > 0) {
+            if (exfat_sector_read(start_lba + sec_index, temp) != 0) return -1;
+        }
+
+        memcpy(temp + sec_offset, src, write_len);
+        if (exfat_sector_write(start_lba + sec_index, temp) != 0) return -1;
+
+        current_offset += write_len;
+        src += write_len;
+        remaining -= write_len;
+    }
+
+    uint8_t sector[512];
+    if (exfat_sector_read(target.entry_lba, sector) != 0) return -1;
+
+    exfat_dentry_file_t *file = (exfat_dentry_file_t *)&sector[target.entry_offset];
+    exfat_dentry_stream_t *stream = (exfat_dentry_stream_t *)&sector[target.entry_offset + 32];
+
+    stream->first_cluster = active_cluster;
+    stream->data_length = new_total;
+    stream->valid_data_length = new_total;
+    file->set_checksum = exfat_calc_entry_crc(&sector[target.entry_offset], file->secondary_count + 1);
+
+    return exfat_sector_write(target.entry_lba, sector);
 }
 
 int exfat_read_file(const char *name, uint8_t *out_buf, uint64_t max_bytes) {
@@ -454,14 +571,23 @@ int exfat_read_file(const char *name, uint8_t *out_buf, uint64_t max_bytes) {
 
     uint8_t *dst = out_buf;
     uint64_t left = bytes_to_read;
+    uint64_t sector_idx = 0;
 
-    for (uint32_t s = 0; s < 8 && left > 0; s++) {
-        if (exfat_sector_read(base_lba + s, sector) != 0) return -1;
+    while (left > 0) {
+        if (exfat_sector_read(base_lba + sector_idx, sector) != 0) return -1;
         uint32_t chunk = (left > 512) ? 512 : (uint32_t)left;
         memcpy(dst, sector, chunk);
         dst += chunk;
         left -= chunk;
+        sector_idx++;
     }
+
+    char numbuf[16];
+    exfat_num_to_str((uint32_t)bytes_to_read, numbuf);
+    char log_buf[64] = "fs (log) Read ";
+    exfat_strcat(log_buf, numbuf);
+    exfat_strcat(log_buf, " bytes successfully");
+    log(log_buf);
 
     return (int)bytes_to_read;
 }
@@ -470,7 +596,8 @@ int exfat_delete_node(const char *name) {
     exfat_target_t target;
     if (exfat_resolve_entry(name, &target) != 0) return -1;
 
-    exfat_free_block(target.cluster);
+    uint32_t clusters = (target.size == 0) ? 1 : (uint32_t)((target.size + 4095) / 4096);
+    exfat_free_blocks(target.cluster, clusters);
 
     uint8_t sector[512];
     if (exfat_sector_read(target.entry_lba, sector) != 0) return -1;
@@ -489,25 +616,40 @@ int exfat_truncate_last_line(const char *name) {
     exfat_target_t target;
     if (exfat_resolve_entry(name, &target) != 0 || target.size == 0) return -1;
 
-    uint8_t buffer[4096];
+    uint64_t last_sector_index = (target.size - 1) / 512;
     uint64_t base_lba = exfat_cluster_lba(target.cluster);
+    uint8_t sector[512];
 
-    uint32_t sectors = (target.size + 511) / 512;
-    for (uint32_t i = 0; i < sectors; i++) {
-        exfat_sector_read(base_lba + i, buffer + (i * 512));
+    if (exfat_sector_read(base_lba + last_sector_index, sector) != 0) return -1;
+
+    uint32_t tail_offset = (uint32_t)((target.size - 1) % 512);
+    int64_t remove_count = 0;
+
+    if (sector[tail_offset] == '\n') {
+        remove_count++;
+        if (tail_offset > 0 && sector[tail_offset - 1] != '\n') {
+            tail_offset--;
+        }
     }
 
-    int64_t new_len = target.size - 1;
-    if (buffer[new_len] == '\n') new_len--;
-
-    while (new_len >= 0 && buffer[new_len] != '\n') {
-        new_len--;
+    while (tail_offset >= 0 && sector[tail_offset] != '\n') {
+        remove_count++;
+        if (tail_offset == 0) break;
+        tail_offset--;
     }
 
-    new_len++;
-    if (new_len < 0) new_len = 0;
+    uint64_t new_len = (target.size > (uint64_t)remove_count) ? target.size - (uint64_t)remove_count : 0;
 
-    return exfat_write_file(name, buffer, (uint64_t)new_len);
+    if (exfat_sector_read(target.entry_lba, sector) != 0) return -1;
+
+    exfat_dentry_file_t *file = (exfat_dentry_file_t *)&sector[target.entry_offset];
+    exfat_dentry_stream_t *stream = (exfat_dentry_stream_t *)&sector[target.entry_offset + 32];
+
+    stream->data_length = new_len;
+    stream->valid_data_length = new_len;
+    file->set_checksum = exfat_calc_entry_crc(&sector[target.entry_offset], file->secondary_count + 1);
+
+    return exfat_sector_write(target.entry_lba, sector);
 }
 
 int exfat_print_directory(void) {
@@ -539,13 +681,13 @@ int exfat_print_directory(void) {
                 }
 
                 if (file->file_attributes & 0x10) {
-                    dogeio_text_print("[DIR]  ");
+                    dogeio_text_print("DIR  ");
                     dogeio_text_println(name_buf);
                 } else {
                     char size_str[16];
                     exfat_num_to_str((uint32_t)stream->data_length, size_str);
 
-                    dogeio_text_print("[FILE] ");
+                    dogeio_text_print("FILE ");
                     dogeio_text_print(name_buf);
                     dogeio_text_print(" (");
                     dogeio_text_print(size_str);
@@ -560,7 +702,7 @@ int exfat_print_directory(void) {
 }
 
 int exfat_change_directory(const char *path) {
-    if (strcmp(path, "/") == 0 || strcmp(path, "..") == 0) {
+    if (str_strcmp(path, "/") == 0 || str_strcmp(path, "..") == 0) {
         g_current_cluster = 4;
         str_strcpy(g_current_path, "/");
         return 0;
