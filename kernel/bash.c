@@ -275,7 +275,7 @@ int system_bash_ex(char* command) {
                 if (!fs_exists(filename)) {
                     fs_create(filename);
                 }
-                editor(filename);
+                system_editor(filename);
             }
         }
         handled = 0;

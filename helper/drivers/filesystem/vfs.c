@@ -6,6 +6,8 @@
 #include <stddef.h>
 #include <bool.h>
 
+extern int exfat_resolve_entry(const char *target_name, void *out);
+
 int fs_format(void) {
     return exfat_wipe_and_format();
 }
@@ -19,11 +21,8 @@ int fs_mkdir(char* foldername) {
 }
 
 int fs_exists(char* filename) {
-    if (!filename || filename[0] == '\0') {
-        return 0;
-    }
-    uint8_t dummy[1];
-    return exfat_read_file(filename, dummy, 0) >= 0 ? 1 : 0;
+    if (!filename || filename[0] == '\0') return 0;
+    return (exfat_resolve_entry(filename, NULL) == 0) ? 1 : 0;
 }
 
 int fs_delete(char* filename) {
@@ -46,26 +45,19 @@ int fs_delete_last_line(char* filename) {
 }
 
 int fs_read(char* filename, char* output_buffer, uint32_t max_size) {
-    if (max_size == 0 || !output_buffer) {
-        return -1;
-    }
+    if (!output_buffer) return -1;
 
     if (!fs_exists(filename)) {
         dogeio_text_println("vfs: file not found or read error.");
         return -1;
     }
 
-    return exfat_read_file(filename, (uint8_t*)output_buffer, max_size);
+    return (int)exfat_read_file(filename, (uint8_t*)output_buffer, max_size);
 }
 
 int fs_write_bytes(char* filename, char* input_buffer, uint32_t size) {
     if (!filename || filename[0] == '\0') {
         dogeio_text_println("vfs: invalid filename for write.");
-        return -1;
-    }
-
-    if (!input_buffer || size == 0) {
-        dogeio_text_println("vfs: invalid input buffer for write.");
         return -1;
     }
 
@@ -102,34 +94,14 @@ int fs_rename(char* filename, char* newname) {
         return 0;
     }
 
-    if (fs_create(newname) < 0) {
-        dogeio_text_println("Error: unable to create target file.");
-        return 0;
-    }
-
-    uint8_t raw_buffer[4096];
-    int bytes_read = exfat_read_file(filename, raw_buffer, sizeof(raw_buffer));
-    if (bytes_read < 0) {
-        dogeio_text_println("Error: unable to read source file.");
-        return 0;
-    }
-
-    int write_result = exfat_write_file(newname, raw_buffer, (uint64_t)bytes_read);
-    if (write_result != 0) {
-        dogeio_text_println("Error: unable to write renamed file.");
-        return 0;
-    }
-
-    if (!fs_delete(filename)) {
-        dogeio_text_println("Warning: source file still exists after rename.");
-    }
-
+    fs_copy(filename, newname);
+    fs_delete(filename);
     return 1;
 }
 
 void fs_copy(char* source, char* dest) {
-    uint8_t raw_buffer[4096];
-    int bytes_read = exfat_read_file(source, raw_buffer, sizeof(raw_buffer));
+    static uint8_t raw_buffer[8192];
+    int64_t bytes_read = exfat_read_file(source, raw_buffer, sizeof(raw_buffer) - 1);
     if (bytes_read < 0) {
         dogeio_text_println("vfs: copy source file not found or unreadable.");
         return;

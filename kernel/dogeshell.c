@@ -260,7 +260,7 @@ int system_dogeshell_ex(char* command) {
         if (result == -2) {
             dogeio_text_println("Error: File does not exist.");
         } else if (result == -1) {
-            dogeio_text_println("Doge Sad: Something went wrong!");
+            dogeio_text_println("Something bad: Something went wrong");
         } else if (result != 0) {
             dogeio_text_println("Not Wow: File Not Found.");
         }
@@ -301,7 +301,7 @@ int system_dogeshell_ex(char* command) {
             if (!fs_exists(filename)) {
                 fs_create(filename);
             }
-            editor(filename);
+            system_editor(filename);
         }
         handled = 0;
     }
