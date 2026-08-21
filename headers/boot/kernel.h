@@ -33,7 +33,7 @@ int         exfat_append_file(const char *name, const uint8_t *data, uint64_t co
 int         exfat_read_file(const char *name, uint8_t *out_buf, uint64_t max_bytes);
 int         exfat_delete_node(const char *name);
 int         exfat_truncate_last_line(const char *name);
-int         exfat_print_directory(void);
+int         exfat_print_directory(int hidden);
 int         exfat_change_directory(const char *path);
 const char* exfat_get_working_dir(void);
 

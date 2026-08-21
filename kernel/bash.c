@@ -6,18 +6,15 @@
 #include <time.h>
 #include <system.h>
 
-char history[32][64];
-
 static void append_history(const char* command) {
     if (!command || command[0] == '\0') {
         return;
     }
 
-    int result = fs_write(".history", (char *)command);
-    if (result == -2) {
+    if (!fs_exists(".history")) {
         fs_create(".history");
-        fs_write(".history", (char *)command);
     }
+    fs_write(".history", (char *)command);
 }
 
 int system_bash_ex(char* command) {
@@ -42,18 +39,26 @@ int system_bash_ex(char* command) {
         handled = 0;
     }
 
-    else if (str_startswith(command, "cd")) {
-        int result = fs_chdir(command + 3);
-        if (result == -2) {
-            dogeio_text_println("Much Error: Not a Folder.");
-        } else if (result == -1) {
-            dogeio_text_println("Such Error: Folder not existing :(");
+    else if (str_strcmp(command, "cd") == 0 || str_startswith(command, "cd ")) {
+        if (str_strlen(command) <= 3) {
+            dogeio_text_println("Much Error: No folder specified.");
+        } else {
+            int result = fs_chdir(command + 3);
+            if (result == -2) {
+                dogeio_text_println("Much Error: Not a Folder.");
+            } else if (result == -1) {
+                dogeio_text_println("Such Error: Folder not existing :(");
+            }
         }
         handled = 0;
     }
 
-    else if (str_startswith(command, "mkdir")) {
-        fs_mkdir(command + 6);
+    else if (str_strcmp(command, "mkdir") == 0 || str_startswith(command, "mkdir ")) {
+        if (str_strlen(command) <= 6) {
+            dogeio_text_println("Error: No directory name specified.");
+        } else {
+            fs_mkdir(command + 6);
+        }
         handled = 0;
     }
 
@@ -62,13 +67,18 @@ int system_bash_ex(char* command) {
         handled = 0;
     }
 
+    else if (str_strcmp(command, "ls -a") == 0 || str_strcmp(command, "ls -all") == 0) {
+        fs_list_dir(1);
+        handled = 0;
+    }
+
     else if (str_startswith(command, "date")) {
         dogeio_text_println(time_get());
         handled = 0;
     }
 
-	else if (str_startswith(command, "color")) {
-        const char *arg = command + 6;
+    else if (str_startswith(command, "color")) {
+        const char *arg = (str_strlen(command) >= 6) ? command + 6 : "";
         if (str_strcmp(arg, "black") == 0) {
             dogeio_text_color = 0xFF000000;
             dogeio_text_clear();
@@ -126,21 +136,20 @@ int system_bash_ex(char* command) {
         handled = 0;
     }
 
-    else if (str_startswith(command, "cat")) {
-        char* filename = command + 4;
-        static char output_buffer[8192];
-
-        int bytes_read = fs_read(filename, output_buffer, sizeof(output_buffer));
-        if (bytes_read < 0) {
-            dogeio_text_println("Error: unable to read file.");
+    else if (str_strcmp(command, "cat") == 0 || str_startswith(command, "cat ")) {
+        if (str_strlen(command) <= 4) {
+            dogeio_text_println("Error: No filename specified.");
         } else {
-            char *line = output_buffer;
-            size_t processed = 0;
-            while ((int)processed < bytes_read) {
-                dogeio_text_println(line);
-                size_t line_len = str_strlen(line);
-                processed += line_len + 1;
-                line += line_len + 1;
+            char* filename = command + 4;
+            static char output_buffer[8192];
+
+            int bytes_read = fs_read(filename, output_buffer, sizeof(output_buffer) - 1);
+            if (bytes_read < 0) {
+                dogeio_text_println("Error: unable to read file.");
+            } else {
+                output_buffer[bytes_read] = '\0';
+                dogeio_text_print(output_buffer);
+                dogeio_text_println("");
             }
         }
         handled = 0;
@@ -177,92 +186,97 @@ int system_bash_ex(char* command) {
         handled = 0;
     }
 
-    else if (str_startswith(command, "sed")) {
-        char* filename = command + 4;
-        static char text[256];
-        
-        dogeio_text_input("text> ", text, 256);
-        
-        int result = fs_write(filename, text);
-        if (result == 1) {
-            dogeio_text_println("write ok");
-        } else if (result == 0) {
-            dogeio_text_println("Error: disk full.");
-        } else if (result == -2) {
-            dogeio_text_println("Error: file not found.");
+    else if (str_strcmp(command, "sed") == 0 || str_startswith(command, "sed ")) {
+        if (str_strlen(command) <= 4) {
+            dogeio_text_println("Error: No filename specified.");
         } else {
-            dogeio_text_println("Not Wow: Something went wrong.");
+            char* filename = command + 4;
+            static char text[256];
+            
+            dogeio_text_input("text> ", text, 256);
+            
+            int result = fs_write(filename, text);
+            if (result == 0) {
+                dogeio_text_println("write ok");
+            } else if (result == -2) {
+                dogeio_text_println("Error: file not found.");
+            } else {
+                dogeio_text_println("Not Wow: Something went wrong.");
+            }
         }
         handled = 0;
     }
 
     else if (str_strcmp(command, "history") == 0) {
         static char output_buffer[8192];
-        int bytes_read = fs_read(".history", output_buffer, sizeof(output_buffer));
+        int bytes_read = fs_read(".history", output_buffer, sizeof(output_buffer) - 1);
         if (bytes_read < 0) {
             dogeio_text_println("No history available.");
         } else {
-            char *line = output_buffer;
-            size_t processed = 0;
-            while ((int)processed < bytes_read) {
-                dogeio_text_println(line);
-                size_t line_len = str_strlen(line);
-                processed += line_len + 1;
-                line += line_len + 1;
+            output_buffer[bytes_read] = '\0';
+            dogeio_text_print(output_buffer);
+            dogeio_text_println("");
+        }
+        handled = 0;
+    }
+
+    else if (str_strcmp(command, "touch") == 0 || str_startswith(command, "touch ")) {
+        if (str_strlen(command) <= 6) {
+            dogeio_text_println("Error: No filename specified.");
+        } else {
+            char* filename = command + 6;
+            int result = fs_create(filename);
+
+            if (result < 0) {
+                dogeio_text_println("Not Wow: Failed to create file.");
             }
         }
         handled = 0;
     }
 
-    else if (str_startswith(command, "touch")) {
-        char* filename = command + 6;
-		int result = fs_create(filename);
-
-        if (result) {
-            dogeio_text_println("Not Wow: Failed to create file.");
-            dogeio_text_println("File name potentially invalid: nothing cant be a filename.");
-        }
-        handled = 0;
-    }
-
-    else if (str_startswith(command, "rm ")) {
-        char* filename = command + 3;
-
-        int result = fs_delete(filename);
-        if (!result) {
-            dogeio_text_println("Not Wow: File Not Found.");
-        } else if (result == -1) {
-            dogeio_text_println("Doge Sad: Something went wrong!");
-        } else if (result == -2) {
-            dogeio_text_println("Error: File does not exist.");
-        }
-        handled = 0;
-    }
-
-	else if (str_strcmp(command, "shutdown") == 0) {
-		dogeio_text_clear_raw();
-		dogeio_text_println("Such shutdown, very goodbye.");
-		halt();
-		handled = 0;
-	}
-
-    else if (str_startswith(command, "edit")) {
-        char* filename = command + 5;
-
-        size_t len = str_strlen(filename);
-        while (len > 0 && (filename[len - 1] == '\n' || filename[len - 1] == '\r' || filename[len - 1] == ' ')) {
-            filename[len - 1] = '\0';
-            len--;
-        }
-
-        if (fs_exists(filename)) {
-            fs_create(filename);
-        }
-
-        if (str_strlen(filename) == 0) {
+    else if (str_strcmp(command, "rm") == 0 || str_startswith(command, "rm ")) {
+        if (str_strlen(command) <= 3) {
             dogeio_text_println("Error: No filename specified.");
         } else {
-            editor(filename);
+            char* filename = command + 3;
+
+            int result = fs_delete(filename);
+            if (!result) {
+                dogeio_text_println("Not Wow: File Not Found.");
+            } else if (result == -1) {
+                dogeio_text_println("Doge Sad: Something went wrong!");
+            }
+        }
+        handled = 0;
+    }
+
+    else if (str_strcmp(command, "shutdown") == 0) {
+        dogeio_text_clear_raw();
+        dogeio_text_println("Such shutdown, very goodbye.");
+        halt();
+        handled = 0;
+    }
+
+    else if (str_strcmp(command, "edit") == 0 || str_startswith(command, "edit ")) {
+        if (str_strlen(command) <= 5) {
+            dogeio_text_println("Error: No filename specified.");
+        } else {
+            char* filename = command + 5;
+
+            size_t len = str_strlen(filename);
+            while (len > 0 && (filename[len - 1] == '\n' || filename[len - 1] == '\r' || filename[len - 1] == ' ')) {
+                filename[len - 1] = '\0';
+                len--;
+            }
+
+            if (str_strlen(filename) == 0) {
+                dogeio_text_println("Error: No filename specified.");
+            } else {
+                if (!fs_exists(filename)) {
+                    fs_create(filename);
+                }
+                editor(filename);
+            }
         }
         handled = 0;
     }
@@ -275,11 +289,11 @@ int system_bash_ex(char* command) {
     return handled;
 }
 
-void system_bash() {
+void system_bash(void) {
     char input[256];
 
-    if (!fs_exists("bash_history")) {
-        fs_create(".bash_history");
+    if (!fs_exists(".history")) {
+        fs_create(".history");
     }
 
     while (true) {
@@ -291,8 +305,7 @@ void system_bash() {
         dogeio_text_print("wow");
         dogeio_text_color_change(0x000000FF);
         dogeio_text_print(":");
-        char* dir;
-        dir = fs_dirname();
+        char* dir = fs_dirname();
 
         if (str_strcmp(dir, "root") == 0) {
             dir = "";

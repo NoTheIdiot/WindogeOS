@@ -100,11 +100,6 @@ static const uint8_t exfat_upcase_default[128] = {
     0x61, 0x00, 0x00, 0x00, 0x1A, 0x00, 0x41, 0x00
 };
 
-static void exfat_strcat(char *dest, const char *src) {
-    while (*dest) dest++;
-    while ((*dest++ = *src++));
-}
-
 static void exfat_num_to_str(uint32_t num, char *out) {
     if (num == 0) { out[0] = '0'; out[1] = '\0'; return; }
     char tmp[16]; int i = 0;
@@ -113,6 +108,10 @@ static void exfat_num_to_str(uint32_t num, char *out) {
     while (i > 0) { out[j++] = tmp[--i]; }
     out[j] = '\0';
 }
+
+// potentially unused
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-function"
 
 static inline int exfat_hw_ready(void) {
     for (volatile int i = 0; i < 4; i++) ports_inb(ATA_STATUS);
@@ -335,6 +334,7 @@ static int exfat_resolve_entry(const char *target_name, exfat_target_t *out) {
     }
     return -1;
 }
+#pragma clang diagnostic pop
 
 int exfat_wipe_and_format(void) {
     log("fs (log) Formatting volume...");
@@ -585,8 +585,8 @@ int exfat_read_file(const char *name, uint8_t *out_buf, uint64_t max_bytes) {
     char numbuf[16];
     exfat_num_to_str((uint32_t)bytes_to_read, numbuf);
     char log_buf[64] = "fs (log) Read ";
-    exfat_strcat(log_buf, numbuf);
-    exfat_strcat(log_buf, " bytes successfully");
+    str_strcat(log_buf, numbuf);
+    str_strcat(log_buf, " bytes successfully");
     log(log_buf);
 
     return (int)bytes_to_read;
@@ -652,10 +652,11 @@ int exfat_truncate_last_line(const char *name) {
     return exfat_sector_write(target.entry_lba, sector);
 }
 
-int exfat_print_directory(void) {
+int exfat_print_directory(int hidden) {
     uint8_t sector[512];
     uint64_t base_lba = exfat_cluster_lba(g_current_cluster);
 
+    dogeio_text_println("-------- In Current Folder --------");
     for (uint32_t s = 0; s < 8; s++) {
         if (exfat_sector_read(base_lba + s, sector) != 0) return -1;
 
@@ -680,18 +681,25 @@ int exfat_print_directory(void) {
                     }
                 }
 
+                if (!hidden && (name_buf[0] == '.' || (file->file_attributes & 0x02))) {
+                    i += file->secondary_count * 32;
+                    continue;
+                }
+
                 if (file->file_attributes & 0x10) {
                     dogeio_text_print("DIR  ");
                     dogeio_text_println(name_buf);
                 } else {
                     char size_str[16];
                     exfat_num_to_str((uint32_t)stream->data_length, size_str);
+                    char name_str[32];
+                    str_pad(name_str, name_buf, 16, ' ');
 
                     dogeio_text_print("FILE ");
-                    dogeio_text_print(name_buf);
-                    dogeio_text_print(" (");
+                    dogeio_text_print(name_str);
+                    dogeio_text_print(" | ");
                     dogeio_text_print(size_str);
-                    dogeio_text_println(" bytes)");
+                    dogeio_text_println(" bytes");
                 }
 
                 i += file->secondary_count * 32;

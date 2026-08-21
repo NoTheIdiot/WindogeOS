@@ -50,39 +50,21 @@ int fs_read(char* filename, char* output_buffer, uint32_t max_size) {
         return -1;
     }
 
-    uint8_t raw_buffer[4096];
-    int bytes_read = exfat_read_file(filename, raw_buffer, sizeof(raw_buffer));
-    if (bytes_read < 0) {
+    if (!fs_exists(filename)) {
         dogeio_text_println("vfs: file not found or read error.");
         return -1;
     }
 
-    uint32_t copy_size = (uint32_t)bytes_read;
-    if (copy_size >= max_size) {
-        copy_size = max_size - 1;
-    }
-
-    uint32_t out_index = 0;
-    for (uint32_t i = 0; i < copy_size; i++) {
-        char c = (char)raw_buffer[i];
-        if (c == '\n') {
-            output_buffer[out_index++] = '\0';
-        } else {
-            output_buffer[out_index++] = c;
-        }
-    }
-
-    output_buffer[out_index] = '\0';
-    return (int)out_index;
+    return exfat_read_file(filename, (uint8_t*)output_buffer, max_size);
 }
 
-int fs_write(char* filename, char* input_buffer) {
+int fs_write_bytes(char* filename, char* input_buffer, uint32_t size) {
     if (!filename || filename[0] == '\0') {
         dogeio_text_println("vfs: invalid filename for write.");
         return -1;
     }
 
-    if (!input_buffer || input_buffer[0] == '\0') {
+    if (!input_buffer || size == 0) {
         dogeio_text_println("vfs: invalid input buffer for write.");
         return -1;
     }
@@ -92,26 +74,16 @@ int fs_write(char* filename, char* input_buffer) {
         return -2;
     }
 
-    uint8_t input_u8[512];
-    size_t input_length = str_strlen(input_buffer);
-    if (input_length > sizeof(input_u8) - 2) {
-        input_length = sizeof(input_u8) - 2;
-    }
+    return exfat_write_file(filename, (uint8_t*)input_buffer, (uint64_t)size);
+}
 
-    memcpy(input_u8, input_buffer, input_length);
-    input_u8[input_length] = '\n';
-    size_t write_length = input_length + 1;
-
-    int append_result = exfat_append_file(filename, input_u8, (uint64_t)write_length);
-    if (append_result == 0) {
-        return 0;
-    }
-    return -1;
+int fs_write(char* filename, char* input_buffer) {
+    if (!input_buffer) return -1;
+    return fs_write_bytes(filename, input_buffer, (uint32_t)str_strlen(input_buffer));
 }
 
 int fs_list_dir(int hidden) {
-    (void)hidden;
-    return exfat_print_directory();
+    return exfat_print_directory(hidden);
 }
 
 int fs_rename(char* filename, char* newname) {
