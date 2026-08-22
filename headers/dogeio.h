@@ -42,4 +42,25 @@ void  fs_copy(char* source, char* dest);
 int   fs_chdir(char* folder);
 char* fs_dirname(void);
 
+// ansi codes
+#define COLOR_BLACK          0x000000
+#define COLOR_RED            0xAA0000
+#define COLOR_GREEN          0x00AA00
+#define COLOR_YELLOW         0xAA5500
+#define COLOR_BLUE           0x0000AA
+#define COLOR_MAGENTA        0xAA00AA
+#define COLOR_CYAN           0x00AAAA
+#define COLOR_WHITE          0xAAAAAA
+
+#define COLOR_BRIGHT_BLACK   0x555555
+#define COLOR_BRIGHT_RED     0xFF5555
+#define COLOR_BRIGHT_GREEN   0x55FF55
+#define COLOR_BRIGHT_YELLOW  0xFFFF55
+#define COLOR_BRIGHT_BLUE    0x5555FF
+#define COLOR_BRIGHT_MAGENTA 0xFF55FF
+#define COLOR_BRIGHT_CYAN    0x55FFFF
+#define COLOR_BRIGHT_WHITE   0xFFFFFF
+
+
+
 #endif

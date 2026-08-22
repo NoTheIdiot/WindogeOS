@@ -1,3 +1,5 @@
+/*  FIH  */
+
 // get some basic functions and types
 #include <stdint.h>
 #include <string.h>
@@ -21,6 +23,11 @@ uint32_t cursor_x = 0;
 uint32_t cursor_y = 1;
 uint32_t dogeio_background_color = 0x000000;
 uint32_t dogeio_text_color       = 0xFFCCCCCC;
+
+static const uint32_t ansi_colors[16] = {
+    0x000000, 0xAA0000, 0x00AA00, 0xAA5500, 0x0000AA, 0xAA00AA, 0x00AAAA, 0xAAAAAA,
+    0x555555, 0xFF5555, 0x55FF55, 0xFFFF55, 0x5555FF, 0xFF55FF, 0x55FFFF, 0xFFFFFFFF
+};
 
 // place a char, obviously.
 void dogeio_text_putchar(char c, uint32_t x, uint32_t y) {
@@ -53,12 +60,10 @@ void dogeio_text_putchar(char c, uint32_t x, uint32_t y) {
     // point
     const uint8_t* glyph = terminal_font[(uint8_t)c];
 
-    // idk why this works but it works
     for (uint32_t g_row = 0; g_row < 16; g_row++) {
         uint8_t bits = glyph[g_row];
         size_t row_offset = (pixel_y + g_row) * u64_pitch + pixel_x;
         
-        // loop.
         framebuffer_ptr[row_offset + 0] = ((bits >> 7) & 1) ? dogeio_text_color : dogeio_background_color;
         framebuffer_ptr[row_offset + 1] = ((bits >> 6) & 1) ? dogeio_text_color : dogeio_background_color;
         framebuffer_ptr[row_offset + 2] = ((bits >> 5) & 1) ? dogeio_text_color : dogeio_background_color;
@@ -70,7 +75,6 @@ void dogeio_text_putchar(char c, uint32_t x, uint32_t y) {
     }
 }
 
-// func() better than func(void)
 void dogeio_text_clear() {
     for (uint32_t i = 0; i < (TERMINAL_ROWS * TERMINAL_COLS); i++) {
         text_grid[i] = ' ';
@@ -90,7 +94,7 @@ void dogeio_text_clear() {
 
     cursor_x = 0;
     cursor_y = 1;
-	menubar_draw();
+    menubar_draw();
 }
 
 void dogeio_text_clear_raw() {
@@ -174,11 +178,13 @@ void dogeio_text_printchar(char c) {
         
         text_grid[cursor_y * TERMINAL_COLS + cursor_x] = ' ';
         dogeio_text_putchar(' ', cursor_x, cursor_y);
-    } else if (c == '\t') {
-        if (cursor_x < TERMINAL_COLS && cursor_y < TERMINAL_ROWS) {
-            text_grid[cursor_y * TERMINAL_COLS + cursor_x] = ' ';
-            for (int i = 0; i < 4; i++) {
-                dogeio_text_putchar(c, cursor_x, cursor_y);
+    } 
+    // tabs (Fixed: renders ' ' spaces instead of passing raw '\t' to putchar)
+    else if (c == '\t') {
+        for (int i = 0; i < 4; i++) {
+            if (cursor_x < TERMINAL_COLS && cursor_y < TERMINAL_ROWS) {
+                text_grid[cursor_y * TERMINAL_COLS + cursor_x] = ' ';
+                dogeio_text_putchar(' ', cursor_x, cursor_y);
                 cursor_x++;
             }
         }
@@ -213,12 +219,46 @@ void dogeio_text_printchar(char c) {
     }
 }
 
+static size_t parse_ansi_escape(const char *str, size_t index) {
+    index += 2; // Skip past '\033['
+    int param = 0;
+
+    while (str[index] >= '0' && str[index] <= '9') {
+        param = param * 10 + (str[index] - '0');
+        index++;
+    }
+
+    if (str[index] == 'm') {
+        if (param == 0) {
+            dogeio_text_color = 0xFFCCCCCC;       // Reset FG
+            dogeio_background_color = 0x000000;   // Reset BG
+        } else if (param >= 30 && param <= 37) {
+            dogeio_text_color = ansi_colors[param - 30];
+        } else if (param >= 90 && param <= 97) {
+            dogeio_text_color = ansi_colors[param - 90 + 8];
+        } else if (param >= 40 && param <= 47) {
+            dogeio_background_color = ansi_colors[param - 40];
+        } else if (param >= 100 && param <= 107) {
+            dogeio_background_color = ansi_colors[param - 100 + 8];
+        }
+    } else if (str[index] == 'J' && param == 2) {
+        dogeio_text_clear();
+    }
+
+    return index;
+}
+
 void dogeio_text_print(const char *str) {
     if (framebuffer_request.response == NULL || framebuffer_request.response->framebuffer_count < 1) {
         return;
     }
 
     for (size_t i = 0; str[i] != '\0'; i++) {
+        if (str[i] == '\033' && str[i + 1] == '[') {
+            i = parse_ansi_escape(str, i);
+            continue;
+        }
+
         dogeio_text_printchar(str[i]);
     }
 }
@@ -244,7 +284,7 @@ void dogeio_text_print_at(const char *str, uint32_t x_pos, uint32_t y_pos, uint3
 
         if (c == '\n') {
             current_x = x_pos;
-            current_y += 1; // increment by 1 text matrix row
+            current_y += 1;
             continue;
         }
 
@@ -264,9 +304,9 @@ void dogeio_text_print_at(const char *str, uint32_t x_pos, uint32_t y_pos, uint3
 }
 
 void dogeio_text_color_change(uint32_t color) {
-	dogeio_text_color = color;
+    dogeio_text_color = color;
 }
 
 void dogeio_text_background_change(uint32_t color) {
-	dogeio_background_color = color;
+    dogeio_background_color = color;
 }
