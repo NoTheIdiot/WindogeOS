@@ -1,4 +1,5 @@
 #include <basicutil.h>
+#include <string.h>
 #include <dogeio.h>
 #include <stdint.h>
 
@@ -28,4 +29,18 @@ void log(const char* str) {
 void duolog(const char* str) {
     dogeio_text_println(str);
     serial_println(str);
+}
+
+// kernel panic (basic)
+void panic(char* reason, char *file, int line) {
+    dogeio_text_clear_raw();
+    dogeio_text_println("====== KERNEL PANIC, YOU MAY CRY. ======");
+    dogeio_text_print("Exception: ");
+    dogeio_text_println(reason);
+    dogeio_text_print("File: ");
+    dogeio_text_println(file);
+    dogeio_text_print("Line: ");
+    char* linestr;
+    str_itoa(line, linestr);
+    dogeio_text_println(linestr);
 }

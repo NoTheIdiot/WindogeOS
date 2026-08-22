@@ -111,6 +111,7 @@ void serial_println(const char* str);
 // basic
 void log(const char* str);
 void duolog(const char* str);
+void panic(char* reason, char *file, int line);
 
 // info
 char* cpuid(void);
