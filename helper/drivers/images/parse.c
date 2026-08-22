@@ -54,3 +54,36 @@ int system_parse_tga(char* filename) {
     dogeio_text_clear();
     return 1;
 }
+
+// make a random image that i just one solid color
+void generate_tga(char* filename, uint8_t r, uint8_t g, uint8_t b) {
+    static uint8_t file_buffer[19218];
+
+    if (fs_exists(filename)) {
+        fs_delete(filename);
+    }
+    fs_create(filename);
+
+    tga_header_t* header = (tga_header_t*)file_buffer;
+    header->id_length = 0;
+    header->color_map_type = 0;
+    header->image_type = 2; 
+    header->color_map_origin = 0;
+    header->color_map_length = 0;
+    header->color_map_depth = 0;
+    header->x_origin = 0;
+    header->y_origin = 0;
+    header->width = 80;
+    header->height = 80;
+    header->bits_per_pixel = 24;
+    header->image_descriptor = 0x20;
+
+    uint8_t* pixels = file_buffer + 18;
+    for (int i = 0; i < 6400; i++) {
+        pixels[i * 3 + 0] = b;
+        pixels[i * 3 + 1] = g;
+        pixels[i * 3 + 2] = r;
+    }
+
+    exfat_write_file(filename, file_buffer, sizeof(file_buffer));
+}

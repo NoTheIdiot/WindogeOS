@@ -17,4 +17,6 @@ typedef struct __attribute__((packed)) {
     uint8_t  image_descriptor;
 } tga_header_t;
 
+void generate_tga(char* filename, uint8_t r, uint8_t g, uint8_t b);
+
 #endif

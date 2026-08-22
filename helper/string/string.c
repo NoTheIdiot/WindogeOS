@@ -147,6 +147,23 @@ void str_strcpy(char *dest, const char *src) {
     while ((*dest++ = *src++));
 }
 
+uint8_t str_to_u8(char *str) {
+    if (!str) return 0;
+
+    while (*str == ' ' || *str == '\t' || *str == '\n') {
+        str++;
+    }
+
+    uint32_t res = 0;
+    while (*str >= '0' && *str <= '9') {
+        res = res * 10 + (uint32_t)(*str - '0');
+        if (res > 255) return 255;
+        str++;
+    }
+
+    return (uint8_t)res;
+}
+
 char* str_strncpy(char* dest, const char* src, size_t n) {
     if (n == 0) return dest;
     

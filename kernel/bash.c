@@ -3,6 +3,7 @@
 #include <basicutil.h>
 #include <string.h>
 #include <bool.h>
+#include <image.h>
 #include <time.h>
 #include <system.h>
 
@@ -15,6 +16,17 @@ static void append_history(const char* command) {
         fs_create(".history");
     }
     fs_write(".history", (char *)command);
+}
+
+static bool is_numeric_string(const char *str) {
+    if (!str || str[0] == '\0') return false;
+    while (*str == ' ' || *str == '\t') str++;
+    if (*str == '\0') return false;
+    while (*str != '\0' && *str != '\n' && *str != '\r') {
+        if (*str < '0' || *str > '9') return false;
+        str++;
+    }
+    return true;
 }
 
 int system_bash_ex(char* command) {
@@ -43,11 +55,18 @@ int system_bash_ex(char* command) {
         if (str_strlen(command) <= 3) {
             dogeio_text_println("Much Error: No folder specified.");
         } else {
-            int result = fs_chdir(command + 3);
-            if (result == -2) {
-                dogeio_text_println("Much Error: Not a Folder.");
-            } else if (result == -1) {
-                dogeio_text_println("Such Error: Folder not existing :(");
+            char* target = command + 3;
+            if (target[0] == '\0') {
+                dogeio_text_println("Much Error: No folder specified.");
+            } else {
+                int result = fs_chdir(target);
+                if (result == -2) {
+                    dogeio_text_println("Much Error: Not a Folder.");
+                } else if (result == -1) {
+                    dogeio_text_println("Such Error: Folder not existing :(");
+                } else if (result != 0) {
+                    dogeio_text_println("Much Error: Could not change directory.");
+                }
             }
         }
         handled = 0;
@@ -57,7 +76,15 @@ int system_bash_ex(char* command) {
         if (str_strlen(command) <= 6) {
             dogeio_text_println("Error: No directory name specified.");
         } else {
-            fs_mkdir(command + 6);
+            char* dir_name = command + 6;
+            if (dir_name[0] == '\0') {
+                dogeio_text_println("Error: Directory name cannot be empty.");
+            } else {
+                int res = fs_mkdir(dir_name);
+                if (res != 0) {
+                    dogeio_text_println("Error: Directory creation failed.");
+                }
+            }
         }
         handled = 0;
     }
@@ -73,13 +100,20 @@ int system_bash_ex(char* command) {
     }
 
     else if (str_startswith(command, "date")) {
-        dogeio_text_println(time_get());
+        const char* t = time_get();
+        if (!t || t[0] == '\0') {
+            dogeio_text_println("Error: Unable to retrieve system time.");
+        } else {
+            dogeio_text_println(t);
+        }
         handled = 0;
     }
 
     else if (str_startswith(command, "color")) {
         const char *arg = (str_strlen(command) >= 6) ? command + 6 : "";
-        if (str_strcmp(arg, "black") == 0) {
+        if (arg[0] == '\0') {
+            dogeio_text_println("Error: No color preset specified.");
+        } else if (str_strcmp(arg, "black") == 0) {
             dogeio_text_color = 0xFF000000;
             dogeio_text_clear();
         } else if (str_strcmp(arg, "white") == 0) {
@@ -131,7 +165,7 @@ int system_bash_ex(char* command) {
             dogeio_text_color = 0xFFCCCCCC;
             dogeio_text_clear();
         } else {
-            dogeio_text_println("unknown colorpreset.");
+            dogeio_text_println("Error: Unknown color preset.");
         }
         handled = 0;
     }
@@ -141,15 +175,20 @@ int system_bash_ex(char* command) {
             dogeio_text_println("Error: No filename specified.");
         } else {
             char* filename = command + 4;
-            static char output_buffer[8192];
-
-            int bytes_read = fs_read(filename, output_buffer, sizeof(output_buffer) - 1);
-            if (bytes_read < 0) {
-                dogeio_text_println("Error: unable to read file.");
+            if (filename[0] == '\0') {
+                dogeio_text_println("Error: No filename specified.");
+            } else if (!fs_exists(filename)) {
+                dogeio_text_println("Error: File does not exist.");
             } else {
-                output_buffer[bytes_read] = '\0';
-                dogeio_text_print(output_buffer);
-                dogeio_text_println("");
+                static char output_buffer[8192];
+                int bytes_read = fs_read(filename, output_buffer, sizeof(output_buffer) - 1);
+                if (bytes_read < 0) {
+                    dogeio_text_println("Error: Unable to read file.");
+                } else {
+                    output_buffer[bytes_read] = '\0';
+                    dogeio_text_print(output_buffer);
+                    dogeio_text_println("");
+                }
             }
         }
         handled = 0;
@@ -165,8 +204,10 @@ int system_bash_ex(char* command) {
             } else {
                 dogeio_text_println("Not Wow: Something Went Wrong.");
             }
+        } else if (str_strcmp(r_u_sure, "no") == 0) {
+            dogeio_text_println("Format canceled.");
         } else {
-            dogeio_text_println("Format skipped.");
+            dogeio_text_println("Error: Invalid response. Format aborted.");
         }
         handled = 0;
     }
@@ -191,31 +232,38 @@ int system_bash_ex(char* command) {
             dogeio_text_println("Error: No filename specified.");
         } else {
             char* filename = command + 4;
-            static char text[256];
-            
-            dogeio_text_input("text> ", text, 256);
-            
-            int result = fs_write(filename, text);
-            if (result == 0) {
-                dogeio_text_println("write ok");
-            } else if (result == -2) {
-                dogeio_text_println("Error: file not found.");
+            if (filename[0] == '\0') {
+                dogeio_text_println("Error: No filename specified.");
             } else {
-                dogeio_text_println("Not Wow: Something went wrong.");
+                static char text[256];
+                dogeio_text_input("text> ", text, 256);
+                
+                int result = fs_write(filename, text);
+                if (result == 0) {
+                    dogeio_text_println("write ok");
+                } else if (result == -2) {
+                    dogeio_text_println("Error: File not found.");
+                } else {
+                    dogeio_text_println("Not Wow: Something went wrong.");
+                }
             }
         }
         handled = 0;
     }
 
     else if (str_strcmp(command, "history") == 0) {
-        static char output_buffer[8192];
-        int bytes_read = fs_read(".history", output_buffer, sizeof(output_buffer) - 1);
-        if (bytes_read < 0) {
+        if (!fs_exists(".history")) {
             dogeio_text_println("No history available.");
         } else {
-            output_buffer[bytes_read] = '\0';
-            dogeio_text_print(output_buffer);
-            dogeio_text_println("");
+            static char output_buffer[8192];
+            int bytes_read = fs_read(".history", output_buffer, sizeof(output_buffer) - 1);
+            if (bytes_read <= 0) {
+                dogeio_text_println("No history available.");
+            } else {
+                output_buffer[bytes_read] = '\0';
+                dogeio_text_print(output_buffer);
+                dogeio_text_println("");
+            }
         }
         handled = 0;
     }
@@ -225,10 +273,15 @@ int system_bash_ex(char* command) {
             dogeio_text_println("Error: No filename specified.");
         } else {
             char* filename = command + 6;
-            int result = fs_create(filename);
-
-            if (result < 0) {
-                dogeio_text_println("Not Wow: Failed to create file.");
+            if (filename[0] == '\0') {
+                dogeio_text_println("Error: No filename specified.");
+            } else if (fs_exists(filename)) {
+                dogeio_text_println("Error: File already exists.");
+            } else {
+                int result = fs_create(filename);
+                if (result < 0) {
+                    dogeio_text_println("Not Wow: Failed to create file.");
+                }
             }
         }
         handled = 0;
@@ -239,12 +292,15 @@ int system_bash_ex(char* command) {
             dogeio_text_println("Error: No filename specified.");
         } else {
             char* filename = command + 3;
-
-            int result = fs_delete(filename);
-            if (!result) {
-                dogeio_text_println("Not Wow: File Not Found.");
-            } else if (result == -1) {
-                dogeio_text_println("Doge Sad: Something went wrong!");
+            if (filename[0] == '\0') {
+                dogeio_text_println("Error: No filename specified.");
+            } else {
+                int result = fs_delete(filename);
+                if (!result) {
+                    dogeio_text_println("Not Wow: File Not Found.");
+                } else if (result == -1) {
+                    dogeio_text_println("Doge Sad: Something went wrong!");
+                }
             }
         }
         handled = 0;
@@ -273,9 +329,46 @@ int system_bash_ex(char* command) {
                 dogeio_text_println("Error: No filename specified.");
             } else {
                 if (!fs_exists(filename)) {
-                    fs_create(filename);
+                    if (fs_create(filename) < 0) {
+                        dogeio_text_println("Error: Could not create file for editing.");
+                    } else {
+                        system_editor(filename);
+                    }
+                } else {
+                    system_editor(filename);
                 }
-                system_editor(filename);
+            }
+        }
+        handled = 0;
+    }
+
+    else if (str_startswith(command, "viewimg")) {
+        char* argument = command +8;
+        system_parse_tga(argument);
+        handled = 0;
+    }
+
+    else if (str_startswith(command, "genimg")) {
+        char* filename = command + 7;
+        if (filename[0] == '\0') {
+            dogeio_text_println("Usage: genimg <filename>");
+        } else {
+            char red[4];
+            char green[4];
+            char blue[4];
+
+            dogeio_text_input("red> ", red, 4);
+            dogeio_text_input("green> ", green, 4);
+            dogeio_text_input("blue> ", blue, 4);
+
+            if (!is_numeric_string(red) || !is_numeric_string(green) || !is_numeric_string(blue)) {
+                dogeio_text_println("Error: RGB values must be numeric digits (0-255).");
+            } else {
+                uint8_t red8 = str_to_u8(red);
+                uint8_t green8 = str_to_u8(green);
+                uint8_t blue8 = str_to_u8(blue);
+            
+                generate_tga(filename, red8, green8, blue8);
             }
         }
         handled = 0;

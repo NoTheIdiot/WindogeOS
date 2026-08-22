@@ -19,7 +19,7 @@ static void append_history(const char* command) {
 int system_dogeshell_ex(char* command) {
     int handled = 1; 
     
-    char* help_command_array[20] = {
+    char* help_command_array[] = {
         "print               | simply prints a piece of text",
         "clear               | clears the terminal screen",
         "dir / list-directory| list contents of current folder",
@@ -39,7 +39,9 @@ int system_dogeshell_ex(char* command) {
         "color               | changes color of text.",
         "history             | show command history from .history",
         "clear-history       | clears history, saves space.",
-        "edit                | shows the very basic code editor"
+        "edit                | shows the very basic code editor",
+        "genimg              | generate a solid color image",
+        "viewimg             | view a solid color image"
     };
 
     if (command == NULL || command[0] == '\0') {
@@ -306,6 +308,28 @@ int system_dogeshell_ex(char* command) {
         handled = 0;
     }
 
+    else if (str_startswith(command, "genimg")) {
+        char* filename = command + 7;
+        char red[4];
+        char green[4];
+        char blue[4];
+        dogeio_text_input("red> ", red, 4);
+        dogeio_text_input("green> ", green, 4);
+        dogeio_text_input("blue> ", blue, 4);
+        uint8_t red8 = str_to_u8(red);
+        uint8_t blue8 = str_to_u8(blue);
+        uint8_t green8 = str_to_u8(green);
+
+        generate_tga(filename, red8, green8, blue8);
+        handled = 0;
+    }
+
+    else if (str_startswith(command, "viewimg")) {
+        char* argument = command +8;
+        system_parse_tga(argument);
+        handled = 0;
+    }
+
     else if (str_strcmp(command, "history") == 0) {
         static char output_buffer[8192];
         int bytes_read = fs_read(".history", output_buffer, sizeof(output_buffer));
@@ -325,7 +349,7 @@ int system_dogeshell_ex(char* command) {
     }
 
     else if (str_strcmp(command, "help") == 0) {
-        for (int i = 0; i < 20; i++) {
+        for (int i = 0; i < 22; i++) {
             dogeio_text_println(help_command_array[i]);
         }
         handled = 0;
@@ -340,6 +364,14 @@ int system_dogeshell_ex(char* command) {
     else if (str_strcmp(command, "clear-history") == 0) {
         fs_delete(".history");
         fs_create(".history");
+        handled = 0;
+    }
+
+    else if (str_startswith(command, "delete") || str_startswith(command, "delete-file")) {
+        char* filename = str_startswith(command, "delete-file") ? (command + 12) : (command + 7);
+        if (!fs_delete(filename)) {
+            dogeio_text_println("Much Error: File does not exist or something went wrong.");
+        }
         handled = 0;
     }
 
