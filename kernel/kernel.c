@@ -37,21 +37,21 @@ void kernel_main(void) {
     if (LIMINE_BASE_REVISION_SUPPORTED(limine_base_revision) == false) {
         log("[Not Wow] Limine's base literally doesn't exist");
         log("          LIMINE_BASE_REVISION_SUPPORTED(limine_base_revision) == false");
-        halt();
+        panic("Do not use fish as your bootloader", __FILE__, __LINE__);
     }
     log("[Wow] Limine's base revision exists, much wow.");
 
     if (framebuffer_request.response == NULL || framebuffer_request.response->framebuffer_count < 1) {
         log("[Not Wow] Limine's framebuffer literally doesn't exist");
         log("          framebuffer_request.response == NULL || framebuffer_request.response->framebuffer_count < 1");
-        halt();
+        panic("Where are your framebuffers?", __FILE__, __LINE__);
     }
     log("[Wow] Limine's Framebuffer Initialize Sucess, very very wow.");
 
     if (memmap_request.response == NULL) {
         log("[Not Wow] Holy shit RAM does not exist.... How?");
         log("          memmap_request.response == NULL");
-        halt();
+        panic("Memmap for some reason isn't here", __FILE__, __LINE__);
     }
     log("[Wow] Memory Map has been found.");
 

@@ -104,7 +104,6 @@ static const uint8_t exfat_upcase_default[128] = {
     0x61, 0x00, 0x00, 0x00, 0x1A, 0x00, 0x41, 0x00
 };
 
-// UPDATED: Accepts uint64_t to format file sizes larger than 4 GiB
 static void exfat_num_to_str(uint64_t num, char *out) {
     if (num == 0) { out[0] = '0'; out[1] = '\0'; return; }
     char tmp[32]; int i = 0;
@@ -130,7 +129,6 @@ static inline int exfat_hw_ready(void) {
     return 0;
 }
 
-// UPDATED: Uses ATA LBA48 commands (0x24) to support >128 GiB drives
 static int exfat_sector_read(uint64_t lba, uint8_t *buffer) {
     if (lba > 0x000FFFFFFFFFFFFULL) {
         log("fs (err) Read LBA out of 48-bit bounds");
