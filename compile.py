@@ -31,7 +31,7 @@ if args.arch == "x86_64":
         "-std=gnu11 -nostdinc -ffreestanding -fno-stack-protector -fno-stack-check "
         "-fno-lto -fno-PIC -fno-pie -ffunction-sections -fdata-sections -Iheaders -m64 "
         "-march=x86-64 -mabi=sysv -mno-80387 -mno-mmx -mno-sse -mno-sse2 -mno-red-zone "
-        "-mcmodel=large"
+        "-mcmodel=large -DWINDOGE_APP"
     )
     linker_file = "linker-files/x86_64.ld"
     linker_flags = "-m elf_x86_64"
@@ -104,7 +104,12 @@ try:
                     app_bin = app_src.replace(".c", ".bin")
                     
                     subprocess.run(f"{cc_app} -c {app_src} -o {app_obj}", shell=True, check=True)
-                    subprocess.run(f"{linker} {linker_flags} -T {app_linker_file} --oformat binary --just-symbols=kernel.elf {app_obj} -o {app_bin}", shell=True, check=True)
+                    subprocess.run(
+    f"{linker} {linker_flags} --no-relax -T {app_linker_file} "
+    f"--oformat binary --just-symbols=kernel.elf {app_obj} -o {app_bin}",
+    shell=True,
+    check=True
+)
                     os.remove(app_obj)
 
     # Search for compiled app binaries AFTER compilation completes
