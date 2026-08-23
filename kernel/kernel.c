@@ -22,6 +22,12 @@ volatile struct limine_framebuffer_request framebuffer_request = {
 };
 
 __attribute__((used, section(".limine_requests")))
+volatile struct limine_hhdm_request hhdm_request = {
+    .id = LIMINE_HHDM_REQUEST_ID,
+    .revision = 0
+};
+
+__attribute__((used, section(".limine_requests")))
 volatile struct limine_memmap_request memmap_request = {
     .id = LIMINE_MEMMAP_REQUEST_ID,
     .revision = 0
@@ -55,13 +61,16 @@ void kernel_main(void) {
     }
     log("[Wow] Memory Map has been found.");
 
+    log("Mounting Drive");
+    if (fs_mount()) {
+        log("Drive mounted");
+    } else {
+        log("Something went wrong, guess im formating");
+        fs_format();
+    }
+
     log("WindogeOS has successfully booted. Start celebrating broski.");
     menubar_draw();
-
-    if (!fs_exists(".windoge")) {
-        fs_format();
-        fs_create(".windoge");
-    }
     
     const char* starting[6] = {
         "================================================================================================================================================================",

@@ -41,6 +41,10 @@ int   fs_rename(char* filename, char* newname);
 void  fs_copy(char* source, char* dest);
 int   fs_chdir(char* folder);
 char* fs_dirname(void);
+int fs_mount(void);
+
+// programs
+int exec_flat_binary(const char *filename, int argc, char **argv);
 
 // ansi codes
 #define COLOR_BLACK          0x000000

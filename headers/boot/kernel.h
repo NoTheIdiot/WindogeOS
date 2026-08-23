@@ -36,6 +36,7 @@ int         exfat_truncate_last_line(const char *name);
 int         exfat_print_directory(int hidden);
 int         exfat_change_directory(const char *path);
 const char* exfat_get_working_dir(void);
+int         exfat_mount(void);
 
 // image rendering stuff
 void put_pixel(uint64_t x, uint64_t y, uint32_t color);

@@ -45,7 +45,8 @@ int system_dogeshell_ex(char* command) {
         "clear-history        | clears history, saves space.",
         "edit                 | shows the very basic code editor",
         "genimg               | generate a solid color image",
-        "viewimg              | view a solid color image"
+        "viewimg              | view a solid color image",
+        "run                  | run a program"
     };
 
     if (command == NULL || command[0] == '\0') {
@@ -58,6 +59,12 @@ int system_dogeshell_ex(char* command) {
         } else {
             dogeio_text_println(""); 
         }
+        handled = 0;
+    }
+
+    if (str_startswith(command, "run")) {
+        char* filename = command + 4;
+        exec_flat_binary(filename, 0, NULL);
         handled = 0;
     }
 

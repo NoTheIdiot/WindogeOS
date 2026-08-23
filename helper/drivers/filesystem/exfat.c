@@ -25,7 +25,6 @@
 #define EXFAT_TYPE_STREAM 0xC0
 #define EXFAT_TYPE_NAME   0xC1
 
-// PRESERVED: Must strictly adhere to the exFAT spec byte layout
 typedef struct __attribute__((packed)) {
     uint8_t  jump_boot[3];
     uint8_t  fs_name[8];
@@ -50,7 +49,6 @@ typedef struct __attribute__((packed)) {
     uint16_t boot_signature;
 } exfat_header_t;
 
-// PRESERVED: Must strictly adhere to the exFAT spec byte layout
 typedef struct __attribute__((packed)) {
     uint8_t  entry_type;
     uint8_t  secondary_count;
@@ -68,7 +66,6 @@ typedef struct __attribute__((packed)) {
     uint8_t  reserved2[7];
 } exfat_dentry_file_t;
 
-// PRESERVED: Must strictly adhere to the exFAT spec byte layout
 typedef struct __attribute__((packed)) {
     uint8_t  entry_type;
     uint8_t  flags;
@@ -82,7 +79,6 @@ typedef struct __attribute__((packed)) {
     uint64_t data_length;
 } exfat_dentry_stream_t;
 
-// PRESERVED: Must strictly adhere to the exFAT spec byte layout
 typedef struct __attribute__((packed)) {
     uint8_t  entry_type;
     uint8_t  flags;
@@ -99,6 +95,9 @@ typedef struct {
 
 static uint32_t g_current_cluster = 4;
 static char     g_current_path[256] = "/";
+static uint32_t g_cluster_heap_offset = 2048;
+static uint32_t g_sectors_per_cluster = 8;
+static uint32_t g_root_cluster         = 4;
 
 static const uint8_t exfat_upcase_default[128] = {
     0x61, 0x00, 0x00, 0x00, 0x1A, 0x00, 0x41, 0x00
@@ -115,6 +114,10 @@ static void exfat_num_to_str(uint64_t num, char *out) {
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-function"
+
+static inline uint64_t exfat_cluster_lba(uint32_t cluster) {
+    return EXFAT_PARTITION_LBA + g_cluster_heap_offset + ((uint64_t)(cluster - 2) * g_sectors_per_cluster);
+}
 
 static inline int exfat_hw_ready(void) {
     for (volatile int i = 0; i < 4; i++) ports_inb(ATA_STATUS);
@@ -156,7 +159,6 @@ static int exfat_sector_read(uint64_t lba, uint8_t *buffer) {
     return 0;
 }
 
-// UPDATED: Uses ATA LBA48 commands (0x34) to support >128 GiB drives
 static int exfat_sector_write(uint64_t lba, const uint8_t *buffer) {
     if (lba > 0x000FFFFFFFFFFFFULL) {
         log("fs (err) Write LBA out of 48-bit bounds");
@@ -198,11 +200,6 @@ static int exfat_sector_write(uint64_t lba, const uint8_t *buffer) {
     return 0;
 }
 
-static inline uint64_t exfat_cluster_lba(uint32_t cluster) {
-    return EXFAT_PARTITION_LBA + 2048 + ((uint64_t)(cluster - 2) * 8);
-}
-
-// PRESERVED: Algorithm bitwise logic must remain 32-bit
 static uint32_t exfat_calc_boot_crc(const uint8_t *sector, size_t bytes, uint32_t crc, bool is_vbr) {
     for (size_t i = 0; i < bytes; i++) {
         if (is_vbr && (i == 106 || i == 107 || i == 112)) continue;
@@ -349,6 +346,31 @@ int exfat_resolve_entry(const char *target_name, exfat_target_t *out) {
     return -1;
 }
 #pragma clang diagnostic pop
+
+int exfat_mount(void) {
+    uint8_t sector[512];
+    if (exfat_sector_read(EXFAT_PARTITION_LBA, sector) != 0) {
+        log("fs (err) Failed to read exFAT VBR");
+        return -1;
+    }
+
+    exfat_header_t *vbr = (exfat_header_t *)sector;
+
+    if (memcmp(vbr->fs_name, "EXFAT   ", 8) != 0) {
+        log("fs (err) Invalid exFAT magic signature");
+        return -1;
+    }
+
+    g_cluster_heap_offset = vbr->cluster_heap_offset;
+    g_sectors_per_cluster = 1 << vbr->sectors_per_cluster_shift;
+    g_root_cluster        = vbr->root_dir_cluster;
+
+    g_current_cluster = g_root_cluster;
+    str_strcpy(g_current_path, "/");
+
+    log("fs (log) exFAT mounted successfully");
+    return 1;
+}
 
 int exfat_wipe_and_format(void) {
     log("fs (log) Formatting volume...");
@@ -750,7 +772,6 @@ int exfat_print_directory(int hidden) {
                     dogeio_text_println(name_buf);
                 } else {
                     char size_str[32];
-                    // UPDATED: Passes 64-bit data_length without casting to uint32_t
                     exfat_num_to_str(stream->data_length, size_str);
                     char name_str[32];
                     str_pad(name_str, name_buf, 16, ' ');
@@ -771,16 +792,16 @@ int exfat_print_directory(int hidden) {
 
 int exfat_change_directory(const char *path) {
     if (str_strcmp(path, "/") == 0 || str_strcmp(path, "..") == 0) {
-        g_current_cluster = 4;
+        g_current_cluster = g_root_cluster;
         str_strcpy(g_current_path, "/");
-        return 0;
+        return 1;
     }
 
     exfat_target_t target;
     if (exfat_resolve_entry(path, &target) == 0 && target.is_dir) {
         g_current_cluster = target.cluster;
         str_strcpy(g_current_path, path);
-        return 0;
+        return 1;
     }
     return -1;
 }

@@ -122,3 +122,7 @@ int fs_chdir(char* folder) {
 char* fs_dirname(void) {
     return (char*)exfat_get_working_dir();
 }
+
+int fs_mount(void) {
+    return exfat_mount();
+}

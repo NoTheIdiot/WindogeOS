@@ -3,71 +3,79 @@ import shutil
 import os
 import platform
 import argparse
+import glob
 
 img_file = "windoge_os.img"
 system = platform.system()
 
-if system == "Windows":
-    linker = "ld.lld"
-else:
-    linker = "ld.lld"
+linker = "ld.lld"
 
-parser = argparse.ArgumentParser(description="WindogeOS Compile File, virtual machine not included.")
-parser.add_argument("-a", "--arch", default="x86_64", help="CPU architecture choice, if there is nothing then it's defaultly x86_64")
+parser = argparse.ArgumentParser(description="WindogeOS Dual-Partition Build Script.")
+parser.add_argument("-a", "--arch", default="x86_64", help="CPU architecture (default: x86_64)")
 args = parser.parse_args()
 
-subprocess.run("clear", shell=True)
+subprocess.run("clear" if system != "Windows" else "cls", shell=True)
+
+app_linker_file = "linker-files/apps.ld"
 
 if args.arch == "x86_64":
     cc = (
         "clang -target x86_64-unknown-none-elf -Wall -Wextra -Werror -Wconversion "
         "-std=gnu11 -nostdinc -ffreestanding -fno-stack-protector -fno-stack-check "
+        "-fno-lto -fno-PIC -fno-pie -ffunction-sections -fdata-sections -Iheaders -m64 "
+        "-march=x86-64 -mabi=sysv -mno-80387 -mno-mmx -mno-sse -mno-sse2 -mno-red-zone "
+        "-mcmodel=kernel"
+    )
+    cc_app = (
+        "clang -target x86_64-unknown-none-elf -Wall -Wextra -Werror -Wconversion "
+        "-std=gnu11 -nostdinc -ffreestanding -fno-stack-protector -fno-stack-check "
         "-fno-lto -fno-PIC -ffunction-sections -fdata-sections -Iheaders -m64 "
-        "-march=x86-64 -mabi=sysv -mno-80387 -mno-mmx -mno-sse -mno-sse2 -mno-red-zone -mcmodel=kernel"
+        "-march=x86-64 -mabi=sysv -mno-80387 -mno-mmx -mno-sse -mno-sse2 -mno-red-zone "
+        "-mcmodel=large"
     )
     linker_file = "linker-files/x86_64.ld"
     linker_flags = "-m elf_x86_64"
     
-elif args.arch == "arm64" or args.arch == "aarch64":
+elif args.arch in ["arm64", "aarch64"]:
     cc = (
         "clang -target aarch64-unknown-none-elf -Wall -Wextra -Werror -Wconversion "
         "-std=gnu11 -nostdinc -ffreestanding -fno-stack-protector -fno-stack-check "
-        "-fno-lto -fno-PIC -ffunction-sections -fdata-sections -Iheaders -mcpu=generic "
-        "-march=armv8-a -mhard-float"
+        "-fno-lto -fno-PIC -fno-pie -ffunction-sections -fdata-sections -Iheaders "
+        "-mcpu=generic -march=armv8-a -mgeneral-regs-only"
+    )
+    cc_app = (
+        "clang -target aarch64-unknown-none-elf -Wall -Wextra -Werror -Wconversion "
+        "-std=gnu11 -nostdinc -ffreestanding -fno-stack-protector -fno-stack-check "
+        "-fno-lto -fno-PIC -ffunction-sections -fdata-sections -Iheaders "
+        "-mcpu=generic -march=armv8-a"
     )
     linker_file = "linker-files/arm64.ld"
     linker_flags = "-m aarch64elf"
 else:
-    print("unknown architecture, only x86_64 or arm64 (or aarch64) supported,")
-    print("leave empty for default (x86_64)")
+    print("Unknown architecture.")
     exit(1)
 
+# Search kernel source files
 search_directories = ["kernel", "helper", "libs", "drivers"]
 source_files = []
 object_files = []
 compile_lines = []
-counter = 1
 
 for folder in search_directories:
     if os.path.exists(folder):
         for root, dirs, files in os.walk(folder):
             for file in files:
+                source_path = os.path.join(root, file)
                 if file.endswith(".c"):
-                    source_path = os.path.join(root, file)
                     flat_object_name = source_path.replace(os.sep, "_").replace(".c", ".o")
                     source_files.append(source_path)
                     object_files.append(flat_object_name)
-                    print(f"{counter} {cc} -c {source_path} -o {flat_object_name}\n")
                     compile_lines.append(f"{cc} -c {source_path} -o {flat_object_name}")
-                
-                if file.endswith(".asm"):
-                    source_path = os.path.join(root, file)
+                elif file.endswith(".asm"):
                     flat_object_name = source_path.replace(os.sep, "_").replace(".asm", ".o")
                     source_files.append(source_path)
                     object_files.append(flat_object_name)
-                    print(f"{counter} nasm -f elf64 {source_path} -o {flat_object_name}\n")
                     compile_lines.append(f"nasm -f elf64 {source_path} -o {flat_object_name}")
-                counter += 1
 
 if not source_files:
     print("Error: No source files found to build.")
@@ -82,68 +90,125 @@ set -e
 {linker} {linker_flags} -T {linker_file} {objects_str} -o kernel.elf
 """
 
-create_img_script_x86_64 = f"""
-set -e
-rm -f {img_file};
-dd if=/dev/zero bs=1M count=0 seek=8 of={img_file};
-PATH=$PATH:/usr/sbin:/sbin sgdisk {img_file} -n 1:2048 -t 1:ef00 -m 1;
-./binaries/limine bios-install {img_file};
-mformat -i {img_file}@@1M;
-mmd -i {img_file}@@1M ::/EFI ::/EFI/BOOT ::/boot ::/boot/limine;
-mcopy -i {img_file}@@1M kernel.elf ::/boot;
-mcopy -i {img_file}@@1M limine.conf ::/
-mcopy -i {img_file}@@1M binaries/limine-bios.sys ::/boot/limine;
-mcopy -i {img_file}@@1M binaries/BOOTX64.EFI ::/EFI/BOOT;
-mcopy -i {img_file}@@1M binaries/BOOTIA32.EFI ::/EFI/BOOT;
-rm -f {objects_str} kernel.elf
-mdir -i {img_file}@@1M ::/
-"""
-
-create_img_script_arm64 = f"""
-set -e
-rm -f {img_file};
-dd if=/dev/zero bs=1M count=0 seek=64 of={img_file};
-PATH=$PATH:/usr/sbin:/sbin sgdisk {img_file} -n 1:2048 -t 1:ef00;
-mformat -i {img_file}@@1M;
-mmd -i {img_file}@@1M ::/EFI ::/EFI/BOOT ::/boot ::/boot/limine;
-mcopy -i {img_file}@@1M kernel.elf ::/boot;
-mcopy -i {img_file}@@1M limine.conf ::/boot/limine;
-mcopy -i {img_file}@@1M binaries/BOOTAA64.EFI ::/EFI/BOOT;
-rm -f {objects_str} kernel.elf
-mdir -i {img_file}@@1M ::/
-"""
-
-if shutil.which("scan-build"):
-    print("Executing Clang Static Analyzer pass...")
-    all_sources = " ".join(source_files)
-    clang_path = shutil.which("clang") or "clang"
-    subprocess.run(f"scan-build --use-analyzer={clang_path} clang --analyze {all_sources} -Iheaders", shell=True)
-
 try:
-    print("compiling source code")
+    print("Compiling kernel source code...")
     subprocess.run(src_compile_script, shell=True, check=True, text=True)
-    
-    print("generating disk image")
+
+    if os.path.exists("apps"):
+        print("Compiling userland flat binaries...")
+        for root, _, files in os.walk("apps"):
+            for file in files:
+                if file.endswith(".c"):
+                    app_src = os.path.join(root, file)
+                    app_obj = app_src.replace(".c", ".o")
+                    app_bin = app_src.replace(".c", ".bin")
+                    
+                    subprocess.run(f"{cc_app} -c {app_src} -o {app_obj}", shell=True, check=True)
+                    subprocess.run(f"{linker} {linker_flags} -T {app_linker_file} --oformat binary --just-symbols=kernel.elf {app_obj} -o {app_bin}", shell=True, check=True)
+                    os.remove(app_obj)
+
+    # Search for compiled app binaries AFTER compilation completes
+    app_copy_commands = ""
+    app_clean_files = []
+    if os.path.exists("apps"):
+        app_bins = glob.glob("apps/**/*.bin", recursive=True) + glob.glob("apps/*.bin")
+        app_bins = list(set(app_bins))  # Remove potential duplicates
+        for app in app_bins:
+            app_copy_commands += f"sudo cp {app} $MOUNT_DATA/;\n"
+            app_clean_files.append(app)
+
+    create_img_script_x86_64 = f"""
+set -e
+rm -f {img_file};
+dd if=/dev/zero bs=1M count=0 seek=1028 of={img_file};
+
+# Part 1: Boot (FAT12, LBA 2048-4095). Part 2: exFAT Data (LBA 4096+)
+PATH=$PATH:/usr/sbin:/sbin sgdisk {img_file} \
+  -n 1:2048:4095 -t 1:8300 \
+  -n 2:4096:2101247 -t 2:0700 -m 1;
+
+./binaries/limine bios-install {img_file};
+
+LOOP_BOOT=$(sudo losetup -f --show -o 1048576 --sizelimit 1048576 {img_file})
+LOOP_DATA=$(sudo losetup -f --show -o 2097152 {img_file})
+
+# Format Partition 1 as FAT12 (no 1MB structure padding, 512b sectors)
+sudo mkfs.fat -F 12 -a -s 1 -n "BOOT" $LOOP_BOOT
+sudo mkfs.exfat -s 512 -c 4K -n "WINDOGEOS" $LOOP_DATA
+
+# Mount Boot Partition and copy ONLY BIOS components + Kernel
+MOUNT_BOOT=$(mktemp -d)
+sudo mount $LOOP_BOOT $MOUNT_BOOT
+sudo mkdir -p $MOUNT_BOOT/boot/limine
+sudo cp kernel.elf $MOUNT_BOOT/boot/
+sudo cp limine.conf $MOUNT_BOOT/
+sudo cp limine.conf $MOUNT_BOOT/boot/limine/
+sudo cp binaries/limine-bios.sys $MOUNT_BOOT/boot/limine/
+sudo umount $MOUNT_BOOT
+sudo losetup -d $LOOP_BOOT
+rmdir $MOUNT_BOOT
+
+# Mount exFAT Data Partition and copy apps
+MOUNT_DATA=$(mktemp -d)
+sudo mount -t exfat-fuse $LOOP_DATA $MOUNT_DATA 2>/dev/null || sudo mount $LOOP_DATA $MOUNT_DATA
+{app_copy_commands}
+sudo umount $MOUNT_DATA
+sudo losetup -d $LOOP_DATA
+rmdir $MOUNT_DATA
+
+rm -f {objects_str} kernel.elf {" ".join(app_clean_files)}
+"""
+
+    create_img_script_arm64 = f"""
+set -e
+rm -f {img_file};
+dd if=/dev/zero bs=1M count=0 seek=1028 of={img_file};
+
+# Part 1: Boot (FAT16/EFI, LBA 2048-4095). Part 2: exFAT Data (LBA 4096+)
+PATH=$PATH:/usr/sbin:/sbin sgdisk {img_file} \
+  -n 1:2048:4095 -t 1:ef00 \
+  -n 2:4096:2101247 -t 2:0700 -m 1;
+
+LOOP_BOOT=$(sudo losetup -f --show -o 1048576 --sizelimit 1048576 {img_file})
+LOOP_DATA=$(sudo losetup -f --show -o 2097152 {img_file})
+
+# Format Partition 1 as FAT16 for UEFI compatibility
+sudo mkfs.fat -F 16 -n "BOOT" $LOOP_BOOT
+sudo mkfs.exfat -s 512 -c 4K -n "WINDOGEOS" $LOOP_DATA
+
+# Mount Boot Partition and copy UEFI Limine + Kernel
+MOUNT_BOOT=$(mktemp -d)
+sudo mount $LOOP_BOOT $MOUNT_BOOT
+sudo mkdir -p $MOUNT_BOOT/EFI/BOOT $MOUNT_BOOT/boot/limine
+sudo cp kernel.elf $MOUNT_BOOT/boot/
+sudo cp limine.conf $MOUNT_BOOT/
+sudo cp limine.conf $MOUNT_BOOT/boot/limine/
+sudo cp binaries/limine-uefi-aarch64.efi $MOUNT_BOOT/EFI/BOOT/BOOTAA64.EFI 2>/dev/null || true
+sudo umount $MOUNT_BOOT
+sudo losetup -d $LOOP_BOOT
+rmdir $MOUNT_BOOT
+
+# Mount exFAT Data Partition and copy apps
+MOUNT_DATA=$(mktemp -d)
+sudo mount -t exfat-fuse $LOOP_DATA $MOUNT_DATA 2>/dev/null || sudo mount $LOOP_DATA $MOUNT_DATA
+{app_copy_commands}
+sudo umount $MOUNT_DATA
+sudo losetup -d $LOOP_DATA
+rmdir $MOUNT_DATA
+
+rm -f {objects_str} kernel.elf {" ".join(app_clean_files)}
+"""
+
+    print("Generating dual-partition image (FAT12 Boot + LBA-4096 exFAT Data)...")
     if args.arch == "x86_64":
         subprocess.run(create_img_script_x86_64, shell=True, check=True)
-    elif args.arch == "arm64" or args.arch == "aarch64":
+    elif args.arch in ["arm64", "aarch64"]:
         subprocess.run(create_img_script_arm64, shell=True, check=True)
-        
-    if system == "Windows":
-        subprocess.run("del /s /q /f *.plist", shell=True)
-    else:
-        subprocess.run("find . -name \"*.plist\" -type f -delete", shell=True)
 
-    print("build success, doesn't mean it will work >:)")
+    print("Build success, doesn't mean it will work >:)")
     exit(0)
 
 except subprocess.CalledProcessError as e:
-    print("\n-------build failed--------")
-    print("cleaning object files")
+    print("\n-------Build failed--------")
     subprocess.run(f"rm -f {objects_str} kernel.elf", shell=True)
-
-    if system == "Windows":
-        subprocess.run("del /s /q /f *.plist", shell=True)
-    else:
-        subprocess.run("find . -name \"*.plist\" -type f -delete", shell=True)
     exit(1)
