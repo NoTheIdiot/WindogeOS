@@ -29,7 +29,7 @@ if args.arch == "x86_64":
     cc_app = (
         "clang -target x86_64-unknown-none-elf -Wall -Wextra -Werror -Wconversion "
         "-std=gnu11 -nostdinc -ffreestanding -fno-stack-protector -fno-stack-check "
-        "-fno-lto -fno-PIC -ffunction-sections -fdata-sections -Iheaders -m64 "
+        "-fno-lto -fno-PIC -fno-pie -ffunction-sections -fdata-sections -Iheaders -m64 "
         "-march=x86-64 -mabi=sysv -mno-80387 -mno-mmx -mno-sse -mno-sse2 -mno-red-zone "
         "-mcmodel=large"
     )
