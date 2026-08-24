@@ -127,7 +127,6 @@ set -e
 rm -f {img_file};
 dd if=/dev/zero bs=1M count=0 seek=1028 of={img_file};
 
-# Part 1: Boot (FAT12, LBA 2048-4095). Part 2: exFAT Data (LBA 4096+)
 PATH=$PATH:/usr/sbin:/sbin sgdisk {img_file} \
   -n 1:2048:4095 -t 1:8300 \
   -n 2:4096:2101247 -t 2:0700 -m 1;
@@ -137,9 +136,8 @@ PATH=$PATH:/usr/sbin:/sbin sgdisk {img_file} \
 LOOP_BOOT=$(sudo losetup -f --show -o 1048576 --sizelimit 1048576 {img_file})
 LOOP_DATA=$(sudo losetup -f --show -o 2097152 {img_file})
 
-# Format Partition 1 as FAT12 (no 1MB structure padding, 512b sectors)
 sudo mkfs.fat -F 12 -a -s 1 -n "BOOT" $LOOP_BOOT
-sudo mkfs.exfat -s 512 -c 4K -n "WINDOGEOS" $LOOP_DATA
+sudo mkfs.exfat -c 4K -L "WINDOGEOS" $LOOP_DATA
 
 # Mount Boot Partition and copy ONLY BIOS components + Kernel
 MOUNT_BOOT=$(mktemp -d)
