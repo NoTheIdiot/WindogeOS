@@ -1,6 +1,7 @@
-#include <dogeio.h>
 #include <stdint.h>
 #include <string.h>
+#include <core.h>
+#include <dogeio.h>
 #include <basicutil.h>
 #include <boot/limine.h>
 
@@ -8,8 +9,6 @@
 #define MAX_APP_SIZE  (2 * 1024 * 1024)
 
 extern volatile struct limine_hhdm_request hhdm_request;
-
-typedef int (*app_entry_t)(int argc, char **argv);
 
 static uint64_t app_pdpt[512] __attribute__((aligned(4096)));
 static uint64_t app_pd[512]   __attribute__((aligned(4096)));
@@ -64,13 +63,15 @@ static void map_app_memory(void) {
 }
 
 int exec_flat_binary(const char *filename, int argc, char **argv) {
+    (void)argc;
+    (void)argv;
+
     if (!fs_exists((char *)filename)) {
         dogeio_text_println("Error: Binary file not found.");
         return -1;
     }
 
     if (!hhdm_request.response) {
-        log("Error: HHDM missing.");
         return -2;
     }
 
@@ -81,10 +82,11 @@ int exec_flat_binary(const char *filename, int argc, char **argv) {
 
     int bytes_read = fs_read((char *)filename, (char *)app_write_buf, MAX_APP_SIZE);
     if (bytes_read <= 0) {
-        log("Failed to read file");
         return -3;
     }
 
-    app_entry_t app_entry = (app_entry_t)APP_PHYS_ADDR;
-    return app_entry(argc, argv);
+    uint64_t user_stack = APP_PHYS_ADDR + MAX_APP_SIZE - 16;
+    core_to_user((void *)APP_PHYS_ADDR, (void *)user_stack);
+
+    return 0;
 }

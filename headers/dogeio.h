@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include "core.h"
 
 extern uint8_t terminal_font[128][16];
 
@@ -34,68 +35,58 @@ extern uint32_t dogeio_text_color;
 
 #ifdef WINDOGE_APP
 
-// who made the C compiler only use 32 bit call
-// i will find you.
-void _k_dogeio_text_putchar(char c, uint32_t x, uint32_t y) __asm__("dogeio_text_putchar");
-void _k_dogeio_text_clear(void) __asm__("dogeio_text_clear");
-void _k_dogeio_text_printchar(char c) __asm__("dogeio_text_printchar");
-void _k_dogeio_text_print(const char *str) __asm__("dogeio_text_print");
-void _k_dogeio_text_println(const char *str) __asm__("dogeio_text_println");
-void _k_dogeio_text_print_at(const char *str, uint32_t x_pos, uint32_t y_pos, uint32_t text_color) __asm__("dogeio_text_print_at");
-void _k_dogeio_text_input(const char* prompt, char* buffer, size_t max_str_length) __asm__("dogeio_text_input");
-void _k_dogeio_text_color_change(uint32_t color) __asm__("dogeio_text_color_change");
-void _k_dogeio_text_background_change(uint32_t color) __asm__("dogeio_text_background_change");
-void _k_dogeio_text_clear_raw(void) __asm__("dogeio_text_clear_raw");
+static inline void dogeio_text_putchar(char c, uint32_t x, uint32_t y) {
+    core_syscall(DOGEIO_TEXT_PUTCHAR, (uint64_t)c, (uint64_t)x, (uint64_t)y, 0);
+}
+static inline void dogeio_text_clear(void) {
+    core_syscall(DOGEIO_TEXT_CLEAR, 0, 0, 0, 0);
+}
+static inline void dogeio_text_printchar(char c) {
+    core_syscall(DOGEIO_TEXT_PRINTCHAR, (uint64_t)c, 0, 0, 0);
+}
+static inline void dogeio_text_print(const char *str) {
+    core_syscall(DOGEIO_TEXT_PRINT, (uint64_t)str, 0, 0, 0);
+}
+static inline void dogeio_text_println(const char *str) {
+    core_syscall(DOGEIO_TEXT_PRINTLN, (uint64_t)str, 0, 0, 0);
+}
+static inline void dogeio_text_print_at(const char *str, uint32_t x, uint32_t y, uint32_t col) {
+    core_syscall(DOGEIO_TEXT_PRINT_AT, (uint64_t)str, (uint64_t)x, (uint64_t)y, (uint64_t)col);
+}
+static inline void dogeio_text_input(const char* prompt, char* buffer, size_t max_len) {
+    core_syscall(DOGEIO_TEXT_INPUT, (uint64_t)prompt, (uint64_t)buffer, (uint64_t)max_len, 0);
+}
+static inline void dogeio_text_color_change(uint32_t color) {
+    core_syscall(DOGEIO_TEXT_COLOR_CHANGE, (uint64_t)color, 0, 0, 0);
+}
+static inline void dogeio_text_background_change(uint32_t color) {
+    core_syscall(DOGEIO_TEXT_BACKGROUND_CHANGE, (uint64_t)color, 0, 0, 0);
+}
+static inline void dogeio_text_clear_raw(void) {
+    core_syscall(DOGEIO_TEXT_CLEAR_RAW, 0, 0, 0, 0);
+}
 
-int   _k_fs_format(void) __asm__("fs_format");
-int   _k_fs_create(char* filename) __asm__("fs_create");
-int   _k_fs_mkdir(char* foldername) __asm__("fs_mkdir");
-int   _k_fs_exists(char* filename) __asm__("fs_exists");
-int   _k_fs_delete(char* filename) __asm__("fs_delete");
-int   _k_fs_delete_last_line(char* filename) __asm__("fs_delete_last_line");
-int   _k_fs_read(char* filename, char* output_buffer, uint32_t max_size) __asm__("fs_read");
-int   _k_fs_write(char* filename, char* input_buffer) __asm__("fs_write");
-int   _k_fs_list_dir(int hidden) __asm__("fs_list_dir");
-int   _k_fs_rename(char* filename, char* newname) __asm__("fs_rename");
-void  _k_fs_copy(char* source, char* dest) __asm__("fs_copy");
-int   _k_fs_chdir(char* folder) __asm__("fs_chdir");
-char* _k_fs_dirname(void) __asm__("fs_dirname");
-int   _k_fs_mount(void) __asm__("fs_mount");
+static inline int fs_format(void) { return (int)core_syscall(DOGEIO_FS_FORMAT, 0, 0, 0, 0); }
+static inline int fs_create(char* file) { return (int)core_syscall(DOGEIO_FS_CREATE, (uint64_t)file, 0, 0, 0); }
+static inline int fs_mkdir(char* dir) { return (int)core_syscall(DOGEIO_FS_MKDIR, (uint64_t)dir, 0, 0, 0); }
+static inline int fs_exists(char* file) { return (int)core_syscall(DOGEIO_FS_EXISTS, (uint64_t)file, 0, 0, 0); }
+static inline int fs_delete(char* file) { return (int)core_syscall(DOGEIO_FS_DELETE, (uint64_t)file, 0, 0, 0); }
+static inline int fs_delete_last_line(char* file) { return (int)core_syscall(DOGEIO_FS_DELETE_LAST_LINE, (uint64_t)file, 0, 0, 0); }
+static inline int fs_read(char* file, char* buf, uint32_t sz) { return (int)core_syscall(DOGEIO_FS_READ, (uint64_t)file, (uint64_t)buf, (uint64_t)sz, 0); }
+static inline int fs_write(char* file, char* buf) { return (int)core_syscall(DOGEIO_FS_WRITE, (uint64_t)file, (uint64_t)buf, 0, 0); }
+static inline int fs_list_dir(int hidden) { return (int)core_syscall(DOGEIO_FS_LIST_DIR, (uint64_t)hidden, 0, 0, 0); }
+static inline int fs_rename(char* oldn, char* newn) { return (int)core_syscall(DOGEIO_FS_RENAME, (uint64_t)oldn, (uint64_t)newn, 0, 0); }
+static inline void fs_copy(char* src, char* dst) { core_syscall(DOGEIO_FS_COPY, (uint64_t)src, (uint64_t)dst, 0, 0); }
+static inline int fs_chdir(char* dir) { return (int)core_syscall(DOGEIO_FS_CHDIR, (uint64_t)dir, 0, 0, 0); }
+static inline char* fs_dirname(void) { return (char*)core_syscall(DOGEIO_FS_DIRNAME, 0, 0, 0, 0); }
+static inline int fs_mount(void) { return (int)core_syscall(DOGEIO_FS_MOUNT, 0, 0, 0, 0); }
 
-int   _k_exec_flat_binary(const char *filename, int argc, char **argv) __asm__("exec_flat_binary");
-
-// 64-bit indirect call wrappers (movabs rax, addr; call rax)
-#define dogeio_text_putchar(c, x, y) (((void(* volatile)(char, uint32_t, uint32_t))&_k_dogeio_text_putchar)(c, x, y))
-#define dogeio_text_clear() (((void(* volatile)(void))&_k_dogeio_text_clear)())
-#define dogeio_text_printchar(c) (((void(* volatile)(char))&_k_dogeio_text_printchar)(c))
-#define dogeio_text_print(str) (((void(* volatile)(const char*))&_k_dogeio_text_print)(str))
-#define dogeio_text_println(str) (((void(* volatile)(const char*))&_k_dogeio_text_println)(str))
-#define dogeio_text_print_at(str, x, y, col) (((void(* volatile)(const char*, uint32_t, uint32_t, uint32_t))&_k_dogeio_text_print_at)(str, x, y, col))
-#define dogeio_text_input(prompt, buf, len) (((void(* volatile)(const char*, char*, size_t))&_k_dogeio_text_input)(prompt, buf, len))
-#define dogeio_text_color_change(color) (((void(* volatile)(uint32_t))&_k_dogeio_text_color_change)(color))
-#define dogeio_text_background_change(color) (((void(* volatile)(uint32_t))&_k_dogeio_text_background_change)(color))
-#define dogeio_text_clear_raw() (((void(* volatile)(void))&_k_dogeio_text_clear_raw)())
-
-#define fs_format() (((int(* volatile)(void))&_k_fs_format)())
-#define fs_create(file) (((int(* volatile)(char*))&_k_fs_create)(file))
-#define fs_mkdir(dir) (((int(* volatile)(char*))&_k_fs_mkdir)(dir))
-#define fs_exists(file) (((int(* volatile)(char*))&_k_fs_exists)(file))
-#define fs_delete(file) (((int(* volatile)(char*))&_k_fs_delete)(file))
-#define fs_delete_last_line(file) (((int(* volatile)(char*))&_k_fs_delete_last_line)(file))
-#define fs_read(file, buf, sz) (((int(* volatile)(char*, char*, uint32_t))&_k_fs_read)(file, buf, sz))
-#define fs_write(file, buf) (((int(* volatile)(char*, char*))&_k_fs_write)(file, buf))
-#define fs_list_dir(h) (((int(* volatile)(int))&_k_fs_list_dir)(h))
-#define fs_rename(old, new) (((int(* volatile)(char*, char*))&_k_fs_rename)(old, new))
-#define fs_copy(src, dst) (((void(* volatile)(char*, char*))&_k_fs_copy)(src, dst))
-#define fs_chdir(dir) (((int(* volatile)(char*))&_k_fs_chdir)(dir))
-#define fs_dirname() (((char*(* volatile)(void))&_k_fs_dirname)())
-#define fs_mount() (((int(* volatile)(void))&_k_fs_mount)())
-
-#define exec_flat_binary(file, ac, av) (((int(* volatile)(const char*, int, char**))&_k_exec_flat_binary)(file, ac, av))
+static inline int exec_flat_binary(const char *file, int argc, char **argv) {
+    return (int)core_syscall(DOGEIO_EXEC_FLAT_BINARY, (uint64_t)file, (uint64_t)argc, (uint64_t)argv, 0);
+}
 
 #else
 
-// Kernel build prototypes
 void dogeio_text_putchar(char c, uint32_t x, uint32_t y);
 void dogeio_text_clear(void);
 void dogeio_text_printchar(char c);
@@ -125,5 +116,4 @@ int   fs_mount(void);
 int exec_flat_binary(const char *filename, int argc, char **argv);
 
 #endif
-
 #endif
