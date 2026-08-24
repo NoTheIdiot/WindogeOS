@@ -88,6 +88,7 @@ typedef struct {
 
 void init_idt(void);
 extern void idt_load(idt_ptr_t *ptr);
+void init_tss(void);
 
 #define DOGEIO_TEXT_PUTCHAR           1
 #define DOGEIO_TEXT_CLEAR             2

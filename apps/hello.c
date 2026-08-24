@@ -1,7 +1,20 @@
 #include <dogeio.h>
 
+void dogeio_exit(int code) {
+    __asm__ volatile (
+        "mov $60, %%rax\n\t"
+        "mov %0, %%rdi\n\t"
+        "syscall"
+        :
+        : "r"((uint64_t)code)
+        : "rax", "rdi"
+    );
+
+    while (1) {}
+}
+
 __attribute__((section(".text._start")))
-int _start(int argc, char **argv) {
+void _start(int argc, char **argv) {
     (void)argc;
     (void)argv;
 
@@ -9,5 +22,5 @@ int _start(int argc, char **argv) {
     dogeio_text_println("hello doge");
     dogeio_text_color_change(COLOR_WHITE);
 
-    return 0;
+    dogeio_exit(0);
 } 

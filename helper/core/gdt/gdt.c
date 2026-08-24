@@ -46,3 +46,24 @@ void init_gdt(void) {
 
     gdt_flush(&gdtr);
 }
+
+void init_tss(void) {
+    memset(&tss, 0, sizeof(tss_entry_t));
+
+    tss.rsp0 = (uint64_t)&kernel_stack_top;
+    tss.iomap_base = sizeof(tss_entry_t);
+
+    uint64_t base = (uint64_t)&tss;
+    uint32_t limit = sizeof(tss_entry_t) - 1;
+
+    gdt.tss_desc.length     = (uint16_t)(limit & 0xFFFF);
+    gdt.tss_desc.base_low   = (uint16_t)(base & 0xFFFF);
+    gdt.tss_desc.base_mid   = (uint8_t)((base >> 16) & 0xFF);
+    gdt.tss_desc.flags1     = 0x89;
+    gdt.tss_desc.flags2     = (uint8_t)((limit >> 16) & 0x0F);
+    gdt.tss_desc.base_high  = (uint8_t)((base >> 24) & 0xFF);
+    gdt.tss_desc.base_upper = (uint32_t)((base >> 32) & 0xFFFFFFFF);
+    gdt.tss_desc.reserved   = 0;
+
+    __asm__ volatile ("ltr %0" :: "r"((uint16_t)0x28));
+}
