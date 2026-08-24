@@ -9,13 +9,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Code I Guess
+    - name: Checkout Code
       uses: actions/checkout@v4.1.7
 
     - name: Install Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang lld nasm mtools exfatprogs
+        sudo apt-get install -y clang lld nasm mtools dosfstools gdisk exfatprogs exfat-fuse
+
+    - name: Fix Binary Permissions
+      run: |
+        chmod +x binaries/limine || true
 
     - name: Compile OS
       run: python3 compile.py
