@@ -15,7 +15,7 @@ jobs:
     - name: Install Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang lld nasm mtools python3
+        sudo apt-get install -y clang lld nasm mtools exfatprogs
 
     - name: Compile OS
       run: python3 compile.py
