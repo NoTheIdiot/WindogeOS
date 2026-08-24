@@ -5,8 +5,8 @@
 #include <dogeio.h>
 #include <bool.h>
 #include <stddef.h>
-#include <image.h>
 #include <basicutil.h>
+#include <core.h>
 #include <boot/kernel.h>
 
 __attribute__((used, section(".limine_requests_start")))
@@ -68,6 +68,10 @@ void kernel_main(void) {
         log("Something went wrong, guess im formating");
         fs_format();
     }
+
+    log("Init gdt");
+    init_gdt();
+    log("Sucess");
 
     log("WindogeOS has successfully booted. Start celebrating broski.");
     menubar_draw();
