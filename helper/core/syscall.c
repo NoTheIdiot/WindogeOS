@@ -1,10 +1,36 @@
 #include <stdint.h>
-#include "core.h"
-#include "dogeio.h"
+#include <core.h>
+#include <basicutil.h>
+#include <system.h>
+#include <dogeio.h>
 
 static uint8_t kernel_stack[16384] __attribute__((aligned(16)));
 void *kernel_stack_top = &kernel_stack[16384];
 void *user_rsp_scratch;
+
+static inline uint64_t rdmsr(uint32_t msr) {
+    uint32_t low, high;
+    __asm__ volatile ("rdmsr" : "=a"(low), "=d"(high) : "c"(msr));
+    return ((uint64_t)high << 32) | low;
+}
+
+static inline void wrmsr(uint32_t msr, uint64_t val) {
+    uint32_t low = (uint32_t)val;
+    uint32_t high = (uint32_t)(val >> 32);
+    __asm__ volatile ("wrmsr" :: "a"(low), "d"(high), "c"(msr) : "memory");
+}
+
+void init_syscall(void) {
+    uint64_t efer = rdmsr(0xC0000080);
+    wrmsr(0xC0000080, efer | 1);
+
+    uint64_t star = ((uint64_t)0x0010 << 48) | ((uint64_t)0x0008 << 32);
+    wrmsr(0xC0000081, star);
+
+    wrmsr(0xC0000082, (uint64_t)syscall_entry);
+
+    wrmsr(0xC0000084, 0x200);
+}
 
 uint64_t c_syscall_handler(uint64_t sys_id, uint64_t arg1, uint64_t arg2, uint64_t arg3, uint64_t arg4) {
     switch (sys_id) {
@@ -71,12 +97,29 @@ uint64_t c_syscall_handler(uint64_t sys_id, uint64_t arg1, uint64_t arg2, uint64
 
         case DOGEIO_EXEC_FLAT_BINARY:
             return (uint64_t)exec_flat_binary((const char *)arg1, (int)arg2, (char **)arg3);
+        
+        case 60:
+            __asm__ volatile (
+                "mov $0x10, %%ax\n\t"
+                "mov %%ax, %%ds\n\t"
+                "mov %%ax, %%es\n\t"
+                "mov %%ax, %%ss\n\t"
+
+                "movq kernel_shell_rbp(%%rip), %%rbp\n\t"
+                "movq kernel_shell_rsp(%%rip), %%rsp\n\t"
+
+                "movq %0, %%rax\n\t"
+                "jmp app_return_point\n\t"
+                :
+                : "r"(arg1)
+                : "rax", "memory"
+            );
+            __builtin_unreachable();
 
         default:
             return (uint64_t)-1;
     }
 }
-
 __attribute__((naked)) void syscall_entry(void) {
     __asm__ volatile (
         "movq %%rsp, user_rsp_scratch(%%rip)\n\t"
@@ -87,6 +130,7 @@ __attribute__((naked)) void syscall_entry(void) {
         "pushq %%rcx\n\t"
         "pushq %%rbp\n\t"
         "pushq %%rbx\n\t"
+        "subq $8, %%rsp\n\t"
 
         "movq %%r10, %%r8\n\t"
         "movq %%rdx, %%rcx\n\t"
@@ -96,6 +140,7 @@ __attribute__((naked)) void syscall_entry(void) {
 
         "call c_syscall_handler\n\t"
 
+        "addq $8, %%rsp\n\t"
         "popq %%rbx\n\t"
         "popq %%rbp\n\t"
         "popq %%rcx\n\t"
@@ -103,9 +148,7 @@ __attribute__((naked)) void syscall_entry(void) {
         "popq %%rsp\n\t"
 
         "sysretq\n\t"
-        :
-        :
-        : "memory"
+        ::: "memory"
     );
 }
 
@@ -115,10 +158,10 @@ void core_to_user(void *user_entry, void *user_stack_top) {
 
     __asm__ volatile (
         "cli\n\t"
-        "mov %0, %%ds\n\t"
-        "mov %0, %%es\n\t"
-        "mov %0, %%fs\n\t"
-        "mov %0, %%gs\n\t"
+        "mov %w0, %%ds\n\t"
+        "mov %w0, %%es\n\t"
+        "mov %w0, %%fs\n\t"
+        "mov %w0, %%gs\n\t"
 
         "pushq %0\n\t"
         "pushq %1\n\t"

@@ -101,7 +101,6 @@ set -e
 """
     subprocess.run(src_compile_script, shell=True, check=True, text=True)
 
-    # STEP 3: Userland Applications
     if os.path.exists("apps"):
         print("Compiling userland flat binaries...")
         for root, _, files in os.walk("apps"):
@@ -114,12 +113,11 @@ set -e
                     subprocess.run(f"{cc_app_build} -c {app_src} -o {app_obj}", shell=True, check=True)
                     subprocess.run(
                         f"{linker} {linker_flags} --no-relax -T {app_linker_file} "
-                        f"--oformat binary --just-symbols=kernel.elf {app_obj} -o {app_bin}",
+                        f"--oformat binary {app_obj} -o {app_bin}",
                         shell=True,
                         check=True
                     )
                     os.remove(app_obj)
-
     app_copy_commands = ""
     app_clean_files = []
     if os.path.exists("apps"):
@@ -129,7 +127,6 @@ set -e
             app_copy_commands += f"sudo cp {app} $MOUNT_DATA/;\n"
             app_clean_files.append(app)
 
-    # STEP 4: Disk Image Assembly & Cleanup
     create_img_script_x86_64 = f"""
 set -e
 rm -f {img_file};

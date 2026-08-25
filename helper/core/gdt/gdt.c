@@ -6,7 +6,7 @@ static uint8_t kernel_stack[16384] __attribute__((aligned(16)));
 
 static gdt_table_t gdt;
 static tss_entry_t tss;
-static gdt_ptr_t   gdtr;
+static gdt_ptr_t gdtr;
 
 static void set_gdt_entry(gdt_entry_t *entry, uint32_t base, uint32_t limit, uint8_t access, uint8_t gran) {
     entry->limit_low    = (uint16_t)(limit & 0xFFFF);
@@ -30,16 +30,12 @@ static void set_tss_descriptor(tss_descriptor_t *desc, uint64_t base, uint32_t l
 
 void init_gdt(void) {
     memset(&gdt, 0, sizeof(gdt));
-    memset(&tss, 0, sizeof(tss));
-
-    tss.rsp0 = (uint64_t)&kernel_stack[sizeof(kernel_stack)];
 
     set_gdt_entry(&gdt.null_desc, 0, 0, 0, 0);
     set_gdt_entry(&gdt.kernel_code, 0, 0, 0x9A, 0x20);
     set_gdt_entry(&gdt.kernel_data, 0, 0, 0x92, 0x00);
-    set_gdt_entry(&gdt.user_data, 0, 0, 0xF2, 0x00);
-    set_gdt_entry(&gdt.user_code, 0, 0, 0xFA, 0x20);
-    set_tss_descriptor(&gdt.tss_desc, (uint64_t)&tss, sizeof(tss) - 1);
+    set_gdt_entry(&gdt.user_data,   0, 0, 0xF2, 0x00);
+    set_gdt_entry(&gdt.user_code,   0, 0, 0xFA, 0x20);
 
     gdtr.limit = sizeof(gdt) - 1;
     gdtr.base  = (uint64_t)&gdt;
@@ -48,22 +44,12 @@ void init_gdt(void) {
 }
 
 void init_tss(void) {
-    memset(&tss, 0, sizeof(tss_entry_t));
+    memset(&tss, 0, sizeof(tss));
 
-    tss.rsp0 = (uint64_t)&kernel_stack_top;
+    tss.rsp0 = (uint64_t)&kernel_stack[sizeof(kernel_stack)];
     tss.iomap_base = sizeof(tss_entry_t);
 
-    uint64_t base = (uint64_t)&tss;
-    uint32_t limit = sizeof(tss_entry_t) - 1;
-
-    gdt.tss_desc.length     = (uint16_t)(limit & 0xFFFF);
-    gdt.tss_desc.base_low   = (uint16_t)(base & 0xFFFF);
-    gdt.tss_desc.base_mid   = (uint8_t)((base >> 16) & 0xFF);
-    gdt.tss_desc.flags1     = 0x89;
-    gdt.tss_desc.flags2     = (uint8_t)((limit >> 16) & 0x0F);
-    gdt.tss_desc.base_high  = (uint8_t)((base >> 24) & 0xFF);
-    gdt.tss_desc.base_upper = (uint32_t)((base >> 32) & 0xFFFFFFFF);
-    gdt.tss_desc.reserved   = 0;
+    set_tss_descriptor(&gdt.tss_desc, (uint64_t)&tss, sizeof(tss) - 1);
 
     __asm__ volatile ("ltr %0" :: "r"((uint16_t)0x28));
 }

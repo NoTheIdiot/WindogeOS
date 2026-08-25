@@ -13,12 +13,10 @@ gdt_flush:
     mov gs, ax
     mov ss, ax
 
-    push 0x08
+    push qword 0x08
     lea rax, [rel .reload_cs]
     push rax
     retfq
 
 .reload_cs:
-    mov ax, 0x28
-    ltr ax
     ret

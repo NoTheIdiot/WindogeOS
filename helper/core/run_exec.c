@@ -5,11 +5,14 @@
 #include <basicutil.h>
 #include <boot/limine.h>
 
-#define APP_PHYS_ADDR 0x01000000ULL // 16MB physical mark (safe from kernel/Limine)
-#define APP_VIRT_ADDR 0x00200000ULL // 2MB virtual mark
+#define APP_PHYS_ADDR 0x01000000ULL
+#define APP_VIRT_ADDR 0x00200000ULL
 #define MAX_APP_SIZE  (2 * 1024 * 1024)
 
 extern volatile struct limine_hhdm_request hhdm_request;
+
+void *kernel_shell_rsp = 0;
+void *kernel_shell_rbp = 0;
 
 static uint64_t app_pdpt[512] __attribute__((aligned(4096)));
 static uint64_t app_pd[512]   __attribute__((aligned(4096)));
@@ -22,12 +25,12 @@ static uint64_t virt_to_phys(void *ptr, uint64_t hhdm) {
     uint64_t *pml4 = (uint64_t *)((cr3 & 0x000FFFFFFFFFF000ULL) + hhdm);
     uint64_t pdpt_e = pml4[(virt >> 39) & 0x1FF];
     if (!(pdpt_e & 1)) return 0;
-    if (pdpt_e & 0x80) return (pdpt_e & 0x000FFFFC00000000ULL) | (virt & 0x3FFFFFFF); // 1GB Page
+    if (pdpt_e & 0x80) return (pdpt_e & 0x000FFFFC00000000ULL) | (virt & 0x3FFFFFFF);
 
     uint64_t *pdpt = (uint64_t *)((pdpt_e & 0x000FFFFFFFFFF000ULL) + hhdm);
     uint64_t pd_e = pdpt[(virt >> 30) & 0x1FF];
     if (!(pd_e & 1)) return 0;
-    if (pd_e & 0x80) return (pd_e & 0x000FFFFFFFFFF00000ULL) | (virt & 0x1FFFFF); // Fixed 2MB Page mask & offset
+    if (pd_e & 0x80) return (pd_e & 0x000FFFFFFFFFF00000ULL) | (virt & 0x1FFFFF);
 
     uint64_t *pd = (uint64_t *)((pd_e & 0x000FFFFFFFFFF000ULL) + hhdm);
     uint64_t pt_e = pd[(virt >> 21) & 0x1FF];
@@ -59,8 +62,8 @@ static void map_app_memory(void) {
     pml4[0] = pdpt_phys | 0x07;
     app_pdpt[0] = pd_phys | 0x07;
     
-    app_pd[0] = APP_PHYS_ADDR | 0x87;
-    app_pd[1] = APP_PHYS_ADDR | 0x87;
+    app_pd[0] = 0; 
+    app_pd[1] = APP_PHYS_ADDR | 0x87; 
 
     __asm__ volatile("mov %0, %%cr3" :: "r"(cr3) : "memory");
 }
@@ -89,7 +92,24 @@ int exec_flat_binary(const char *filename, int argc, char **argv) {
     }
 
     uint64_t user_stack = APP_VIRT_ADDR + MAX_APP_SIZE - 16;
+    uint64_t exit_code = 0;
+
+    __asm__ volatile (
+        "movq %%rsp, kernel_shell_rsp(%%rip)\n\t"
+        "movq %%rbp, kernel_shell_rbp(%%rip)\n\t"
+        : : : "memory"
+    );
+
     core_to_user((void *)APP_VIRT_ADDR, (void *)user_stack);
 
-    return 0;
+    __asm__ volatile (
+        ".global app_return_point\n\t"
+        "app_return_point:\n\t"
+        "movq %%rax, %0\n\t"
+        : "=r"(exit_code)
+        :
+        : "memory"
+    );
+
+    return (int)exit_code;
 }

@@ -56,6 +56,7 @@ ISR_ERR   30
 ISR_NOERR 31
 
 isr_common:
+    cld
     push rax
     push rbx
     push rcx
