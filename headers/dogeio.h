@@ -33,7 +33,7 @@ extern uint32_t dogeio_text_color;
 #define COLOR_BRIGHT_CYAN    0x55FFFF
 #define COLOR_BRIGHT_WHITE   0xFFFFFF
 
-#ifdef WINDOGE_APP
+#ifdef RING3
 
 static inline void dogeio_text_putchar(char c, uint32_t x, uint32_t y) {
     core_syscall(DOGEIO_TEXT_PUTCHAR, (uint64_t)c, (uint64_t)x, (uint64_t)y, 0);

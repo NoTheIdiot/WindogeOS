@@ -1,3 +1,5 @@
+#define RING3
+
 // this is to parse .tga files
 #include <system.h>
 #include <boot/kernel.h>

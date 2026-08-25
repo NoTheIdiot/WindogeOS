@@ -29,7 +29,3 @@ extern volatile struct limine_framebuffer_request framebuffer_request;
     volatile uint32_t *pixel_address = (volatile uint32_t*)((uint8_t*)fb->address + (y * fb->pitch) + (x * 4));
     *pixel_address = color;
 }
-
-[[maybe_unused]] uint32_t rgb_to_u32(uint8_t red, uint8_t green, uint8_t blue) {
-    return (0xFFU << 24) | ((uint32_t)red << 16) | ((uint32_t)green << 8) | (uint32_t)blue;
-}
