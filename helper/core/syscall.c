@@ -29,7 +29,7 @@ static inline void wrmsr(uint32_t msr, uint64_t val) {
 }
 
 void init_syscall(void) {
-    uint64_t star = ((uint64_t)0x08 << 32) | ((uint64_t)0x10 << 48);
+    uint64_t star = ((uint64_t)0x08 << 32) | ((uint64_t)0x0B << 48);
     wrmsr(IA32_STAR, star);
 
     wrmsr(IA32_LSTAR, (uint64_t)syscall_entry);
