@@ -9,6 +9,20 @@ static inline uint32_t rgb_to_u32(uint8_t red, uint8_t green, uint8_t blue) {
     return ((uint32_t)red << 16) | ((uint32_t)green << 8) | (uint32_t)blue;
 }
 
+#define KERNEL_MENUBAR_DRAW             100
+#define KERNEL_EXFAT_WIPE_AND_FORMAT    101
+#define KERNEL_EXFAT_CREATE_NODE        102
+#define KERNEL_EXFAT_WRITE_FILE         103
+#define KERNEL_EXFAT_APPEND_FILE        104
+#define KERNEL_EXFAT_READ_FILE          105
+#define KERNEL_EXFAT_DELETE_NODE        106
+#define KERNEL_EXFAT_TRUNCATE_LAST_LINE 107
+#define KERNEL_EXFAT_PRINT_DIRECTORY    108
+#define KERNEL_EXFAT_CHANGE_DIRECTORY   109
+#define KERNEL_EXFAT_GET_WORKING_DIR    110
+#define KERNEL_EXFAT_MOUNT              111
+#define KERNEL_PUT_PIXEL                112
+
 #ifdef RING3
 
 #define KERNEL_MENUBAR_DRAW             100

@@ -3,12 +3,20 @@
 #include <basicutil.h>
 #include <system.h>
 #include <dogeio.h>
+#include <boot/kernel.h>
+#include <boot/limine.h>
+
+#define IA32_STAR   0xC0000081
+#define IA32_LSTAR  0xC0000082
+#define IA32_FMASK  0xC0000084
 
 static uint8_t kernel_stack[16384] __attribute__((aligned(16)));
 void *kernel_stack_top = &kernel_stack[16384];
 void *user_rsp_scratch;
 
-static inline uint64_t rdmsr(uint32_t msr) {
+extern volatile struct limine_framebuffer_request framebuffer_request;
+
+[[maybe_unused]] static inline uint64_t rdmsr(uint32_t msr) {
     uint32_t low, high;
     __asm__ volatile ("rdmsr" : "=a"(low), "=d"(high) : "c"(msr));
     return ((uint64_t)high << 32) | low;
@@ -21,15 +29,11 @@ static inline void wrmsr(uint32_t msr, uint64_t val) {
 }
 
 void init_syscall(void) {
-    uint64_t efer = rdmsr(0xC0000080);
-    wrmsr(0xC0000080, efer | 1);
+    uint64_t star = ((uint64_t)0x08 << 32) | ((uint64_t)0x10 << 48);
+    wrmsr(IA32_STAR, star);
 
-    uint64_t star = ((uint64_t)0x0010 << 48) | ((uint64_t)0x0008 << 32);
-    wrmsr(0xC0000081, star);
-
-    wrmsr(0xC0000082, (uint64_t)syscall_entry);
-
-    wrmsr(0xC0000084, 0x200);
+    wrmsr(IA32_LSTAR, (uint64_t)syscall_entry);
+    wrmsr(IA32_FMASK, 0x200);
 }
 
 uint64_t c_syscall_handler(uint64_t sys_id, uint64_t arg1, uint64_t arg2, uint64_t arg3, uint64_t arg4) {
@@ -97,29 +101,65 @@ uint64_t c_syscall_handler(uint64_t sys_id, uint64_t arg1, uint64_t arg2, uint64
 
         case DOGEIO_EXEC_FLAT_BINARY:
             return (uint64_t)exec_flat_binary((const char *)arg1, (int)arg2, (char **)arg3);
+
+            case KERNEL_MENUBAR_DRAW:
+            menubar_draw();
+            return 0;
+
+        case KERNEL_EXFAT_WIPE_AND_FORMAT:
+            return (uint64_t)exfat_wipe_and_format();
+
+        case KERNEL_EXFAT_CREATE_NODE:
+            return (uint64_t)exfat_create_node((const char*)arg1, (bool)arg2);
+
+        case KERNEL_EXFAT_WRITE_FILE:
+            return (uint64_t)exfat_write_file((const char*)arg1, (const uint8_t*)arg2, arg3);
+
+        case KERNEL_EXFAT_APPEND_FILE:
+            return (uint64_t)exfat_append_file((const char*)arg1, (const uint8_t*)arg2, arg3);
+
+        case KERNEL_EXFAT_READ_FILE:
+            return (uint64_t)exfat_read_file((const char*)arg1, (uint8_t*)arg2, arg3);
+
+        case KERNEL_EXFAT_DELETE_NODE:
+            return (uint64_t)exfat_delete_node((const char*)arg1);
+
+        case KERNEL_EXFAT_TRUNCATE_LAST_LINE:
+            return (uint64_t)exfat_truncate_last_line((const char*)arg1);
+
+        case KERNEL_EXFAT_PRINT_DIRECTORY:
+            return (uint64_t)exfat_print_directory((int)arg1);
+
+        case KERNEL_EXFAT_CHANGE_DIRECTORY:
+            return (uint64_t)exfat_change_directory((const char*)arg1);
+
+        case KERNEL_EXFAT_GET_WORKING_DIR:
+            return (uint64_t)exfat_get_working_dir();
+
+        case KERNEL_EXFAT_MOUNT:
+            return (uint64_t)exfat_mount();
+
+        case KERNEL_PUT_PIXEL: {
+            uint64_t x = arg1;
+            uint64_t y = arg2;
+            uint32_t color = (uint32_t)arg3;
+
+            struct limine_framebuffer *fb = framebuffer_request.response->framebuffers[0];
+            if (x < fb->width && y < fb->height) {
+                volatile uint32_t *pixel_address = (volatile uint32_t*)((uint8_t*)fb->address + (y * fb->pitch) + (x * 4));
+                *pixel_address = color;
+            }
+            break;
+        }   
         
-        case 60:
-            __asm__ volatile (
-                "mov $0x10, %%ax\n\t"
-                "mov %%ax, %%ds\n\t"
-                "mov %%ax, %%es\n\t"
-                "mov %%ax, %%ss\n\t"
-
-                "movq kernel_shell_rbp(%%rip), %%rbp\n\t"
-                "movq kernel_shell_rsp(%%rip), %%rsp\n\t"
-
-                "movq %0, %%rax\n\t"
-                "jmp app_return_point\n\t"
-                :
-                : "r"(arg1)
-                : "rax", "memory"
-            );
-            __builtin_unreachable();
-
         default:
             return (uint64_t)-1;
     }
+
+    // a wtf code
+    return (uint64_t)-5;
 }
+
 __attribute__((naked)) void syscall_entry(void) {
     __asm__ volatile (
         "movq %%rsp, user_rsp_scratch(%%rip)\n\t"
@@ -130,7 +170,10 @@ __attribute__((naked)) void syscall_entry(void) {
         "pushq %%rcx\n\t"
         "pushq %%rbp\n\t"
         "pushq %%rbx\n\t"
-        "subq $8, %%rsp\n\t"
+        "pushq %%r12\n\t"
+        "pushq %%r13\n\t"
+        "pushq %%r14\n\t"
+        "pushq %%r15\n\t"
 
         "movq %%r10, %%r8\n\t"
         "movq %%rdx, %%rcx\n\t"
@@ -139,8 +182,10 @@ __attribute__((naked)) void syscall_entry(void) {
         "movq %%rax, %%rdi\n\t"
 
         "call c_syscall_handler\n\t"
-
-        "addq $8, %%rsp\n\t"
+        "popq %%r15\n\t"
+        "popq %%r14\n\t"
+        "popq %%r13\n\t"
+        "popq %%r12\n\t"
         "popq %%rbx\n\t"
         "popq %%rbp\n\t"
         "popq %%rcx\n\t"
@@ -148,29 +193,37 @@ __attribute__((naked)) void syscall_entry(void) {
         "popq %%rsp\n\t"
 
         "sysretq\n\t"
-        ::: "memory"
+        :
+        :
+        : "memory"
     );
 }
 
-void core_to_user(void *user_entry, void *user_stack_top) {
-    uint64_t user_ds = 0x1B;
-    uint64_t user_cs = 0x23;
+void core_to_user(uint64_t user_pml4_phys, void *user_entry, void *user_stack_top) {
+    uint64_t user_cs = 0x08; 
+    uint64_t user_ds = 0x10; 
 
     __asm__ volatile (
         "cli\n\t"
-        "mov %w0, %%ds\n\t"
-        "mov %w0, %%es\n\t"
-        "mov %w0, %%fs\n\t"
-        "mov %w0, %%gs\n\t"
-
-        "pushq %0\n\t"
-        "pushq %1\n\t"
+        "mov %[_pml4], %%rax\n\t"
+        "mov %%rax, %%cr3\n\t"
+        "mov %w[_ds], %%ax\n\t"
+        "mov %%ax, %%ds\n\t"
+        "mov %%ax, %%es\n\t"
+        "mov %%ax, %%fs\n\t"
+        "mov %%ax, %%gs\n\t"
+        "pushq %[_ds]\n\t"
+        "pushq %[_stack]\n\t"
         "pushq $0x202\n\t"
-        "pushq %2\n\t"
-        "pushq %3\n\t"
+        "pushq %[_cs]\n\t"
+        "pushq %[_entry]\n\t"
         "iretq\n\t"
         :
-        : "r"(user_ds), "r"(user_stack_top), "r"(user_cs), "r"(user_entry)
-        : "memory"
+        : [_pml4] "r"(user_pml4_phys),
+          [_ds] "r"(user_ds),
+          [_stack] "r"(user_stack_top),
+          [_cs] "r"(user_cs),
+          [_entry] "r"(user_entry)
+        : "rax", "memory"
     );
 }

@@ -123,7 +123,7 @@ extern void *user_rsp_scratch;
 
 void syscall_entry(void);
 uint64_t c_syscall_handler(uint64_t sys_id, uint64_t arg1, uint64_t arg2, uint64_t arg3, uint64_t arg4);
-void core_to_user(void *user_entry, void *user_stack_top);
+void core_to_user(uint64_t user_pml4_phys, void *user_entry, void *user_stack_top);
 
 static inline uint64_t core_syscall(uint64_t sys_id, uint64_t arg1, uint64_t arg2, uint64_t arg3, uint64_t arg4) {
     uint64_t result;
@@ -138,5 +138,9 @@ static inline uint64_t core_syscall(uint64_t sys_id, uint64_t arg1, uint64_t arg
 
     return result;
 }
+
+void init_syscall(void);
+void init_user_space(void);
+uint64_t pmm_alloc_block(void);
 
 #endif
