@@ -6,9 +6,9 @@
 #include <boot/kernel.h>
 #include <boot/limine.h>
 
-#define IA32_STAR   0xC0000081
-#define IA32_LSTAR  0xC0000082
-#define IA32_FMASK  0xC0000084
+#define IA32_STAR    0xC0000081
+#define IA32_LSTAR   0xC0000082
+#define IA32_FMASK   0xC0000084
 
 static uint8_t kernel_stack[16384] __attribute__((aligned(16)));
 void *kernel_stack_top = &kernel_stack[16384];
@@ -29,7 +29,7 @@ static inline void wrmsr(uint32_t msr, uint64_t val) {
 }
 
 void init_syscall(void) {
-    uint64_t star = ((uint64_t)0x08 << 32) | ((uint64_t)0x10 << 48);
+    uint64_t star = ((uint64_t)0x08 << 32) | ((uint64_t)0x1B << 48);
     wrmsr(IA32_STAR, star);
 
     wrmsr(IA32_LSTAR, (uint64_t)syscall_entry);
@@ -102,7 +102,7 @@ uint64_t c_syscall_handler(uint64_t sys_id, uint64_t arg1, uint64_t arg2, uint64
         case DOGEIO_EXEC_FLAT_BINARY:
             return (uint64_t)exec_flat_binary((const char *)arg1, (int)arg2, (char **)arg3);
 
-            case KERNEL_MENUBAR_DRAW:
+        case KERNEL_MENUBAR_DRAW:
             menubar_draw();
             return 0;
 
@@ -149,14 +149,13 @@ uint64_t c_syscall_handler(uint64_t sys_id, uint64_t arg1, uint64_t arg2, uint64
                 volatile uint32_t *pixel_address = (volatile uint32_t*)((uint8_t*)fb->address + (y * fb->pitch) + (x * 4));
                 *pixel_address = color;
             }
-            break;
+            return 0;
         }   
         
         default:
             return (uint64_t)-1;
     }
 
-    // a wtf code
     return (uint64_t)-5;
 }
 
@@ -165,7 +164,6 @@ __attribute__((naked)) void syscall_entry(void) {
         "movq %%rsp, user_rsp_scratch(%%rip)\n\t"
         "movq kernel_stack_top(%%rip), %%rsp\n\t"
 
-        "pushq user_rsp_scratch(%%rip)\n\t"
         "pushq %%r11\n\t"
         "pushq %%rcx\n\t"
         "pushq %%rbp\n\t"
@@ -182,6 +180,7 @@ __attribute__((naked)) void syscall_entry(void) {
         "movq %%rax, %%rdi\n\t"
 
         "call c_syscall_handler\n\t"
+
         "popq %%r15\n\t"
         "popq %%r14\n\t"
         "popq %%r13\n\t"
@@ -190,7 +189,8 @@ __attribute__((naked)) void syscall_entry(void) {
         "popq %%rbp\n\t"
         "popq %%rcx\n\t"
         "popq %%r11\n\t"
-        "popq %%rsp\n\t"
+
+        "movq user_rsp_scratch(%%rip), %%rsp\n\t"
 
         "sysretq\n\t"
         :
@@ -200,8 +200,8 @@ __attribute__((naked)) void syscall_entry(void) {
 }
 
 void core_to_user(uint64_t user_pml4_phys, void *user_entry, void *user_stack_top) {
-    uint64_t user_cs = 0x08; 
-    uint64_t user_ds = 0x10; 
+    uint64_t user_cs = 0x1B; 
+    uint64_t user_ds = 0x23; 
 
     __asm__ volatile (
         "cli\n\t"
