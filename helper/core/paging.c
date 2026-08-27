@@ -53,21 +53,12 @@ uint64_t create_user_pml4(void) {
 
     uint64_t *boot_pml4 = get_limine_boot_pml4();
     
-    // Deep copy higher-half (kernel space) entries safely
+    // Map higher-half (kernel space) entries safely with user bit enabled
     for (int i = 256; i < 512; i++) {
         if (boot_pml4[i] & PAGE_PRESENT) {
             uint64_t src_pdpt_phys = boot_pml4[i] & 0xFFFFFFFFF000ULL;
-            uint64_t *src_pdpt = (uint64_t *)phys_to_virt(src_pdpt_phys);
-            
-            uint64_t dst_pdpt_phys = pmm_alloc_block();
-            uint64_t *dst_pdpt = (uint64_t *)phys_to_virt(dst_pdpt_phys);
-
-            for (int j = 0; j < 512; j++) {
-                dst_pdpt[j] = src_pdpt[j];
-            }
-
-            uint64_t flags = boot_pml4[i] & 0xFFF;
-            pml4_virt[i] = dst_pdpt_phys | flags;
+            uint64_t flags = (boot_pml4[i] & 0xFFF) | PAGE_USER;
+            pml4_virt[i] = src_pdpt_phys | flags;
         }
     }
 
@@ -126,7 +117,7 @@ void init_user_space(void) {
     map_user_page(user_pml4, user_virt_code, code_phys);
     map_user_page(user_pml4, user_virt_stack - 4096, stack_phys);
 
-    unsigned char app_bytes[] = { 0xEB, 0xFE };
+    unsigned char app_bytes[] = { 0xEB, 0xFE }; // jmp $
     unsigned char *dest = (unsigned char *)phys_to_virt(code_phys);
     for (int i = 0; i < (int)sizeof(app_bytes); i++) {
         dest[i] = app_bytes[i];

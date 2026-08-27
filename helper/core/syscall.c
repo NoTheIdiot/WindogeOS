@@ -6,6 +6,7 @@
 #include <boot/kernel.h>
 #include <boot/limine.h>
 
+#define IA32_EFER    0xC0000080
 #define IA32_STAR    0xC0000081
 #define IA32_LSTAR   0xC0000082
 #define IA32_FMASK   0xC0000084
@@ -29,14 +30,24 @@ static inline void wrmsr(uint32_t msr, uint64_t val) {
 }
 
 void init_syscall(void) {
-    uint64_t star = ((uint64_t)0x08 << 32) | ((uint64_t)0x0B << 48);
+    uint64_t efer = rdmsr(IA32_EFER);
+    efer |= (1 << 0); 
+    wrmsr(IA32_EFER, efer);
+
+    uint64_t star = ((uint64_t)0x10 << 32) | ((uint64_t)0x08 << 48);
     wrmsr(IA32_STAR, star);
 
     wrmsr(IA32_LSTAR, (uint64_t)syscall_entry);
     wrmsr(IA32_FMASK, 0x200);
 }
 
-uint64_t c_syscall_handler(uint64_t sys_id, uint64_t arg1, uint64_t arg2, uint64_t arg3, uint64_t arg4) {
+uint64_t c_syscall_handler(
+    [[maybe_unused]] uint64_t sys_id, 
+    [[maybe_unused]] uint64_t arg1, 
+    [[maybe_unused]] uint64_t arg2, 
+    [[maybe_unused]] uint64_t arg3, 
+    [[maybe_unused]] uint64_t arg4
+) {
     switch (sys_id) {
         case DOGEIO_TEXT_PUTCHAR:
             dogeio_text_putchar((char)arg1, (uint32_t)arg2, (uint32_t)arg3);
@@ -181,6 +192,8 @@ __attribute__((naked)) void syscall_entry(void) {
 
         "call c_syscall_handler\n\t"
 
+        "movq %%rax, %%r12\n\t"
+
         "popq %%r15\n\t"
         "popq %%r14\n\t"
         "popq %%r13\n\t"
@@ -191,6 +204,8 @@ __attribute__((naked)) void syscall_entry(void) {
         "popq %%r11\n\t"
 
         "movq user_rsp_scratch(%%rip), %%rsp\n\t"
+
+        "movq %%r12, %%rax\n\t"
 
         "sysretq\n\t"
         :

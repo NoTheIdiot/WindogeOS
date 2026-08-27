@@ -15,7 +15,18 @@
         {
             "label": "start virtual machine",
             "type": "shell",
-            "command": "cd /home/user/WindogeOS && python3 start_vm.py",
+            "command": "cd /home/user/WindogeOS && python3 start_vm.py --debug",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": false
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "debugging time",
+            "type": "shell",
+            "command": "cd /home/user/WindogeOS && python3 debug.py",
             "presentation": {
                 "reveal": "always",
                 "panel": "shared",
@@ -27,7 +38,8 @@
             "label": "build and run WindogeOS",
             "dependsOn": [
                 "compile",
-                "start virtual machine"
+                "start virtual machine",
+                "debugging time"
             ],
             "group": {
                 "kind": "build",
