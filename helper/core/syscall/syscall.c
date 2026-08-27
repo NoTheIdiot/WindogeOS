@@ -15,6 +15,9 @@ static uint8_t kernel_stack[16384] __attribute__((aligned(16)));
 void *kernel_stack_top = &kernel_stack[16384];
 void *user_rsp_scratch;
 
+extern void syscall_entry(void);
+extern void core_to_user(uint64_t user_pml4_phys, void *user_entry, void *user_stack_top);
+
 extern volatile struct limine_framebuffer_request framebuffer_request;
 
 [[maybe_unused]] static inline uint64_t rdmsr(uint32_t msr) {
@@ -31,14 +34,14 @@ static inline void wrmsr(uint32_t msr, uint64_t val) {
 
 void init_syscall(void) {
     uint64_t efer = rdmsr(IA32_EFER);
-    efer |= (1 << 0); 
+    efer |= (1 << 0);
     wrmsr(IA32_EFER, efer);
 
     uint64_t star = ((uint64_t)0x10 << 32) | ((uint64_t)0x08 << 48);
     wrmsr(IA32_STAR, star);
 
     wrmsr(IA32_LSTAR, (uint64_t)syscall_entry);
-    wrmsr(IA32_FMASK, 0x200);
+    wrmsr(IA32_FMASK, 0x200); 
 }
 
 uint64_t c_syscall_handler(
@@ -168,77 +171,4 @@ uint64_t c_syscall_handler(
     }
 
     return (uint64_t)-5;
-}
-
-__attribute__((naked)) void syscall_entry(void) {
-    __asm__ volatile (
-        "movq %%rsp, user_rsp_scratch(%%rip)\n\t"
-        "movq kernel_stack_top(%%rip), %%rsp\n\t"
-
-        "pushq %%r11\n\t"
-        "pushq %%rcx\n\t"
-        "pushq %%rbp\n\t"
-        "pushq %%rbx\n\t"
-        "pushq %%r12\n\t"
-        "pushq %%r13\n\t"
-        "pushq %%r14\n\t"
-        "pushq %%r15\n\t"
-
-        "movq %%r10, %%r8\n\t"
-        "movq %%rdx, %%rcx\n\t"
-        "movq %%rsi, %%rdx\n\t"
-        "movq %%rdi, %%rsi\n\t"
-        "movq %%rax, %%rdi\n\t"
-
-        "call c_syscall_handler\n\t"
-
-        "movq %%rax, %%r12\n\t"
-
-        "popq %%r15\n\t"
-        "popq %%r14\n\t"
-        "popq %%r13\n\t"
-        "popq %%r12\n\t"
-        "popq %%rbx\n\t"
-        "popq %%rbp\n\t"
-        "popq %%rcx\n\t"
-        "popq %%r11\n\t"
-
-        "movq user_rsp_scratch(%%rip), %%rsp\n\t"
-
-        "movq %%r12, %%rax\n\t"
-
-        "sysretq\n\t"
-        :
-        :
-        : "memory"
-    );
-}
-
-void core_to_user(uint64_t user_pml4_phys, void *user_entry, void *user_stack_top) {
-    uint64_t user_cs = 0x1B; 
-    uint64_t user_ds = 0x23; 
-
-    __asm__ volatile (
-        "cli\n\t"
-        "mov %[_pml4], %%rax\n\t"
-        "mov %%rax, %%cr3\n\t"
-        "mov %w[_ds], %%ax\n\t"
-        "mov %%ax, %%ds\n\t"
-        "mov %%ax, %%es\n\t"
-        "mov %%ax, %%fs\n\t"
-        "mov %%ax, %%gs\n\t"
-        "pushq %[_ds]\n\t"
-        "pushq %[_stack]\n\t"
-        "pushq $0x202\n\t"
-        "pushq %[_cs]\n\t"
-        "pushq %[_entry]\n\t"
-        "iretq\n\t"
-        :
-        : [_pml4] "r"(user_pml4_phys),
-          [_ds] "r"(user_ds),
-          [_stack] "r"(user_stack_top),
-          [_cs] "r"(user_cs),
-          [_entry] "r"(user_entry)
-        : "rax", "memory"
-    );
 }
