@@ -10,15 +10,19 @@
 #define IA32_STAR    0xC0000081
 #define IA32_LSTAR   0xC0000082
 #define IA32_FMASK   0xC0000084
+#define IA32_KERNEL_GS_BASE 0xC0000102
 
 static uint8_t kernel_stack[16384] __attribute__((aligned(16)));
-void *kernel_stack_top = &kernel_stack[16384];
-void *user_rsp_scratch;
+typedef struct {
+    uint64_t kernel_stack_top;
+    uint64_t user_rsp_scratch;
+} __attribute__ ((aligned(16))) gs_data;
 
 extern void syscall_entry(void);
 extern void core_to_user(uint64_t user_pml4_phys, void *user_entry, void *user_stack_top);
 
 extern volatile struct limine_framebuffer_request framebuffer_request;
+static gs_data per_core_gs __attribute__((aligned(16)));
 
 [[maybe_unused]] static inline uint64_t rdmsr(uint32_t msr) {
     uint32_t low, high;
@@ -33,6 +37,13 @@ static inline void wrmsr(uint32_t msr, uint64_t val) {
 }
 
 void init_syscall(void) {
+    uint64_t top = (uint64_t)(kernel_stack + sizeof(kernel_stack));
+    top &= ~0xFULL;
+    per_core_gs.kernel_stack_top = top;
+    per_core_gs.user_rsp_scratch = 0;
+
+    wrmsr(IA32_KERNEL_GS_BASE, (uint64_t)&per_core_gs);
+
     uint64_t efer = rdmsr(IA32_EFER);
     efer |= (1 << 0);
     wrmsr(IA32_EFER, efer);
@@ -41,7 +52,7 @@ void init_syscall(void) {
     wrmsr(IA32_STAR, star);
 
     wrmsr(IA32_LSTAR, (uint64_t)syscall_entry);
-    wrmsr(IA32_FMASK, 0x200); 
+    wrmsr(IA32_FMASK, 0x200);
 }
 
 uint64_t c_syscall_handler(

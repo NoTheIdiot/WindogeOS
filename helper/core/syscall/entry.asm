@@ -2,22 +2,17 @@
 
 global syscall_entry
 extern c_syscall_handler
-extern user_rsp_scratch
-extern kernel_stack_top
 
 section .text
 
 syscall_entry:
-    ; save user stack pointer and switch to kernel stack
-    mov qword [rel user_rsp_scratch], rsp
-    mov rsp, qword [rel kernel_stack_top]
+    swapgs
+    mov [gs:8], rsp        ; save user RSP
+    mov rsp, [gs:0]        ; switch to kernel stack
 
-    ; save regeisters clobbered by SYSCALL or needed for SYSRET
-    ; syscall is to go from ring 3 to ring 0
-    ; sysret is to GO to ring 3
-
-    push rcx          ; user RIP
-    push r11          ; user RFLAGS
+    ; save registers
+    push rcx               ; user RIP
+    push r11               ; user RFLAGS
     push rbp
     push rbx
     push r12
@@ -25,34 +20,28 @@ syscall_entry:
     push r14
     push r15
 
-    ; map system V AMD64 ABI args (holy alphabet soup) for c_syscall_handler:
-    mov r8, r10       ; arg4 (r10) -> 5th argument (r8)
-    mov rcx, rdx      ; arg3 (rdx) -> 4th argument (rcx)
-    mov rdx, rsi      ; arg2 (rsi) -> 3rd argument (rdx)
-    mov rsi, rdi      ; arg1 (rdi) -> 2nd argument (rsi)
-    mov rdi, rax      ; sys_id (rax) -> 1st argument (rdi)
+    ; map syscall args to System V ABI
+    mov r8, r10
+    mov rcx, rdx
+    mov rdx, rsi
+    mov rsi, rdi
+    mov rdi, rax
 
-    ; into C 
-    call c_syscall_handler 
+    call c_syscall_handler
 
-    ; save return value in r12 temporarily in r12
+    ; exit half
     mov r12, rax
-
-    ; SWITCH TO USER STACK IDIOT
-    mov rsp, qword [rel user_rsp_scratch]
-
-    ; put the return value back to rax
-    mov rax, r12
-
-    ; restore the dang regs
     pop r15
     pop r14
     pop r13
     pop r12
     pop rbx
     pop rbp
-    pop r11           ; restores user RFLAGS
-    pop rcx           ; restores user RIP
+    pop r11
+    pop rcx
 
-    ; return to ring 3 (userspace), safely :D
+    mov rdx, [gs:8]
+    swapgs
+    mov rsp, rdx
+    mov rax, r12
     sysretq
