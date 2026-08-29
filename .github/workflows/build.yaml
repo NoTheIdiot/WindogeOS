@@ -29,6 +29,6 @@ jobs:
       with:
         name: windoge-os-image
         path: |
-          *.img
-          *.iso
-          *.bin
+          **/*.img
+          **/*.iso
+          **/*.bin
