@@ -1,7 +1,9 @@
+#include <string.h>
 #include <stdint.h>
 #include <boot/limine.h>
 #include <boot/kernel.h>
 #include <core.h>
+#include <basicutil.h>
 
 #define PAGE_PRESENT (1ULL << 0)
 #define PAGE_WRITE   (1ULL << 1)
@@ -24,12 +26,16 @@ uint64_t pmm_alloc_block(void) {
             if (current_addr + 4096 <= entry->base + entry->length) {
                 uint64_t frame = current_addr;
                 current_addr += 4096;
+                char framestr[64];
+                str_itoa((int)frame, framestr);
+                log(framestr);
                 return frame;
             }
         }
         memmap_idx++;
         current_addr = 0;
     }
+    log("[PE] Page Error: It didn't map.");
     return 0;
 }
 
