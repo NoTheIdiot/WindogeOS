@@ -1,12 +1,31 @@
-#define RING3
-
 // this is to parse .tga files
 #include <system.h>
 #include <boot/kernel.h>
+#include <boot/limine.h>
 #include <stdint.h>
 #include <stddef.h> 
 #include <image.h>
 #include <dogeio.h>
+
+extern volatile struct limine_framebuffer_request framebuffer_request;
+
+void put_pixel(uint64_t x, uint64_t y, uint32_t color) {
+    if (framebuffer_request.response == NULL || framebuffer_request.response->framebuffer_count < 1) {
+        return;
+    }
+
+    struct limine_framebuffer *fb = framebuffer_request.response->framebuffers[0];
+
+    if (x >= fb->width || y >= fb->height) {
+        return;
+    }
+
+    uint32_t *fb_ptr = (uint32_t *)fb->address;
+    uint64_t pitch_pixels = fb->pitch / 4;
+
+    fb_ptr[y * pitch_pixels + x] = color;
+}
+
 
 int system_parse_tga(char* filename) {
     static uint8_t image_buffer[20000];

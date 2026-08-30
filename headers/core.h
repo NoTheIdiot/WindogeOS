@@ -48,13 +48,14 @@ typedef struct {
 } __attribute__((packed)) gdt_ptr_t;
 
 typedef struct {
-    gdt_entry_t      null_desc;   // 0x00
-    gdt_entry_t      kernel_code; // 0x08
-    gdt_entry_t      kernel_data; // 0x10
-    gdt_entry_t      user_data;   // 0x18
-    gdt_entry_t      user_code;   // 0x20
-    tss_descriptor_t tss_desc;    // 0x28
+    gdt_entry_t      null_desc;   
+    gdt_entry_t      kernel_code; 
+    gdt_entry_t      kernel_data; 
+    gdt_entry_t      user_code;   
+    gdt_entry_t      user_data;   
+    tss_descriptor_t tss_desc;    
 } __attribute__((packed, aligned(4096))) gdt_table_t;
+
 
 void init_gdt(void);
 extern void gdt_flush(gdt_ptr_t *ptr);
@@ -88,59 +89,12 @@ typedef struct {
 
 void init_idt(void);
 extern void idt_load(idt_ptr_t *ptr);
-void init_tss(void);
-
-#define DOGEIO_TEXT_PUTCHAR           1
-#define DOGEIO_TEXT_CLEAR             2
-#define DOGEIO_TEXT_PRINTCHAR         3
-#define DOGEIO_TEXT_PRINT             4
-#define DOGEIO_TEXT_PRINTLN           5
-#define DOGEIO_TEXT_PRINT_AT          6
-#define DOGEIO_TEXT_INPUT             7
-#define DOGEIO_TEXT_COLOR_CHANGE      8
-#define DOGEIO_TEXT_BACKGROUND_CHANGE 9
-#define DOGEIO_TEXT_CLEAR_RAW         10
-
-#define DOGEIO_FS_FORMAT              11
-#define DOGEIO_FS_CREATE              12
-#define DOGEIO_FS_MKDIR               13
-#define DOGEIO_FS_EXISTS              14
-#define DOGEIO_FS_DELETE              15
-#define DOGEIO_FS_DELETE_LAST_LINE    16
-#define DOGEIO_FS_READ                17
-#define DOGEIO_FS_WRITE               18
-#define DOGEIO_FS_LIST_DIR            19
-#define DOGEIO_FS_RENAME              20
-#define DOGEIO_FS_COPY                21
-#define DOGEIO_FS_CHDIR               22
-#define DOGEIO_FS_DIRNAME             23
-#define DOGEIO_FS_MOUNT               24
-
-#define DOGEIO_EXEC_FLAT_BINARY       25
-
-extern void *kernel_stack_top;
-extern void *user_rsp_scratch;
-
-void syscall_entry(void);
-uint64_t c_syscall_handler(uint64_t sys_id, uint64_t arg1, uint64_t arg2, uint64_t arg3, uint64_t arg4);
-void core_to_user(uint64_t user_pml4_phys, void *user_entry, void *user_stack_top);
-
-static inline uint64_t core_syscall(uint64_t sys_id, uint64_t arg1, uint64_t arg2, uint64_t arg3, uint64_t arg4) {
-    uint64_t result;
-    register uint64_t r10 __asm__("r10") = arg4;
-
-    __asm__ volatile (
-        "syscall\n\t"
-        : "=a"(result)
-        : "a"(sys_id), "D"(arg1), "S"(arg2), "d"(arg3), "r"(r10)
-        : "rcx", "r11", "memory"
-    );
-
-    return result;
-}
 
 void init_syscall(void);
 void init_user_space(void);
 uint64_t pmm_alloc_block(void);
+void core_c_dispatcher(uint64_t syscall_num, uint64_t arg1, uint64_t arg2, uint64_t arg3);
+void core_to_user(uint64_t cr3_phys, void *entry_point, void *user_stack);
+void init_syscalls(void);
 
 #endif

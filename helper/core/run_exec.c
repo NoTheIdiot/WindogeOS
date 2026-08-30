@@ -55,8 +55,14 @@ static uint64_t map_app_memory(uint64_t stack_phys) {
     uint64_t *app_pml4 = (uint64_t *)pmm_alloc_block();
     uint64_t *app_pdpt = (uint64_t *)pmm_alloc_block();
     uint64_t *app_pd   = (uint64_t *)pmm_alloc_block();
-    uint64_t *app_stack_pdpt = (uint64_t *)pmm_alloc_block();
-    uint64_t *app_stack_pd   = (uint64_t *)pmm_alloc_block();
+    
+    uint64_t stack_pml4_idx = (USER_STACK_VIRT >> 39) & 0x1FF;
+    uint64_t stack_pdpt_idx = (USER_STACK_VIRT >> 30) & 0x1FF;
+    uint64_t stack_pd_idx   = (USER_STACK_VIRT >> 21) & 0x1FF;
+    uint64_t stack_pt_idx   = (USER_STACK_VIRT >> 12) & 0x1FF;
+
+    uint64_t *app_stack_pdpt = (stack_pml4_idx == 0) ? app_pdpt : (uint64_t *)pmm_alloc_block();
+    uint64_t *app_stack_pd   = (stack_pml4_idx == 0 && stack_pdpt_idx == 0) ? app_pd : (uint64_t *)pmm_alloc_block();
     uint64_t *app_stack_pt   = (uint64_t *)pmm_alloc_block();
 
     if (!app_pml4 || !app_pdpt || !app_pd || !app_stack_pdpt || !app_stack_pd || !app_stack_pt) return 0;
@@ -64,8 +70,9 @@ static uint64_t map_app_memory(uint64_t stack_phys) {
     memset(app_pml4, 0, 4096);
     memset(app_pdpt, 0, 4096);
     memset(app_pd, 0, 4096);
-    memset(app_stack_pdpt, 0, 4096);
-    memset(app_stack_pd, 0, 4096);
+    
+    if (stack_pml4_idx != 0) memset(app_stack_pdpt, 0, 4096);
+    if (!(stack_pml4_idx == 0 && stack_pdpt_idx == 0)) memset(app_stack_pd, 0, 4096);
     memset(app_stack_pt, 0, 4096);
 
     for (int i = 256; i < 512; i++) {
@@ -75,19 +82,14 @@ static uint64_t map_app_memory(uint64_t stack_phys) {
     uint64_t pml4_phys = virt_to_phys(app_pml4, hhdm);
     uint64_t pdpt_phys = virt_to_phys(app_pdpt, hhdm);
     uint64_t pd_phys   = virt_to_phys(app_pd, hhdm);
-    
-    uint64_t stack_pml4_idx = (USER_STACK_VIRT >> 39) & 0x1FF;
-    uint64_t stack_pdpt_idx = (USER_STACK_VIRT >> 30) & 0x1FF;
-    uint64_t stack_pd_idx   = (USER_STACK_VIRT >> 21) & 0x1FF;
-    uint64_t stack_pt_idx   = (USER_STACK_VIRT >> 12) & 0x1FF;
-
-    uint64_t stack_pdpt_phys = virt_to_phys(app_stack_pdpt, hhdm);
-    uint64_t stack_pd_phys   = virt_to_phys(app_stack_pd, hhdm);
-    uint64_t stack_pt_phys   = virt_to_phys(app_stack_pt, hhdm);
 
     app_pml4[0] = pdpt_phys | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;
     app_pdpt[0] = pd_phys   | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;
     app_pd[2]   = APP_PHYS_ADDR | (1ULL << 7) | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;
+
+    uint64_t stack_pdpt_phys = virt_to_phys(app_stack_pdpt, hhdm);
+    uint64_t stack_pd_phys   = virt_to_phys(app_stack_pd, hhdm);
+    uint64_t stack_pt_phys   = virt_to_phys(app_stack_pt, hhdm);
 
     app_pml4[stack_pml4_idx] = stack_pdpt_phys | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;
     app_stack_pdpt[stack_pdpt_idx] = stack_pd_phys | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;

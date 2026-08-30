@@ -72,8 +72,7 @@ void kernel_main(void) {
     log("Init gdt idt tss and syscall");
     init_gdt();
     init_idt();
-    init_tss();
-    init_syscall();
+    init_syscalls();
     log("Success");
 
     log("WindogeOS has successfully booted. Start celebrating broski.");

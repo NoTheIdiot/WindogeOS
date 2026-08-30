@@ -30,26 +30,22 @@ static void set_tss_descriptor(tss_descriptor_t *desc, uint64_t base, uint32_t l
 
 void init_gdt(void) {
     memset(&gdt, 0, sizeof(gdt));
+    memset(&tss, 0, sizeof(tss));
 
-    set_gdt_entry(&gdt.null_desc, 0, 0, 0, 0);
-    set_gdt_entry(&gdt.kernel_code, 0, 0, 0x9A, 0x20);
-    set_gdt_entry(&gdt.kernel_data, 0, 0, 0x92, 0x00);
-    set_gdt_entry(&gdt.user_data,   0, 0, 0xF2, 0x00);
-    set_gdt_entry(&gdt.user_code,   0, 0, 0xFA, 0x20);
+    set_gdt_entry(&gdt.null_desc, 0, 0, 0, 0);       
+    set_gdt_entry(&gdt.kernel_code, 0, 0, 0x9A, 0x20); 
+    set_gdt_entry(&gdt.kernel_data, 0, 0, 0x92, 0x00); 
+    set_gdt_entry(&gdt.user_code,   0, 0, 0xFA, 0x20); 
+    set_gdt_entry(&gdt.user_data,   0, 0, 0xF2, 0x00); 
+
+    tss.rsp0 = (uint64_t)&kernel_stack[sizeof(kernel_stack)];
+    tss.iomap_base = sizeof(tss_entry_t);
+    set_tss_descriptor(&gdt.tss_desc, (uint64_t)&tss, sizeof(tss) - 1);
 
     gdtr.limit = sizeof(gdt) - 1;
     gdtr.base  = (uint64_t)&gdt;
 
     gdt_flush(&gdtr);
-}
-
-void init_tss(void) {
-    memset(&tss, 0, sizeof(tss));
-
-    tss.rsp0 = (uint64_t)&kernel_stack[sizeof(kernel_stack)];
-    tss.iomap_base = sizeof(tss_entry_t);
-
-    set_tss_descriptor(&gdt.tss_desc, (uint64_t)&tss, sizeof(tss) - 1);
 
     __asm__ volatile ("ltr %0" :: "r"((uint16_t)0x28));
 }

@@ -130,6 +130,11 @@ int system_dogeshell_ex(char* command) {
         handled = 0;
     }
 
+    else if (str_strcmp(command, "test") == 0) {
+        
+        handled = 0;
+    }
+
     else if (str_strcmp(command, "shutdown") == 0) {
         dogeio_text_clear_raw();
         dogeio_text_println("Such shutdown, very goodbye.");
