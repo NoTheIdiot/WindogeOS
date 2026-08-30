@@ -12,6 +12,9 @@
 extern volatile struct limine_hhdm_request hhdm_request;
 extern volatile struct limine_memmap_request memmap_request;
 
+#define STACK_BLOCKS 32
+static void* stack_blocks_array[STACK_BLOCKS];
+
 uint64_t pmm_alloc_block(void) {
     static uint64_t memmap_idx = 0;
     static uint64_t current_addr = 0;
@@ -43,6 +46,10 @@ static inline void *phys_to_virt(uint64_t phys) {
     return (void *)(phys + hhdm_request.response->offset);
 }
 
+static inline uint64_t virt_to_phys(void *ptr, uint64_t hhdm) {
+    return (uint64_t)ptr - hhdm;
+}
+
 uint64_t* get_limine_boot_pml4(void) {
     uint64_t cr3;
     asm volatile("mov %%cr3, %0" : "=r" (cr3));
@@ -60,11 +67,11 @@ uint64_t create_user_pml4(void) {
     uint64_t *boot_pml4 = get_limine_boot_pml4();
     
     for (int i = 256; i < 512; i++) {
-    if (boot_pml4[i] & PAGE_PRESENT) {
-        uint64_t src_pdpt_phys = boot_pml4[i] & 0xFFFFFFFFF000ULL;
-        pml4_virt[i] = src_pdpt_phys | PAGE_PRESENT | PAGE_WRITE; 
+        if (boot_pml4[i] & PAGE_PRESENT) {
+            uint64_t src_pdpt_phys = boot_pml4[i] & 0xFFFFFFFFF000ULL;
+            pml4_virt[i] = src_pdpt_phys | PAGE_PRESENT | PAGE_WRITE; 
+        }
     }
-}
 
     return pml4_phys;
 }
@@ -131,4 +138,30 @@ void init_user_space(void) {
     }
 
     core_to_user(user_pml4, (void *)user_virt_code, (void *)user_virt_stack_top);
+}
+
+uint64_t allocate_flat_user_stack(uint64_t hhdm, uint64_t pml4_phys) {
+    for (int i = 0; i < STACK_BLOCKS; i++) {
+        uint64_t phys_block = pmm_alloc_block();
+        if (!phys_block) return 0;
+        
+        stack_blocks_array[i] = (void*)phys_block;
+        void* virt_page = phys_to_virt(phys_block);
+        memset(virt_page, 0, 4096);
+
+        uint64_t user_virt_addr = 0x7FFF00000000ULL - ((uint64_t)(i + 1) * 4096);
+        map_user_page(pml4_phys, user_virt_addr, phys_block);
+    }
+    return virt_to_phys(stack_blocks_array[0], hhdm);
+}
+
+void clean_user_stack_scratchpad(uint64_t hhdm) {
+    (void)hhdm;
+    for (int i = 0; i < STACK_BLOCKS; i++) {
+        if (stack_blocks_array[i]) {
+            void* virt_page = phys_to_virt((uint64_t)stack_blocks_array[i]);
+            memset(virt_page, 0, 4096);
+            stack_blocks_array[i] = NULL;
+        }
+    }
 }

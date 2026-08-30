@@ -89,6 +89,7 @@ typedef struct {
 
 void init_idt(void);
 extern void idt_load(idt_ptr_t *ptr);
+uint64_t allocate_flat_user_stack(uint64_t hhdm, uint64_t pml4_phys);
 
 void init_syscall(void);
 void init_user_space(void);
