@@ -11,4 +11,8 @@ static inline void dogeio_text_print(const char* text) {
     _syscall(DOGEIO_TEXT_PRINT, (uint64_t)text);
 }
 
+static inline void dogeio_update(void) {
+    _syscall(DOGEIO_UPDATE, 0);
+}
+
 #endif

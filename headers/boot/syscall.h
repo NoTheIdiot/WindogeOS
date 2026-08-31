@@ -2,7 +2,8 @@
 #define BOOT_SYSCALL_H
 
 #define DOGEIO_TEXT_EXIT 0
-#define DOGEIO_TEXT_PRINT 1
+#define DOGEIO_UPDATE 1
+#define DOGEIO_TEXT_PRINT 2
 
 #include <stdint.h>
 

@@ -38,6 +38,34 @@ size_t str_strlen(const char *str) {
     return counter;
 }
 
+void u16_to_str(uint16_t value, char *out) {
+    char buf[6];
+    int i = 0;
+    if (value == 0) {
+        out[0] = '0';
+        out[1] = '\0';
+        return;
+    }
+    while (value > 0) {
+        buf[i++] = (char)('0' + (value % 10));
+        value /= 10;
+    }
+    for (int j = 0; j < i; j++) {
+        out[j] = buf[i - j - 1];
+    }
+    out[i] = '\0';
+}
+
+uint16_t str_to_u16(const char *s) {
+    uint16_t result = 0;
+    while (*s) {
+        if (*s < '0' || *s > '9') break;
+        result = result * 10 + (uint16_t)(*s - '0');
+        s++;
+    }
+    return result;
+}
+
 void str_itoa(int n, char* str) {
     int i = 0;
     

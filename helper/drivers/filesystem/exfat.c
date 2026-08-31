@@ -791,19 +791,60 @@ int exfat_print_directory(int hidden) {
 }
 
 int exfat_change_directory(const char *path) {
-    if (str_strcmp(path, "/") == 0 || str_strcmp(path, "..") == 0) {
+    if (!path || path[0] == '\0') return 0;
+
+    if (str_strcmp(path, "/") == 0) {
         g_current_cluster = g_root_cluster;
         str_strcpy(g_current_path, "/");
         return 1;
     }
 
-    exfat_target_t target;
-    if (exfat_resolve_entry(path, &target) == 0 && target.is_dir) {
-        g_current_cluster = target.cluster;
-        str_strcpy(g_current_path, path);
-        return 1;
+    char temp[256];
+    str_strcpy(temp, path);
+
+    char new_path[256];
+    str_strcpy(new_path, g_current_path);
+
+    uint32_t cluster = g_current_cluster;
+    int start = 0;
+    int len = (int)str_strlen(temp);
+
+    while (start < len) {
+        int end = start;
+        while (end < len && temp[end] != '/') end++;
+
+        char token[64];
+        int toklen = end - start;
+        if (toklen >= 64) toklen = 63;
+        for (int i = 0; i < toklen; i++) token[i] = temp[start + i];
+        token[toklen] = '\0';
+
+        if (toklen > 0) {
+            if (str_strcmp(token, "..") == 0) {
+                cluster = g_root_cluster;
+                str_strcpy(new_path, "/");
+            } else if (str_strcmp(token, ".") == 0) {
+            } else {
+                exfat_target_t target;
+                g_current_cluster = cluster;
+                if (exfat_resolve_entry(token, &target) != 0) {
+                    return -1;
+                }
+                if (!target.is_dir) {
+                    return -2;
+                }
+                cluster = target.cluster;
+                if (str_strlen(new_path) > 1) str_strcat(new_path, "/");
+                str_strcat(new_path, token);
+            }
+        }
+
+        start = end + 1;
     }
-    return -1;
+
+    g_current_cluster = cluster;
+    str_strcpy(g_current_path, new_path);
+    return 1;
 }
 
 const char* exfat_get_working_dir(void) {

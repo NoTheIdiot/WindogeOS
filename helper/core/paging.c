@@ -29,16 +29,12 @@ uint64_t pmm_alloc_block(void) {
             if (current_addr + 4096 <= entry->base + entry->length) {
                 uint64_t frame = current_addr;
                 current_addr += 4096;
-                char framestr[64];
-                str_itoa((int)frame, framestr);
-                log(framestr);
                 return frame;
             }
         }
         memmap_idx++;
         current_addr = 0;
     }
-    log("[PE] Page Error: It didn't map.");
     return 0;
 }
 
@@ -69,7 +65,7 @@ uint64_t create_user_pml4(void) {
     for (int i = 256; i < 512; i++) {
         if (boot_pml4[i] & PAGE_PRESENT) {
             uint64_t src_pdpt_phys = boot_pml4[i] & 0xFFFFFFFFF000ULL;
-            pml4_virt[i] = src_pdpt_phys | PAGE_PRESENT | PAGE_WRITE; 
+            pml4_virt[i] = src_pdpt_phys | PAGE_PRESENT | PAGE_WRITE | PAGE_USER; 
         }
     }
 
@@ -93,6 +89,7 @@ void map_user_page(uint64_t pml4_phys, uint64_t virtual_addr, uint64_t physical_
         pml4[pml4_idx] = pdpt_phys | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;
     } else {
         pdpt = (uint64_t *)phys_to_virt(pml4[pml4_idx] & 0xFFFFFFFFF000ULL);
+        pml4[pml4_idx] |= PAGE_USER;
     }
 
     if (!(pdpt[pdpt_idx] & PAGE_PRESENT)) {
@@ -102,6 +99,7 @@ void map_user_page(uint64_t pml4_phys, uint64_t virtual_addr, uint64_t physical_
         pdpt[pdpt_idx] = pd_phys | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;
     } else {
         pd = (uint64_t *)phys_to_virt(pdpt[pdpt_idx] & 0xFFFFFFFFF000ULL);
+        pdpt[pdpt_idx] |= PAGE_USER;
     }
 
     if (!(pd[pd_idx] & PAGE_PRESENT)) {
@@ -111,6 +109,7 @@ void map_user_page(uint64_t pml4_phys, uint64_t virtual_addr, uint64_t physical_
         pd[pd_idx] = pt_phys | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;
     } else {
         pt = (uint64_t *)phys_to_virt(pd[pd_idx] & 0xFFFFFFFFF000ULL);
+        pd[pd_idx] |= PAGE_USER;
     }
 
     pt[pt_idx] = (physical_addr & 0xFFFFFFFFF000ULL) | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;

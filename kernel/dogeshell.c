@@ -435,7 +435,7 @@ int system_dogeshell_ex(char* command) {
     }
     
     else if (str_strcmp(command, "whereami") == 0) {
-        dogeio_text_println("root (/)");
+        dogeio_text_println(fs_dirname());
         handled = 0;
     }
 

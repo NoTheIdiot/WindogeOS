@@ -16,4 +16,7 @@ extern uint32_t old;
 void system_editor(char* filename);
 void system_settings();
 
+int system_create_user(char* name, char* password);
+int system_verify_user(const char* name, char* password);
+
 #endif

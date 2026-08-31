@@ -77,12 +77,75 @@ void kernel_main(void) {
 
     log("WindogeOS has successfully booted. Start celebrating broski.");
     menubar_draw();
+
+    if (!fs_exists(".windoge")) {
+        fs_format();
+        fs_mount();
+
+        dogeio_text_println("Welcome to WindogeOS setup. (Version WindogeOS v0.01)");
+        dogeio_text_println("Such doge very OS. Much cheems many veichular manslaughter.");
+        dogeio_text_println("Press enter to continue.");
+
+        char nothing[1];
+        dogeio_text_input("", nothing, 1);
+
+        fs_mkdir("system");
+        fs_mkdir("users");
+        fs_chdir("system");
+        fs_mkdir("pass");
+        fs_chdir("/");
+        fs_create(".windoge");
+
+        char username_new[64];
+        char password_new[64];
+
+        char root_new[64];
+        fs_chdir("/system/pass");
+
+        dogeio_text_println("Enter root password. You'll need this for admin level privages.");
+        dogeio_text_input("root password (new)> ", root_new, 64);
+        fs_create("root.hash");
+        fs_write("root.hash", root_new);
+        dogeio_text_println("");
+        fs_chdir("/");
+
+        dogeio_text_println("Create a new user. Not sure why anyone would daily drive since it's useless...");
+        dogeio_text_input("new username> ", username_new, 64);
+        dogeio_text_input("new password> ", password_new, 64);
+        system_create_user(username_new, password_new);
+
+        dogeio_text_println("\nSetup complete. Press enter to start system.");
+        dogeio_text_input("", nothing, 1);
+    }
+
+    dogeio_text_clear();
+    dogeio_text_println("Locked screen.");
+    
+    char username[64];
+    while (true) {
+        char password[64];
+
+        dogeio_text_input("username> ", username, 64);
+        dogeio_text_input("password> ", password, 64);
+
+        if (system_verify_user(username, password)) {
+            break;
+        }
+        dogeio_text_println("Wrong password or user doesn't exist :(");
+    }
+    
+    char userpath[128];
+    str_strcpy(userpath, "/users/");
+    str_strcat(userpath, username);
+    fs_chdir(userpath);
+
+    dogeio_text_clear();
     
     const char* starting[6] = {
         "================================================================================================================================================================",
         "=                                                                                                                                                              =",
-        "=                                                              Welcome to WindogeOS v0.0.5-Build3!                                                             =",
-        "=                                                          Type 'help' for more help in the dogeshell                                                          =",
+        "=                                                     Welcome to WindogeOS v0.0.5-Build3!                                                                      =",
+        "=                                                        Type 'help' for more help in the dogeshell                                                            =",
         "=                                                                                                                                                              =",
         "================================================================================================================================================================"
     };

@@ -25,6 +25,8 @@ int str_startswith(const char *str, const char *prefix);
 int str_atoi(char* s);
 void str_strcpy(char *dest, const char *src);
 char* str_strncpy(char* dest, const char* src, size_t n);
+void u16_to_str(uint16_t value, char *out);
+uint16_t str_to_u16(const char *s);
 float str_atof(const char *str);
 char* str_strcat(char* dest, const char* src);
 void str_split_filename(const char *input, char *name, char *ext);
