@@ -93,6 +93,7 @@ void kernel_main(void) {
         fs_mkdir("users");
         fs_chdir("system");
         fs_mkdir("pass");
+        fs_mkdir("root");
         fs_chdir("/");
         fs_create(".windoge");
 
@@ -110,7 +111,13 @@ void kernel_main(void) {
         fs_chdir("/");
 
         dogeio_text_println("Create a new user. Not sure why anyone would daily drive since it's useless...");
+        dogeio_text_println("Username must be lowercase.");
         dogeio_text_input("new username> ", username_new, 64);
+        for (int i = 0; username_new[i] != '\0'; i++) {
+            if (username_new[i] >= 'A' && username_new[i] <= 'Z') {
+                username_new[i] += 32; 
+            }
+        }
         dogeio_text_input("new password> ", password_new, 64);
         system_create_user(username_new, password_new);
 
@@ -129,6 +136,7 @@ void kernel_main(void) {
         dogeio_text_input("password> ", password, 64);
 
         if (system_verify_user(username, password)) {
+            str_strcpy(current_user, username);
             break;
         }
         dogeio_text_println("Wrong password or user doesn't exist :(");

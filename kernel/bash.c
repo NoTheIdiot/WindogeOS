@@ -64,7 +64,7 @@ int system_bash_ex(char* command) {
                     dogeio_text_println("Much Error: Not a Folder.");
                 } else if (result == -1) {
                     dogeio_text_println("Such Error: Folder not existing :(");
-                } else if (result != 0) {
+                } else if (result != 1) {
                     dogeio_text_println("Much Error: Could not change directory.");
                 }
             }
@@ -384,39 +384,51 @@ int system_bash_ex(char* command) {
 
 void system_bash(void) {
     char input[256];
+    int status = 0;
 
     if (!fs_exists(".history")) {
         fs_create(".history");
     }
 
     while (true) {
-        for (int i = 0; i < 256; i++) {
-            input[i] = '\0';
-        }
-
-        dogeio_text_color_change(0x0000FF00);
-        dogeio_text_print("wow");
-        dogeio_text_color_change(0x000000FF);
+        dogeio_text_color_change(0xFF00FF00);
+        dogeio_text_print(current_user);
+        dogeio_text_color_change(old);
         dogeio_text_print(":");
-        char* dir = fs_dirname();
 
-        if (str_strcmp(dir, "root") == 0) {
-            dir = "";
+        char home_path[128];
+        for (int i = 0; i < 128; i++) {
+            home_path[i] = '\0';
+        }
+        
+        dogeio_text_color_change(0xADD8E6);
+        str_strcpy(home_path, "/users/");
+        str_strcat(home_path, current_user);
+
+        char* current_dir = fs_dirname();
+
+        if (str_strcmp(current_dir, home_path) == 0) {
+            dogeio_text_print("~");
+        } else {
+            dogeio_text_print(current_dir);
         }
 
-        dogeio_text_print(dir);
-        dogeio_text_print("/");
+        if (status == 1) {
+            dogeio_text_color_change(0xFFFF0000);
+            dogeio_text_print("[1] ");
+        }
 
-        dogeio_text_color_change(0xFFFFFFFF);
+        dogeio_text_color_change(old);
         dogeio_text_input("$ ", input, 256);
-
+        
         if (input[0] != '\0') {
             append_history(input);
         }
-
+        
         if (str_strcmp(input, "exit") == 0) {
             return;
         }
-        system_bash_ex(input);
+        
+        status = system_bash_ex(input);
     }
 }

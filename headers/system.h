@@ -11,6 +11,7 @@ void system_bash();
 
 void system_fetch();
 extern char* windoge_version;
+extern char current_user[64];
 extern uint32_t old;
 
 void system_editor(char* filename);

@@ -23,30 +23,30 @@ int system_dogeshell_ex(char* command) {
     int handled = 1; 
     
     char* help_command_array[] = {
-        "print                | simply prints a piece of text",
-        "clear                | clears the terminal screen",
+        "print              | simply prints a piece of text",
+        "clear              | clears the terminal screen",
         "dir / list-directory | list contents of current folder",
         "read / read-file     | outputs the contents of a file",
         "write / write-file   | writes a str of text to a file",
-        "help                 | outputs this help menu breakdown",
-        "shutdown             | shutsdown the computer",
-        "cpuinfo              | prints the cpu name",
-        "raminfo              | prints system memory info",
+        "help               | outputs this help menu breakdown",
+        "shutdown           | shutsdown the computer",
+        "cpuinfo            | prints the cpu name",
+        "raminfo            | prints system memory info",
         "del / delete-file    | deletes a file",
         "create / create-file | creates a file",
         "rename / rename-file | renames a file",
-        "whoami               | displays your current username",
-        "whereami             | displays your current folder location",
-        "time                 | displays the time",
-        "ver                  | shows version",
-        "fetch                | shows the system information",
-        "color                | changes color of text.",
-        "history              | show command history from .history",
-        "clear-history        | clears history, saves space.",
-        "edit                 | shows the very basic code editor",
-        "genimg               | generate a solid color image",
-        "viewimg              | view a solid color image",
-        "run                  | run a program"
+        "whoami             | displays your current username",
+        "whereami           | displays your current folder location",
+        "time               | displays the time",
+        "ver                | shows version",
+        "fetch              | shows the system information",
+        "color              | changes color of text.",
+        "history            | show command history from .history",
+        "clear-history      | clears history, saves space.",
+        "edit               | shows the very basic code editor",
+        "genimg             | generate a solid color image",
+        "viewimg            | view a solid color image",
+        "run                | run a program"
     };
 
     if (command == NULL || command[0] == '\0') {
@@ -62,7 +62,7 @@ int system_dogeshell_ex(char* command) {
         handled = 0;
     }
 
-    if (str_startswith(command, "run")) {
+    else if (str_startswith(command, "run")) {
         char* filename = command + 4;
         exec_flat_binary(filename, 0, NULL);
         handled = 0;
@@ -130,11 +130,6 @@ int system_dogeshell_ex(char* command) {
         handled = 0;
     }
 
-    else if (str_strcmp(command, "test") == 0) {
-        
-        handled = 0;
-    }
-
     else if (str_strcmp(command, "shutdown") == 0) {
         dogeio_text_clear_raw();
         dogeio_text_println("Such shutdown, very goodbye.");
@@ -145,6 +140,19 @@ int system_dogeshell_ex(char* command) {
     else if (str_strcmp(command, "cd") == 0 || str_startswith(command, "cd ")) {
         char *path = str_startswith(command, "cd ") ? (command + 3) : "";
         while (*path == ' ') path++;
+
+        char resolved_path[128];
+        // Handle ~ or empty cd to go to user's home directory
+        if (str_strcmp(path, "~") == 0 || path[0] == '\0') {
+            str_strcpy(resolved_path, "/users/");
+            str_strcat(resolved_path, current_user);
+            path = resolved_path;
+        } else if (str_startswith(path, "~/")) {
+            str_strcpy(resolved_path, "/users/");
+            str_strcat(resolved_path, current_user);
+            str_strcat(resolved_path, path + 1); // Append subpath after ~
+            path = resolved_path;
+        }
 
         int result = fs_chdir(path);
         if (result == -2) {
@@ -430,7 +438,7 @@ int system_dogeshell_ex(char* command) {
     }
 
     else if (str_strcmp(command, "whoami") == 0) {
-        dogeio_text_println("wow");
+        dogeio_text_println(current_user);
         handled = 0;
     }
     
@@ -457,10 +465,26 @@ void system_dogeshell(void) {
 
     while (true) {
         dogeio_text_color_change(0xFF00FF00);
-        dogeio_text_print("wow");
+        dogeio_text_print(current_user);
         dogeio_text_color_change(old);
         dogeio_text_print(" (");
-        dogeio_text_print(fs_dirname());
+
+        char home_path[128];
+        for (int i = 0; i < 128; i++) {
+            home_path[i] = '\0';
+        }
+        
+        str_strcpy(home_path, "/users/");
+        str_strcat(home_path, current_user);
+
+        char* current_dir = fs_dirname();
+
+        if (str_strcmp(current_dir, home_path) == 0) {
+            dogeio_text_print("~");
+        } else {
+            dogeio_text_print(current_dir);
+        }
+
         dogeio_text_print(") ");
 
         if (status == 1) {
