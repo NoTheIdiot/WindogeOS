@@ -17,5 +17,6 @@ coding a long term project
   python start_vm.py
 
 = Notes
-Devnew is the main development branch. I work on shit there, do expect that it doesn't boot
-on that branch for a while somtimes.
+Everything is at main now.
+You only live once
+
