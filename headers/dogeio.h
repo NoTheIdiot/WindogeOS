@@ -44,6 +44,27 @@ void dogeio_text_color_change(uint32_t color);
 void dogeio_text_background_change(uint32_t color);
 void dogeio_text_clear_raw(void);
 
+#define FS_PERM_READ   0x01u
+#define FS_PERM_WRITE  0x02u
+#define FS_PERM_EXEC   0x04u
+#define FS_PERM_DELETE 0x08u
+#define FS_PERM_CREATE 0x10u
+#define FS_PERM_LIST   0x20u
+
+typedef struct {
+    char path[128];
+    uint32_t owner_uid;
+    uint32_t group_gid;
+    uint32_t owner_mask;
+    uint32_t group_mask;
+    uint32_t other_mask;
+} fs_acl_t;
+
+int fs_set_current_user(uint32_t uid, uint32_t gid);
+int fs_set_permissions(const char *path, uint32_t owner_uid, uint32_t group_gid,
+                       uint32_t owner_mask, uint32_t group_mask, uint32_t other_mask);
+int fs_check_access(const char *path, uint32_t requested_mask);
+
 int   fs_format(void);
 int   fs_create(char* filename);
 int   fs_mkdir(char* foldername);

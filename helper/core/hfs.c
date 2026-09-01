@@ -42,3 +42,4 @@ int system_verify_user(const char* name, char* password) {
     stored[bytes_read] = '\0';
     return (str_strcmp(password, stored) == 0) ? 1 : 0;
 }
+
