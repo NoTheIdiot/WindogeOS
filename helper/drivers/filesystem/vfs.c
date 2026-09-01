@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stddef.h>
 #include <bool.h>
+#include <system.h>
 
 extern int exfat_resolve_entry(const char *target_name, void *out);
 
@@ -12,6 +13,7 @@ static fs_acl_t g_acl_table[64];
 static uint32_t g_acl_count = 0;
 static uint32_t g_current_uid = 0;
 static uint32_t g_current_gid = 0;
+static int g_auth_override = 0;
 
 static int fs_acl_find(const char *path) {
     if (!path || path[0] == '\0') {
@@ -58,6 +60,11 @@ int fs_set_current_user(uint32_t uid, uint32_t gid) {
     return 0;
 }
 
+int fs_set_auth_override(int enabled) {
+    g_auth_override = enabled ? 1 : 0;
+    return 0;
+}
+
 int fs_set_permissions(const char *path, uint32_t owner_uid, uint32_t group_gid,
                        uint32_t owner_mask, uint32_t group_mask, uint32_t other_mask) {
     if (!path || path[0] == '\0') {
@@ -73,32 +80,39 @@ int fs_check_access(const char *path, uint32_t requested_mask) {
         return 0;
     }
 
-    int idx = fs_acl_find(path);
-    if (idx < 0) {
-        if (g_current_uid == 0) {
-            return 0;
-        }
-        return -1;
-    }
-
-    fs_acl_t *entry = &g_acl_table[idx];
-    uint32_t effective_mask = entry->other_mask;
-
-    if (g_current_uid == entry->owner_uid) {
-        effective_mask = entry->owner_mask;
-    } else if (g_current_gid == entry->group_gid) {
-        effective_mask = entry->group_mask;
-    }
-
-    if (g_current_uid == 0) {
-        effective_mask = 0xFFFFFFFFu;
-    }
-
-    if ((requested_mask & effective_mask) == requested_mask) {
+    if (g_current_uid == 0 || g_auth_override) {
         return 0;
     }
 
-    return -1;
+    if (str_strcmp(path, "/system") == 0 || str_startswith(path, "/system/")) {
+        return -1;
+    }
+
+    if ((str_strcmp(path, ".windoge") == 0 || str_strcmp(path, "/.windoge") == 0) &&
+        (requested_mask & FS_PERM_DELETE) != 0) {
+        return -1;
+    }
+
+    if (str_startswith(path, "/users/")) {
+        const char *rest = path + 7;
+        while (*rest == '/') rest++;
+        if (*rest != '\0') {
+            char target_user[64];
+            int i = 0;
+            while (*rest != '\0' && *rest != '/' && i < 63) {
+                target_user[i++] = *rest++;
+            }
+            target_user[i] = '\0';
+
+            if (str_strcmp(target_user, current_user) != 0 &&
+                str_strcmp(target_user, "root") != 0 &&
+                str_strcmp(target_user, "admin") != 0) {
+                return -1;
+            }
+        }
+    }
+
+    return 0;
 }
 
 int fs_format(void) {
@@ -138,6 +152,12 @@ int fs_exists(char* filename) {
 
 int fs_delete(char* filename) {
     if (!filename || filename[0] == '\0') {
+        return -1;
+    }
+
+    if ((str_strcmp(filename, ".windoge") == 0 || str_strcmp(filename, "/.windoge") == 0) ||
+        (str_strcmp(filename, "/system") == 0 || str_startswith(filename, "/system/"))) {
+        dogeio_text_println("vfs: protected path cannot be deleted");
         return -1;
     }
 
@@ -206,9 +226,17 @@ int fs_write(char* filename, char* input_buffer) {
 }
 
 int fs_list_dir(int hidden) {
-    if (fs_check_access("/", FS_PERM_LIST) != 0) {
+    char *cwd = fs_dirname();
+    if (cwd != NULL && str_strcmp(cwd, "/users") == 0 &&
+        str_strcmp(current_user, "root") != 0 && str_strcmp(current_user, "admin") != 0) {
+        dogeio_text_println("vfs: listing /users is restricted to your account.");
         return -1;
     }
+
+    if (str_startswith(cwd, "/system") && str_strcmp(current_user, "root") != 0 && str_strcmp(current_user, "admin") != 0) {
+        return -1;
+    }
+
     return exfat_print_directory(hidden);
 }
 
@@ -281,7 +309,7 @@ int fs_mount(void) {
     if (rc == 0) {
         g_acl_count = 0;
         fs_acl_set_default_entry("/", 0, 0, 0x1Fu, 0x1Fu, 0x05u);
-        fs_acl_set_default_entry("/system", 0, 0, 0x1Fu, 0x1Fu, 0x05u);
+        fs_acl_set_default_entry("/system", 0, 0, 0x1Fu, 0x1Fu, 0x00u);
         fs_acl_set_default_entry("/users", 0, 0, 0x1Fu, 0x1Fu, 0x05u);
     }
     return rc;

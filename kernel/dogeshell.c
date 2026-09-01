@@ -161,7 +161,6 @@ int system_dogeshell_ex(char* command) {
         while (*path == ' ') path++;
 
         char resolved_path[128];
-        // Handle ~ or empty cd to go to user's home directory
         if (str_strcmp(path, "~") == 0 || path[0] == '\0') {
             str_strcpy(resolved_path, "/users/");
             str_strcat(resolved_path, current_user);
@@ -169,17 +168,62 @@ int system_dogeshell_ex(char* command) {
         } else if (str_startswith(path, "~/")) {
             str_strcpy(resolved_path, "/users/");
             str_strcat(resolved_path, current_user);
-            str_strcat(resolved_path, path + 1); // Append subpath after ~
+            str_strcat(resolved_path, path + 1);
             path = resolved_path;
         }
 
-        int result = fs_chdir(path);
-        if (result == -2) {
-            dogeio_text_println("Much Error: Not a Folder.");
-        } else if (result == -1) {
-            dogeio_text_println("Such Error: Folder not existing :(");
+        if (str_startswith(path, "/system") &&
+            str_strcmp(current_user, "root") != 0 &&
+            str_strcmp(current_user, "admin") != 0) {
+            dogeio_text_println("Access denied: system is reserved for admin/root.");
+            handled = 0;
+        } else if (str_startswith(path, "/users/") &&
+                   str_strcmp(current_user, "root") != 0 &&
+                   str_strcmp(current_user, "admin") != 0) {
+            char target_user[64];
+            const char *rest = path + 7;
+            while (*rest == '/') rest++;
+            int i = 0;
+            while (*rest != '\0' && *rest != '/' && i < 63) {
+                target_user[i++] = *rest++;
+            }
+            target_user[i] = '\0';
+
+            if (target_user[0] != '\0' && str_strcmp(target_user, current_user) != 0) {
+                char passbuf[64];
+                dogeio_text_input("Password for ", passbuf, 64);
+                dogeio_text_println(target_user);
+                dogeio_text_input(" > ", passbuf, 64);
+                if (!system_verify_user(target_user, passbuf)) {
+                    dogeio_text_println("Access denied: wrong password for that user.");
+                    handled = 0;
+                } else {
+                    int result = fs_chdir(path);
+                    if (result == -2) {
+                        dogeio_text_println("Much Error: Not a Folder.");
+                    } else if (result == -1) {
+                        dogeio_text_println("Such Error: Folder not existing :(");
+                    }
+                    handled = 0;
+                }
+            } else {
+                int result = fs_chdir(path);
+                if (result == -2) {
+                    dogeio_text_println("Much Error: Not a Folder.");
+                } else if (result == -1) {
+                    dogeio_text_println("Such Error: Folder not existing :(");
+                }
+                handled = 0;
+            }
+        } else {
+            int result = fs_chdir(path);
+            if (result == -2) {
+                dogeio_text_println("Much Error: Not a Folder.");
+            } else if (result == -1) {
+                dogeio_text_println("Such Error: Folder not existing :(");
+            }
+            handled = 0;
         }
-        handled = 0;
     }
 
     else if (str_strcmp(command, "mkdir") == 0 || str_startswith(command, "mkdir ") ||
@@ -202,18 +246,77 @@ int system_dogeshell_ex(char* command) {
 
     else if (str_strcmp(command, "format") == 0) {
         char r_u_sure[4];
-        dogeio_text_input("Are You Sure? (yes/no)\nMUCH WARNING: THIS WILL ERASE THE DISK.\n", r_u_sure, 4);
-        if (str_strcmp(r_u_sure, "yes") == 0) {
-            int result = fs_format();
-            if (result) {
-                dogeio_text_println("Formated Disk.");
+        if (str_strcmp(current_user, "root") != 0 && str_strcmp(current_user, "admin") != 0) {
+            char root_pass[64];
+            dogeio_text_input("root password> ", root_pass, 64);
+            if (!system_verify_user("root", root_pass)) {
+                dogeio_text_println("Access denied: root privileges required.");
+                handled = 0;
             } else {
-                dogeio_text_println("Not Wow: Something Went Wrong.");
+                dogeio_text_input("Are You Sure? (yes/no)\nMUCH WARNING: THIS WILL ERASE THE DISK.\n", r_u_sure, 4);
+                if (str_strcmp(r_u_sure, "yes") == 0) {
+                    int result = fs_format();
+                    if (result) {
+                        dogeio_text_println("Formated Disk.");
+                    } else {
+                        dogeio_text_println("Not Wow: Something Went Wrong.");
+                    }
+                } else {
+                    dogeio_text_println("Format skipped.");
+                }
+                handled = 0;
             }
         } else {
-            dogeio_text_println("Format skipped.");
+            dogeio_text_input("Are You Sure? (yes/no)\nMUCH WARNING: THIS WILL ERASE THE DISK.\n", r_u_sure, 4);
+            if (str_strcmp(r_u_sure, "yes") == 0) {
+                int result = fs_format();
+                if (result) {
+                    dogeio_text_println("Formated Disk.");
+                } else {
+                    dogeio_text_println("Not Wow: Something Went Wrong.");
+                }
+            } else {
+                dogeio_text_println("Format skipped.");
+            }
+            handled = 0;
         }
-        handled = 0;
+    }
+
+    else if (str_strcmp(command, "admin") == 0 || str_startswith(command, "admin ")) {
+        char *subcommand = str_startswith(command, "admin ") ? (command + 6) : "";
+        while (*subcommand == ' ') subcommand++;
+
+        if (subcommand[0] == '\0') {
+            dogeio_text_println("Usage: admin <command>");
+            handled = 0;
+        } else {
+            char root_pass[64];
+            dogeio_text_input("root password> ", root_pass, 64);
+            if (!system_verify_user("root", root_pass)) {
+                dogeio_text_println("Access denied: wrong root password.");
+                handled = 0;
+            } else {
+                char copied[128];
+                str_strcpy(copied, subcommand);
+                if (str_strcmp(subcommand, "format") == 0) {
+                    char yesno[4];
+                    dogeio_text_input("Are You Sure? (yes/no)\nMUCH WARNING: THIS WILL ERASE THE DISK.\n", yesno, 4);
+                    if (str_strcmp(yesno, "yes") == 0) {
+                        int result = fs_format();
+                        if (result) {
+                            dogeio_text_println("Formated Disk.");
+                        } else {
+                            dogeio_text_println("Not Wow: Something Went Wrong.");
+                        }
+                    } else {
+                        dogeio_text_println("Format skipped.");
+                    }
+                } else {
+                    system_dogeshell_ex(copied);
+                }
+                handled = 0;
+            }
+        }
     }
 
     else if (str_strcmp(command, "clear") == 0) {

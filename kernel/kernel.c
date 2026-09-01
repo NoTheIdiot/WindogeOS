@@ -80,6 +80,7 @@ void kernel_main(void) {
 
     if (!fs_exists(".windoge")) {
         fs_mount();
+        fs_set_auth_override(1);
 
         dogeio_text_println("Welcome to WindogeOS setup");
         dogeio_text_println("Version: WindogeOS v0.01");
@@ -104,6 +105,12 @@ void kernel_main(void) {
         fs_chdir("/");
         fs_create(".windoge");
 
+        fs_chdir("/users");
+        if (!fs_exists("admin")) {
+            fs_mkdir("admin");
+        }
+        fs_chdir("/");
+
         char username_new[64];
         char password_new[64];
         char root_new[64];
@@ -121,6 +128,8 @@ void kernel_main(void) {
         fs_chdir("/system/pass");
         fs_create("root.hash");
         fs_write("root.hash", root_new);
+        fs_create("admin.hash");
+        fs_write("admin.hash", root_new);
         fs_chdir("/");
 
         while (true) {
@@ -151,13 +160,20 @@ void kernel_main(void) {
         }
 
         system_create_user(username_new, password_new);
+        fs_chdir("/users");
+        if (!fs_exists("admin")) {
+            fs_mkdir("admin");
+        }
+        fs_chdir("/");
 
         dogeio_text_clear();
         char nothing[1];
         dogeio_text_input("Press enter to reboot.", nothing, 1);
+        fs_set_auth_override(0);
         core_reboot();
     }
 
+    fs_set_auth_override(1);
     dogeio_text_println("Welcome to WindogeOS v0.01");
 
     char username[64];
@@ -169,11 +185,17 @@ void kernel_main(void) {
 
         if (system_verify_user(username, password)) {
             str_strcpy(current_user, username);
+            fs_set_auth_override(0);
+            if (str_strcmp(username, "root") == 0 || str_strcmp(username, "admin") == 0) {
+                fs_set_current_user(0, 0);
+            } else {
+                fs_set_current_user(1, 1);
+            }
             break;
         }
         dogeio_text_println("Wrong password or user doesn't exist :(");
     }
-    
+
     char userpath[128];
     str_strcpy(userpath, "/users/");
     str_strcat(userpath, username);
