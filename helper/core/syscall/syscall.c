@@ -24,40 +24,38 @@ typedef struct {
 
 static core_cpu_data_t bsp_cpu_storage;
 
-void core_c_dispatcher(uint64_t syscall_num, uint64_t arg1, uint64_t arg2, uint64_t arg3) {
+uint64_t core_c_dispatcher(uint64_t syscall_num, uint64_t arg1, uint64_t arg2, uint64_t arg3) {
     (void)arg2;
     (void)arg3;
     switch (syscall_num) {
         case DOGEIO_TEXT_EXIT:
             __asm__ volatile("mov %0, %%cr3" :: "r"(shell_cr3_backup));
-            
             __asm__ volatile (
-                "mov %0, %%rsp\n\t" 
+                "mov %0, %%rsp\n\t"
                 "mov %1, %%rbp\n\t"
-                "jmp *%2\n\t" 
+                "jmp *%2\n\t"
                 :
                 : "r"(shell_rsp_backup), "r"(shell_rbp_backup), "r"(shell_rip_backup)
                 : "memory"
             );
-            break;
+            __builtin_unreachable();
         case DOGEIO_TEXT_PRINT:
             if (arg1 != 0) {
                 dogeio_text_print((const char*)arg1);
             }
-            break;
+            return 0;
         default:
             dogeio_text_print("Something went wrong (bad instruction)\n");
             __asm__ volatile("mov %0, %%cr3" :: "r"(shell_cr3_backup));
-            
             __asm__ volatile (
-                "mov %0, %%rsp\n\t" 
+                "mov %0, %%rsp\n\t"
                 "mov %1, %%rbp\n\t"
-                "jmp *%2\n\t" 
+                "jmp *%2\n\t"
                 :
                 : "r"(shell_rsp_backup), "r"(shell_rbp_backup), "r"(shell_rip_backup)
                 : "memory"
             );
-            break;
+            __builtin_unreachable();
     }
 }
 
@@ -82,7 +80,12 @@ void init_syscalls(void) {
 
     __asm__ volatile("wrmsr" :: "a"(0x200), "d"(0), "c"(MSR_SFMASK));
 
-    uint32_t star_low  = 0;
-    uint32_t star_high = (0x08) | ((0x1B) << 16);
-    __asm__ volatile("wrmsr" :: "a"(star_low), "d"(star_high), "c"(MSR_STAR));
+    /* STAR layout: [63:48] = kernel CS, [47:32] = user CS,
+       [31:16] = kernel SS, [15:0] = user SS. */
+    uint64_t star_value = ((uint64_t)0x08 << 48) |
+                          ((uint64_t)0x1B << 32) |
+                          ((uint64_t)0x10 << 16) |
+                          0x23ULL;
+    __asm__ volatile("wrmsr" :: "a"((uint32_t)(star_value & 0xFFFFFFFFULL)),
+                              "d"((uint32_t)(star_value >> 32)), "c"(MSR_STAR));
 }

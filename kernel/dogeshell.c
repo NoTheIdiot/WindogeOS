@@ -64,7 +64,18 @@ int system_dogeshell_ex(char* command) {
 
     else if (str_startswith(command, "run")) {
         char* filename = command + 4;
-        exec_flat_binary(filename, 0, NULL);
+        while (*filename == ' ') filename++;
+
+        char *end = filename + str_strlen(filename);
+        while (end > filename && end[-1] == ' ') {
+            *--end = '\0';
+        }
+
+        if (*filename != '\0') {
+            exec_flat_binary(filename, 0, NULL);
+        } else {
+            dogeio_text_println("Error: No filename specified.");
+        }
         handled = 0;
     }
 

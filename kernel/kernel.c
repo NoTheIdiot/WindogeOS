@@ -79,7 +79,6 @@ void kernel_main(void) {
     menubar_draw();
 
     if (!fs_exists(".windoge")) {
-        fs_format();
         fs_mount();
 
         dogeio_text_println("Welcome to WindogeOS setup. (Version WindogeOS v0.01)");

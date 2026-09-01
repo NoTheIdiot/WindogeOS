@@ -40,6 +40,9 @@ int exec_flat_binary(const char *filename, int argc, char **argv) {
     if (!app_pml4_phys) return -5;
 
     map_user_page(app_pml4_phys, APP_VIRT_ADDR, APP_PHYS_ADDR);
+    if (!((app_pml4_phys != 0) && (APP_VIRT_ADDR < 0x100000000ULL))) {
+        return -6;
+    }
 
     if (!allocate_flat_user_stack(hhdm, app_pml4_phys)) {
         return -4;

@@ -9,38 +9,38 @@ extern core_c_dispatcher
 
 section .text
 core_sys_entry:
-    swapgs               
+    swapgs
+    mov [gs:8], rsp
+    mov rsp, [gs:0]
 
-    mov [gs:8], rsp     
-    mov rsp, [gs:0]      
+    ; Save the user return state and argument registers.
+    ; SYSRET restores RIP from RCX and RFLAGS from R11.
+    push r11
+    push rcx
+    push rdi
+    push rsi
+    push rdx
+    push r10
+    push r8
+    push r9
 
-    push rcx             
-    push r11             
-    push rdi             
-    push rsi             
-    push rdx             
-    push r10             
-    push r8              
-    push r9              
-    push rax             
-
-    mov rdi, rax         
-    mov rsi, [rsp + 48]  
-    mov rdx, [rsp + 40]  
-    mov rcx, [rsp + 32]  
+    ; System call ABI: rax = syscall number, rdi = arg1, rsi = arg2, rdx = arg3.
+    mov rdi, rax
+    mov rsi, [rsp + 8*5]
+    mov rdx, [rsp + 8*4]
+    mov rcx, [rsp + 8*3]
 
     call core_c_dispatcher
 
-    add rsp, 8           
     pop r9
     pop r8
     pop r10
     pop rdx
     pop rsi
     pop rdi
-    pop r11              
-    pop rcx              
+    pop rcx
+    pop r11
 
-    mov rsp, [gs:8]      
-    swapgs               
+    mov rsp, [gs:8]
+    swapgs
     o64 sysret

@@ -223,7 +223,7 @@ int system_bash_ex(char* command) {
     }
 
     else if (str_strcmp(command, "pwd") == 0) {
-        dogeio_text_println("root (/)");
+        dogeio_text_println(fs_dirname());
         handled = 0;
     }
 
