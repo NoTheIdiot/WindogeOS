@@ -172,16 +172,12 @@ int system_dogeshell_ex(char* command) {
             path = resolved_path;
         }
 
-        if (str_startswith(path, "/system") &&
-            str_strcmp(current_user, "root") != 0 &&
-            str_strcmp(current_user, "admin") != 0) {
-            dogeio_text_println("Access denied: system is reserved for admin/root.");
+        if (str_startswith(path, "/system")) {
+            dogeio_text_println("Access denied: system is never accessible.");
             handled = 0;
-        } else if (str_startswith(path, "/users/") &&
-                   str_strcmp(current_user, "root") != 0 &&
-                   str_strcmp(current_user, "admin") != 0) {
+        } else if (str_startswith(path, "/users/") || str_startswith(path, "users/")) {
             char target_user[64];
-            const char *rest = path + 7;
+            const char *rest = str_startswith(path, "/users/") ? (path + 7) : path + 6;
             while (*rest == '/') rest++;
             int i = 0;
             while (*rest != '\0' && *rest != '/' && i < 63) {
@@ -190,22 +186,8 @@ int system_dogeshell_ex(char* command) {
             target_user[i] = '\0';
 
             if (target_user[0] != '\0' && str_strcmp(target_user, current_user) != 0) {
-                char passbuf[64];
-                dogeio_text_input("Password for ", passbuf, 64);
-                dogeio_text_println(target_user);
-                dogeio_text_input(" > ", passbuf, 64);
-                if (!system_verify_user(target_user, passbuf)) {
-                    dogeio_text_println("Access denied: wrong password for that user.");
-                    handled = 0;
-                } else {
-                    int result = fs_chdir(path);
-                    if (result == -2) {
-                        dogeio_text_println("Much Error: Not a Folder.");
-                    } else if (result == -1) {
-                        dogeio_text_println("Such Error: Folder not existing :(");
-                    }
-                    handled = 0;
-                }
+                dogeio_text_println("Access denied: cd to another user's account is not allowed.");
+                handled = 0;
             } else {
                 int result = fs_chdir(path);
                 if (result == -2) {

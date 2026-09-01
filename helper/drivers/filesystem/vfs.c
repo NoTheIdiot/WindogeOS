@@ -93,20 +93,26 @@ int fs_check_access(const char *path, uint32_t requested_mask) {
         return -1;
     }
 
-    if (str_startswith(path, "/users/")) {
-        const char *rest = path + 7;
-        while (*rest == '/') rest++;
-        if (*rest != '\0') {
+    const char *scan = path;
+    if (scan[0] == '/') {
+        scan++;
+    }
+    while (*scan == '/') {
+        scan++;
+    }
+
+    if (str_startswith(scan, "users")) {
+        scan += 5;
+        while (*scan == '/') scan++;
+        if (*scan != '\0') {
             char target_user[64];
             int i = 0;
-            while (*rest != '\0' && *rest != '/' && i < 63) {
-                target_user[i++] = *rest++;
+            while (*scan != '\0' && *scan != '/' && i < 63) {
+                target_user[i++] = *scan++;
             }
             target_user[i] = '\0';
 
-            if (str_strcmp(target_user, current_user) != 0 &&
-                str_strcmp(target_user, "root") != 0 &&
-                str_strcmp(target_user, "admin") != 0) {
+            if (target_user[0] != '\0' && str_strcmp(target_user, current_user) != 0) {
                 return -1;
             }
         }
@@ -227,13 +233,8 @@ int fs_write(char* filename, char* input_buffer) {
 
 int fs_list_dir(int hidden) {
     char *cwd = fs_dirname();
-    if (cwd != NULL && str_strcmp(cwd, "/users") == 0 &&
+    if (cwd != NULL && str_startswith(cwd, "/system") &&
         str_strcmp(current_user, "root") != 0 && str_strcmp(current_user, "admin") != 0) {
-        dogeio_text_println("vfs: listing /users is restricted to your account.");
-        return -1;
-    }
-
-    if (str_startswith(cwd, "/system") && str_strcmp(current_user, "root") != 0 && str_strcmp(current_user, "admin") != 0) {
         return -1;
     }
 
@@ -290,6 +291,32 @@ void fs_copy(char* source, char* dest) {
 int fs_chdir(char* folder) {
     if (!folder || folder[0] == '\0') {
         return -1;
+    }
+
+    const char *scan = folder;
+    if (scan[0] == '/') {
+        scan++;
+    }
+    while (*scan == '/') {
+        scan++;
+    }
+
+    if (str_startswith(scan, "users")) {
+        scan += 5;
+        while (*scan == '/') scan++;
+        if (*scan != '\0') {
+            char target_user[64];
+            int i = 0;
+            while (*scan != '\0' && *scan != '/' && i < 63) {
+                target_user[i++] = *scan++;
+            }
+            target_user[i] = '\0';
+
+            if (target_user[0] != '\0' && str_strcmp(target_user, current_user) != 0) {
+                dogeio_text_println("vfs: cross-user chdir denied");
+                return -1;
+            }
+        }
     }
 
     if (fs_check_access(folder, FS_PERM_EXEC | FS_PERM_LIST) != 0) {
