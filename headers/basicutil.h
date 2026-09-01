@@ -7,6 +7,8 @@
 
 // really basic stuff
 void halt();
+void core_shutdown(void);
+void core_reboot(void);
 
 extern const char* doge_ascii[22];
 

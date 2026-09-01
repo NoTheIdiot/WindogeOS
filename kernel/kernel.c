@@ -81,52 +81,85 @@ void kernel_main(void) {
     if (!fs_exists(".windoge")) {
         fs_mount();
 
-        dogeio_text_println("Welcome to WindogeOS setup. (Version WindogeOS v0.01)");
-        dogeio_text_println("Such doge very OS. Much cheems many veichular manslaughter.");
-        dogeio_text_println("Press enter to continue.");
+        dogeio_text_println("Welcome to WindogeOS setup");
+        dogeio_text_println("Version: WindogeOS v0.01");
 
-        char nothing[1];
-        dogeio_text_input("", nothing, 1);
+        char proceed[2];
+        dogeio_text_input("Press Enter to continue> ", proceed, 2);
 
-        fs_mkdir("system");
-        fs_mkdir("users");
-        fs_chdir("system");
-        fs_mkdir("pass");
-        fs_mkdir("root");
+        if (!fs_exists("system")) {
+            fs_mkdir("system");
+        }
+        if (!fs_exists("users")) {
+            fs_mkdir("users");
+        }
+
+        fs_chdir("/system");
+        if (!fs_exists("pass")) {
+            fs_mkdir("pass");
+        }
+        if (!fs_exists("root")) {
+            fs_mkdir("root");
+        }
         fs_chdir("/");
         fs_create(".windoge");
 
         char username_new[64];
         char password_new[64];
-
         char root_new[64];
-        fs_chdir("/system/pass");
 
-        dogeio_text_println("Enter root password. You'll need this for admin level privages.");
-        dogeio_text_input("root password (new)> ", root_new, 64);
+        while (true) {
+            dogeio_text_println("\nCreate the root password.");
+            dogeio_text_input("root password> ", root_new, 64);
+            if (root_new[0] == '\0') {
+                dogeio_text_println("Password cannot be empty.");
+                continue;
+            }
+            break;
+        }
+
+        fs_chdir("/system/pass");
         fs_create("root.hash");
         fs_write("root.hash", root_new);
-        dogeio_text_println("");
         fs_chdir("/");
 
-        dogeio_text_println("Create a new user. Not sure why anyone would daily drive since it's useless...");
-        dogeio_text_println("Username must be lowercase.");
-        dogeio_text_input("new username> ", username_new, 64);
-        for (int i = 0; username_new[i] != '\0'; i++) {
-            if (username_new[i] >= 'A' && username_new[i] <= 'Z') {
-                username_new[i] += 32; 
+        while (true) {
+            dogeio_text_println("username must be lowercase and non-empty.");
+            dogeio_text_input("username> ", username_new, 64);
+
+            for (int i = 0; username_new[i] != '\0'; i++) {
+                if (username_new[i] >= 'A' && username_new[i] <= 'Z') {
+                    username_new[i] += 32;
+                }
+                if (username_new[i] == ' ' || username_new[i] == '\t' || username_new[i] == '\n' || username_new[i] == '\r') {
+                    username_new[i] = '\0';
+                    break;
+                }
             }
+
+            if (username_new[0] == '\0') {
+                dogeio_text_println("username cannot be empty.");
+                continue;
+            }
+
+            dogeio_text_input("password> ", password_new, 64);
+            if (password_new[0] == '\0') {
+                dogeio_text_println("password cannot be empty.");
+                continue;
+            }
+            break;
         }
-        dogeio_text_input("new password> ", password_new, 64);
+
         system_create_user(username_new, password_new);
 
-        dogeio_text_println("\nSetup complete. Press enter to start system.");
-        dogeio_text_input("", nothing, 1);
+        dogeio_text_clear();
+        char nothing[1];
+        dogeio_text_input("Press enter to reboot.", nothing, 1);
+        core_reboot();
     }
 
-    dogeio_text_clear();
-    dogeio_text_println("Locked screen.");
-    
+    dogeio_text_println("Welcome to WindogeOS v0.01");
+
     char username[64];
     while (true) {
         char password[64];
@@ -164,5 +197,5 @@ void kernel_main(void) {
     log("Starting Dogeshell");
     system_dogeshell();
 
-    halt();
+    core_shutdown();
 }

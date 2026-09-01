@@ -309,7 +309,14 @@ int system_bash_ex(char* command) {
     else if (str_strcmp(command, "shutdown") == 0) {
         dogeio_text_clear_raw();
         dogeio_text_println("Such shutdown, very goodbye.");
-        halt();
+        core_shutdown();
+        handled = 0;
+    }
+
+    else if (str_strcmp(command, "reboot") == 0) {
+        dogeio_text_clear_raw();
+        dogeio_text_println("Very reboot, much restart.");
+        core_reboot();
         handled = 0;
     }
 
