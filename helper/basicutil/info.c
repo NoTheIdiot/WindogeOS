@@ -77,6 +77,29 @@ uint64_t get_ram(void) {
     return total_ram_bytes;
 }
 
+uint64_t get_ram_end_address(void) {
+    if (memmap_request.response == NULL) {
+        return 0; 
+    }
+
+    uint64_t highest_address = 0;
+    uint64_t entries = memmap_request.response->entry_count;
+
+    for (uint64_t i = 0; i < entries; i++) {
+        struct limine_memmap_entry *entry = memmap_request.response->entries[i];
+
+        if (entry->type == LIMINE_MEMMAP_USABLE) {
+            uint64_t entry_end = entry->base + entry->length;
+            if (entry_end > highest_address) {
+                highest_address = entry_end;
+            }
+        }
+    }
+
+    return highest_address;
+}
+
+
 __attribute__((section(".limine_requests"))) static const uint8_t code_marker_start = 0;
 __attribute__((section(".bss")))             static uint8_t       code_marker_end;
 
