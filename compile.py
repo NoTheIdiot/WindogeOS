@@ -63,7 +63,6 @@ if not c_sources and not asm_sources:
     exit(1)
 
 try:
-    # STEP 1: Static Analysis
     print("Running Clang Static Analyzer...")
     for src in c_sources:
         subprocess.run(f"{cc_analyze} {src}", shell=True, check=True)
@@ -76,7 +75,6 @@ try:
                     subprocess.run(f"{cc_app_analyze} {app_src}", shell=True, check=True)
     print("Analysis clean. Proceeding to compilation...\n")
 
-    # STEP 2: Compilation Pass
     print("Compiling kernel source code...")
     compile_lines = []
     object_files = []
@@ -118,14 +116,13 @@ set -e
                         check=True
                     )
                     os.remove(app_obj)
-    app_copy_commands = ""
+
     app_clean_files = []
     if os.path.exists("apps"):
         app_bins = glob.glob("apps/**/*.bin", recursive=True) + glob.glob("apps/*.bin")
-        app_bins = list(set(app_bins))
-        for app in app_bins:
-            app_copy_commands += f"sudo cp {app} $MOUNT_DATA/;\n"
-            app_clean_files.append(app)
+        app_clean_files = list(set(app_bins))
+
+    app_copy_commands = "if [ -d apps ]; then sudo cp -r apps/* $$MOUNT_DATA/; fi"
 
     create_img_script_x86_64 = f"""
 set -e
