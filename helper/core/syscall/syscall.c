@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <dogeio.h>
+#include <boot/kernel.h>
 #include <boot/syscall.h>
 
 #define MSR_EFER         0xC0000080
@@ -44,6 +45,9 @@ uint64_t core_c_dispatcher(uint64_t syscall_num, uint64_t arg1, uint64_t arg2, u
                 dogeio_text_print((const char*)arg1);
             }
             return 0;
+        case DOGEIO_UPDATE:
+            menubar_draw();
+            return 0;
         default:
             dogeio_text_print("Something went wrong (bad instruction)\n");
             __asm__ volatile("mov %0, %%cr3" :: "r"(shell_cr3_backup));
@@ -80,12 +84,9 @@ void init_syscalls(void) {
 
     __asm__ volatile("wrmsr" :: "a"(0x200), "d"(0), "c"(MSR_SFMASK));
 
-    /* STAR layout: [63:48] = kernel CS, [47:32] = user CS,
-       [31:16] = kernel SS, [15:0] = user SS. */
-    uint64_t star_value = ((uint64_t)0x08 << 48) |
-                          ((uint64_t)0x1B << 32) |
-                          ((uint64_t)0x10 << 16) |
-                          0x23ULL;
+     /* STAR layout: syscall CS is [47:32]; SYSRET CS is [63:48] + 16. */
+     uint64_t star_value = ((uint64_t)0x0B << 48) |
+                                  ((uint64_t)0x08 << 32);
     __asm__ volatile("wrmsr" :: "a"((uint32_t)(star_value & 0xFFFFFFFFULL)),
                               "d"((uint32_t)(star_value >> 32)), "c"(MSR_STAR));
 }

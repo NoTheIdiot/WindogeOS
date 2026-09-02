@@ -186,11 +186,6 @@ void kernel_main(void) {
         if (system_verify_user(username, password)) {
             str_strcpy(current_user, username);
             fs_set_auth_override(0);
-            if (str_strcmp(username, "root") == 0 || str_strcmp(username, "admin") == 0) {
-                fs_set_current_user(0, 0);
-            } else {
-                fs_set_current_user(1, 1);
-            }
             break;
         }
         dogeio_text_println("Wrong password or user doesn't exist :(");

@@ -176,18 +176,34 @@ int system_dogeshell_ex(char* command) {
             dogeio_text_println("Access denied: system is never accessible.");
             handled = 0;
         } else if (str_startswith(path, "/users/") || str_startswith(path, "users/")) {
-            char target_user[64];
             const char *rest = str_startswith(path, "/users/") ? (path + 7) : path + 6;
             while (*rest == '/') rest++;
+
+            char target_user[64];
             int i = 0;
             while (*rest != '\0' && *rest != '/' && i < 63) {
                 target_user[i++] = *rest++;
             }
             target_user[i] = '\0';
 
-            if (target_user[0] != '\0' && str_strcmp(target_user, current_user) != 0) {
-                dogeio_text_println("Access denied: cd to another user's account is not allowed.");
+            if (target_user[0] == '\0') {
+                dogeio_text_println("Access denied: /users requires a user folder name.");
                 handled = 0;
+            } else if (str_strcmp(target_user, current_user) != 0) {
+                char target_pass[64];
+                dogeio_text_input("password> ", target_pass, 64);
+                if (!system_verify_user(target_user, target_pass)) {
+                    dogeio_text_println("Access denied: wrong password for that user.");
+                    handled = 0;
+                } else {
+                    int result = fs_chdir(path);
+                    if (result == -2) {
+                        dogeio_text_println("Much Error: Not a Folder.");
+                    } else if (result == -1) {
+                        dogeio_text_println("Such Error: Folder not existing :(");
+                    }
+                    handled = 0;
+                }
             } else {
                 int result = fs_chdir(path);
                 if (result == -2) {

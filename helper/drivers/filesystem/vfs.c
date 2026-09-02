@@ -11,8 +11,6 @@ extern int exfat_resolve_entry(const char *target_name, void *out);
 
 static fs_acl_t g_acl_table[64];
 static uint32_t g_acl_count = 0;
-static uint32_t g_current_uid = 0;
-static uint32_t g_current_gid = 0;
 static int g_auth_override = 0;
 
 static int fs_acl_find(const char *path) {
@@ -36,12 +34,11 @@ static void fs_acl_set_default_entry(const char *path, uint32_t owner_uid, uint3
 
     int idx = fs_acl_find(path);
     if (idx >= 0) {
-        fs_acl_t *entry = &g_acl_table[idx];
-        entry->owner_uid = owner_uid;
-        entry->group_gid = group_gid;
-        entry->owner_mask = owner_mask;
-        entry->group_mask = group_mask;
-        entry->other_mask = other_mask;
+        g_acl_table[idx].owner_uid = owner_uid;
+        g_acl_table[idx].group_gid = group_gid;
+        g_acl_table[idx].owner_mask = owner_mask;
+        g_acl_table[idx].group_mask = group_mask;
+        g_acl_table[idx].other_mask = other_mask;
         return;
     }
 
@@ -54,9 +51,74 @@ static void fs_acl_set_default_entry(const char *path, uint32_t owner_uid, uint3
     g_acl_count++;
 }
 
-int fs_set_current_user(uint32_t uid, uint32_t gid) {
-    g_current_uid = uid;
-    g_current_gid = gid;
+static int fs_extract_target_user(const char *path, char *out_user, size_t out_size) {
+    if (!path || path[0] == '\0' || !out_user || out_size == 0) {
+        return 0;
+    }
+
+    char normalized[256];
+    if (str_strlen(path) >= sizeof(normalized)) {
+        return 0;
+    }
+    str_strcpy(normalized, path);
+
+    char segments[32][64];
+    int depth = 0;
+    char *cursor = normalized;
+
+    while (*cursor != '\0') {
+        while (*cursor == '/') {
+            cursor++;
+        }
+        if (*cursor == '\0') {
+            break;
+        }
+
+        size_t seg_len = 0;
+        while (cursor[seg_len] != '\0' && cursor[seg_len] != '/') {
+            seg_len++;
+        }
+        if (seg_len == 0) {
+            break;
+        }
+        if (seg_len >= sizeof(segments[0])) {
+            return 0;
+        }
+        if (depth >= 32) {
+            return 0;
+        }
+
+        str_strncpy(segments[depth], cursor, seg_len + 1);
+        segments[depth][seg_len] = '\0';
+        depth++;
+        cursor += seg_len;
+        if (*cursor == '/') {
+            cursor++;
+        }
+    }
+
+    int normalized_depth = 0;
+    for (int i = 0; i < depth; i++) {
+        if (str_strcmp(segments[i], "..") == 0) {
+            if (normalized_depth > 0) {
+                normalized_depth--;
+            }
+        } else if (str_strcmp(segments[i], ".") == 0) {
+            continue;
+        } else {
+            str_strcpy(segments[normalized_depth], segments[i]);
+            normalized_depth++;
+        }
+    }
+
+    for (int i = 0; i + 1 < normalized_depth; i++) {
+        if (str_strcmp(segments[i], "users") == 0) {
+            str_strncpy(out_user, segments[i + 1], out_size);
+            return 1;
+        }
+    }
+
+    out_user[0] = '\0';
     return 0;
 }
 
@@ -80,53 +142,56 @@ int fs_check_access(const char *path, uint32_t requested_mask) {
         return 0;
     }
 
-    if (g_current_uid == 0 || g_auth_override) {
+    if (g_auth_override) {
         return 0;
     }
 
-    if (str_strcmp(path, "/system") == 0 || str_startswith(path, "/system/")) {
+    if (str_strcmp(current_user, "root") == 0 || str_strcmp(current_user, "admin") == 0) {
+        return 0;
+    }
+
+    char resolved[256];
+    if (path[0] == '/') {
+        str_strcpy(resolved, path);
+    } else {
+        char *cwd = fs_dirname();
+        if (!cwd || cwd[0] == '\0') {
+            str_strcpy(resolved, path);
+        } else {
+            str_strcpy(resolved, cwd);
+            if (resolved[str_strlen(resolved) - 1] != '/') {
+                str_strcat(resolved, "/");
+            }
+            str_strcat(resolved, path);
+        }
+    }
+
+    if (str_strcmp(resolved, "/system") == 0 || str_startswith(resolved, "/system/")) {
         return -1;
     }
 
-    if ((str_strcmp(path, ".windoge") == 0 || str_strcmp(path, "/.windoge") == 0) &&
+    if ((str_strcmp(resolved, ".windoge") == 0 || str_strcmp(resolved, "/.windoge") == 0) &&
         (requested_mask & FS_PERM_DELETE) != 0) {
         return -1;
     }
 
-    const char *scan = path;
-    if (scan[0] == '/') {
-        scan++;
-    }
-    while (*scan == '/') {
-        scan++;
-    }
-
-    if (str_startswith(scan, "users")) {
-        scan += 5;
-        while (*scan == '/') scan++;
-        if (*scan != '\0') {
-            char target_user[64];
-            int i = 0;
-            while (*scan != '\0' && *scan != '/' && i < 63) {
-                target_user[i++] = *scan++;
-            }
-            target_user[i] = '\0';
-
-            if (target_user[0] != '\0' && str_strcmp(target_user, current_user) != 0) {
-                return -1;
-            }
+    char target_user[64];
+    if (fs_extract_target_user(resolved, target_user, sizeof(target_user))) {
+        if (target_user[0] != '\0' && str_strcmp(target_user, current_user) != 0) {
+            return -1;
         }
     }
 
     return 0;
 }
 
+
 int fs_format(void) {
     return exfat_wipe_and_format();
 }
 
 int fs_create(char* filename) {
-    if (filename == NULL || filename[0] == '\0') {
+    if (!filename || filename[0] == '\0') {
         return -1;
     }
 
@@ -135,11 +200,15 @@ int fs_create(char* filename) {
         return -1;
     }
 
-    return exfat_create_node(filename, false);
+    int rc = exfat_create_node(filename, false);
+    if (rc == 0) {
+        fs_set_permissions(filename, 0, 0, 0x1Fu, 0x1Fu, 0x00u);
+    }
+    return rc;
 }
 
 int fs_mkdir(char* foldername) {
-    if (foldername == NULL || foldername[0] == '\0') {
+    if (!foldername || foldername[0] == '\0') {
         return -1;
     }
 
@@ -148,7 +217,11 @@ int fs_mkdir(char* foldername) {
         return -1;
     }
 
-    return exfat_create_node(foldername, true); 
+    int rc = exfat_create_node(foldername, true);
+    if (rc == 0) {
+        fs_set_permissions(foldername, 0, 0, 0x1Fu, 0x1Fu, 0x00u);
+    }
+    return rc;
 }
 
 int fs_exists(char* filename) {
@@ -247,7 +320,8 @@ int fs_rename(char* filename, char* newname) {
         return 0;
     }
 
-    if (fs_check_access(filename, FS_PERM_DELETE) != 0 || fs_check_access(newname, FS_PERM_CREATE | FS_PERM_WRITE) != 0) {
+    if (fs_check_access(filename, FS_PERM_DELETE) != 0 ||
+        fs_check_access(newname, FS_PERM_CREATE | FS_PERM_WRITE) != 0) {
         dogeio_text_println("Error: permission denied for rename.");
         return 0;
     }
@@ -293,32 +367,6 @@ int fs_chdir(char* folder) {
         return -1;
     }
 
-    const char *scan = folder;
-    if (scan[0] == '/') {
-        scan++;
-    }
-    while (*scan == '/') {
-        scan++;
-    }
-
-    if (str_startswith(scan, "users")) {
-        scan += 5;
-        while (*scan == '/') scan++;
-        if (*scan != '\0') {
-            char target_user[64];
-            int i = 0;
-            while (*scan != '\0' && *scan != '/' && i < 63) {
-                target_user[i++] = *scan++;
-            }
-            target_user[i] = '\0';
-
-            if (target_user[0] != '\0' && str_strcmp(target_user, current_user) != 0) {
-                dogeio_text_println("vfs: cross-user chdir denied");
-                return -1;
-            }
-        }
-    }
-
     if (fs_check_access(folder, FS_PERM_EXEC | FS_PERM_LIST) != 0) {
         dogeio_text_println("vfs: permission denied for chdir");
         return -1;
@@ -340,4 +388,17 @@ int fs_mount(void) {
         fs_acl_set_default_entry("/users", 0, 0, 0x1Fu, 0x1Fu, 0x05u);
     }
     return rc;
+}
+
+int fs_list(const char* directory, int show_hidden) {
+    if (directory && directory[0] != '\0') {
+        if (fs_chdir((char*)directory) != 0) {
+            return -1;
+        }
+    }
+    return exfat_print_directory(show_hidden);
+}
+
+char* fs_current_dir(void) {
+    return (char*)exfat_get_working_dir();
 }

@@ -60,7 +60,6 @@ typedef struct {
     uint32_t other_mask;
 } fs_acl_t;
 
-int fs_set_current_user(uint32_t uid, uint32_t gid);
 int fs_set_auth_override(int enabled);
 int fs_set_permissions(const char *path, uint32_t owner_uid, uint32_t group_gid,
                        uint32_t owner_mask, uint32_t group_mask, uint32_t other_mask);
