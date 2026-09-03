@@ -29,6 +29,8 @@ static bool is_numeric_string(const char *str) {
     return true;
 }
 
+extern uint32_t saved_color;
+
 int system_bash_ex(char* command) {
     int handled = 1; 
 
@@ -391,7 +393,6 @@ int system_bash_ex(char* command) {
 
 void system_bash(void) {
     char input[256];
-    int status = 0;
 
     if (!fs_exists(".history")) {
         fs_create(".history");
@@ -400,7 +401,7 @@ void system_bash(void) {
     while (true) {
         dogeio_text_color_change(0xFF00FF00);
         dogeio_text_print(current_user);
-        dogeio_text_color_change(old);
+        dogeio_text_color_change(saved_color);
         dogeio_text_print(":");
 
         char home_path[128];
@@ -420,12 +421,7 @@ void system_bash(void) {
             dogeio_text_print(current_dir);
         }
 
-        if (status == 1) {
-            dogeio_text_color_change(0xFFFF0000);
-            dogeio_text_print("[1] ");
-        }
-
-        dogeio_text_color_change(old);
+        dogeio_text_color_change(saved_color);
         dogeio_text_input("$ ", input, 256);
         
         if (input[0] != '\0') {
@@ -436,6 +432,6 @@ void system_bash(void) {
             return;
         }
         
-        status = system_bash_ex(input);
+        system_bash_ex(input);
     }
 }

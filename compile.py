@@ -116,13 +116,14 @@ set -e
                         check=True
                     )
                     os.remove(app_obj)
-
+    app_copy_commands = ""
     app_clean_files = []
     if os.path.exists("apps"):
         app_bins = glob.glob("apps/**/*.bin", recursive=True) + glob.glob("apps/*.bin")
-        app_clean_files = list(set(app_bins))
-
-    app_copy_commands = "if [ -d apps ]; then sudo cp -r apps/* $$MOUNT_DATA/; fi"
+        app_bins = list(set(app_bins))
+        for app in app_bins:
+            app_copy_commands += f"sudo cp {app} $MOUNT_DATA/;\n"
+            app_clean_files.append(app)
 
     create_img_script_x86_64 = f"""
 set -e
