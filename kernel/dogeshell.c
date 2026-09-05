@@ -1,3 +1,4 @@
+#include <time.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <dogeio.h>
@@ -42,6 +43,7 @@ char* help[] = {
     "cpuinfo                 | show CPU name",
     "raminfo                 | show RAM amount in bytes",
     "time                    | shows time",
+    "date                    | shows the date and time",
     "fetch                   | just like fastfetch",
     "=======================================================",
     "",
@@ -122,44 +124,14 @@ int system_dogeshell_ex(char* command) {
 
     /*  file system functions, and this is a human not a fucking clanker  */
     else if (str_startswith(command, "dir")) {
-        char* location = command + 4;
-        char* current_location = fs_dirname();
-        char folder[64];
-        char flag[16];
-        int increment = 0;
-        for (int i = 0; i < (int)str_strlen(location); i++) {
-            
-            if (location[i] != ' ') {
-                increment++;
-            } else {
-                str_strncpy(folder, location, (size_t)increment);
-                break;
-            }
-        }
+        char flags[16];
 
-        char* final = location + increment;
-        str_strcpy(flag, final);
-
-        if (!fs_chdir(folder)) {
-            dogeio_text_println("Not Wow: folder location not found.");
-            handled = -1;
+        if (str_strcmp(flags, "--hidden")) {
+            fs_list_dir(1);
         } else {
-            if (str_strcmp(flag, "--hidden")) {
-                fs_list_dir(1);
-            }
-
-            else if (flag[0] == '\0') {
-                fs_list_dir(0);
-            }
-
-            else {
-                dogeio_text_println("Unknown Flag, doing default.");
-                fs_list_dir(0);
-            }
-
-            fs_chdir(current_location);
-            handled = 0;
+            fs_list_dir(0);
         }
+        handled = 0;
     }
 
     // read a file, more of a cat than a read
@@ -230,9 +202,7 @@ int system_dogeshell_ex(char* command) {
     // create a file
     else if (str_startswith(command, "create")) {
         char* file = command + 7;
-        if (fs_create(file) == 0) {
-            dogeio_text_println("Error: file doesn't exist, could be typo.");
-        } else if (fs_create(file) == -1) {
+        if (fs_create(file) == -1) {
             dogeio_text_println("Much Sad: something went a little oops");
         }
 
@@ -242,9 +212,13 @@ int system_dogeshell_ex(char* command) {
     // delete a file
     else if (str_startswith(command, "del")) {
         char* file = command + 4;
-        fs_delete(file);
-
-        handled = 0;
+        if (!fs_exists(file)) {
+            dogeio_text_println("Error; file doesn't exist, could be a typo");
+            handled = -1;
+        } else {
+            fs_delete(file);
+            handled = 0;
+        }
     }
 
     // whereami
@@ -252,6 +226,90 @@ int system_dogeshell_ex(char* command) {
         dogeio_text_println(fs_dirname());
         handled = 0;
     }
+
+    /*  system information  */
+    else if (str_strcmp(command, "whoami") == 0) {
+        dogeio_text_println(current_user);
+        handled = 0;
+    }
+
+    else if (str_strcmp(command, "cpuinfo") == 0) {
+        dogeio_text_println(cpuid());
+        handled = 0;
+    }
+
+    else if (str_strcmp(command, "fetch") == 0) {
+        system_fetch();
+        handled = 0;
+    }
+
+    else if (str_strcmp(command, "date") == 0) {
+        dogeio_text_print(date_get());
+        dogeio_text_print(" ");
+        dogeio_text_println(time_get());
+        handled = 0;
+    }
+
+    else if (str_strcmp(command, "time") == 0) {
+        dogeio_text_println(time_get());
+        handled = 0;
+    }
+
+    /*  system utilities  */
+    else if (str_startswith(command, "edit")) {
+        char* filename = command + 5;
+        while (*filename == ' ') filename++;
+
+        size_t len = str_strlen(filename);
+        while (len > 0 && (filename[len - 1] == '\n' || filename[len - 1] == '\r' || filename[len - 1] == ' ')) {
+            filename[len - 1] = '\0';
+            len--;
+        }
+
+        if (str_strlen(filename) == 0) {
+            dogeio_text_println("Error: no filename specified :(");
+        } else {
+            if (!fs_exists(filename)) {
+                fs_create(filename);
+            }
+            system_editor(filename);
+        }
+        handled = 0;
+    }
+
+    else if (str_startswith(command, "dogescript")) {
+        char* filename = command + 11;
+
+        if (fs_exists(filename)) {
+            static char* dogescript_buffer[4096];
+            int bytes_read = fs_read(filename, buffer, 8192);
+            int last_free = 0;
+            int increment = 0;
+            int location  = 0;
+            int lines     = 0;
+
+            for (int i = 0; i < (int)str_strlen(buffer); i++) {
+                if (buffer[i] == '\n') {
+                    str_strncpy(dogescript_buffer[last_free], buffer + location, increment);
+                    location = location + increment;
+                    lines++;
+                } else if (buffer[i] == '\0') {
+                    str_strncpy(dogescript_buffer[last_free], buffer + location, increment);
+                    lines++;
+                } else {
+                    increment++;
+                }
+            }
+
+            for (int i = 0; i < lines; i++) {
+                system_dogescript_execute(dogescript_buffer[i]);
+            }
+            handled = 0;
+        } else {
+            dogeio_text_println("error: file doesn't exist :(");
+            handled = -1;
+        }
+   }
 
     // other stuff
     str_strcpy(old2, (const char*)fs_dirname);

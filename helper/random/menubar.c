@@ -2,11 +2,10 @@
 #include <dogeio.h>
 #include <boot/kernel.h>
 #include <time.h>
+#include <string.h>
 #include <system.h>
 
 #define TERMINAL_COLS 160
-
-void str_pad(char *dest, const char *src, int target_len, char pad_char);
 
 void menubar_draw() {
     uint32_t old_text_color = dogeio_text_color;
@@ -22,19 +21,33 @@ void menubar_draw() {
 
     char menu_buffer[TERMINAL_COLS + 1];
 
+    char* current_date = date_get();
     char* current_time = time_get();
-    int time_len = 0;
-    while (current_time[time_len] != '\0') {
-        time_len++;
+
+    char right_section[32];
+    int r_idx = 0;
+
+    while (current_date[r_idx] != '\0') {
+        right_section[r_idx] = current_date[r_idx];
+        r_idx++;
     }
 
-    int left_section_target_len = TERMINAL_COLS - time_len - 1;
+    right_section[r_idx++] = ' ';
+
+    int t_idx = 0;
+    while (current_time[t_idx] != '\0') {
+        right_section[r_idx++] = current_time[t_idx++];
+    }
+    right_section[r_idx] = '\0';
+
+    int right_len = r_idx;
+    int left_section_target_len = TERMINAL_COLS - right_len - 1;
 
     dogeio_text_print(" ");
     str_pad(menu_buffer, windoge_version, left_section_target_len - 1, ' ');
 
     dogeio_text_print(menu_buffer);
-    dogeio_text_print(current_time);
+    dogeio_text_print(right_section);
     dogeio_text_print(" ");
 
     dogeio_text_color_change(old_text_color);

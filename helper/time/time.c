@@ -48,8 +48,16 @@ void time_update_time(void) {
         time.year   = (uint32_t)((time.year & 0x0F) + ((time.year / 16) * 10));
     }
 
-    if (!(status_b & 0x02) && (time.hour & 0x80)) {
-        time.hour = (uint8_t)(((time.hour & 0x7F) + 12) % 24);
+    time.year += 2000;
+
+    if (!(status_b & 0x02)) {
+        uint8_t is_pm = time.hour & 0x80;
+        time.hour &= 0x7F;
+        if (is_pm && time.hour != 12) {
+            time.hour += 12;
+        } else if (!is_pm && time.hour == 12) {
+            time.hour = 0;
+        }
     }
 }
 
@@ -72,4 +80,28 @@ char* time_get(void) {
     raw_buffer[i++] = '\0';
 
     return raw_buffer;
+}
+
+char* date_get(void) {
+    time_update_time();
+
+    static char date_buffer[16];
+    int i = 0;
+
+    date_buffer[i++] = (char)((time.day / 10) + '0');
+    date_buffer[i++] = (char)((time.day % 10) + '0');
+    date_buffer[i++] = '/';
+
+    date_buffer[i++] = (char)((time.month / 10) + '0');
+    date_buffer[i++] = (char)((time.month % 10) + '0');
+    date_buffer[i++] = '/';
+
+    uint32_t full_year = time.year;
+    date_buffer[i++] = (char)((full_year / 1000) + '0');
+    date_buffer[i++] = (char)(((full_year % 1000) / 100) + '0');
+    date_buffer[i++] = (char)(((full_year % 100) / 10) + '0');
+    date_buffer[i++] = (char)((full_year % 10) + '0');
+    date_buffer[i++] = '\0';
+
+    return date_buffer;
 }

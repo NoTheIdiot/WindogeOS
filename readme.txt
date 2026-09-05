@@ -1,7 +1,7 @@
 = About WindogeOS
-WindogeOS is supposed to be a free and lightweight operating system,
-that is trying try to give a middle finger to windows 11. I just like
-coding a long term project
+WindogeOS is supposed to be a free and lightweight operating system.
+Hate these "AI powered operating systems" or "Vibe coded" OSes,
+also giving a middle finger to windows 11's ai slop copilot.
 
 = Updates
 Added a programming language that is semi "powerful"

@@ -21,5 +21,6 @@ void system_settings();
 uint64_t get_ram_end_address(void);
 int system_create_user(char* name, char* password);
 int system_verify_user(const char* name, char* password);
+int system_dogescript_execute(const char* script_text);
 
 #endif
