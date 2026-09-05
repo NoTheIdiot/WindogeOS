@@ -246,16 +246,16 @@ int fs_delete(char* filename) {
     }
 
     if (!fs_exists(filename)) {
-        dogeio_text_println("fs (delete): file does not exist");
+        log("fs (delete): file does not exist");
         return 0;
     }
 
     if (exfat_delete_node(filename) == 0) {
-        dogeio_text_println("fs (delete): file deleted");
+        log("fs (delete): file deleted");
         return 1;
     }
 
-    dogeio_text_println("fs (delete): error deleting file");
+    log("fs (delete): error deleting file");
     return -1;
 }
 

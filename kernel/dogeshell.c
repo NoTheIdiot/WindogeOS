@@ -199,6 +199,60 @@ int system_dogeshell_ex(char* command) {
     	}
     }
 
+    // rename a file
+    else if (str_startswith(command, "rename")) {
+        char* file = command + 7;
+        int firstarg_length = 0;
+        char first_arg[64];
+        char second_arg[64];
+
+        if (!fs_exists(file)) {
+            dogeio_text_println("Error: file doesn't exist");
+            dogeio_text_println("Could be a typo.");
+            handled = -1;
+        } else {
+            for (int i = 0; i < (int)str_strlen(file); i++) {
+
+                if (file[i] != ' ') {
+                    firstarg_length++;
+                } else {
+                    str_strncpy(first_arg, file, (size_t)firstarg_length);
+                    str_strcpy(second_arg, file + firstarg_length);
+                }
+
+            }
+
+            fs_rename(first_arg, second_arg);
+            handled = 0;
+        }
+    }
+
+    // create a file
+    else if (str_startswith(command, "create")) {
+        char* file = command + 7;
+        if (fs_create(file) == 0) {
+            dogeio_text_println("Error: file doesn't exist, could be typo.");
+        } else if (fs_create(file) == -1) {
+            dogeio_text_println("Much Sad: something went a little oops");
+        }
+
+        handled = 0;   
+    }
+
+    // delete a file
+    else if (str_startswith(command, "del")) {
+        char* file = command + 4;
+        fs_delete(file);
+
+        handled = 0;
+    }
+
+    // whereami
+    else if (str_strcmp(command, "whereami") == 0) {
+        dogeio_text_println(fs_dirname());
+        handled = 0;
+    }
+
     // other stuff
     str_strcpy(old2, (const char*)fs_dirname);
     fs_chdir(user);
