@@ -288,13 +288,13 @@ int system_dogeshell_ex(char* command) {
             int location  = 0;
             int lines     = 0;
 
-            for (int i = 0; i < (int)str_strlen(buffer); i++) {
+            for (int i = 0; i < bytes_read; i++) {
                 if (buffer[i] == '\n') {
-                    str_strncpy(dogescript_buffer[last_free], buffer + location, increment);
+                    str_strncpy(dogescript_buffer[last_free], buffer + location, (size_t)increment);
                     location = location + increment;
                     lines++;
                 } else if (buffer[i] == '\0') {
-                    str_strncpy(dogescript_buffer[last_free], buffer + location, increment);
+                    str_strncpy(dogescript_buffer[last_free], buffer + location, (size_t)increment);
                     lines++;
                 } else {
                     increment++;

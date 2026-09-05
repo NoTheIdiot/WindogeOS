@@ -110,7 +110,7 @@ static const char *next_line(const char *line) {
 	return *line == '\n' ? line + 1 : line;
 }
 
-int dogescript_execute(const char* script_text) {
+int system_dogescript_execute(const char* script_text) {
 	if (script_text == NULL) return 0;
 	scan_labels(script_text);
 
