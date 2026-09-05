@@ -185,6 +185,20 @@ int system_dogeshell_ex(char* command) {
         }
     }
 
+    // write a file (also known as sed)
+    else if (str_startswith(command, "write")) {
+    	char* file = command + 6;
+
+    	if (!fs_exists(file)) {
+    		dogeio_text_println("Much Error: file doesn't exist");
+    		handled = -1;
+    	} else {
+    		dogeio_text_input("> ", buffer, 8192);
+            fs_write(file, buffer);
+            handled = 0;
+    	}
+    }
+
     // other stuff
     str_strcpy(old2, (const char*)fs_dirname);
     fs_chdir(user);
