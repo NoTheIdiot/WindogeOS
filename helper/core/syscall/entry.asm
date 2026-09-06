@@ -25,10 +25,12 @@ core_sys_entry:
     push r9
 
     ; System call ABI: rax = syscall number, rdi = arg1, rsi = arg2, rdx = arg3.
-    mov rdi, rax
-    mov rsi, [rsp + 8*5]
-    mov rdx, [rsp + 8*4]
-    mov rcx, [rsp + 8*3]
+    pop r10
+    pop rdx
+    pop rsi
+    pop rdi
+    pop rcx
+    pop r11 
 
     call core_c_dispatcher
 

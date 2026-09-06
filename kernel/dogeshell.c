@@ -124,7 +124,7 @@ int system_dogeshell_ex(char* command) {
 
     /*  file system functions, and this is a human not a fucking clanker  */
     else if (str_startswith(command, "dir")) {
-        char flags[16];
+        char* flags = command + 4;
 
         if (str_strcmp(flags, "--hidden")) {
             fs_list_dir(1);
@@ -172,30 +172,31 @@ int system_dogeshell_ex(char* command) {
     }
 
     // rename a file
-    else if (str_startswith(command, "rename")) {
-        char* file = command + 7;
-        int firstarg_length = 0;
-        char first_arg[64];
-        char second_arg[64];
+    else if (str_startswith(command, "rename ")) {
+        char* args = command + 7;
+        char first_arg[64] = {0};
+        char second_arg[64] = {0};
+        
+        int i = 0;
+        while (args[i] != '\0' && args[i] != ' ' && i < 63) {
+            first_arg[i] = args[i];
+            i++;
+        }
+        first_arg[i] = '\0';
 
-        if (!fs_exists(file)) {
-            dogeio_text_println("Error: file doesn't exist");
-            dogeio_text_println("Could be a typo.");
-            handled = -1;
-        } else {
-            for (int i = 0; i < (int)str_strlen(file); i++) {
+        if (args[i] == ' ') {
+            i++;
+        }
 
-                if (file[i] != ' ') {
-                    firstarg_length++;
-                } else {
-                    str_strncpy(first_arg, file, (size_t)firstarg_length);
-                    str_strcpy(second_arg, file + firstarg_length);
-                }
+        str_strncpy(second_arg, args + i, 63);
+        second_arg[63] = '\0';
 
-            }
-
+        if (fs_exists(first_arg)) {
             fs_rename(first_arg, second_arg);
             handled = 0;
+        } else {
+            dogeio_text_println("Error: file doesn't exist");
+            handled = -1;
         }
     }
 
