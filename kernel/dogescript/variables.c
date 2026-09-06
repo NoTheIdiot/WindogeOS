@@ -7,17 +7,16 @@
 #include <bool.h>
 #include "dogescript.h"
 
-// 12 kilobytes
-variable variable_stack[128];
+variable variable_stack[8];
 size_t latest_variable_free = 0;
 
 int change_variable(char* name, uint64_t value, char* string_value, bool is_string) {
-    if (name == NULL || (is_string && string_value == NULL)) {
+    if (name == NULL || name[0] == '\0' || (is_string && string_value == NULL)) {
         return 0;
     }
 
     for (size_t i = 0; i < latest_variable_free; i++) {
-        if (str_strcmp(variable_stack[i].variable_name, name) == 0) {
+        if (variable_stack[i].variable_name[0] != '\0' && str_strcmp(variable_stack[i].variable_name, name) == 0) {
             variable_stack[i].is_string = is_string;
             if (is_string) {
                 str_strncpy(variable_stack[i].string_value, string_value, 70);
@@ -34,21 +33,20 @@ int change_variable(char* name, uint64_t value, char* string_value, bool is_stri
 }
 
 variable* get_variable(char* name) {
-    if (name == NULL) {
+    if (name == NULL || name[0] == '\0') {
         return NULL;
     }
 
     for (size_t i = 0; i < latest_variable_free; i++) {
-        if (str_strcmp(variable_stack[i].variable_name, name) == 0) {
+        if (variable_stack[i].variable_name[0] != '\0' && str_strcmp(variable_stack[i].variable_name, name) == 0) {
             return &variable_stack[i];
         }
     }
     return NULL;
 }
 
-// set a variable
 int set_variable(char* name, uint64_t value, char* string_value, bool is_string) {
-    if (name == NULL || (is_string && string_value == NULL)) {
+    if (name == NULL || name[0] == '\0' || (is_string && string_value == NULL)) {
         return 0;
     }
 
@@ -67,7 +65,7 @@ int set_variable(char* name, uint64_t value, char* string_value, bool is_string)
     if (is_string) {
         str_strncpy(variable_stack[latest_variable_free].string_value, string_value, 70);
         variable_stack[latest_variable_free].string_value[70] = '\0';
-        variable_stack[latest_variable_free].value        = 0;
+        variable_stack[latest_variable_free].value = 0;
     } else {
         variable_stack[latest_variable_free].value = value;
         variable_stack[latest_variable_free].string_value[0] = '\0';

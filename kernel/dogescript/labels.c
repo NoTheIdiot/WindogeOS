@@ -7,10 +7,14 @@
 #include <bool.h>
 #include "dogescript.h"
 
-script_label label_table[MAX_LABELS];
-size_t total_labels = 0;
+static script_label label_table[MAX_LABELS];
+static size_t total_labels = 0;
 
 int add_label(char* name, const char* ptr) {
+    if (name == NULL || name[0] == '\0' || ptr == NULL) {
+        return 0;
+    }
+
     for (size_t i = 0; i < total_labels; i++) {
         if (str_strcmp(label_table[i].label_name, name) == 0) {
             label_table[i].script_ptr = ptr;
@@ -30,6 +34,10 @@ int add_label(char* name, const char* ptr) {
 }
 
 const char* find_label(char* name) {
+    if (name == NULL || name[0] == '\0') {
+        return NULL;
+    }
+
     for (size_t i = 0; i < total_labels; i++) {
         if (str_strcmp(label_table[i].label_name, name) == 0) {
             return label_table[i].script_ptr;
@@ -51,9 +59,11 @@ void scan_labels(const char* script_text) {
         while (*line == ' ' || *line == '\t' || *line == '\n' || *line == '\r') {
             line++;
         }
-        if (*line == '\0') break;
+        if (*line == '\0') {
+            break;
+        }
 
-            if (str_strncmp(line, "LABEL ", 6) == 0) {
+        if (str_strncmp(line, "LABEL ", 6) == 0) {
             line += 6;
             char name[16];
             size_t i = 0;
@@ -62,14 +72,17 @@ void scan_labels(const char* script_text) {
                 i++;
             }
             name[i] = '\0';
-            const char* target = line + i;
-            while (*target != '\n' && *target != '\0') {
-                target++;
+            
+            if (i > 0) {
+                const char* target = line + i;
+                while (*target != '\n' && *target != '\0') {
+                    target++;
+                }
+                if (*target == '\n') {
+                    target++;
+                }
+                add_label(name, target);
             }
-            if (*target == '\n') {
-                target++;
-            }
-            add_label(name, target);
         }
 
         while (*line != '\n' && *line != '\0') {
