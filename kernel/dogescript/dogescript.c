@@ -135,5 +135,6 @@ int system_dogescript_execute(char* line) {
 
 
 int system_dogescript(char* file) {
-
+    (void)file;
+    return 0;
 }

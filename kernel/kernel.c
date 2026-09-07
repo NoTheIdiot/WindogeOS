@@ -82,11 +82,29 @@ void kernel_main(void) {
         fs_mount();
         fs_set_auth_override(1);
 
-        dogeio_text_println("Welcome to WindogeOS setup");
-        dogeio_text_println("Version: WindogeOS v0.01");
-
         char proceed[2];
-        dogeio_text_input("Press Enter to continue> ", proceed, 2);
+        while (true) {
+            dogeio_text_println("Welcome to WindogeOS setup");
+            dogeio_text_println("Version: WindogeOS v0.01");
+            dogeio_text_println("\n[1] start setup");
+            dogeio_text_println("[2] testing cmd");
+            dogeio_text_println("[3] shutdown computer");
+            dogeio_text_println("[4] reboot");
+            dogeio_text_input("> ", proceed, 2);
+
+            if (proceed[0] == '1') {
+                break;
+            } else if (proceed[0] == '2') {
+                system_dogeshell();
+                dogeio_text_clear();
+            } else if (proceed[0] == '3') {
+                core_shutdown();
+            } else if (proceed[0] == '4') {
+                core_reboot();
+            } else {
+                dogeio_text_println("bad option, choose 1, 2, 3 or 4");
+            }
+        }
 
         if (!fs_exists("system")) {
             fs_mkdir("system");

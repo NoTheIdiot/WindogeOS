@@ -372,6 +372,10 @@ void system_dogeshell(void) {
 
         dogeio_text_color_change(saved_color);
         dogeio_text_input("> ", input, 256);
+
+        if (str_strcmp(input, "exit") == 0) {
+            return;
+        }
         status = system_dogeshell_ex(input);
     }
 }
