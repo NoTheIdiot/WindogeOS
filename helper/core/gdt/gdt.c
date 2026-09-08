@@ -1,6 +1,5 @@
-#include <stdint.h>
-#include <string.h>
 #include <core.h>
+#include <string.h>
 
 static uint8_t kernel_stack[16384] __attribute__((aligned(16)));
 
@@ -32,11 +31,11 @@ void init_gdt(void) {
     memset(&gdt, 0, sizeof(gdt));
     memset(&tss, 0, sizeof(tss));
 
-    set_gdt_entry(&gdt.null_desc, 0, 0, 0, 0);       
+    set_gdt_entry(&gdt.null_desc,   0, 0, 0, 0);       
     set_gdt_entry(&gdt.kernel_code, 0, 0, 0x9A, 0x20); 
     set_gdt_entry(&gdt.kernel_data, 0, 0, 0x92, 0x00); 
-    set_gdt_entry(&gdt.user_code,   0, 0, 0xFA, 0x20); 
     set_gdt_entry(&gdt.user_data,   0, 0, 0xF2, 0x00); 
+    set_gdt_entry(&gdt.user_code,   0, 0, 0xFA, 0x20); 
 
     tss.rsp0 = (uint64_t)&kernel_stack[sizeof(kernel_stack)];
     tss.iomap_base = sizeof(tss_entry_t);

@@ -52,7 +52,6 @@ char* help[] = {
     "edit                    | edits a file",
     "genimg                  | generates a solid color image",
     "viewimg                 | views solid color image",
-    "dogescript              | runs dogescript scripts",
     "=======================================================",
 };
 
@@ -277,40 +276,6 @@ int system_dogeshell_ex(char* command) {
         }
         handled = 0;
     }
-
-    else if (str_startswith(command, "dogescript")) {
-        char* filename = command + 11;
-
-        if (fs_exists(filename)) {
-            static char* dogescript_buffer[4096];
-            int bytes_read = fs_read(filename, buffer, 8192);
-            int last_free = 0;
-            int increment = 0;
-            int location  = 0;
-            int lines     = 0;
-
-            for (int i = 0; i < bytes_read; i++) {
-                if (buffer[i] == '\n') {
-                    str_strncpy(dogescript_buffer[last_free], buffer + location, (size_t)increment);
-                    location = location + increment;
-                    lines++;
-                } else if (buffer[i] == '\0') {
-                    str_strncpy(dogescript_buffer[last_free], buffer + location, (size_t)increment);
-                    lines++;
-                } else {
-                    increment++;
-                }
-            }
-
-            for (int i = 0; i < lines; i++) {
-                system_dogescript_execute(dogescript_buffer[i]);
-            }
-            handled = 0;
-        } else {
-            dogeio_text_println("error: file doesn't exist :(");
-            handled = -1;
-        }
-   }
 
     // other stuff
     str_strcpy(old2, (const char*)fs_dirname);

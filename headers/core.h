@@ -48,12 +48,12 @@ typedef struct {
 } __attribute__((packed)) gdt_ptr_t;
 
 typedef struct {
-    gdt_entry_t      null_desc;   
-    gdt_entry_t      kernel_code; 
-    gdt_entry_t      kernel_data; 
-    gdt_entry_t      user_code;   
-    gdt_entry_t      user_data;   
-    tss_descriptor_t tss_desc;    
+    gdt_entry_t      null_desc;   // 0x00
+    gdt_entry_t      kernel_code; // 0x08
+    gdt_entry_t      kernel_data; // 0x10
+    gdt_entry_t      user_data;   // 0x18 
+    gdt_entry_t      user_code;   // 0x20
+    tss_descriptor_t tss_desc;    // 0x28
 } __attribute__((packed, aligned(4096))) gdt_table_t;
 
 
