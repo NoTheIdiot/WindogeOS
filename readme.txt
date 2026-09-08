@@ -4,8 +4,8 @@ Hate these "AI powered operating systems" or "Vibe coded" OSes,
 also giving a middle finger to windows 11's ai slop copilot.
 
 = Updates
-Added a programming language that is semi "powerful"
 Also decided to rewrite the shell since it's junk
+Im going back to syscall, the programming language page faulted
 
 = How to such compile and run?
 - Install git, clang, python, and qemu-system. Yes, the other tools (like limine, that's it)
