@@ -1,40 +1,53 @@
 bits 64
-global core_to_user
-extern shell_rsp_backup
-extern shell_rbp_backup
-extern shell_rip_backup
-extern shell_cr3_backup
+
+global to_userland_ring3
+
+; c function:
+; void to_userland_ring3(uint64_t user_rip, uint64_t user_rsp);
+; args:  
+; rdi = user_rip
+; rsi = user_rsp
 
 section .text
-core_to_user:
+to_userland_ring3:
+    ; disable interrupts during the transition
+    ; so the time doesn't corrupt the stack frame
     cli
 
-    ; Save the kernel state so a future exit can restore the original context.
-    mov rax, cr3
-    mov [rel shell_cr3_backup], rax
-    mov [rel shell_rsp_backup], rsp
-    mov [rel shell_rbp_backup], rbp
-    lea rax, [rel .after_iret]
-    mov [rel shell_rip_backup], rax
-
-    mov cr3, rdi
-
-    ; Switch to the user selectors.
+    ; get data segment 
+    ; 0x23 is user data, index 4 RPL 3
     mov ax, 0x23
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov gs, ax
 
-    ; Build the IRETQ frame on the user stack itself.
-    mov rsp, rdx
+    ; load the kernel's GS base for MSR_IA32_KERNEL_GS_BASE
+    swapgs
+
+    ; build iretq stack frame
     push qword 0x23
-    push qword 0x0000000000000000
-    pushfq
-    push qword 0x1B
     push rsi
 
-    iretq
+    ; 0x202 means intterupts yes (bit 9)
+    push qword 0x202
+    push rdi
+\
+    xor rax, rax
+    xor rbx, rbx
+    xor rcx, rcx
+    xor rdx, rdx
+    xor rbp, rbp
+    xor r8, r8
+    xor r9, r9
+    xor r10, r10
+    xor r11, r11
+    xor r12, r12
+    xor r13, r13
+    xor r14, r14
+    xor r15, r15
+    xor rdi, rdi
+    xor rsi, rsi
 
-.after_iret:
-    ret
+    ; to ring 3
+    iretq
