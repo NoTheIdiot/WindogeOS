@@ -21,6 +21,14 @@ void system_settings();
 uint64_t get_ram_end_address(void);
 int system_create_user(char* name, char* password);
 int system_verify_user(const char* name, char* password);
-int system_dogescript_execute(const char* script_text);
+
+// system calls
+#define FS_READ         01
+#define FS_WRITE        02
+
+#define DOGEIO_PRINT    11
+#define DOGEIO_CLEAR    12
+
+#define EXIT            0
 
 #endif
