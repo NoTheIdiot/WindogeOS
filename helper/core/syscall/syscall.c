@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <core.h>
+#include <basicutil.h>
 
 #define MSR_IA32_EFER   0xC0000080
 #define MSR_IA32_STAR   0xC0000081
@@ -13,18 +14,6 @@
 #define RFLAGS_IF       (1ULL << 9)
 
 extern void syscall_entry(void);
-
-static inline uint64_t rdmsr(uint32_t msr) {
-    uint32_t lo, hi;
-    __asm__ volatile ("rdmsr" : "=a"(lo), "=d"(hi) : "c"(msr));
-    return ((uint64_t)hi << 32) | lo;
-}
-
-static inline void wrmsr(uint32_t msr, uint64_t val) {
-    uint32_t lo = (uint32_t)val;
-    uint32_t hi = (uint32_t)(val >> 32);
-    __asm__ volatile ("wrmsr" : : "a"(lo), "d"(hi), "c"(msr));
-}
 
 struct cpu_regs {
     uint64_t rax, rbx, rcx, rdx, rsi, rdi, rbp, r8, r9, r10, r11, r12, r13, r14, r15, user_rsp;

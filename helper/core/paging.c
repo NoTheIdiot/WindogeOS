@@ -1,166 +1,18 @@
-#include <string.h>
+#include <system.h>
 #include <stdint.h>
+#include <stddef.h>
 #include <boot/limine.h>
-#include <boot/kernel.h>
-#include <core.h>
-#include <basicutil.h>
 
-#define PAGE_PRESENT (1ULL << 0)
-#define PAGE_WRITE   (1ULL << 1)
-#define PAGE_USER    (1ULL << 2)
+#define PAGE_PRESENT  (1ULL << 0)
+#define PAGE_WRITABLE (1ULL << 1)
+#define PAGE_USER     (1ULL << 2)
 
-extern volatile struct limine_hhdm_request hhdm_request;
+#define PAGE_USER_FLAGS (PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER)
+
+// get limine memory requests
 extern volatile struct limine_memmap_request memmap_request;
+extern volatile struct limine_hhdm_request   hhdm_request;
 
-#define STACK_BLOCKS 32
-static void* stack_blocks_array[STACK_BLOCKS];
-
-uint64_t pmm_alloc_block(void) {
-    static uint64_t memmap_idx = 0;
-    static uint64_t current_addr = 0;
-    struct limine_memmap_response *memmap = memmap_request.response;
-
-    while (memmap_idx < memmap->entry_count) {
-        struct limine_memmap_entry *entry = memmap->entries[memmap_idx];
-        if (entry->type == LIMINE_MEMMAP_USABLE) {
-            if (current_addr == 0 || current_addr < entry->base) {
-                current_addr = entry->base;
-            }
-            if (current_addr + 4096 <= entry->base + entry->length) {
-                uint64_t frame = current_addr;
-                current_addr += 4096;
-                return frame;
-            }
-        }
-        memmap_idx++;
-        current_addr = 0;
-    }
-    return 0;
-}
-
-static inline void *phys_to_virt(uint64_t phys) {
-    return (void *)(phys + hhdm_request.response->offset);
-}
-
-static inline uint64_t virt_to_phys(void *ptr, uint64_t hhdm) {
-    return (uint64_t)ptr - hhdm;
-}
-
-uint64_t* get_limine_boot_pml4(void) {
-    uint64_t cr3;
-    asm volatile("mov %%cr3, %0" : "=r" (cr3));
-    return (uint64_t *)phys_to_virt(cr3 & 0xFFFFFFFFF000ULL);
-}
-
-uint64_t create_user_pml4(void) {
-    uint64_t pml4_phys = pmm_alloc_block();
-    uint64_t *pml4_virt = (uint64_t *)phys_to_virt(pml4_phys);
-
-    for (int i = 0; i < 512; i++) {
-        pml4_virt[i] = 0;
-    }
-
-    uint64_t *boot_pml4 = get_limine_boot_pml4();
+static inline uint64_t read_cr3(void) {
     
-    for (int i = 256; i < 512; i++) {
-        if (boot_pml4[i] & PAGE_PRESENT) {
-            uint64_t src_pdpt_phys = boot_pml4[i] & 0xFFFFFFFFF000ULL;
-            pml4_virt[i] = src_pdpt_phys | PAGE_PRESENT | PAGE_WRITE | PAGE_USER; 
-        }
-    }
-
-    return pml4_phys;
-}
-
-void map_user_page(uint64_t pml4_phys, uint64_t virtual_addr, uint64_t physical_addr) {
-    uint64_t *pml4 = (uint64_t *)phys_to_virt(pml4_phys);
-
-    uint64_t pml4_idx = (virtual_addr >> 39) & 0x1FF;
-    uint64_t pdpt_idx  = (virtual_addr >> 30) & 0x1FF;
-    uint64_t pd_idx    = (virtual_addr >> 21) & 0x1FF;
-    uint64_t pt_idx    = (virtual_addr >> 12) & 0x1FF;
-
-    uint64_t *pdpt, *pd, *pt;
-
-    if (!(pml4[pml4_idx] & PAGE_PRESENT)) {
-        uint64_t pdpt_phys = pmm_alloc_block();
-        pdpt = (uint64_t *)phys_to_virt(pdpt_phys);
-        for (int i = 0; i < 512; i++) pdpt[i] = 0;
-        pml4[pml4_idx] = pdpt_phys | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;
-    } else {
-        pdpt = (uint64_t *)phys_to_virt(pml4[pml4_idx] & 0xFFFFFFFFF000ULL);
-        pml4[pml4_idx] |= PAGE_USER;
-    }
-
-    if (!(pdpt[pdpt_idx] & PAGE_PRESENT)) {
-        uint64_t pd_phys = pmm_alloc_block();
-        pd = (uint64_t *)phys_to_virt(pd_phys);
-        for (int i = 0; i < 512; i++) pd[i] = 0;
-        pdpt[pdpt_idx] = pd_phys | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;
-    } else {
-        pd = (uint64_t *)phys_to_virt(pdpt[pdpt_idx] & 0xFFFFFFFFF000ULL);
-        pdpt[pdpt_idx] |= PAGE_USER;
-    }
-
-    if (!(pd[pd_idx] & PAGE_PRESENT)) {
-        uint64_t pt_phys = pmm_alloc_block();
-        pt = (uint64_t *)phys_to_virt(pt_phys);
-        for (int i = 0; i < 512; i++) pt[i] = 0;
-        pd[pd_idx] = pt_phys | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;
-    } else {
-        pt = (uint64_t *)phys_to_virt(pd[pd_idx] & 0xFFFFFFFFF000ULL);
-        pd[pd_idx] |= PAGE_USER;
-    }
-
-    pt[pt_idx] = (physical_addr & 0xFFFFFFFFF000ULL) | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;
-}
-
-void init_user_space(void) {
-    uint64_t user_pml4 = create_user_pml4();
-
-    uint64_t code_phys = pmm_alloc_block();
-    uint64_t user_virt_code = 0x400000;
-    map_user_page(user_pml4, user_virt_code, code_phys);
-
-    uint64_t user_virt_stack_top = 0x800000;
-    size_t stack_pages = 32;
-    for (size_t i = 0; i < stack_pages; i++) {
-        uint64_t phys = pmm_alloc_block();
-        uint64_t virt = user_virt_stack_top - (i+1) * 0x1000;
-        map_user_page(user_pml4, virt, phys);
-    }
-
-    unsigned char app_bytes[] = { 0xEB, 0xFE };
-    unsigned char *dest = (unsigned char *)phys_to_virt(code_phys);
-    for (int i = 0; i < (int)sizeof(app_bytes); i++) {
-        dest[i] = app_bytes[i];
-    }
-
-    core_to_user(user_pml4, (void *)user_virt_code, (void *)user_virt_stack_top);
-}
-
-uint64_t allocate_flat_user_stack(uint64_t hhdm, uint64_t pml4_phys) {
-    for (int i = 0; i < STACK_BLOCKS; i++) {
-        uint64_t phys_block = pmm_alloc_block();
-        if (!phys_block) return 0;
-        
-        stack_blocks_array[i] = (void*)phys_block;
-        void* virt_page = phys_to_virt(phys_block);
-        memset(virt_page, 0, 4096);
-
-        uint64_t user_virt_addr = 0x7FFF00000000ULL - ((uint64_t)(i + 1) * 4096);
-        map_user_page(pml4_phys, user_virt_addr, phys_block);
-    }
-    return virt_to_phys(stack_blocks_array[0], hhdm);
-}
-
-void clean_user_stack_scratchpad(uint64_t hhdm) {
-    (void)hhdm;
-    for (int i = 0; i < STACK_BLOCKS; i++) {
-        if (stack_blocks_array[i]) {
-            void* virt_page = phys_to_virt((uint64_t)stack_blocks_array[i]);
-            memset(virt_page, 0, 4096);
-            stack_blocks_array[i] = NULL;
-        }
-    }
 }
