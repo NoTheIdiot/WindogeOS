@@ -57,7 +57,9 @@ void kernel_main(void) {
     if (memmap_request.response == NULL) {
         log("[Not Wow] Holy shit RAM does not exist.... How?");
         log("          memmap_request.response == NULL");
-        panic("Memmap for some reason isn't here", __FILE__, __LINE__);
+        dogeio_text_println("[Not Wow] Memmap request does not respond. Not Wow.");
+        cli();
+        halt();
     }
     log("[Wow] Memory Map has been found.");
 

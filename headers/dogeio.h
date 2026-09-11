@@ -79,6 +79,7 @@ void  fs_copy(char* source, char* dest);
 int   fs_chdir(char* folder);
 char* fs_dirname(void);
 int   fs_mount(void);
+int   fs_read_raw(char* filename, uint8_t* output_buffer, uint32_t max_size);
 
 int exec_flat_binary(const char *filename, int argc, char **argv);
 

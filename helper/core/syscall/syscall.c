@@ -2,6 +2,7 @@
 #include <dogeio.h>
 #include <string.h>
 #include <stdint.h>
+#include <bool.h>
 #include <core.h>
 #include <basicutil.h>
 
@@ -11,13 +12,20 @@
 #define MSR_IA32_FMASK  0xC0000084
 
 #define EFER_SCE        (1ULL << 0)
+
+#define RFLAGS_TF       (1ULL << 8)
 #define RFLAGS_IF       (1ULL << 9)
+#define RFLAGS_DF       (1ULL << 10)
 
 extern void syscall_entry(void);
 
 struct cpu_regs {
     uint64_t rax, rbx, rcx, rdx, rsi, rdi, rbp, r8, r9, r10, r11, r12, r13, r14, r15, user_rsp;
 };
+
+static inline bool is_user_address(const void *ptr) {
+    return (uint64_t)ptr < 0x0000800000000000ULL;
+}
 
 uint64_t syscall_handler(struct cpu_regs *regs) {
     uint64_t sc_num = regs->rax;
@@ -29,6 +37,10 @@ uint64_t syscall_handler(struct cpu_regs *regs) {
             char* buffer   = (char*)regs->rsi;
             uint32_t size  = (uint32_t)regs->rdx;
 
+            if (!is_user_address(filepath) || !is_user_address(buffer)) {
+                return (uint64_t)-1;
+            }
+
             ret_val = (uint64_t)(int64_t)fs_read(filepath, buffer, size);
             break;
         }
@@ -36,6 +48,10 @@ uint64_t syscall_handler(struct cpu_regs *regs) {
         case FS_WRITE: {
             char* filepath = (char*)regs->rdi;
             char* buffer   = (char*)regs->rsi;
+
+            if (!is_user_address(filepath) || !is_user_address(buffer)) {
+                return (uint64_t)-1;
+            }
 
             ret_val = (uint64_t)(int64_t)fs_write(filepath, buffer);
             break;
@@ -53,11 +69,11 @@ void init_syscalls(void) {
     wrmsr(MSR_IA32_EFER, rdmsr(MSR_IA32_EFER) | EFER_SCE);
 
     uint64_t kernel_cs = 0x08; 
-    uint64_t user_base = 0x1B; 
+    uint64_t user_base = 0x10; 
     
     uint64_t star = (kernel_cs << 32) | (user_base << 48);
     wrmsr(MSR_IA32_STAR, star);
 
     wrmsr(MSR_IA32_LSTAR, (uint64_t)syscall_entry);
-    wrmsr(MSR_IA32_FMASK, RFLAGS_IF);
+    wrmsr(MSR_IA32_FMASK, RFLAGS_IF | RFLAGS_TF | RFLAGS_DF);
 }

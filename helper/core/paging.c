@@ -15,23 +15,14 @@
 extern volatile struct limine_memmap_request memmap_request;
 extern volatile struct limine_hhdm_request   hhdm_request;
 
-static inline uint64_t read_cr3(void) {
-    uint64_t cr3;
-    __asm__ volatile ("mov %%cr3, %0" : "=r"(cr3));
-    return cr3;
-}
-
-static inline void invlpg(uint64_t vaddr) {
-    __asm__ volatile ("invlpg (%0)" :: "r"(vaddr) : "memory");
-}
-
 uint64_t pmm_alloc_zeroed_page(void) {
     static uint64_t alloc_index = 0;
     static uint64_t alloc_offset = 0;
 
     if (!memmap_request.response || !hhdm_request.response) {
         dogeio_text_println("[Error] Bootloader requests not found, try rebooting.");
-        while (1) { cli(); halt(); }
+        cli();
+        halt();
     }
 
     struct limine_memmap_response *memmap = memmap_request.response;
@@ -56,8 +47,10 @@ uint64_t pmm_alloc_zeroed_page(void) {
         alloc_offset = 0;
     }
 
-    dogeio_text_println("[Error] Out of physical RAM!");
-    while (1) { cli(); halt(); }
+    dogeio_text_println("[error] out of dang ram");
+    cli();
+    halt();
+    return 0;
 }
 
 static inline uint64_t* get_or_alloc_table(uint64_t* table, size_t index, uint64_t hhdm_offset) {

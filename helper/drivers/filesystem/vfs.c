@@ -280,6 +280,23 @@ int fs_read(char* filename, char* output_buffer, uint32_t max_size) {
     return (int)exfat_read_file(filename, (uint8_t*)output_buffer, max_size);
 }
 
+int fs_read_raw(char* filename, uint8_t* output_buffer, uint32_t max_size) {
+    if (!output_buffer) return -1;
+    if (!filename || filename[0] == '\0') return -1;
+
+    if (fs_check_access(filename, FS_PERM_READ) != 0) {
+        dogeio_text_println("vfs: permission denied for read");
+        return -1;
+    }
+
+    if (!fs_exists(filename)) {
+        dogeio_text_println("vfs: file not found or read error.");
+        return -1;
+    }
+
+    return (int)exfat_read_file(filename, output_buffer, max_size);
+}
+
 int fs_write_bytes(char* filename, char* input_buffer, uint32_t size) {
     if (!filename || filename[0] == '\0') {
         dogeio_text_println("vfs: invalid filename for write.");
