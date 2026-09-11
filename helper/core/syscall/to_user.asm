@@ -16,7 +16,7 @@ to_userland_ring3:
 
     ; get data segment 
     ; 0x23 is user data, index 4 RPL 3
-    mov ax, 0x23
+    mov ax, 0x1b
     mov ds, ax
     mov es, ax
     mov fs, ax
@@ -26,13 +26,14 @@ to_userland_ring3:
     swapgs
 
     ; build iretq stack frame
-    push qword 0x23
+    push qword 0x1b
     push rsi
 
     ; 0x202 means intterupts yes (bit 9)
     push qword 0x202
+    push qword 0x23
     push rdi
-\
+
     xor rax, rax
     xor rbx, rbx
     xor rcx, rcx

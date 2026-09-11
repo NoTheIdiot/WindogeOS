@@ -24,6 +24,8 @@ int system_verify_user(const char* name, char* password);
 
 void setup_ring3_memory(uint64_t user_code_virt, uint64_t user_stack_virt, const uint8_t *user_code, size_t code_size);
 void map_user_page(uint64_t virt_addr, uint64_t phys_addr);
+uint64_t pmm_alloc_zeroed_page(void);
+extern void to_userland_ring3(uint64_t user_rip, uint64_t user_rsp) __attribute__((noreturn));
 
 // system calls
 #define FS_READ         01
