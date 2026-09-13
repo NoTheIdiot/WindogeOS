@@ -793,19 +793,20 @@ int exfat_print_directory(int hidden) {
 int exfat_change_directory(const char *path) {
     if (!path || path[0] == '\0') return 0;
 
-    if (str_strcmp(path, "/") == 0) {
-        g_current_cluster = g_root_cluster;
-        str_strcpy(g_current_path, "/");
-        return 1;
+    uint32_t cluster;
+    char new_path[256];
+
+    if (path[0] == '/') {
+        cluster = g_root_cluster;
+        str_strcpy(new_path, "/");
+    } else {
+        cluster = g_current_cluster;
+        str_strcpy(new_path, g_current_path);
     }
 
     char temp[256];
     str_strcpy(temp, path);
 
-    char new_path[256];
-    str_strcpy(new_path, g_current_path);
-
-    uint32_t cluster = g_current_cluster;
     int start = 0;
     int len = (int)str_strlen(temp);
 
@@ -821,20 +822,66 @@ int exfat_change_directory(const char *path) {
 
         if (toklen > 0) {
             if (str_strcmp(token, "..") == 0) {
-                cluster = g_root_cluster;
-                str_strcpy(new_path, "/");
-            } else if (str_strcmp(token, ".") == 0) {
-            } else {
+                if (str_strcmp(new_path, "/") != 0) {
+                    int path_len = (int)str_strlen(new_path);
+                    int last_slash = -1;
+                    for (int i = path_len - 1; i >= 0; i--) {
+                        if (new_path[i] == '/') {
+                            last_slash = i;
+                            break;
+                        }
+                    }
+                    if (last_slash <= 0) {
+                        str_strcpy(new_path, "/");
+                    } else {
+                        new_path[last_slash] = '\0';
+                    }
+
+                    cluster = g_root_cluster;
+                    if (str_strcmp(new_path, "/") != 0) {
+                        char rewalk[256];
+                        str_strcpy(rewalk, new_path + 1);
+                        int r_start = 0;
+                        int r_len = (int)str_strlen(rewalk);
+                        while (r_start < r_len) {
+                            int r_end = r_start;
+                            while (r_end < r_len && rewalk[r_end] != '/') r_end++;
+
+                            char r_token[64];
+                            int r_toklen = r_end - r_start;
+                            if (r_toklen >= 64) r_toklen = 63;
+                            for (int k = 0; k < r_toklen; k++) r_token[k] = rewalk[r_start + k];
+                            r_token[r_toklen] = '\0';
+
+                            if (r_toklen > 0) {
+                                exfat_target_t target;
+                                uint32_t prev = g_current_cluster;
+                                g_current_cluster = cluster;
+                                int res = exfat_resolve_entry(r_token, &target);
+                                g_current_cluster = prev;
+                                if (res == 0 && target.is_dir) {
+                                    cluster = target.cluster;
+                                }
+                            }
+                            r_start = r_end + 1;
+                        }
+                    }
+                }
+            } else if (str_strcmp(token, ".") != 0) {
                 exfat_target_t target;
+                uint32_t prev_cluster = g_current_cluster;
                 g_current_cluster = cluster;
-                if (exfat_resolve_entry(token, &target) != 0) {
-                    return -1;
-                }
-                if (!target.is_dir) {
-                    return -2;
-                }
+                int res = exfat_resolve_entry(token, &target);
+                g_current_cluster = prev_cluster;
+
+                if (res != 0) return -1;
+                if (!target.is_dir) return -2;
+
                 cluster = target.cluster;
-                if (str_strlen(new_path) > 1) str_strcat(new_path, "/");
+
+                if (str_strcmp(new_path, "/") != 0) {
+                    str_strcat(new_path, "/");
+                }
                 str_strcat(new_path, token);
             }
         }
@@ -844,7 +891,7 @@ int exfat_change_directory(const char *path) {
 
     g_current_cluster = cluster;
     str_strcpy(g_current_path, new_path);
-    return 1;
+    return 0;
 }
 
 const char* exfat_get_working_dir(void) {

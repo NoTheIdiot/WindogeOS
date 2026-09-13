@@ -128,17 +128,17 @@ set -e
     create_img_script_x86_64 = f"""
 set -e
 rm -f {img_file};
-dd if=/dev/zero bs=1M count=0 seek=1028 of={img_file};
+dd if=/dev/zero bs=1M count=0 seek=8 of={img_file};
 
 PATH=$PATH:/usr/sbin:/sbin sgdisk {img_file} \
   -n 1:2048:4095 -t 1:8300 \
-  -n 2:4096:2101247 -t 2:0700 -m 1;
+  -n 2:4096:16350 -t 2:0700 -m 1;
 
 chmod +x binaries/limine 2>/dev/null || true
 ./binaries/limine bios-install {img_file};
 
 LOOP_BOOT=$(sudo losetup -f --show -o 1048576 --sizelimit 1048576 {img_file})
-LOOP_DATA=$(sudo losetup -f --show -o 2097152 {img_file})
+LOOP_DATA=$(sudo losetup -f --show -o 2097152 --sizelimit 6274560 {img_file})
 
 sudo mkfs.fat -F 12 -a -s 1 -n "BOOT" $LOOP_BOOT
 sudo mkfs.exfat -c 4K -L "WINDOGEOS" $LOOP_DATA
@@ -168,16 +168,16 @@ find . -name "*.plist" -type f -delete 2>/dev/null || rm -f *.plist
     create_img_script_arm64 = f"""
 set -e
 rm -f {img_file};
-dd if=/dev/zero bs=1M count=0 seek=1028 of={img_file};
+dd if=/dev/zero bs=1M count=0 seek=8 of={img_file};
 
 PATH=$PATH:/usr/sbin:/sbin sgdisk {img_file} \
   -n 1:2048:4095 -t 1:ef00 \
-  -n 2:4096:2101247 -t 2:0700 -m 1;
+  -n 2:4096:16350 -t 2:0700 -m 1;
 
 LOOP_BOOT=$(sudo losetup -f --show -o 1048576 --sizelimit 1048576 {img_file})
-LOOP_DATA=$(sudo losetup -f --show -o 2097152 {img_file})
+LOOP_DATA=$(sudo losetup -f --show -o 2097152 --sizelimit 6274560 {img_file})
 
-sudo mkfs.fat -F 16 -n "BOOT" $LOOP_BOOT
+sudo mkfs.fat -F 12 -n "BOOT" $LOOP_BOOT
 sudo mkfs.exfat -c 4K -L "WINDOGEOS" $LOOP_DATA
 
 MOUNT_BOOT=$(mktemp -d)
