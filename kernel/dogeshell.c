@@ -144,10 +144,42 @@ int system_dogeshell_ex(char* command) {
         handled = 0;
     }
     else if ((arg = get_cmd_arg(command, "dir")) != NULL) {
-        if (str_strcmp(arg, "--hidden") == 0) {
-            fs_list_dir(1);
+        char clean_arg[256];
+        str_strcpy(clean_arg, arg);
+
+        int len = (int)str_strlen(clean_arg);
+        while (len > 0 && (clean_arg[len - 1] == '\n' || clean_arg[len - 1] == '\r' || clean_arg[len - 1] == ' ')) {
+            clean_arg[--len] = '\0';
+        }
+
+        int show_hidden = 0;
+        char path[256] = {0};
+
+        if (str_strcmp(clean_arg, "--hidden") == 0) {
+            show_hidden = 1;
+        } else if (str_startswith(clean_arg, "--hidden ")) {
+            show_hidden = 1;
+            str_strcpy(path, clean_arg + 9);
         } else {
-            fs_list_dir(0);
+            int arg_len = (int)str_strlen(clean_arg);
+            if (arg_len >= 8 && str_strcmp(clean_arg + arg_len - 8, "--hidden") == 0) {
+                show_hidden = 1;
+                str_strncpy(path, clean_arg, (size_t)arg_len - 8);
+                path[arg_len - 8] = '\0';
+
+                int p_len = (int)str_strlen(path);
+                while (p_len > 0 && path[p_len - 1] == ' ') {
+                    path[--p_len] = '\0';
+                }
+            } else {
+                str_strcpy(path, clean_arg);
+            }
+        }
+
+        if (path[0] != '\0') {
+            fs_list(path, show_hidden);
+        } else {
+            fs_list_dir(show_hidden);
         }
         handled = 0;
     }

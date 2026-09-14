@@ -312,31 +312,36 @@ int fs_mount(void) {
 }
 
 int fs_list(const char* directory, int show_hidden) {
-    if (directory && directory[0] != '\0') {
-        char clean[256];
-        fs_sanitize_path(directory, clean, sizeof(clean));
-        if (clean[0] != '\0') {
-            char saved_cwd[256];
-            char *current = (char*)exfat_get_working_dir();
-            int walked = 0;
-            if (current) {
-                str_strcpy(saved_cwd, current);
-                walked = 1;
-            }
-
-            if (exfat_change_directory(clean) != 0) {
-                return -1;
-            }
-
-            int rc = exfat_print_directory(show_hidden);
-
-            if (walked) {
-                exfat_change_directory(saved_cwd);
-            }
-            return rc;
-        }
+    if (!directory || directory[0] == '\0') {
+        return exfat_print_directory(show_hidden);
     }
-    return exfat_print_directory(show_hidden);
+
+    char clean[256];
+    fs_sanitize_path(directory, clean, sizeof(clean));
+
+    if (str_strcmp(clean, "--hidden") == 0 || clean[0] == '\0') {
+        return exfat_print_directory(show_hidden);
+    }
+
+    char saved_cwd[256];
+    char *current = (char*)exfat_get_working_dir();
+    int walked = 0;
+
+    if (current) {
+        str_strcpy(saved_cwd, current);
+        walked = 1;
+    }
+
+    if (exfat_change_directory(clean) != 0) {
+        return -1; 
+    }
+
+    int rc = exfat_print_directory(show_hidden);
+
+    if (walked) {
+        exfat_change_directory(saved_cwd);
+    }
+    return rc;
 }
 
 char* fs_current_dir(void) {
