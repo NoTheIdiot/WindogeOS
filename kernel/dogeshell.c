@@ -242,18 +242,27 @@ int system_dogeshell_ex(char* command) {
             }
         }
     }
-    else if ((arg = get_cmd_arg(command, "cd")) != NULL) {
-        const char* target = (str_strlen(arg) == 0) ? user : arg;
-        if (str_strcmp(target, "/") != 0 && !fs_exists((char*)target)) {
+    
+    else if (str_startswith(command, "cd")) {
+        char* target = command + 3; 
+        int is_root = (str_strcmp(target, "/") == 0);
+    
+        if (!is_root && !fs_exists(target)) {
             dogeio_text_println("Error: much folder location doesn't exist.");
             handled = -1;
-        } else if (fs_chdir((char*)target) == -1) {
-            dogeio_text_println("Error: unable to change directory.");
-            handled = -1;
-        } else {
+        } 
+        else if (str_startswith(target, "/system") != 0) {
+            dogeio_text_println("Error: Much permission denied :(");
+            handled = -2;
+        } 
+        else {
+            fs_chdir(target);
             handled = 0;
         }
     }
+    
+    
+    
     else if ((arg = get_cmd_arg(command, "write")) != NULL) {
         if (str_strlen(arg) == 0) {
             dogeio_text_println("Much Error: no file specified.");
