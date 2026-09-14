@@ -36,6 +36,15 @@ volatile struct limine_memmap_request memmap_request = {
 __attribute__((used, section(".limine_requests_end")))
 volatile uint64_t limine_requests_end_marker[] = LIMINE_REQUESTS_END_MARKER;
 
+static void clean_input_string(char* str) {
+    if (!str) return;
+    int len = 0;
+    while (str[len] != '\0') len++;
+    while (len > 0 && (str[len - 1] == '\r' || str[len - 1] == '\n' || str[len - 1] == ' ' || str[len - 1] == '\t')) {
+        str[--len] = '\0';
+    }
+}
+
 void kernel_main(void) {
     serial_init();
     log("[Wow] Serial Initialize Sucess, very wow.");
@@ -93,6 +102,7 @@ void kernel_main(void) {
             dogeio_text_println("[3] shutdown computer");
             dogeio_text_println("[4] reboot");
             dogeio_text_input("> ", proceed, 2);
+            clean_input_string(proceed);
 
             if (proceed[0] == '1') {
                 break;
@@ -108,36 +118,26 @@ void kernel_main(void) {
             }
         }
 
-        if (!fs_exists("system")) {
-            fs_mkdir("system");
+        if (!fs_exists("/system")) {
+            fs_mkdir("/system");
         }
-        if (!fs_exists("users")) {
-            fs_mkdir("users");
+        if (!fs_exists("/system/accounts")) {
+            fs_mkdir("/system/accounts");
+        }
+        if (!fs_exists("/users")) {
+            fs_mkdir("/users");
         }
 
-        fs_chdir("/system");
-        if (!fs_exists("pass")) {
-            fs_mkdir("pass");
-        }
-        if (!fs_exists("root")) {
-            fs_mkdir("root");
-        }
-        fs_chdir("/");
         fs_create(".windoge");
-
-        fs_chdir("/users");
-        if (!fs_exists("admin")) {
-            fs_mkdir("admin");
-        }
-        fs_chdir("/");
 
         char username_new[64];
         char password_new[64];
         char root_new[64];
 
         while (true) {
-            dogeio_text_println("\nCreate the root password.");
-            dogeio_text_input("root password> ", root_new, 64);
+            dogeio_text_println("\nCreate the admin password.");
+            dogeio_text_input("admin password> ", root_new, 64);
+            clean_input_string(root_new);
             if (root_new[0] == '\0') {
                 dogeio_text_println("Password cannot be empty.");
                 continue;
@@ -145,24 +145,16 @@ void kernel_main(void) {
             break;
         }
 
-        fs_chdir("/system/pass");
-        fs_create("root.hash");
-        fs_write("root.hash", root_new);
-        fs_create("admin.hash");
-        fs_write("admin.hash", root_new);
-        fs_chdir("/");
+        system_create_user("admin", root_new, 0);
 
         while (true) {
             dogeio_text_println("username must be lowercase and non-empty.");
             dogeio_text_input("username> ", username_new, 64);
+            clean_input_string(username_new);
 
             for (int i = 0; username_new[i] != '\0'; i++) {
                 if (username_new[i] >= 'A' && username_new[i] <= 'Z') {
                     username_new[i] += 32;
-                }
-                if (username_new[i] == ' ' || username_new[i] == '\t' || username_new[i] == '\n' || username_new[i] == '\r') {
-                    username_new[i] = '\0';
-                    break;
                 }
             }
 
@@ -171,7 +163,13 @@ void kernel_main(void) {
                 continue;
             }
 
+            if (str_strcmp(username_new, "admin") == 0) {
+                dogeio_text_println("username cannot be admin.");
+                continue;
+            }
+
             dogeio_text_input("password> ", password_new, 64);
+            clean_input_string(password_new);
             if (password_new[0] == '\0') {
                 dogeio_text_println("password cannot be empty.");
                 continue;
@@ -179,12 +177,7 @@ void kernel_main(void) {
             break;
         }
 
-        system_create_user(username_new, password_new);
-        fs_chdir("/users");
-        if (!fs_exists("admin")) {
-            fs_mkdir("admin");
-        }
-        fs_chdir("/");
+        system_create_user(username_new, password_new, 1);
 
         dogeio_text_clear();
         char nothing[1];
@@ -202,6 +195,9 @@ void kernel_main(void) {
 
         dogeio_text_input("username> ", username, 64);
         dogeio_text_input("password> ", password, 64);
+
+        clean_input_string(username);
+        clean_input_string(password);
 
         if (system_verify_user(username, password)) {
             str_strcpy(current_user, username);
@@ -221,8 +217,8 @@ void kernel_main(void) {
     const char* starting[6] = {
         "================================================================================================================================================================",
         "=                                                                                                                                                              =",
-        "=                                                     Welcome to WindogeOS v0.0.5-Build3!                                                                      =",
-        "=                                                        Type 'help' for more help in the dogeshell                                                            =",
+        "=                                                     Welcome to WindogeOS v0.1!                                                                               =",
+        "=                                               type 'help' for more help in the dogeshell                                                                     =",
         "=                                                                                                                                                              =",
         "================================================================================================================================================================"
     };

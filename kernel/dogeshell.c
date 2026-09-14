@@ -143,46 +143,51 @@ int system_dogeshell_ex(char* command) {
         core_reboot();
         handled = 0;
     }
-    else if ((arg = get_cmd_arg(command, "dir")) != NULL) {
-        char clean_arg[256];
-        str_strcpy(clean_arg, arg);
+    
+    else if (str_startswith(command, "dir")) {
+        char* args = command + 3;
+        while (*args == ' ') args++;
 
-        int len = (int)str_strlen(clean_arg);
-        while (len > 0 && (clean_arg[len - 1] == '\n' || clean_arg[len - 1] == '\r' || clean_arg[len - 1] == ' ')) {
-            clean_arg[--len] = '\0';
+        char clean_args[128];
+        str_strncpy(clean_args, args, sizeof(clean_args) - 1);
+        clean_args[sizeof(clean_args) - 1] = '\0';
+
+        int len = (int)str_strlen(clean_args);
+        while (len > 0 && (clean_args[len - 1] == '\n' || clean_args[len - 1] == '\r' || clean_args[len - 1] == ' ')) {
+            clean_args[--len] = '\0';
         }
 
         int show_hidden = 0;
-        char path[256] = {0};
+        char directory[128] = {0};
 
-        if (str_strcmp(clean_arg, "--hidden") == 0) {
-            show_hidden = 1;
-        } else if (str_startswith(clean_arg, "--hidden ")) {
-            show_hidden = 1;
-            str_strcpy(path, clean_arg + 9);
+        if (clean_args[0] == '\0') {
+            fs_list_dir(0);
+        } else if (str_strcmp(clean_args, "--hidden") == 0) {
+            fs_list_dir(1);
         } else {
-            int arg_len = (int)str_strlen(clean_arg);
-            if (arg_len >= 8 && str_strcmp(clean_arg + arg_len - 8, "--hidden") == 0) {
+            if (str_startswith(clean_args, "--hidden ")) {
                 show_hidden = 1;
-                str_strncpy(path, clean_arg, (size_t)arg_len - 8);
-                path[arg_len - 8] = '\0';
-
-                int p_len = (int)str_strlen(path);
-                while (p_len > 0 && path[p_len - 1] == ' ') {
-                    path[--p_len] = '\0';
-                }
+                str_strcpy(directory, clean_args + 9);
             } else {
-                str_strcpy(path, clean_arg);
+                int clen = (int)str_strlen(clean_args);
+                if (clen > 8 && str_strcmp(clean_args + clen - 8, "--hidden") == 0 && clean_args[clen - 9] == ' ') {
+                    show_hidden = 1;
+                    str_strncpy(directory, clean_args, (size_t)clen - 9);
+                    directory[clen - 9] = '\0';
+                } else {
+                    str_strcpy(directory, clean_args);
+                }
             }
-        }
 
-        if (path[0] != '\0') {
-            fs_list(path, show_hidden);
-        } else {
-            fs_list_dir(show_hidden);
+            if (directory[0] != '\0') {
+                fs_list(directory, show_hidden);
+            } else {
+                fs_list_dir(show_hidden);
+            }
         }
         handled = 0;
     }
+
     else if ((arg = get_cmd_arg(command, "create")) != NULL) {
         if (str_strlen(arg) == 0) {
             dogeio_text_println("Error: no filename specified.");

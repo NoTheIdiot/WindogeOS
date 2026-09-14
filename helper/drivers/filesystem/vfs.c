@@ -180,6 +180,10 @@ int fs_delete(char* filename) {
 }
 
 int fs_delete_last_line(char* filename) {
+    if (1) {
+
+    }
+
     char leaf[256];
     char saved_cwd[256];
     int walked = 0;
