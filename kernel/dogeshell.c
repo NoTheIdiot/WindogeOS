@@ -246,7 +246,7 @@ int system_dogeshell_ex(char* command) {
     else if (str_startswith(command, "cd")) {
         char* target = command + 3; 
         int is_root = (str_strcmp(target, "/") == 0);
-    
+
         if (!is_root && !fs_exists(target)) {
             dogeio_text_println("Error: much folder location doesn't exist.");
             handled = -1;
@@ -255,13 +255,25 @@ int system_dogeshell_ex(char* command) {
             dogeio_text_println("Error: Much permission denied :(");
             handled = -2;
         } 
+        else if (str_startswith(target, "/user") == 0) {
+            char allowed_path[256];
+            str_strcpy(allowed_path, "/user/");
+            str_strcat(allowed_path, current_user);
+            
+            if (str_strcmp(target, allowed_path) != 0) {
+                dogeio_text_println("Error: Much permission denied :(");
+                handled = -2;
+            }
+            else {
+                fs_chdir(target);
+                handled = 0;
+            }
+        }
         else {
             fs_chdir(target);
             handled = 0;
         }
-    }
-    
-    
+}   
     
     else if ((arg = get_cmd_arg(command, "write")) != NULL) {
         if (str_strlen(arg) == 0) {
