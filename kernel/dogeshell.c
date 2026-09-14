@@ -206,14 +206,14 @@ int system_dogeshell_ex(char* command) {
         }
     }
     else if ((arg = get_cmd_arg(command, "cd")) != NULL) {
-        if (str_strlen(arg) == 0) {
-            fs_chdir(user);
-            handled = 0;
-        } else if (!fs_exists((char*)arg)) {
+        const char* target = (str_strlen(arg) == 0) ? user : arg;
+        if (str_strcmp(target, "/") != 0 && !fs_exists((char*)target)) {
             dogeio_text_println("Error: much folder location doesn't exist.");
             handled = -1;
+        } else if (fs_chdir((char*)target) == -1) {
+            dogeio_text_println("Error: unable to change directory.");
+            handled = -1;
         } else {
-            fs_chdir((char*)arg);
             handled = 0;
         }
     }

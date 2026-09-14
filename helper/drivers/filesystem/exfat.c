@@ -793,10 +793,25 @@ int exfat_print_directory(int hidden) {
 int exfat_change_directory(const char *path) {
     if (!path || path[0] == '\0') return 0;
 
+    char temp[256];
+    str_strcpy(temp, path);
+
+    int len = (int)str_strlen(temp);
+    while (len > 0 && (temp[len - 1] == '\n' || temp[len - 1] == '\r' || temp[len - 1] == ' ')) {
+        temp[--len] = '\0';
+    }
+
+    char *clean_path = temp;
+    while (*clean_path == ' ') {
+        clean_path++;
+    }
+
+    if (clean_path[0] == '\0') return 0;
+
     uint32_t cluster;
     char new_path[256];
 
-    if (path[0] == '/') {
+    if (clean_path[0] == '/') {
         cluster = g_root_cluster;
         str_strcpy(new_path, "/");
     } else {
@@ -804,20 +819,17 @@ int exfat_change_directory(const char *path) {
         str_strcpy(new_path, g_current_path);
     }
 
-    char temp[256];
-    str_strcpy(temp, path);
-
     int start = 0;
-    int len = (int)str_strlen(temp);
+    len = (int)str_strlen(clean_path);
 
     while (start < len) {
         int end = start;
-        while (end < len && temp[end] != '/') end++;
+        while (end < len && clean_path[end] != '/') end++;
 
         char token[64];
         int toklen = end - start;
         if (toklen >= 64) toklen = 63;
-        for (int i = 0; i < toklen; i++) token[i] = temp[start + i];
+        for (int i = 0; i < toklen; i++) token[i] = clean_path[start + i];
         token[toklen] = '\0';
 
         if (toklen > 0) {

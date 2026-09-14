@@ -9,15 +9,45 @@
 
 extern int exfat_resolve_entry(const char *target_name, void *out);
 
+static void fs_sanitize_path(const char *in, char *out, size_t out_size) {
+    if (!in || !out || out_size == 0) return;
+
+    while (*in == ' ') in++;
+
+    str_strncpy(out, in, out_size - 1);
+    out[out_size - 1] = '\0';
+
+    int len = (int)str_strlen(out);
+
+    while (len > 0 && (out[len - 1] == '\n' || out[len - 1] == '\r' || out[len - 1] == ' ')) {
+        out[--len] = '\0';
+    }
+
+    while (len > 1 && out[len - 1] == '/') {
+        out[--len] = '\0';
+    }
+}
+
 static int fs_split_path(const char *path, char *out_parent, size_t parent_size, 
                           char *out_filename, size_t filename_size) {
     if (!path || path[0] == '\0') return -1;
 
-    size_t len = str_strlen(path);
+    char clean[256];
+    fs_sanitize_path(path, clean, sizeof(clean));
+
+    if (clean[0] == '\0') return -1;
+
+    if (str_strcmp(clean, "/") == 0) {
+        str_strcpy(out_parent, "/");
+        str_strcpy(out_filename, ".");
+        return 0;
+    }
+
+    size_t len = str_strlen(clean);
     int last_slash = -1;
 
     for (int i = (int)len - 1; i >= 0; i--) {
-        if (path[i] == '/') {
+        if (clean[i] == '/') {
             last_slash = i;
             break;
         }
@@ -25,23 +55,19 @@ static int fs_split_path(const char *path, char *out_parent, size_t parent_size,
 
     if (last_slash == -1) {
         out_parent[0] = '\0';
-        str_strncpy(out_filename, path, filename_size - 1);
+        str_strncpy(out_filename, clean, filename_size - 1);
         out_filename[filename_size - 1] = '\0';
         return 0;
     }
 
-    if (path[last_slash + 1] == '\0') {
-        return -1;
-    }
-
-    str_strncpy(out_filename, &path[last_slash + 1], filename_size - 1);
+    str_strncpy(out_filename, &clean[last_slash + 1], filename_size - 1);
     out_filename[filename_size - 1] = '\0';
 
     if (last_slash == 0) {
         str_strcpy(out_parent, "/");
     } else {
         size_t copy_len = (size_t)last_slash < (parent_size - 1) ? (size_t)last_slash : (parent_size - 1);
-        str_strncpy(out_parent, path, copy_len);
+        str_strncpy(out_parent, clean, copy_len);
         out_parent[copy_len] = '\0';
     }
 
@@ -98,7 +124,7 @@ int fs_format(void) {
 }
 
 int fs_create(char* filename) {
-    char leaf[64];
+    char leaf[256];
     char saved_cwd[256];
     int walked = 0;
 
@@ -112,7 +138,7 @@ int fs_create(char* filename) {
 }
 
 int fs_mkdir(char* foldername) {
-    char leaf[64];
+    char leaf[256];
     char saved_cwd[256];
     int walked = 0;
 
@@ -126,7 +152,7 @@ int fs_mkdir(char* foldername) {
 }
 
 int fs_exists(char* filename) {
-    char leaf[64];
+    char leaf[256];
     char saved_cwd[256];
     int walked = 0;
 
@@ -140,7 +166,7 @@ int fs_exists(char* filename) {
 }
 
 int fs_delete(char* filename) {
-    char leaf[64];
+    char leaf[256];
     char saved_cwd[256];
     int walked = 0;
 
@@ -154,7 +180,7 @@ int fs_delete(char* filename) {
 }
 
 int fs_delete_last_line(char* filename) {
-    char leaf[64];
+    char leaf[256];
     char saved_cwd[256];
     int walked = 0;
 
@@ -170,7 +196,7 @@ int fs_delete_last_line(char* filename) {
 int fs_read(char* filename, char* output_buffer, uint32_t max_size) {
     if (!output_buffer) return -1;
 
-    char leaf[64];
+    char leaf[256];
     char saved_cwd[256];
     int walked = 0;
 
@@ -186,7 +212,7 @@ int fs_read(char* filename, char* output_buffer, uint32_t max_size) {
 int fs_read_raw(char* filename, uint8_t* output_buffer, uint32_t max_size) {
     if (!output_buffer) return -1;
 
-    char leaf[64];
+    char leaf[256];
     char saved_cwd[256];
     int walked = 0;
 
@@ -200,7 +226,7 @@ int fs_read_raw(char* filename, uint8_t* output_buffer, uint32_t max_size) {
 }
 
 int fs_write_bytes(char* filename, char* input_buffer, uint32_t size) {
-    char leaf[64];
+    char leaf[256];
     char saved_cwd[256];
     int walked = 0;
 
@@ -222,6 +248,28 @@ int fs_list_dir(int hidden) {
     return exfat_print_directory(hidden);
 }
 
+int fs_copy(char* source, char* dest) {
+    static uint8_t raw_buffer[65536];
+    int64_t bytes_read = fs_read_raw(source, raw_buffer, sizeof(raw_buffer));
+    if (bytes_read < 0) {
+        return -1;
+    }
+
+    if (fs_exists(dest)) {
+        fs_delete(dest);
+    }
+
+    if (fs_create(dest) != 0) {
+        return -1;
+    }
+
+    if (fs_write_bytes(dest, (char*)raw_buffer, (uint32_t)bytes_read) != 0) {
+        return -1;
+    }
+
+    return 0;
+}
+
 int fs_rename(char* filename, char* newname) {
     if (!filename || filename[0] == '\0' || !newname || newname[0] == '\0') {
         return 0;
@@ -235,24 +283,12 @@ int fs_rename(char* filename, char* newname) {
         return 0;
     }
 
-    fs_copy(filename, newname);
+    if (fs_copy(filename, newname) != 0) {
+        return 0;
+    }
+
     fs_delete(filename);
     return 1;
-}
-
-void fs_copy(char* source, char* dest) {
-    static uint8_t raw_buffer[8192];
-    int64_t bytes_read = fs_read_raw(source, raw_buffer, sizeof(raw_buffer) - 1);
-    if (bytes_read < 0) {
-        return;
-    }
-
-    if (fs_exists(dest)) {
-        fs_delete(dest);
-    }
-    fs_create(dest);
-
-    fs_write_bytes(dest, (char*)raw_buffer, (uint32_t)bytes_read);
 }
 
 int fs_chdir(char* folder) {
@@ -260,7 +296,11 @@ int fs_chdir(char* folder) {
         return -1;
     }
 
-    return exfat_change_directory(folder);
+    char clean[256];
+    fs_sanitize_path(folder, clean, sizeof(clean));
+    if (clean[0] == '\0') return -1;
+
+    return exfat_change_directory(clean);
 }
 
 char* fs_dirname(void) {
@@ -273,8 +313,27 @@ int fs_mount(void) {
 
 int fs_list(const char* directory, int show_hidden) {
     if (directory && directory[0] != '\0') {
-        if (fs_chdir((char*)directory) != 0) {
-            return -1;
+        char clean[256];
+        fs_sanitize_path(directory, clean, sizeof(clean));
+        if (clean[0] != '\0') {
+            char saved_cwd[256];
+            char *current = (char*)exfat_get_working_dir();
+            int walked = 0;
+            if (current) {
+                str_strcpy(saved_cwd, current);
+                walked = 1;
+            }
+
+            if (exfat_change_directory(clean) != 0) {
+                return -1;
+            }
+
+            int rc = exfat_print_directory(show_hidden);
+
+            if (walked) {
+                exfat_change_directory(saved_cwd);
+            }
+            return rc;
         }
     }
     return exfat_print_directory(show_hidden);

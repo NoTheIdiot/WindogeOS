@@ -75,7 +75,7 @@ int   fs_read(char* filename, char* output_buffer, uint32_t max_size);
 int   fs_write(char* filename, char* input_buffer);
 int   fs_list_dir(int hidden);
 int   fs_rename(char* filename, char* newname);
-void  fs_copy(char* source, char* dest);
+int   fs_copy(char* source, char* dest);
 int   fs_chdir(char* folder);
 char* fs_dirname(void);
 int   fs_mount(void);
