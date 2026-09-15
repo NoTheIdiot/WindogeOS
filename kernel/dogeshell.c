@@ -51,8 +51,7 @@ char* help[] = {
     "System Utilities",
     "=======================================================",
     "edit   [file]           | edits a file",
-    "genimg                  | generates a solid color image",
-    "viewimg                 | views solid color image",
+    "run    [file]           | run a program",
     "=======================================================",
 };
 
@@ -244,36 +243,22 @@ int system_dogeshell_ex(char* command) {
     }
     
     else if (str_startswith(command, "cd")) {
-        char* target = command + 3; 
-        int is_root = (str_strcmp(target, "/") == 0);
-
-        if (!is_root && !fs_exists(target)) {
-            dogeio_text_println("Error: much folder location doesn't exist.");
+        char* target = command + 3;
+        if (str_startswith(target, "/system")) {
+            dogeio_text_println("Error: permission denied, because it's a system folder :(");
             handled = -1;
-        } 
-        else if (str_startswith(target, "/system") != 0) {
-            dogeio_text_println("Error: Much permission denied :(");
-            handled = -2;
-        } 
-        else if (str_startswith(target, "/user") == 0) {
-            char allowed_path[256];
-            str_strcpy(allowed_path, "/user/");
-            str_strcat(allowed_path, current_user);
-            
-            if (str_strcmp(target, allowed_path) != 0) {
-                dogeio_text_println("Error: Much permission denied :(");
+        } else if (str_strcmp(fs_dirname(), "/users") == 0 && str_strcmp(current_user, target) != 0) {
+            dogeio_text_println("Error: permission denied, because why are you trying to see other accounts?");
+            handled = -1;
+        } else {
+            if (!fs_chdir(target)) {
+                handled = 0;
+            } else {
+                dogeio_text_println("Error: much folder doesn't exist :(");
                 handled = -2;
             }
-            else {
-                fs_chdir(target);
-                handled = 0;
-            }
         }
-        else {
-            fs_chdir(target);
-            handled = 0;
-        }
-}   
+    }   
     
     else if ((arg = get_cmd_arg(command, "write")) != NULL) {
         if (str_strlen(arg) == 0) {
@@ -366,6 +351,17 @@ int system_dogeshell_ex(char* command) {
         }
     }
 
+    else if (str_startswith(command, "run")) {
+        char* target = command + 4;
+        system_run_exec(target, 65536);
+        handled = 0;
+    }
+
+    else if (str_strcmp(command, "bash") == 0) {
+        system_bash();
+        handled = 0;
+    }
+
     if (handled == 0 || handled == -1) {
         char hist_path[128];
         get_history_path(hist_path);
@@ -436,9 +432,6 @@ void system_dogeshell(void) {
         dogeio_text_color_change(saved_color);
         dogeio_text_input("> ", input, sizeof(input));
 
-        if (str_strcmp(input, "exit") == 0) {
-            return;
-        }
         status = system_dogeshell_ex(input);
     }
 }

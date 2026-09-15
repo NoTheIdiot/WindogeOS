@@ -25,7 +25,7 @@ void cleanup_user_pages(void) {
     write_cr3(read_cr3());
 }
 
-void run_exec(char *filename, int program_size) {
+void system_run_exec(char *filename, int program_size) {
     if (!filename || program_size <= 0) {
         dogeio_text_println("[Error] Invalid binary filename or size.");
         return;

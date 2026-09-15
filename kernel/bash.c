@@ -12,19 +12,29 @@ static void append_history(const char* command) {
         return;
     }
 
-    if (!fs_exists(".history")) {
-        fs_create(".history");
+    char history_path[256];
+    str_strcpy(history_path, "/users/");
+    str_strcat(history_path, current_user);
+    str_strcat(history_path, "/.history");
+
+    if (!fs_exists(history_path)) {
+        fs_create(history_path);
     }
-    fs_write(".history", (char *)command);
+    fs_write(history_path, (char *)command);
 }
 
-static bool is_numeric_string(const char *str) {
-    if (!str || str[0] == '\0') return false;
-    while (*str == ' ' || *str == '\t') str++;
-    if (*str == '\0') return false;
-    while (*str != '\0' && *str != '\n' && *str != '\r') {
-        if (*str < '0' || *str > '9') return false;
-        str++;
+static bool is_path_allowed(const char* path) {
+    if (!path) return false;
+    if (str_startswith(path, "/system")) {
+        return false;
+    }
+    if (str_startswith(path, "/users/")) {
+        char allowed_prefix[128];
+        str_strcpy(allowed_prefix, "/users/");
+        str_strcat(allowed_prefix, current_user);
+        if (!str_startswith(path, allowed_prefix)) {
+            return false;
+        }
     }
     return true;
 }
@@ -53,13 +63,27 @@ int system_bash_ex(char* command) {
         handled = 0;
     }
 
+    else if (str_strcmp(command, "pwd") == 0) {
+        dogeio_text_println(fs_dirname());
+        handled = 0;
+    }
+
+    else if (str_strcmp(command, "ls") == 0) {
+        fs_list_dir(0);
+        handled = 0;
+    }
+    else if (str_strcmp(command, "ls -a") == 0 || str_strcmp(command, "ls -all") == 0) {
+        fs_list_dir(1);
+        handled = 0;
+    }
+
     else if (str_strcmp(command, "cd") == 0 || str_startswith(command, "cd ")) {
         if (str_strlen(command) <= 3) {
             dogeio_text_println("Much Error: No folder specified.");
         } else {
             char* target = command + 3;
-            if (target[0] == '\0') {
-                dogeio_text_println("Much Error: No folder specified.");
+            if (!is_path_allowed(target)) {
+                dogeio_text_println("Much Error: Access denied to path.");
             } else {
                 int result = fs_chdir(target);
                 if (result == -2) {
@@ -74,13 +98,32 @@ int system_bash_ex(char* command) {
         handled = 0;
     }
 
+    else if (str_strcmp(command, "touch") == 0 || str_startswith(command, "touch ")) {
+        if (str_strlen(command) <= 6) {
+            dogeio_text_println("Error: No filename specified.");
+        } else {
+            char* filename = command + 6;
+            if (!is_path_allowed(filename)) {
+                dogeio_text_println("Error: Access denied.");
+            } else if (fs_exists(filename)) {
+                dogeio_text_println("Error: File already exists.");
+            } else {
+                int result = fs_create(filename);
+                if (result < 0) {
+                    dogeio_text_println("Not Wow: Failed to create file.");
+                }
+            }
+        }
+        handled = 0;
+    }
+
     else if (str_strcmp(command, "mkdir") == 0 || str_startswith(command, "mkdir ")) {
         if (str_strlen(command) <= 6) {
             dogeio_text_println("Error: No directory name specified.");
         } else {
             char* dir_name = command + 6;
-            if (dir_name[0] == '\0') {
-                dogeio_text_println("Error: Directory name cannot be empty.");
+            if (!is_path_allowed(dir_name)) {
+                dogeio_text_println("Error: Access denied.");
             } else {
                 int res = fs_mkdir(dir_name);
                 if (res != 0) {
@@ -91,94 +134,13 @@ int system_bash_ex(char* command) {
         handled = 0;
     }
 
-    else if (str_strcmp(command, "ls") == 0) {
-        fs_list_dir(0);
-        handled = 0;
-    }
-
-    else if (str_strcmp(command, "ls -a") == 0 || str_strcmp(command, "ls -all") == 0) {
-        fs_list_dir(1);
-        handled = 0;
-    }
-
-    else if (str_startswith(command, "date")) {
-        const char* t = time_get();
-        if (!t || t[0] == '\0') {
-            dogeio_text_println("Error: Unable to retrieve system time.");
-        } else {
-            dogeio_text_println(t);
-        }
-        handled = 0;
-    }
-
-    else if (str_startswith(command, "color")) {
-        const char *arg = (str_strlen(command) >= 6) ? command + 6 : "";
-        if (arg[0] == '\0') {
-            dogeio_text_println("Error: No color preset specified.");
-        } else if (str_strcmp(arg, "black") == 0) {
-            dogeio_text_color = 0xFF000000;
-            dogeio_text_clear();
-        } else if (str_strcmp(arg, "white") == 0) {
-            dogeio_text_color = 0xFFFFFFFF;
-            dogeio_text_clear();
-        } else if (str_strcmp(arg, "grey") == 0) {
-            dogeio_text_color = 0xFF808080;
-            dogeio_text_clear();
-        } else if (str_strcmp(arg, "dark_grey") == 0) {
-            dogeio_text_color = 0xFF404040;
-            dogeio_text_clear();
-        } else if (str_strcmp(arg, "red") == 0) {
-            dogeio_text_color = 0xFFFF0000;
-            dogeio_text_clear();
-        } else if (str_strcmp(arg, "green") == 0) {
-            dogeio_text_color = 0xFF00FF00;
-            dogeio_text_clear();
-        } else if (str_strcmp(arg, "blue") == 0) {
-            dogeio_text_color = 0xFF0000FF;
-            dogeio_text_clear();
-        } else if (str_strcmp(arg, "yellow") == 0) {
-            dogeio_text_color = 0xFFFFFF00;
-            dogeio_text_clear();
-        } else if (str_strcmp(arg, "cyan") == 0) {
-            dogeio_text_color = 0xFF00FFFF;
-            dogeio_text_clear();
-        } else if (str_strcmp(arg, "magenta") == 0) {
-            dogeio_text_color = 0xFFFF00FF;
-            dogeio_text_clear();
-        } else if (str_strcmp(arg, "navy") == 0) {
-            dogeio_text_color = 0xFF000080;
-            dogeio_text_clear();
-        } else if (str_strcmp(arg, "maroon") == 0) {
-            dogeio_text_color = 0xFF800000;
-            dogeio_text_clear();
-        } else if (str_strcmp(arg, "teal") == 0) {
-            dogeio_text_color = 0xFF008080;
-            dogeio_text_clear();
-        } else if (str_strcmp(arg, "olive") == 0) {
-            dogeio_text_color = 0xFF808000;
-            dogeio_text_clear();
-        } else if (str_strcmp(arg, "doge_gold") == 0) {
-            dogeio_text_color = 0xFFE1B857;
-            dogeio_text_clear();
-        } else if (str_strcmp(arg, "doge_tan") == 0) {
-            dogeio_text_color = 0xFFF4DFB1;
-            dogeio_text_clear();
-        } else if (str_strcmp(arg, "gray") == 0) {
-            dogeio_text_color = 0xFFCCCCCC;
-            dogeio_text_clear();
-        } else {
-            dogeio_text_println("Error: Unknown color preset.");
-        }
-        handled = 0;
-    }
-
     else if (str_strcmp(command, "cat") == 0 || str_startswith(command, "cat ")) {
         if (str_strlen(command) <= 4) {
             dogeio_text_println("Error: No filename specified.");
         } else {
             char* filename = command + 4;
-            if (filename[0] == '\0') {
-                dogeio_text_println("Error: No filename specified.");
+            if (!is_path_allowed(filename)) {
+                dogeio_text_println("Error: Access denied.");
             } else if (!fs_exists(filename)) {
                 dogeio_text_println("Error: File does not exist.");
             } else {
@@ -196,50 +158,16 @@ int system_bash_ex(char* command) {
         handled = 0;
     }
 
-    else if (str_strcmp(command, "format") == 0) {
-        char r_u_sure[4];
-        dogeio_text_input("Are You Sure? (yes/no)\nMUCH WARNING: THIS WILL ERASE THE DISK.\n", r_u_sure, 4);
-        if (str_strcmp(r_u_sure, "yes") == 0) {
-            int result = fs_format();
-            if (result) {
-                dogeio_text_println("Formated Disk.");
-            } else {
-                dogeio_text_println("Not Wow: Something Went Wrong.");
-            }
-        } else if (str_strcmp(r_u_sure, "no") == 0) {
-            dogeio_text_println("Format canceled.");
-        } else {
-            dogeio_text_println("Error: Invalid response. Format aborted.");
-        }
-        handled = 0;
-    }
-
-    else if (str_strcmp(command, "fetch") == 0) {
-        system_fetch();
-        handled = 0;
-    }
-
-    else if (str_strcmp(command, "whoami") == 0) {
-        dogeio_text_println("wow");
-        handled = 0;
-    }
-
-    else if (str_strcmp(command, "pwd") == 0) {
-        dogeio_text_println(fs_dirname());
-        handled = 0;
-    }
-
     else if (str_strcmp(command, "sed") == 0 || str_startswith(command, "sed ")) {
         if (str_strlen(command) <= 4) {
             dogeio_text_println("Error: No filename specified.");
         } else {
             char* filename = command + 4;
-            if (filename[0] == '\0') {
-                dogeio_text_println("Error: No filename specified.");
+            if (!is_path_allowed(filename)) {
+                dogeio_text_println("Error: Access denied.");
             } else {
                 static char text[256];
                 dogeio_text_input("text> ", text, 256);
-                
                 int result = fs_write(filename, text);
                 if (result == 0) {
                     dogeio_text_println("write ok");
@@ -253,12 +181,100 @@ int system_bash_ex(char* command) {
         handled = 0;
     }
 
+    else if (str_startswith(command, "mv ")) {
+        char* args = command + 3;
+        char old_name[128] = {0};
+        char new_name[128] = {0};
+        int i = 0;
+        
+        while (args[i] != ' ' && args[i] != '\0' && i < 127) {
+            old_name[i] = args[i];
+            i++;
+        }
+        old_name[i] = '\0';
+
+        if (args[i] == ' ') {
+            i++;
+            int j = 0;
+            while (args[i] != '\0' && j < 127) {
+                new_name[j++] = args[i++];
+            }
+            new_name[j] = '\0';
+        }
+
+        if (old_name[0] == '\0' || new_name[0] == '\0') {
+            dogeio_text_println("Usage: mv <old_path> <new_path>");
+        } else if (!is_path_allowed(old_name) || !is_path_allowed(new_name)) {
+            dogeio_text_println("Error: Access denied.");
+        } else {
+            int result = fs_rename(old_name, new_name);
+            if (result != 0) {
+                dogeio_text_println("Not Wow: Failed to move/rename file.");
+            }
+        }
+        handled = 0;
+    }
+
+    else if (str_strcmp(command, "rm") == 0 || str_startswith(command, "rm ")) {
+        if (str_strlen(command) <= 3) {
+            dogeio_text_println("Error: No filename specified.");
+        } else {
+            char* filename = command + 3;
+            if (!is_path_allowed(filename)) {
+                dogeio_text_println("Error: Access denied.");
+            } else {
+                int result = fs_delete(filename);
+                if (!result) {
+                    dogeio_text_println("Not Wow: File Not Found.");
+                } else if (result == -1) {
+                    dogeio_text_println("Doge Sad: Something went wrong!");
+                }
+            }
+        }
+        handled = 0;
+    }
+
+    else if (str_strcmp(command, "whoami") == 0) {
+        dogeio_text_println("wow");
+        handled = 0;
+    }
+
+    else if (str_strcmp(command, "ver") == 0) {
+        dogeio_text_println("DogeOS Bash Compatibility Layer v1.0");
+        handled = 0;
+    }
+
+    else if (str_strcmp(command, "cpuinfo") == 0) {
+        dogeio_text_println(cpuid());
+        handled = 0;
+    }
+
+    else if (str_strcmp(command, "fetch") == 0) {
+        system_fetch();
+        handled = 0;
+    }
+
+    else if (str_startswith(command, "date")) {
+        const char* t = time_get();
+        if (!t || t[0] == '\0') {
+            dogeio_text_println("Error: Unable to retrieve system time.");
+        } else {
+            dogeio_text_println(t);
+        }
+        handled = 0;
+    }
+
     else if (str_strcmp(command, "history") == 0) {
-        if (!fs_exists(".history")) {
+        char history_path[256];
+        str_strcpy(history_path, "/users/");
+        str_strcat(history_path, current_user);
+        str_strcat(history_path, "/.history");
+
+        if (!fs_exists(history_path)) {
             dogeio_text_println("No history available.");
         } else {
             static char output_buffer[8192];
-            int bytes_read = fs_read(".history", output_buffer, sizeof(output_buffer) - 1);
+            int bytes_read = fs_read(history_path, output_buffer, sizeof(output_buffer) - 1);
             if (bytes_read <= 0) {
                 dogeio_text_println("No history available.");
             } else {
@@ -270,41 +286,13 @@ int system_bash_ex(char* command) {
         handled = 0;
     }
 
-    else if (str_strcmp(command, "touch") == 0 || str_startswith(command, "touch ")) {
-        if (str_strlen(command) <= 6) {
-            dogeio_text_println("Error: No filename specified.");
-        } else {
-            char* filename = command + 6;
-            if (filename[0] == '\0') {
-                dogeio_text_println("Error: No filename specified.");
-            } else if (fs_exists(filename)) {
-                dogeio_text_println("Error: File already exists.");
-            } else {
-                int result = fs_create(filename);
-                if (result < 0) {
-                    dogeio_text_println("Not Wow: Failed to create file.");
-                }
-            }
-        }
-        handled = 0;
-    }
-
-    else if (str_strcmp(command, "rm") == 0 || str_startswith(command, "rm ")) {
-        if (str_strlen(command) <= 3) {
-            dogeio_text_println("Error: No filename specified.");
-        } else {
-            char* filename = command + 3;
-            if (filename[0] == '\0') {
-                dogeio_text_println("Error: No filename specified.");
-            } else {
-                int result = fs_delete(filename);
-                if (!result) {
-                    dogeio_text_println("Not Wow: File Not Found.");
-                } else if (result == -1) {
-                    dogeio_text_println("Doge Sad: Something went wrong!");
-                }
-            }
-        }
+    else if (str_strcmp(command, "clear-history") == 0) {
+        char history_path[256];
+        str_strcpy(history_path, "/users/");
+        str_strcat(history_path, current_user);
+        str_strcat(history_path, "/.history");
+        fs_delete(history_path);
+        dogeio_text_println("History cleared.");
         handled = 0;
     }
 
@@ -322,63 +310,12 @@ int system_bash_ex(char* command) {
         handled = 0;
     }
 
-    else if (str_strcmp(command, "edit") == 0 || str_startswith(command, "edit ")) {
-        if (str_strlen(command) <= 5) {
-            dogeio_text_println("Error: No filename specified.");
+    else if (str_startswith(command, "run ")) {
+        char* binary = command + 4;
+        if (!is_path_allowed(binary)) {
+            dogeio_text_println("Error: Access denied.");
         } else {
-            char* filename = command + 5;
-
-            size_t len = str_strlen(filename);
-            while (len > 0 && (filename[len - 1] == '\n' || filename[len - 1] == '\r' || filename[len - 1] == ' ')) {
-                filename[len - 1] = '\0';
-                len--;
-            }
-
-            if (str_strlen(filename) == 0) {
-                dogeio_text_println("Error: No filename specified.");
-            } else {
-                if (!fs_exists(filename)) {
-                    if (fs_create(filename) < 0) {
-                        dogeio_text_println("Error: Could not create file for editing.");
-                    } else {
-                        system_editor(filename);
-                    }
-                } else {
-                    system_editor(filename);
-                }
-            }
-        }
-        handled = 0;
-    }
-
-    else if (str_startswith(command, "viewimg")) {
-        char* argument = command +8;
-        system_parse_tga(argument);
-        handled = 0;
-    }
-
-    else if (str_startswith(command, "genimg")) {
-        char* filename = command + 7;
-        if (filename[0] == '\0') {
-            dogeio_text_println("Usage: genimg <filename>");
-        } else {
-            char red[4];
-            char green[4];
-            char blue[4];
-
-            dogeio_text_input("red> ", red, 4);
-            dogeio_text_input("green> ", green, 4);
-            dogeio_text_input("blue> ", blue, 4);
-
-            if (!is_numeric_string(red) || !is_numeric_string(green) || !is_numeric_string(blue)) {
-                dogeio_text_println("Error: RGB values must be numeric digits (0-255).");
-            } else {
-                uint8_t red8 = str_to_u8(red);
-                uint8_t green8 = str_to_u8(green);
-                uint8_t blue8 = str_to_u8(blue);
-            
-                generate_tga(filename, red8, green8, blue8);
-            }
+            system_run_exec(binary, 65536);
         }
         handled = 0;
     }
@@ -393,28 +330,21 @@ int system_bash_ex(char* command) {
 
 void system_bash(void) {
     char input[256];
-
-    if (!fs_exists(".history")) {
-        fs_create(".history");
-    }
+    int last_status = 0;
 
     while (true) {
         dogeio_text_color_change(0xFF00FF00);
         dogeio_text_print(current_user);
         dogeio_text_color_change(saved_color);
-        dogeio_text_print(":");
+        dogeio_text_print(" ");
 
-        char home_path[128];
-        for (int i = 0; i < 128; i++) {
-            home_path[i] = '\0';
-        }
-        
-        dogeio_text_color_change(0xADD8E6);
+        char home_path[128] = {0};
         str_strcpy(home_path, "/users/");
         str_strcat(home_path, current_user);
 
         char* current_dir = fs_dirname();
 
+        dogeio_text_color_change(0xADD8E6);
         if (str_strcmp(current_dir, home_path) == 0) {
             dogeio_text_print("~");
         } else {
@@ -422,16 +352,24 @@ void system_bash(void) {
         }
 
         dogeio_text_color_change(saved_color);
-        dogeio_text_input("$ ", input, 256);
         
+        if (last_status != 0) {
+            dogeio_text_color_change(0xFFFF0000);
+        } else {
+            dogeio_text_color_change(0xFF00FF00);
+        }
+        
+        dogeio_text_input(" > ", input, 256);
+        dogeio_text_color_change(saved_color);
+
         if (input[0] != '\0') {
             append_history(input);
         }
-        
+
         if (str_strcmp(input, "exit") == 0) {
             return;
         }
-        
-        system_bash_ex(input);
+
+        last_status = system_bash_ex(input);
     }
 }
