@@ -45,6 +45,8 @@ static void clean_input_string(char* str) {
     }
 }
 
+char computer_name[64];
+
 void kernel_main(void) {
     serial_init();
     log("[Wow] Serial Initialize Sucess, very wow.");
@@ -154,6 +156,9 @@ void kernel_main(void) {
             }
             break;
         }
+
+        dogeio_text_println("Name your wow computer.");
+        dogeio_text_input("> ", computer_name, 64);
 
         system_create_user(username_new, password_new, 1);
 

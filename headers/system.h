@@ -14,6 +14,7 @@ extern char* windoge_version;
 extern char current_user[64];
 extern uint32_t old;
 extern char* dogeshell_version;
+extern char computer_name[64];
 
 void system_editor(char* filename);
 void system_settings();

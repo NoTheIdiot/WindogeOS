@@ -247,6 +247,9 @@ int system_dogeshell_ex(char* command) {
         if (str_startswith(target, "/system")) {
             dogeio_text_println("Error: permission denied, because it's a system folder :(");
             handled = -1;
+        } else if (str_strcmp(target, "system") == 0 && str_strcmp(fs_dirname(), "/") == 0) {
+			dogeio_text_println("Error: permission denied, because it's a system folder :(");
+			handled = -1;
         } else if (str_strcmp(fs_dirname(), "/users") == 0 && str_strcmp(current_user, target) != 0) {
             dogeio_text_println("Error: permission denied, because why are you trying to see other accounts?");
             handled = -1;

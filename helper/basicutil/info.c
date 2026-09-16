@@ -119,14 +119,16 @@ void system_fetch() {
 
         switch (i) {
             case 1:
-                dogeio_text_println("wow/computer");
+                dogeio_text_print(current_user);
+                dogeio_text_print(" / ");
+                dogeio_text_println("wow-computer");
                 break;
             case 2:
                 dogeio_text_println("-----------------------------");
                 break;
             case 3:
                 dogeio_text_print("Such User: ");
-                dogeio_text_println("wow");
+                dogeio_text_println(current_user);
                 break;
             case 4:
                 dogeio_text_print("Version: ");
