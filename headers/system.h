@@ -31,12 +31,22 @@ uint64_t pmm_alloc_zeroed_page(void);
 extern void to_userland_ring3(uint64_t user_rip, uint64_t user_rsp) __attribute__((noreturn));
 
 // system calls
-#define FS_READ         01
-#define FS_WRITE        02
+#define FS_READ	01
+#define FS_WRITE 02
+#define FS_EXISTS 03
+#define FS_CREATE 04
+#define FS_MKDIR 05
+#define FS_DELETE 06 
+#define FS_RENAME 07
+#define FS_READ_RAW 08
 
-#define DOGEIO_PRINT    11
-#define DOGEIO_CLEAR    12
+#define DOGEIO_PRINT 11
+#define DOGEIO_CLEAR 12
+#define DOGEIO_INPUT 13
+#define DOGEIO_COLOR 14
+#define DOGEIO_BACKGROUND 15
+#define DOGEIO_CLEAR_RAW 16
 
-#define EXIT            0
+#define SYS_EXIT 0
 
 #endif

@@ -10,6 +10,7 @@ idt_load:
     ret
 
 %macro ISR_NOERR 1
+global isr_stub_%1
 isr_stub_%1:
     push qword 0
     push qword %1
@@ -17,6 +18,7 @@ isr_stub_%1:
 %endmacro
 
 %macro ISR_ERR 1
+global isr_stub_%1
 isr_stub_%1:
     push qword %1
     jmp isr_common
@@ -54,6 +56,12 @@ ISR_NOERR 28
 ISR_NOERR 29
 ISR_ERR   30
 ISR_NOERR 31
+
+%assign i 32
+%rep 224
+    ISR_NOERR i
+%assign i i+1
+%endrep
 
 isr_common:
     cld
@@ -105,3 +113,9 @@ isr_stub_table:
     dq isr_stub_20, isr_stub_21, isr_stub_22, isr_stub_23
     dq isr_stub_24, isr_stub_25, isr_stub_26, isr_stub_27
     dq isr_stub_28, isr_stub_29, isr_stub_30, isr_stub_31
+
+%assign j 32
+%rep 224
+    dq isr_stub_%+j
+%assign j j+1
+%endrep

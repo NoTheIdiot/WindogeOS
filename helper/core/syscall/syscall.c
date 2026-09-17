@@ -56,6 +56,8 @@ uint64_t syscall_handler(struct cpu_regs *regs) {
             ret_val = (uint64_t)(int64_t)fs_write(filepath, buffer);
             break;
         }
+
+        
         
         default:
             ret_val = (uint64_t)-1; 

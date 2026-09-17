@@ -82,11 +82,13 @@ void kernel_main(void) {
         fs_format();
     }
 
-    log("Init gdt idt tss and syscall");
+    duolog("[dogeing] initializing gdt");
     init_gdt();
+    duolog("[dogeing] initializing idt");
     init_idt();
+    duolog("[dogeing] initializing syscalls");
     init_syscalls();
-    log("Success");
+    log("[wow] all basic drivers done");
 
     log("WindogeOS has successfully booted. Start celebrating broski.");
     menubar_draw();
@@ -98,6 +100,7 @@ void kernel_main(void) {
         char proceed[1];
         dogeio_text_input("Press enter to start setup.", proceed, 1);
 
+        duolog("\n[dogeing] creating folders");
         if (!fs_exists("/system")) {
             fs_mkdir("/system");
         }
@@ -108,6 +111,7 @@ void kernel_main(void) {
             fs_mkdir("/users");
         }
 
+        duolog("[dogeing] creating boot file");
         fs_create(".windoge");
 
         char username_new[64];
@@ -128,15 +132,9 @@ void kernel_main(void) {
         system_create_user("admin", root_new, 0);
 
         while (true) {
-            dogeio_text_println("username must be lowercase and non-empty.");
+            dogeio_text_println("username must be non-empty.");
             dogeio_text_input("username> ", username_new, 64);
             clean_input_string(username_new);
-
-            for (int i = 0; username_new[i] != '\0'; i++) {
-                if (username_new[i] >= 'A' && username_new[i] <= 'Z') {
-                    username_new[i] += 32;
-                }
-            }
 
             if (username_new[0] == '\0') {
                 dogeio_text_println("username cannot be empty.");
@@ -160,7 +158,11 @@ void kernel_main(void) {
         dogeio_text_println("Name your wow computer.");
         dogeio_text_input("> ", computer_name, 64);
 
+        duolog("[dogeing] creating accounts");
         system_create_user(username_new, password_new, 1);
+
+        duolog("[wow] setup complete");
+        duolog("[dogeing] prompting reboot ");
 
         dogeio_text_clear();
         char nothing[1];
