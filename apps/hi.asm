@@ -1,8 +1,6 @@
 bits 64
-org 0x00400000
 
-%define SYS_EXIT 0
-%define FS_WRITE 2
+%include "headers/user/dogeio.inc"
 
 section .text
 global _start

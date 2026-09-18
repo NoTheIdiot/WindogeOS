@@ -30,14 +30,8 @@ def run_parallel(commands):
                 sys.exit(1)
 
 def cleanup():
-    """Removes temporary object files, static analysis outputs, and intermediary binaries."""
     subprocess.run("find . -name '*.o' -type f -delete 2>/dev/null || true", shell=True)
     subprocess.run("find . -name '*.plist' -type f -delete 2>/dev/null || true", shell=True)
-    if os.path.exists("kernel.elf"):
-        try:
-            os.remove("kernel.elf")
-        except OSError:
-            pass
     if os.path.exists("part2_exfat.img"):
         try:
             os.remove("part2_exfat.img")
@@ -71,7 +65,7 @@ def main():
         tools = cfg.tools
 
         common_flags = (
-            "-Wall -Wextra -Werror -Wconversion -std=gnu11 -nostdinc -ffreestanding "
+            "-g -Wall -Wextra -Werror -Wconversion -std=gnu11 -nostdinc -ffreestanding "
             "-fno-stack-protector -fno-stack-check -fno-lto -fno-PIC -fno-pie "
             "-ffunction-sections -fdata-sections -Iheaders"
         )
@@ -110,12 +104,14 @@ def main():
         print(f"[dogeing] Found {len(c_source)} Kernel C files, {len(asm_source)} Kernel ASM files, {len(app_sources)} App files")
 
         if not args.skip_analyze:
-            print("[0/4] Running Clang Static Analyzer (parallel)...")
+            print("[0/4] Running Static Analyzer (parallel)...")
+            analyzer_bin = tools.get("analyzer", tools["c_compiler"])
+            analyze_flag = "-fanalyzer -fsyntax-only" if "gcc" in analyzer_bin else "--analyze"
             analyze_cmds = [
-                f"{tools['c_compiler']} --analyze {arch_cfg['kernel_flags']} {common_flags} {src}"
+                f"{analyzer_bin} {analyze_flag} {arch_cfg['kernel_flags']} {common_flags} {src}"
                 for src in c_source
             ] + [
-                f"{tools['c_compiler']} --analyze {arch_cfg['app_flags']} {common_flags} {src}"
+                f"{analyzer_bin} {analyze_flag} {arch_cfg['app_flags']} {common_flags} {src}"
                 for src, ftype in app_sources if ftype == "c"
             ]
             if analyze_cmds:
@@ -133,7 +129,7 @@ def main():
         for src in asm_source:
             obj = src.replace(os.sep, "_").replace(".asm", ".o")
             object_files.append(obj)
-            compile_cmds.append(f"{tools['assembler']} -f elf64 {src} -o {obj}")
+            compile_cmds.append(f"{tools['assembler']} -f elf64 -g -F dwarf {src} -o {obj}")
 
         run_parallel(compile_cmds)
 
@@ -157,7 +153,7 @@ def main():
                 if ftype == "c":
                     compile_step = f"{tools['c_compiler']} {arch_cfg['app_flags']} {common_flags} -c {app_src} -o {app_obj}"
                 else:
-                    compile_step = f"{tools['assembler']} -f elf64 {app_src} -o {app_obj}"
+                    compile_step = f"{tools['assembler']} -f elf64 -g -F dwarf {app_src} -o {app_obj}"
 
                 chain_cmd = (
                     f"{compile_step} && "
@@ -220,7 +216,8 @@ def main():
         if compiled_apps:
             mnt_dir = "/tmp/windoge_p2_mnt"
             os.makedirs(mnt_dir, exist_ok=True)
-            cmd(f"sudo mount -o loop {part2_img} {mnt_dir}")
+            loop_dev = subprocess.check_output(f"sudo losetup -f --show {part2_img}", shell=True).decode().strip()
+            cmd(f"sudo mount.exfat-fuse {loop_dev} {mnt_dir}")
             try:
                 for app_bin in compiled_apps:
                     if os.path.exists(app_bin):
@@ -229,6 +226,7 @@ def main():
                         print(f"[dogeing] Injected binary to exFAT: {app_name}")
             finally:
                 cmd(f"sudo umount {mnt_dir}")
+                cmd(f"sudo losetup -d {loop_dev}")
                 if os.path.exists(mnt_dir):
                     os.rmdir(mnt_dir)
 

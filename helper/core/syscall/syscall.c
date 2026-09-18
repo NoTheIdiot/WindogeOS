@@ -24,7 +24,7 @@ struct cpu_regs {
 };
 
 static inline bool is_user_address(const void *ptr) {
-    return (uint64_t)ptr < 0x0000800000000000ULL;
+    return ptr != NULL && (uint64_t)ptr < 0x0000800000000000ULL;
 }
 
 uint64_t syscall_handler(struct cpu_regs *regs) {
@@ -57,8 +57,6 @@ uint64_t syscall_handler(struct cpu_regs *regs) {
             break;
         }
 
-        
-        
         default:
             ret_val = (uint64_t)-1; 
             break;

@@ -37,8 +37,11 @@ void init_gdt(void) {
     set_gdt_entry(&gdt.user_data,   0, 0, 0xF2, 0x00); 
     set_gdt_entry(&gdt.user_code,   0, 0, 0xFA, 0x20); 
 
-    tss.rsp0 = (uint64_t)&kernel_stack[sizeof(kernel_stack)];
+    uint64_t stack_top = (uint64_t)&kernel_stack[sizeof(kernel_stack)];
+    tss.rsp0 = stack_top;
+    tss.ist1 = stack_top;
     tss.iomap_base = sizeof(tss_entry_t);
+
     set_tss_descriptor(&gdt.tss_desc, (uint64_t)&tss, sizeof(tss) - 1);
 
     gdtr.limit = sizeof(gdt) - 1;
