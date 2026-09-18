@@ -140,7 +140,7 @@ def main():
 
         run_parallel(app_cmds)
 
-    print("[4/4] Generating Disk Image (mtools)...")
+    print("[4/4] Generating Disk Image (FAT Boot + exFAT Data)...")
 
     img_file = cfg.img_file
     if os.path.exists(img_file):
@@ -160,7 +160,6 @@ def main():
         cmd(f"./binaries/limine bios-install {img_file} 2>/dev/null", critical=False)
 
     boot_offset = 1048576
-    data_offset = 2097152
 
     cmd(f"mformat -i {img_file}@@{boot_offset} -v BOOT")
     cmd(f"mmd -i {img_file}@@{boot_offset} ::/boot")
@@ -182,11 +181,28 @@ def main():
         elif arch in ["arm64", "aarch64"]:
             cmd(f"mcopy -i {img_file}@@{boot_offset} {sys_binary} ::/EFI/BOOT/BOOTAA64.EFI")
 
-    cmd(f"mformat -i {img_file}@@{data_offset} -F -v WINDOGEOS")
+    # --- PARTITION 2: Genuine exFAT Setup ---
+    part2_img = "part2_exfat.img"
+    p2_sectors = 65502 - 4096 + 1  # 61407 sectors (~30MB)
+    cmd(f"dd if=/dev/zero of={part2_img} bs=512 count={p2_sectors} 2>/dev/null")
+    cmd(f"mkfs.exfat -L WINDOGEOS {part2_img}")
 
-    for app_bin in compiled_apps:
-        app_name = os.path.basename(app_bin)
-        cmd(f"mcopy -i {img_file}@@{data_offset} {app_bin} ::/{app_name}")
+    if compiled_apps:
+        mnt_dir = "/tmp/windoge_p2_mnt"
+        os.makedirs(mnt_dir, exist_ok=True)
+        cmd(f"sudo mount -o loop {part2_img} {mnt_dir}")
+        try:
+            for app_bin in compiled_apps:
+                cmd(f"sudo cp {app_bin} {mnt_dir}/")
+        finally:
+            cmd(f"sudo umount {mnt_dir}")
+            if os.path.exists(mnt_dir):
+                os.rmdir(mnt_dir)
+
+    # Splice exFAT partition into disk image at sector 4096
+    cmd(f"dd if={part2_img} of={img_file} bs=512 seek=4096 conv=notrunc 2>/dev/null")
+    if os.path.exists(part2_img):
+        os.remove(part2_img)
 
     cmd(f"rm -f {objects_str} kernel.elf")
     cmd("find . -name '*.plist' -type f -delete 2>/dev/null || true", critical=False)
