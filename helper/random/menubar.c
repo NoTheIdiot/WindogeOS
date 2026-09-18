@@ -7,7 +7,7 @@
 
 #define TERMINAL_COLS 160
 
-void menubar_draw() {
+void menubar_draw(void) {
     uint32_t old_text_color = dogeio_text_color;
     uint32_t old_bg_color = dogeio_background_color;
     uint32_t old_cursor_x = cursor_x;
@@ -19,15 +19,18 @@ void menubar_draw() {
     cursor_x = 0;
     cursor_y = 0;
 
-    char menu_buffer[TERMINAL_COLS + 1];
+    const char* ver = windoge_version ? windoge_version : "v0.1";
 
     char* current_date = date_get();
     char* current_time = time_get();
 
-    char right_section[32];
+    if (!current_date) current_date = "N/A";
+    if (!current_time) current_time = "00:00";
+
+    char right_section[64];
     int r_idx = 0;
 
-    while (current_date[r_idx] != '\0') {
+    while (current_date[r_idx] != '\0' && r_idx < 30) {
         right_section[r_idx] = current_date[r_idx];
         r_idx++;
     }
@@ -35,16 +38,22 @@ void menubar_draw() {
     right_section[r_idx++] = ' ';
 
     int t_idx = 0;
-    while (current_time[t_idx] != '\0') {
+    while (current_time[t_idx] != '\0' && r_idx < 62) {
         right_section[r_idx++] = current_time[t_idx++];
     }
     right_section[r_idx] = '\0';
 
     int right_len = r_idx;
-    int left_section_target_len = TERMINAL_COLS - right_len - 1;
 
+    int left_section_target_len = TERMINAL_COLS - right_len - 1;
+    if (left_section_target_len < 2) {
+        left_section_target_len = 2;
+    }
+
+    char menu_buffer[TERMINAL_COLS + 1];
     dogeio_text_print(" ");
-    str_pad(menu_buffer, windoge_version, left_section_target_len - 1, ' ');
+
+    str_pad(menu_buffer, ver, left_section_target_len - 1, ' ');
 
     dogeio_text_print(menu_buffer);
     dogeio_text_print(right_section);
