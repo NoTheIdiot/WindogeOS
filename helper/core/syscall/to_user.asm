@@ -10,29 +10,21 @@ global to_userland_ring3
 
 section .text
 to_userland_ring3:
-    ; disable interrupts during the transition
-    ; so the time doesn't corrupt the stack frame
+    ; Disable interrupts during stack frame construction
     cli
 
-    ; get data segment 
-    ; 0x23 is user data, index 4 RPL 3
+    ; Load Ring 3 data segment selectors (0x18 | RPL 3 = 0x1B)
     mov ax, 0x1b
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov gs, ax
 
-    ; load the kernel's GS base for MSR_IA32_KERNEL_GS_BASE
-    swapgs
-
-    ; build iretq stack frame
-    push qword 0x1b
-    push rsi
-
-    ; 0x202 means intterupts yes (bit 9)
-    push qword 0x202
-    push qword 0x23
-    push rdi
+    push qword 0x1b     ; SS  = User Data (0x18 | 3)
+    push rsi            ; RSP = User RSP
+    push qword 0x202    ; RFLAGS = IF enabled (bit 9) + reserved bit 1
+    push qword 0x23     ; CS  = User Code (0x20 | 3)
+    push rdi            ; RIP = User RIP
 
     xor rax, rax
     xor rbx, rbx
@@ -50,5 +42,5 @@ to_userland_ring3:
     xor rdi, rdi
     xor rsi, rsi
 
-    ; to ring 3
+    ; restrict your freedom :)
     iretq

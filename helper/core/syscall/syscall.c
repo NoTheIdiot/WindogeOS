@@ -6,18 +6,27 @@
 #include <core.h>
 #include <basicutil.h>
 
-#define MSR_IA32_EFER   0xC0000080
-#define MSR_IA32_STAR   0xC0000081
-#define MSR_IA32_LSTAR  0xC0000082
-#define MSR_IA32_FMASK  0xC0000084
+#define MSR_IA32_EFER            0xC0000080
+#define MSR_IA32_STAR            0xC0000081
+#define MSR_IA32_LSTAR           0xC0000082
+#define MSR_IA32_FMASK           0xC0000084
+#define MSR_IA32_KERNEL_GS_BASE  0xC0000102
 
-#define EFER_SCE        (1ULL << 0)
+#define EFER_SCE                 (1ULL << 0)
 
-#define RFLAGS_TF       (1ULL << 8)
-#define RFLAGS_IF       (1ULL << 9)
-#define RFLAGS_DF       (1ULL << 10)
+#define RFLAGS_TF                (1ULL << 8)
+#define RFLAGS_IF                (1ULL << 9)
+#define RFLAGS_DF                (1ULL << 10)
 
 extern void syscall_entry(void);
+
+typedef struct {
+    uint64_t kernel_rsp;
+    uint64_t user_rsp_scratch;
+} per_cpu_data_t;
+
+static uint8_t syscall_stack[16384] __attribute__((aligned(16)));
+static per_cpu_data_t bsp_cpu_data;
 
 struct cpu_regs {
     uint64_t rax, rbx, rcx, rdx, rsi, rdi, rbp, r8, r9, r10, r11, r12, r13, r14, r15, user_rsp;
@@ -76,4 +85,9 @@ void init_syscalls(void) {
 
     wrmsr(MSR_IA32_LSTAR, (uint64_t)syscall_entry);
     wrmsr(MSR_IA32_FMASK, RFLAGS_IF | RFLAGS_TF | RFLAGS_DF);
+
+    bsp_cpu_data.kernel_rsp = (uint64_t)&syscall_stack[sizeof(syscall_stack)];
+    bsp_cpu_data.user_rsp_scratch = 0;
+
+    wrmsr(MSR_IA32_KERNEL_GS_BASE, (uint64_t)&bsp_cpu_data);
 }
