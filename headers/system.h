@@ -25,10 +25,41 @@ int system_verify_user(const char* name, char* password);
 int system_can_access_path(const char* username, const char* target_path);
 void system_run_exec(char *filename, int program_size);
 
+// paging
 void setup_ring3_memory(uint64_t user_code_virt, uint64_t user_stack_virt, const uint8_t *user_code, size_t code_size);
 void map_user_page(uint64_t virt_addr, uint64_t phys_addr);
 uint64_t pmm_alloc_zeroed_page(void);
 extern void to_userland_ring3(uint64_t user_rip, uint64_t user_rsp) __attribute__((noreturn));
+
+// pci
+typedef struct {
+    uint64_t address;
+    uint64_t size;
+    bool is_mmio;
+    bool is_64bit;
+} pci_bar_t;
+
+typedef struct {
+    uint8_t bus;
+    uint8_t slot;
+    uint8_t func;
+    uint16_t vendor_id;
+    uint16_t device_id;
+    uint8_t class_code;
+    uint8_t subclass;
+    uint8_t prog_if;
+} pci_device_t;
+
+
+uint32_t  pci_read_32(uint8_t bus, uint8_t slot, uint8_t func, uint16_t offset);
+uint16_t  pci_read_16(uint8_t bus, uint8_t slot, uint8_t func, uint16_t offset);
+uint8_t   pci_read_8(uint8_t bus, uint8_t slot, uint8_t func, uint16_t offset);
+
+void      pci_write_32(uint8_t bus, uint8_t slot, uint8_t func, uint16_t offset, uint32_t val);
+
+pci_bar_t pci_get_bar(uint8_t bus, uint8_t slot, uint8_t func, uint8_t bar_index);
+void      pci_enable_device(uint8_t bus, uint8_t slot, uint8_t func);
+void      pci_scan_bus(void);
 
 // system calls
 #define FS_READ	01

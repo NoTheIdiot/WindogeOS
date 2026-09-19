@@ -93,4 +93,43 @@ static inline void ports_insw(unsigned short port, void *addr, unsigned long cou
 #endif
 }
 
+static inline void ports_outl(uintptr_t addr, uint32_t val) {
+    #if defined(__x86_64__) || defined(__i386__)
+        asm volatile ("outl %0, %1" : : "a"(val), "Nd"((uint16_t)addr));
+    #elif defined(__aarch64__) || defined(__arm__)
+        #if defined(__aarch64__)
+        asm volatile ("dsb sy" ::: "memory");
+        #else
+        asm volatile ("dsb" ::: "memory");
+        #endif
+
+        *(volatile uint32_t *)addr = val;
+
+        #if defined(__aarch64__)
+        asm volatile ("dsb sy" ::: "memory");
+        #else
+        asm volatile ("dsb" ::: "memory");
+        #endif
+    #endif
+}
+
+static inline uint32_t ports_inl(uintptr_t addr) {
+    #if defined(__x86_64__) || defined (__i386__)
+        uint32_t ret;
+        asm volatile ("inl %1, %0" : "=a"(ret) : "Nd"((uint16_t)addr));
+        return ret;
+
+    #elif defined(__aarch64__) || defined(__arm__)
+        uint32_t val = *(volatile uint32_t *)addr;
+
+        #if defined(__aarch64__)
+        asm volatile ("dmb sy" ::: "memory");
+        #else
+        asm volatile ("dmb" ::: "memory");
+    #endif
+
+        return val;
+    #endif
+}
+
 #endif
