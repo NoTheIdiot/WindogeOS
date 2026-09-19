@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <bool.h>
 #include "core.h"
 
 extern uint8_t terminal_font[128][16];
@@ -14,6 +15,7 @@ extern uint32_t cursor_x;
 extern uint32_t cursor_y;
 extern uint32_t dogeio_background_color;
 extern uint32_t dogeio_text_color;
+extern bool dogeio_cursor_visible;
 
 #define COLOR_BLACK          0x000000
 #define COLOR_RED            0xAA0000

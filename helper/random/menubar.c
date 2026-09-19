@@ -12,6 +12,7 @@ void menubar_draw(void) {
     uint32_t old_bg_color = dogeio_background_color;
     uint32_t old_cursor_x = cursor_x;
     uint32_t old_cursor_y = cursor_y;
+    dogeio_cursor_visible = false;
 
     dogeio_text_color_change(0xFFFFFF);
     dogeio_text_background_change(0x282828);
@@ -63,4 +64,5 @@ void menubar_draw(void) {
     dogeio_text_background_change(old_bg_color);
     cursor_x = old_cursor_x;
     cursor_y = old_cursor_y;
+    dogeio_cursor_visible = true;
 }

@@ -1,4 +1,4 @@
-/*  FIH  */
+/*   FIH   */
 
 // get some basic functions and types
 #include <stdint.h>
@@ -21,16 +21,16 @@ uint32_t bg_color_grid[TERMINAL_ROWS * TERMINAL_COLS];
 // other stuff
 uint32_t cursor_x = 0;
 uint32_t cursor_y = 1;
+bool dogeio_cursor_visible = false;
 uint32_t dogeio_background_color = 0x000000;
-uint32_t dogeio_text_color       = 0xFFCCCCCC;
+uint32_t dogeio_text_color        = 0xFFCCCCCC;
 
 static const uint32_t ansi_colors[16] = {
     0x000000, 0xAA0000, 0x00AA00, 0xAA5500, 0x0000AA, 0xAA00AA, 0x00AAAA, 0xAAAAAA,
     0x555555, 0xFF5555, 0x55FF55, 0xFFFF55, 0x5555FF, 0xFF55FF, 0x55FFFF, 0xFFFFFFFF
 };
 
-// place a char, obviously.
-void dogeio_text_putchar(char c, uint32_t x, uint32_t y) {
+void dogeio_text_putchar_raw_glyph(char c, uint32_t x, uint32_t y) {
     if (framebuffer_request.response == NULL || framebuffer_request.response->framebuffer_count < 1) {
         return;
     }
@@ -42,22 +42,14 @@ void dogeio_text_putchar(char c, uint32_t x, uint32_t y) {
     struct limine_framebuffer *framebuffer = framebuffer_request.response->framebuffers[0];
     uint32_t* framebuffer_ptr = (uint32_t*)framebuffer->address;
 
-    // convert grid coordinates to raw pixels
     uint32_t pixel_x = x * 8;
     uint32_t pixel_y = y * 16;
     uint64_t u64_pitch = framebuffer->pitch / 4;
 
-    // check if out of bounds and if is, throw it to the void
     if (pixel_x + 8 > framebuffer->width || pixel_y + 16 > framebuffer->height) {
         return;
     }
 
-    uint32_t idx = y * TERMINAL_COLS + x;
-    text_grid[idx] = c;
-    text_color_grid[idx] = dogeio_text_color;
-    bg_color_grid[idx] = dogeio_background_color;
-
-    // point
     const uint8_t* glyph = terminal_font[(uint8_t)c];
 
     for (uint32_t g_row = 0; g_row < 16; g_row++) {
@@ -73,6 +65,30 @@ void dogeio_text_putchar(char c, uint32_t x, uint32_t y) {
         framebuffer_ptr[row_offset + 6] = ((bits >> 1) & 1) ? dogeio_text_color : dogeio_background_color;
         framebuffer_ptr[row_offset + 7] = (bits & 1)        ? dogeio_text_color : dogeio_background_color;
     }
+}
+
+// place a char, obviously.
+void dogeio_text_putchar(char c, uint32_t x, uint32_t y) {
+    if (framebuffer_request.response == NULL || framebuffer_request.response->framebuffer_count < 1) {
+        return;
+    }
+
+    if ((uint8_t)c >= 128) {
+        c = ' '; 
+    }
+
+    // check if out of bounds and if is, throw it to the void
+    if (x >= TERMINAL_COLS || y >= TERMINAL_ROWS) {
+        return;
+    }
+
+    uint32_t idx = y * TERMINAL_COLS + x;
+    text_grid[idx] = c;
+    text_color_grid[idx] = dogeio_text_color;
+    bg_color_grid[idx] = dogeio_background_color;
+
+    // point
+    dogeio_text_putchar_raw_glyph(c, x, y);
 }
 
 void dogeio_text_clear() {
@@ -153,12 +169,23 @@ static void dogeio_text_scroll() {
         dogeio_text_color = saved_text_color;
         dogeio_background_color = saved_bg_color;
         menubar_draw();
+        if (dogeio_cursor_visible) {
+            dogeio_text_putchar_raw_glyph('_', cursor_x, cursor_y);
+        }
     }
 }
 
 void dogeio_text_printchar(char c) {
+    if (dogeio_cursor_visible && cursor_x < TERMINAL_COLS && cursor_y < TERMINAL_ROWS) {
+        uint32_t current_idx = cursor_y * TERMINAL_COLS + cursor_x;
+        dogeio_text_putchar_raw_glyph(text_grid[current_idx], cursor_x, cursor_y);
+    }
+
     // newlines
     if (c == '\n') {
+        text_grid[cursor_y * TERMINAL_COLS + cursor_x] = ' ';
+        dogeio_text_putchar(' ', cursor_x, cursor_y);
+
         cursor_x = 0;
         cursor_y++;
 
@@ -169,9 +196,14 @@ void dogeio_text_printchar(char c) {
     }
     // backspaces
     else if (c == '\b') {
+        if (cursor_x < TERMINAL_COLS && cursor_y < TERMINAL_ROWS) {
+            uint32_t old_idx = cursor_y * TERMINAL_COLS + cursor_x;
+            dogeio_text_putchar(text_grid[old_idx], cursor_x, cursor_y);
+        }
+
         if (cursor_x > 0) {
             cursor_x--;
-        } else if (cursor_y > 0) { 
+        } else if (cursor_y > 1) { 
             cursor_y--;
             cursor_x = TERMINAL_COLS - 1;
         }
@@ -217,6 +249,25 @@ void dogeio_text_printchar(char c) {
             }
         }
     }
+
+    if (dogeio_cursor_visible && cursor_x < TERMINAL_COLS && cursor_y < TERMINAL_ROWS) {
+        dogeio_text_putchar_raw_glyph('_', cursor_x, cursor_y);
+    }
+}
+
+void dogeio_text_cursor_show() {
+    dogeio_cursor_visible = true;
+    if (cursor_x < TERMINAL_COLS && cursor_y < TERMINAL_ROWS) {
+        dogeio_text_putchar_raw_glyph('_', cursor_x, cursor_y);
+    }
+}
+
+void dogeio_text_cursor_hide() {
+    if (dogeio_cursor_visible && cursor_x < TERMINAL_COLS && cursor_y < TERMINAL_ROWS) {
+        uint32_t idx = cursor_y * TERMINAL_COLS + cursor_x;
+        dogeio_text_putchar_raw_glyph(text_grid[idx], cursor_x, cursor_y);
+    }
+    dogeio_cursor_visible = false;
 }
 
 static size_t parse_ansi_escape(const char *str, size_t index) {
