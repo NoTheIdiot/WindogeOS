@@ -2,6 +2,7 @@
 #include <string.h>
 
 static uint8_t kernel_stack[16384] __attribute__((aligned(16)));
+static uint8_t double_fault_stack[4096] __attribute__((aligned(16)));
 
 static gdt_table_t gdt;
 static tss_entry_t tss;
@@ -31,15 +32,14 @@ void init_gdt(void) {
     memset(&gdt, 0, sizeof(gdt));
     memset(&tss, 0, sizeof(tss));
 
-    set_gdt_entry(&gdt.null_desc,   0, 0, 0, 0);       
-    set_gdt_entry(&gdt.kernel_code, 0, 0, 0x9A, 0x20); 
-    set_gdt_entry(&gdt.kernel_data, 0, 0, 0x92, 0x00); 
-    set_gdt_entry(&gdt.user_data,   0, 0, 0xF2, 0x00); 
-    set_gdt_entry(&gdt.user_code,   0, 0, 0xFA, 0x20); 
+    set_gdt_entry(&gdt.null_desc,   0, 0,          0,    0);
+    set_gdt_entry(&gdt.kernel_code, 0, 0xFFFFFFFF, 0x9A, 0x20);
+    set_gdt_entry(&gdt.kernel_data, 0, 0xFFFFFFFF, 0x92, 0x00);
+    set_gdt_entry(&gdt.user_data,   0, 0xFFFFFFFF, 0xF2, 0x00);
+    set_gdt_entry(&gdt.user_code,   0, 0xFFFFFFFF, 0xFA, 0x20);
 
-    uint64_t stack_top = (uint64_t)&kernel_stack[sizeof(kernel_stack)];
-    tss.rsp0 = stack_top;
-    tss.ist1 = stack_top;
+    tss.rsp0 = (uint64_t)&kernel_stack[sizeof(kernel_stack)];
+    tss.ist1 = (uint64_t)&double_fault_stack[sizeof(double_fault_stack)];
     tss.iomap_base = sizeof(tss_entry_t);
 
     set_tss_descriptor(&gdt.tss_desc, (uint64_t)&tss, sizeof(tss) - 1);
@@ -49,5 +49,6 @@ void init_gdt(void) {
 
     gdt_flush(&gdtr);
 
-    __asm__ volatile ("ltr %0" :: "r"((uint16_t)0x28));
+    uint16_t tss_selector = 0x28;
+    __asm__ volatile ("ltr %w0" :: "r"(tss_selector));
 }
