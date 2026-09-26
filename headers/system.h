@@ -31,6 +31,39 @@ void map_user_page(uint64_t virt_addr, uint64_t phys_addr);
 uint64_t pmm_alloc_zeroed_page(void);
 extern void to_userland_ring3(uint64_t user_rip, uint64_t user_rsp) __attribute__((noreturn));
 
+// raw exfat functions
+
+#define ATA_DATA         0x1F0
+#define ATA_FEATURES     0x1F1
+#define ATA_SECTOR_CNT   0x1F2
+#define ATA_LBA_LOW      0x1F3
+#define ATA_LBA_MID      0x1F4
+#define ATA_LBA_HIGH     0x1F5
+#define ATA_DRIVE_HEAD   0x1F6
+#define ATA_COMMAND      0x1F7
+#define ATA_STATUS       0x1F7
+
+#ifndef FS_BASE_LBA
+#define FS_BASE_LBA      4096
+#endif
+
+#ifndef BLOCK_SIZE
+#define BLOCK_SIZE       512
+#endif
+
+void        menubar_draw(void);
+int         exfat_wipe_and_format(void);
+int         exfat_create_node(const char *name, bool is_dir);
+int         exfat_write_file(const char *name, const uint8_t *data, uint64_t count);
+int         exfat_append_file(const char *name, const uint8_t *data, uint64_t count);
+int64_t     exfat_read_file(const char *name, uint8_t *out_buf, uint64_t max_bytes);
+int         exfat_delete_node(const char *name);
+int         exfat_truncate_last_line(const char *name);
+int         exfat_print_directory(int hidden);
+int         exfat_change_directory(const char *path);
+const char* exfat_get_working_dir(void);
+int         exfat_mount(void);
+
 // pci
 typedef struct {
     uint64_t address;

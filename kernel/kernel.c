@@ -6,7 +6,6 @@
 #include <bool.h>
 #include <stddef.h>
 #include <basicutil.h>
-#include <core.h>
 #include <boot/kernel.h>
 
 __attribute__((used, section(".limine_requests_start")))
