@@ -5,10 +5,6 @@
 #include <stddef.h>
 #include <bool.h>
 
-static inline uint32_t rgb_to_u32(uint8_t red, uint8_t green, uint8_t blue) {
-    return ((uint32_t)red << 16) | ((uint32_t)green << 8) | (uint32_t)blue;
-}
-
 #define ATA_DATA         0x1F0
 #define ATA_FEATURES     0x1F1
 #define ATA_SECTOR_CNT   0x1F2
@@ -39,6 +35,5 @@ int         exfat_print_directory(int hidden);
 int         exfat_change_directory(const char *path);
 const char* exfat_get_working_dir(void);
 int         exfat_mount(void);
-void        put_pixel(uint64_t x, uint64_t y, uint32_t color);
 
 #endif
