@@ -81,8 +81,8 @@ void kernel_main(void) {
         fs_format();
     }
 
-    duolog("[dogeing] initializing gdt");
-    init_gdt();
+    duolog("[dogeing] initializing gdt + tss");
+    init_gdt_tss();
     duolog("[dogeing] initializing idt");
     init_idt();
     duolog("[dogeing] initializing syscalls");

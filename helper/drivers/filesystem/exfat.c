@@ -1,4 +1,3 @@
-#include <boot/kernel.h>
 #include <boot/limine.h>
 #include <dogeio.h>
 #include <stdint.h>
@@ -6,6 +5,7 @@
 #include <string.h>
 #include <basicutil.h>
 #include <bool.h>
+#include <system.h>
 
 #define ATA_STATUS     0x1F7
 #define ATA_DRIVE_HEAD 0x1F6

@@ -8,7 +8,7 @@
 #include <boot/limine.h>
 #include <basicutil.h>
 #include <stddef.h>
-#include <boot/kernel.h>
+#include <system.h>
 
 // get the framebuffer array in the kernel
 extern volatile struct limine_framebuffer_request framebuffer_request;

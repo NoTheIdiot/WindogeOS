@@ -1,6 +1,6 @@
 #include <stdint.h>
 #include <stddef.h>
-#include <boot/kernel.h>
+#include <system.h>
 #include "disk.h"
 #include <basicutil.h>
 

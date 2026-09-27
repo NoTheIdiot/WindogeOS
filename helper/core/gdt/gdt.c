@@ -3,17 +3,18 @@
 #include <stddef.h>
 
 // gdt type struct
-typedef struct {
+// also why __attribute__((packed)) after typedef strcut?
+typedef struct __attribute__((packed)) {
     uint16_t limit_low;
     uint16_t base_low;
     uint8_t  base_middle;
     uint8_t  access;
     uint8_t  granularity;
     uint8_t  base_high;
-} gdt_entry_t __attribute__((packed));
+} gdt_entry_t;
 
 // extended gdt type struct (tss)
-typedef struct {
+typedef struct __attribute__((packed)) {
     uint16_t limit_low;
     uint16_t base_low;
     uint8_t  base_middle;
@@ -22,9 +23,9 @@ typedef struct {
     uint8_t  base_high;
     uint32_t base_upper;
     uint32_t reserved;
-} tss_entry_t __attribute__((packed));
+} tss_entry_t;
 
-typedef struct {
+typedef struct __attribute__((packed)) {
     uint32_t reserved0;
     uint64_t rsp0;
     uint64_t rsp1;
@@ -40,29 +41,32 @@ typedef struct {
     uint64_t reserved2;
     uint16_t reserved3;
     uint16_t iomap_base;
-} tss_t __attribute__((packed));
+} tss_t;
 
 // actual structs used
-typedef struct {
+typedef struct __attribute__((packed)) {
     gdt_entry_t null_desc;
     gdt_entry_t kernel_code;
     gdt_entry_t kernel_data;
     gdt_entry_t user_data;
     gdt_entry_t user_code;
     tss_entry_t tss_desc;
-} __attribute__((packed)) gdt_t;
+} gdt_t;
 
-typedef struct {
+typedef struct __attribute__((packed)) {
     uint16_t limit;
     uint64_t base;
-} __attribute__((packed)) gdtr_t;
+} gdtr_t;
 
-// 16kb stack
+// 16kb stacks
 static uint8_t kernel_stack[16384] __attribute__((aligned(16)));
+static uint8_t double_fault_stack[16384] __attribute__((aligned(16)));
 
 gdt_t gdt;
 tss_t tss;
 gdtr_t gdtr;
+
+extern void gdt_flush(gdtr_t* gdtr_ptr);
 
 void gdt_set_entry(gdt_entry_t *entry, uint32_t base, uint32_t limit, uint8_t access, uint8_t flags) {
     entry->base_low     = (uint16_t)(base & 0xFFFF);
@@ -91,7 +95,7 @@ void init_gdt_tss(void) {
     }
 
     tss.rsp0 = (uint64_t)&kernel_stack[sizeof(kernel_stack)];
-    tss.iomap_base = sizeof(tss_t);
+    tss.ist1 = (uint64_t)&double_fault_stack[sizeof(double_fault_stack)];
 
     gdt_set_entry(&gdt.null_desc, 0, 0, 0, 0);
     gdt_set_entry(&gdt.kernel_code, 0, 0xFFFFFFFF, 0x9A, 0xA0);

@@ -25,6 +25,7 @@ extern bool dogeio_cursor_visible;
 #define COLOR_MAGENTA        0xAA00AA
 #define COLOR_CYAN           0x00AAAA
 #define COLOR_WHITE          0xAAAAAA
+#define COLOR_DARK_GRAY     0x282828
 
 #define COLOR_BRIGHT_BLACK   0x555555
 #define COLOR_BRIGHT_RED     0xFF5555
@@ -42,9 +43,19 @@ void dogeio_text_print(const char *str);
 void dogeio_text_println(const char *str);
 void dogeio_text_print_at(const char *str, uint32_t x_pos, uint32_t y_pos, uint32_t text_color);
 void dogeio_text_input(const char* prompt, char* buffer, size_t max_str_length);
+uint16_t dogeio_get_key(void);
 void dogeio_text_color_change(uint32_t color);
 void dogeio_text_background_change(uint32_t color);
 void dogeio_text_clear_raw(void);
+
+
+#define KEY_UP        0x101
+#define KEY_DOWN      0x102
+#define KEY_LEFT      0x103
+#define KEY_RIGHT     0x104
+#define KEY_BACKSPACE 0x008
+#define KEY_ENTER     0x00A
+#define KEY_UNKNOWN   0x000
 
 #define FS_PERM_READ   0x01u
 #define FS_PERM_WRITE  0x02u

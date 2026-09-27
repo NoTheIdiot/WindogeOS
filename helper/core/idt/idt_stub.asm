@@ -1,70 +1,58 @@
-bits 64
-global idt_load
-global isr_stub_table
-extern exception_handler
-
+[bits 64]
 section .text
 
+global idt_load
 idt_load:
     lidt [rdi]
     ret
 
-%macro ISR_NOERR 1
+extern isr_common_handler
+
+%macro ISR_NOERRCODE 1
 global isr_stub_%1
 isr_stub_%1:
-    push qword 0
-    push qword %1
-    jmp isr_common
+    push qword 0          
+    push qword %1         
+    jmp isr_common_stub
 %endmacro
 
-%macro ISR_ERR 1
+%macro ISR_ERRCODE 1
 global isr_stub_%1
 isr_stub_%1:
-    push qword %1
-    jmp isr_common
+    push qword %1         
+    jmp isr_common_stub
 %endmacro
 
-ISR_NOERR 0
-ISR_NOERR 1
-ISR_NOERR 2
-ISR_NOERR 3
-ISR_NOERR 4
-ISR_NOERR 5
-ISR_NOERR 6
-ISR_NOERR 7
-ISR_ERR   8
-ISR_NOERR 9
-ISR_ERR   10
-ISR_ERR   11
-ISR_ERR   12
-ISR_ERR   13
-ISR_ERR   14
-ISR_NOERR 15
-ISR_NOERR 16
-ISR_ERR   17
-ISR_NOERR 18
-ISR_NOERR 19
-ISR_NOERR 20
-ISR_ERR   21
-ISR_NOERR 22
-ISR_NOERR 23
-ISR_NOERR 24
-ISR_NOERR 25
-ISR_NOERR 26
-ISR_NOERR 27
-ISR_NOERR 28
-ISR_NOERR 29
-ISR_ERR   30
-ISR_NOERR 31
 
-%assign i 32
-%rep 224
-    ISR_NOERR i
+ISR_NOERRCODE 0   
+ISR_NOERRCODE 1   
+ISR_NOERRCODE 2   
+ISR_NOERRCODE 3   
+ISR_NOERRCODE 4   
+ISR_NOERRCODE 5   
+ISR_NOERRCODE 6   
+ISR_NOERRCODE 7   
+ISR_ERRCODE   8   
+ISR_NOERRCODE 9   
+ISR_ERRCODE   10  
+ISR_ERRCODE   11  
+ISR_ERRCODE   12  
+ISR_ERRCODE   13  
+ISR_ERRCODE   14  
+ISR_NOERRCODE 15  
+ISR_NOERRCODE 16  
+ISR_ERRCODE   17  
+ISR_NOERRCODE 18  
+ISR_NOERRCODE 19  
+ISR_NOERRCODE 20  
+ISR_ERRCODE   21  
+%assign i 22
+%rep 10
+ISR_NOERRCODE i
 %assign i i+1
 %endrep
 
-isr_common:
-    cld
+isr_common_stub:
     push rax
     push rbx
     push rcx
@@ -81,8 +69,8 @@ isr_common:
     push r14
     push r15
 
-    mov rdi, rsp
-    call exception_handler
+    mov rdi, rsp           
+    call isr_common_handler
 
     pop r15
     pop r14
@@ -100,22 +88,14 @@ isr_common:
     pop rbx
     pop rax
 
-    add rsp, 16
+    add rsp, 16            
     iretq
 
 section .rodata
+global isr_stub_table
 isr_stub_table:
-    dq isr_stub_0,  isr_stub_1,  isr_stub_2,  isr_stub_3
-    dq isr_stub_4,  isr_stub_5,  isr_stub_6,  isr_stub_7
-    dq isr_stub_8,  isr_stub_9,  isr_stub_10, isr_stub_11
-    dq isr_stub_12, isr_stub_13, isr_stub_14, isr_stub_15
-    dq isr_stub_16, isr_stub_17, isr_stub_18, isr_stub_19
-    dq isr_stub_20, isr_stub_21, isr_stub_22, isr_stub_23
-    dq isr_stub_24, isr_stub_25, isr_stub_26, isr_stub_27
-    dq isr_stub_28, isr_stub_29, isr_stub_30, isr_stub_31
-
-%assign j 32
-%rep 224
-    dq isr_stub_%+j
-%assign j j+1
+%assign i 0
+%rep 32
+    dq isr_stub_%[i]
+%assign i i+1
 %endrep

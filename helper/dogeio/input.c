@@ -21,14 +21,12 @@ const char map_upper[] = {
    'Z', 'X', 'C', 'V', 'B', 'N', 'M', '<', '>', '?', 0, '*', 0, ' '
 };
 
-void dogeio_text_input(const char *prompt, char *buffer, size_t max_size) {
-    if (prompt != NULL) {
-        dogeio_text_print(prompt);
-    }
+static bool global_shift_pressed = false;
+static bool global_ctrl_pressed  = false;
 
-    size_t index = 0;
-    bool shift_pressed = false;
+uint16_t dogeio_get_key(void) {
     char last_seen_time[16] = {0};
+    bool escaped = false;
 
     while (1) {
         while ((ports_inb(0x64) & 1) == 0) {
@@ -47,26 +45,91 @@ void dogeio_text_input(const char *prompt, char *buffer, size_t max_size) {
 
         uint8_t code = ports_inb(0x60);
 
+        if (code == 0xE0) {
+            escaped = true;
+            continue;
+        }
+
         if (code == 0x2A || code == 0x36) {
-            shift_pressed = true;
+            global_shift_pressed = true;
+            escaped = false;
             continue;
         }
-
+        
         if (code == 0xAA || code == 0xB6) {
-            shift_pressed = false;
+            global_shift_pressed = false;
+            escaped = false;
+            continue;
+        }
+        
+        if (code == 0x1D) {
+            global_ctrl_pressed = true;
+            escaped = false;
             continue;
         }
 
+       
+        if (code == 0x9D) {
+            global_ctrl_pressed = false;
+            escaped = false;
+            continue;
+        }
+        
         if (code & 0x80) {
+            escaped = false;
             continue;
         }
 
-        if (code == 0x1C) {
+        if (escaped) {
+            escaped = false;
+            if (code == 0x48) return KEY_UP;
+            if (code == 0x50) return KEY_DOWN;
+            if (code == 0x4B) return KEY_LEFT;
+            if (code == 0x4D) return KEY_RIGHT;
+            continue;
+        }
+
+        if (code == 0x1C) return KEY_ENTER;
+        if (code == 0x0E) return KEY_BACKSPACE;
+
+        if (code == 0x48) return KEY_UP;
+        if (code == 0x50) return KEY_DOWN;
+        if (code == 0x4B) return KEY_LEFT;
+        if (code == 0x4D) return KEY_RIGHT;
+
+        if (code < 58) {
+            char c = global_shift_pressed ? map_upper[code] : map_lower[code];
+            if (c != 0) {
+                if (global_ctrl_pressed) {
+                    if (c >= 'a' && c <= 'z') {
+                        return (uint16_t)(c - 'a' + 1);
+                    } else if (c >= 'A' && c <= 'Z') {
+                        return (uint16_t)(c - 'A' + 1);
+                    }
+                }
+                return (uint16_t)c;
+            }
+        }
+    }
+    return KEY_UNKNOWN;
+}
+
+void dogeio_text_input(const char *prompt, char *buffer, size_t max_size) {
+    if (prompt != NULL) {
+        dogeio_text_print(prompt);
+    }
+
+    size_t index = 0;
+
+    while (1) {
+        uint16_t key = dogeio_get_key();
+
+        if (key == KEY_ENTER) {
             dogeio_text_print("\n");
             break;
         }
 
-        if (code == 0x0E) {
+        if (key == KEY_BACKSPACE) {
             if (index > 0) {
                 index--;
                 buffer[index] = '\0';
@@ -75,16 +138,27 @@ void dogeio_text_input(const char *prompt, char *buffer, size_t max_size) {
             continue;
         }
 
-        if (code < 58) {
-            char c = shift_pressed ? map_upper[code] : map_lower[code];
+        
+        if (key >= 32 && key < 127) {
+            char c = (char)key;
+            if (index < (max_size - 1)) {
+                buffer[index++] = c;
+                char str[] = {c, '\0'};
+                dogeio_text_print(str);
+            }
+            continue;
+        }
 
-            if (c != 0) {
-                if (index < (max_size - 1)) {
-                    buffer[index++] = c;
-                    char str[] = {c, '\0'};
-                    dogeio_text_print(str);
+        
+        if (key >= 1 && key <= 26) {
+            if (key == 21) { 
+                while (index > 0) {
+                    index--;
+                    buffer[index] = '\0';
+                    dogeio_text_print("\b");
                 }
             }
+            
         }
     }
 

@@ -5,9 +5,13 @@
 #include <stddef.h>
 #include <bool.h>
 
-// some idt gdt and tss
+// useless visual only things
+// though it's not really useless.....
+void menubar_draw(void);
+
+// init sum gdt tss and idt
+// though i equally suck at all of these ta
 void init_gdt_tss(void);
 void init_idt(void);
-extern void idt_load(idt_ptr_t *ptr);
 
 #endif
