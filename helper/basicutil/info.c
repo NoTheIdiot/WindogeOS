@@ -113,6 +113,11 @@ uint64_t get_used_ram(void) {
 void system_fetch() {
     char ram_str[32]; 
     char ram_used_str[32];
+    char storage_buf[32];
+    
+    uint32_t total_clusters = 0;
+    uint32_t free_clusters = 0;
+    int metrics_status = exfat_get_space_metrics(&total_clusters, &free_clusters);
 
     for (int i = 0; i < 22; i++) {
         dogeio_text_print(doge_ascii[i]);
@@ -147,6 +152,43 @@ void system_fetch() {
                 str_itoa((int)(get_ram() / 1024 / 1024), ram_str);
                 dogeio_text_print(ram_str);
                 dogeio_text_println(" MB");
+                break;
+            case 7:
+                dogeio_text_print("Storage: ");
+                if (metrics_status == 0 && total_clusters > 0) {
+                    uint32_t used_clusters = total_clusters - free_clusters;
+                    str_itoa((int)used_clusters, storage_buf);
+                    dogeio_text_print(storage_buf);
+                    dogeio_text_print(" / ");
+                    str_itoa((int)total_clusters, storage_buf);
+                    dogeio_text_print(storage_buf);
+                    dogeio_text_println(" Clusters");
+                } else {
+                    dogeio_text_println("Error reading exFAT");
+                }
+                break;
+            case 8:
+                if (metrics_status == 0 && total_clusters > 0) {
+                    uint32_t used_clusters = total_clusters - free_clusters;
+                    uint32_t percentage = (used_clusters * 100U) / total_clusters;
+                    
+                    dogeio_text_print("Disk Map: [");
+                    uint32_t bar_width = 12;
+                    uint32_t filled = (percentage * bar_width) / 100U;
+                    for (uint32_t j = 0; j < bar_width; j++) {
+                        if (j < filled) {
+                            dogeio_text_print("=");
+                        } else {
+                            dogeio_text_print(".");
+                        }
+                    }
+                    dogeio_text_print("] ");
+                    str_itoa((int)percentage, storage_buf);
+                    dogeio_text_print(storage_buf);
+                    dogeio_text_println("%");
+                } else {
+                    dogeio_text_println("");
+                }
                 break;
             default:
                 dogeio_text_println("");

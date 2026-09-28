@@ -63,6 +63,7 @@ int         exfat_print_directory(int hidden);
 int         exfat_change_directory(const char *path);
 const char* exfat_get_working_dir(void);
 int         exfat_mount(void);
+int         exfat_get_space_metrics(uint32_t *out_total_clusters, uint32_t *out_free_clusters);
 
 // pci
 typedef struct {

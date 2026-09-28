@@ -7,6 +7,8 @@
 #include <bool.h>
 #include <system.h>
 
+extern int ata_ReadSector(uint64_t lba, uint8_t *buffer);
+
 #define ATA_STATUS     0x1F7
 #define ATA_DRIVE_HEAD 0x1F6
 #define ATA_SECTOR_CNT 0x1F2
@@ -908,4 +910,18 @@ int exfat_change_directory(const char *path) {
 
 const char* exfat_get_working_dir(void) {
     return g_current_path;
+}
+
+int exfat_get_space_metrics(uint32_t *out_total_clusters, uint32_t *out_free_clusters) {
+    if (out_total_clusters == NULL || out_free_clusters == NULL) return -1;
+
+    uint8_t boot_sector[512];
+    if (ata_ReadSector(FS_BASE_LBA, boot_sector) != 0) return -1;
+
+    uint32_t cluster_count = *(uint32_t*)&boot_sector[88];
+    uint32_t free_count = cluster_count;
+
+    *out_total_clusters = cluster_count;
+    *out_free_clusters = free_count;
+    return 0;
 }
