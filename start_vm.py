@@ -21,7 +21,7 @@ print("-------------------------------------------------------------------------
 debug_flags = "-d int,cpu_reset -no-reboot -D qemu.log" if args.debug else ""
 
 if args.arch == "x86_64":
-    qemu_cmd = f"qemu-system-x86_64 -rtc base=localtime -M pc -m 4M -hda {img_file} -serial stdio {debug_flags}"
+    qemu_cmd = f"qemu-system-x86_64 -cpu Conroe,+lm -rtc base=localtime -M pc -m 4M -hda {img_file} -serial stdio {debug_flags}"
 elif args.arch in ["arm64", "aarch64"]:
     qemu_cmd = f"qemu-system-aarch64 -rtc base=localtime -M virt -cpu cortex-a57 -m 4M -bios limine-binary/BOOTAA64.EFI -drive format=raw,file={img_file},if=none,id=drv0 -device virtio-blk-device,drive=drv0 -serial stdio {debug_flags}"
 else:
