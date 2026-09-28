@@ -47,7 +47,8 @@ uint16_t dogeio_get_key(void);
 void dogeio_text_color_change(uint32_t color);
 void dogeio_text_background_change(uint32_t color);
 void dogeio_text_clear_raw(void);
-
+void dogeio_print_hex8(uint8_t val);
+void dogeio_print_hex16(uint16_t val);
 
 #define KEY_UP        0x101
 #define KEY_DOWN      0x102

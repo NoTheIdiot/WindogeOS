@@ -361,3 +361,14 @@ void dogeio_text_color_change(uint32_t color) {
 void dogeio_text_background_change(uint32_t color) {
     dogeio_background_color = color;
 }
+
+void dogeio_print_hex8(uint8_t val) {
+    const char hex_chars[] = "0123456789ABCDEF";
+    char buf[3] = { hex_chars[(val >> 4) & 0x0F], hex_chars[val & 0x0F], '\0' };
+    dogeio_text_print(buf);
+}
+
+void dogeio_print_hex16(uint16_t val) {
+    dogeio_print_hex8((uint8_t)(val >> 8));
+    dogeio_print_hex8((uint8_t)(val & 0xFF));
+}

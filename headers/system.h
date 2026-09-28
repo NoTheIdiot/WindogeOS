@@ -93,6 +93,8 @@ void      pci_write_32(uint8_t bus, uint8_t slot, uint8_t func, uint16_t offset,
 pci_bar_t pci_get_bar(uint8_t bus, uint8_t slot, uint8_t func, uint8_t bar_index);
 void      pci_enable_device(uint8_t bus, uint8_t slot, uint8_t func);
 void      pci_scan_bus(void);
+char* pci_class_to_name(uint8_t class_code);
+bool parse_slot_string(const char* str, uint8_t* bus, uint8_t* slot, uint8_t* func);
 
 // system calls
 #define FS_READ	01

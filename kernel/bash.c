@@ -310,6 +310,60 @@ int system_bash_ex(char* command) {
         handled = 0;
     }
 
+    else if (str_startswith(command, "edit")) {
+        char* arg = command + 5;
+        if (str_strlen(arg) == 0) {
+            dogeio_text_println("Error: no filename specified :(");
+            handled = -1;
+        } else {
+            if (!fs_exists((char*)arg)) {
+                fs_create((char*)arg);
+            }
+            system_editor((char*)arg);
+            handled = 0;
+        }
+    }
+
+    else if (str_startswith(command, "pci")) {
+        dogeio_text_println("ADDR      IDENTITY DESCRIPTION & [VENDOR:DEVICE ID]");
+        dogeio_text_println("---------------------------------------------------------");
+
+        for (uint16_t bus = 0; bus < 256; bus++) {
+            for (uint8_t slot = 0; slot < 32; slot++) {
+                for (uint8_t func = 0; func < 8; func++) {
+                    
+                    uint16_t vendor_id = pci_read_16((uint8_t)bus, slot, func, 0x00);
+                    
+                    if (vendor_id == 0xFFFF) {
+                        if (func == 0) break;
+                        continue;
+                    }
+
+                    uint16_t device_id = pci_read_16((uint8_t)bus, slot, func, 0x02);
+                    uint8_t class_code = pci_read_8((uint8_t)bus, slot, func, 0x0B);
+
+                    dogeio_print_hex8((uint8_t)bus);
+                    dogeio_text_print(":");
+                    dogeio_print_hex8(slot);
+                    dogeio_text_print(".");
+                    
+                    char f_str[2] = { (char)('0' + func), '\0' };
+                    dogeio_text_print(f_str);
+                    dogeio_text_print("    ");
+
+                    dogeio_text_print(pci_class_to_name(class_code));
+                    
+                    dogeio_text_print(" [");
+                    dogeio_print_hex16(vendor_id);
+                    dogeio_text_print(":");
+                    dogeio_print_hex16(device_id);
+                    dogeio_text_println("]");
+                }
+            }
+        }
+        handled = 0;
+    }
+
     else if (str_startswith(command, "run ")) {
         char* binary = command + 4;
         if (!is_path_allowed(binary)) {

@@ -1,4 +1,3 @@
-// pci stuff
 #include <stdint.h>
 #include <stddef.h>
 #include <system.h>
@@ -65,7 +64,6 @@ uint8_t pci_read_8(uint8_t bus, uint8_t slot, uint8_t func, uint16_t offset) {
     return (uint8_t)((val >> (((uint32_t)offset & 3U) * 8U)) & 0xFFU);
 }
 
-// some of the actual stuff
 #define PCI_COMMAND_OFFSET 0x04U
 #define PCI_CMD_IO_ENABLE  (1U << 0)
 #define PCI_CMD_MEM_ENABLE (1U << 1)
@@ -112,4 +110,41 @@ pci_bar_t pci_get_bar(uint8_t bus, uint8_t slot, uint8_t func, uint8_t bar_index
     }
 
     return bar;
+}
+
+char* pci_class_to_name(uint8_t class_code) {
+    switch (class_code) {
+        case 0x00: return "Unclassified Device (unknown device type)";
+        case 0x01: return "Mass Storage Controller (IDE/SATA)";
+        case 0x02: return "Network Controller (Ethernet/Wi-Fi)";
+        case 0x03: return "Display Controller (VGA)";
+        case 0x04: return "Multimedia Controller (Audio)";
+        case 0x05: return "Memory Controller";
+        case 0x06: return "Bridge Device (Host/ISA)";
+        case 0x07: return "Simple Communication Controller";
+        case 0x08: return "Base System Peripheral";
+        case 0x09: return "Input Device (much keyboard, or mouse)";
+        case 0x0A: return "Docking Station";
+        case 0x0B: return "Processor (another CPU?)";
+        case 0x0C: return "Serial Bus Controller (USB/SMBus)";
+        case 0x0D: return "Wireless Controller";
+        default:   return "Unknown Device Type (wtf is this)";
+    }
+}
+
+bool parse_slot_string(const char* str, uint8_t* bus, uint8_t* slot, uint8_t* func) {
+    uint32_t b = 0, s = 0, f = 0;
+    const char* p = str;
+
+    while (*p >= '0' && *p <= '9') b = (b * 10) + (uint32_t)(*p++ - '0');
+    if (*p != ':') return false; p++;
+    while (*p >= '0' && *p <= '9') s = (s * 10) + (uint32_t)(*p++ - '0');
+    if (*p != '.') return false; p++;
+    while (*p >= '0' && *p <= '9') f = (f * 10) + (uint32_t)(*p++ - '0');
+
+    if (b < 256 && s < 32 && f < 8) {
+        *bus = (uint8_t)b; *slot = (uint8_t)s; *func = (uint8_t)f;
+        return true;
+    }
+    return false;
 }
