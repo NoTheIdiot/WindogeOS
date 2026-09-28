@@ -211,7 +211,7 @@ void dogeio_text_printchar(char c) {
         text_grid[cursor_y * TERMINAL_COLS + cursor_x] = ' ';
         dogeio_text_putchar(' ', cursor_x, cursor_y);
     } 
-    // tabs (Fixed: renders ' ' spaces instead of passing raw '\t' to putchar)
+    
     else if (c == '\t') {
         for (int i = 0; i < 4; i++) {
             if (cursor_x < TERMINAL_COLS && cursor_y < TERMINAL_ROWS) {

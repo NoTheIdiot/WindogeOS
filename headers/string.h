@@ -16,6 +16,7 @@ int memcmp(const void *s1, const void *s2, size_t n);
 
 // regular str stuff
 int str_strcmp(const char *str1, const char *str2);
+void clean_input_string(char* str);
 size_t str_strlen(const char* str);
 void str_pad(char *dest, const char *src, int target_len, char pad_char);
 void str_itoa(int n, char* str);

@@ -50,6 +50,7 @@ char* help[] = {
     "",
     "System Utilities",
     "=======================================================",
+    "user-setup              | user setup and login",
     "edit   [file]           | edits a file",
     "pci                     | lists all pci devices",
     "run    [file]           | run a program",
@@ -390,6 +391,51 @@ int system_dogeshell_ex(char* command) {
                     dogeio_print_hex16(device_id);
                     dogeio_text_println("]");
                 }
+            }
+        }
+        handled = 0;
+    }
+
+    else if (str_strcmp(command, "user-setup") == 0) {
+        uint16_t get_key;
+        char username[64];
+        char password[64];
+
+        dogeio_text_println("WindogeOS users setup");
+        dogeio_text_println("[1] add user");
+        dogeio_text_println("[2] login");
+        dogeio_text_println("[3] exit");
+        while (true) {
+            get_key = dogeio_get_key();
+
+            if (get_key == (uint16_t)('1')) {
+                dogeio_text_println("Create the much username.");
+                dogeio_text_input("> ", username, 64);
+
+                dogeio_text_println("Create the wow password.");
+                dogeio_text_input("> ", password, 64);
+                system_create_user(username, password, 1);
+                break;
+            } else if (get_key == (uint16_t)('2')) {
+                dogeio_text_println("Login into an account");
+                while (true) {
+
+                    dogeio_text_input("username> ", username, 64);
+                    dogeio_text_input("password> ", password, 64);
+
+                    clean_input_string(username);
+                    clean_input_string(password);
+
+                    if (system_verify_user(username, password)) {
+                        str_strcpy(current_user, username);
+                        fs_set_auth_override(0);
+                        break;
+                    }
+                    dogeio_text_println("Wrong password or user doesn't exist :(");
+                }
+                break;
+            } else if (get_key == (uint16_t)('3')) {
+                break;
             }
         }
         handled = 0;

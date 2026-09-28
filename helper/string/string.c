@@ -13,6 +13,15 @@ int str_strcmp(const char* str1, const char *str2) {
     return *(const unsigned char*)str1 - *(const unsigned char*)str2;
 }
 
+void clean_input_string(char* str) {
+    if (!str) return;
+    int len = 0;
+    while (str[len] != '\0') len++;
+    while (len > 0 && (str[len - 1] == '\r' || str[len - 1] == '\n' || str[len - 1] == ' ' || str[len - 1] == '\t')) {
+        str[--len] = '\0';
+    }
+}
+
 void str_pad(char *dest, const char *src, int target_len, char pad_char) {
     int i = 0;
     while (src[i] != '\0' && i < target_len) {

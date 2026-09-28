@@ -35,15 +35,6 @@ volatile struct limine_memmap_request memmap_request = {
 __attribute__((used, section(".limine_requests_end")))
 volatile uint64_t limine_requests_end_marker[] = LIMINE_REQUESTS_END_MARKER;
 
-static void clean_input_string(char* str) {
-    if (!str) return;
-    int len = 0;
-    while (str[len] != '\0') len++;
-    while (len > 0 && (str[len - 1] == '\r' || str[len - 1] == '\n' || str[len - 1] == ' ' || str[len - 1] == '\t')) {
-        str[--len] = '\0';
-    }
-}
-
 char computer_name[64];
 
 void kernel_main(void) {
