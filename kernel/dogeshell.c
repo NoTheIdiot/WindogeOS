@@ -51,6 +51,7 @@ char* help[] = {
     "System Utilities",
     "=======================================================",
     "edit   [file]           | edits a file",
+    "pci                     | lists all pci devices",
     "run    [file]           | run a program",
     "=======================================================",
 };
