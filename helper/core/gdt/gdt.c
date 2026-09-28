@@ -45,14 +45,13 @@ typedef struct __attribute__((packed)) {
 
 // actual structs used
 typedef struct __attribute__((packed)) {
-    gdt_entry_t null_desc;
-    gdt_entry_t kernel_code;
-    gdt_entry_t kernel_data;
-    gdt_entry_t user_data;
-    gdt_entry_t user_code;
-    tss_entry_t tss_desc;
+    gdt_entry_t null_desc;    // 0x00
+    gdt_entry_t kernel_code;  // 0x08
+    gdt_entry_t kernel_data;  // 0x10
+    gdt_entry_t user_data;    // 0x18
+    gdt_entry_t user_code;    // 0x20
+    tss_entry_t tss_desc;     // 0x28
 } gdt_t;
-
 typedef struct __attribute__((packed)) {
     uint16_t limit;
     uint64_t base;
