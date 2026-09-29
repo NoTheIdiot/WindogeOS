@@ -1,15 +1,22 @@
 = About WindogeOS
-WindogeOS is supposed to be a free and lightweight operating system.
-Hate these "AI powered operating systems" or "Vibe coded" OSes,
-also giving a middle finger to windows 11's ai slop copilot.
+Doge filled OS that fits in a floppy.
+Also supposed to be a free and lightweight operating system.
+Also being easy to use on the command line.
 
 = Updates
 Also decided to rewrite the shell since it's junk
 Im going back to syscall, the programming language page faulted
 
 = How to such compile and run?
-- Install git, clang, python, and qemu-system. Yes, the other tools (like limine, that's it)
-  is already included.
+- Install the following
+    git
+    python
+    clang
+    lld
+    llvm
+    mtools
+    exfatprogs
+    exfat-fuse
 
 - Run this in your terminal, if you are on windows, install wsl by typing
   "wsl --install Ubuntu"
@@ -20,7 +27,8 @@ Im going back to syscall, the programming language page faulted
   python compile.py
   python start_vm.py
 
-= Notes
-Everything is at main now.
-You only live once
+  that's it, you might have to type in your sudo password
+  for compile.py
 
+= Notes
+  nothing is wrong, why are your reading till here?
