@@ -84,7 +84,7 @@ typedef struct {
     uint8_t prog_if;
 } pci_device_t;
 
-
+// pci
 uint32_t  pci_read_32(uint8_t bus, uint8_t slot, uint8_t func, uint16_t offset);
 uint16_t  pci_read_16(uint8_t bus, uint8_t slot, uint8_t func, uint16_t offset);
 uint8_t   pci_read_8(uint8_t bus, uint8_t slot, uint8_t func, uint16_t offset);
@@ -94,8 +94,15 @@ void      pci_write_32(uint8_t bus, uint8_t slot, uint8_t func, uint16_t offset,
 pci_bar_t pci_get_bar(uint8_t bus, uint8_t slot, uint8_t func, uint8_t bar_index);
 void      pci_enable_device(uint8_t bus, uint8_t slot, uint8_t func);
 void      pci_scan_bus(void);
-char* pci_class_to_name(uint8_t class_code);
-bool parse_slot_string(const char* str, uint8_t* bus, uint8_t* slot, uint8_t* func);
+char*     pci_class_to_name(uint8_t class_code);
+bool      parse_slot_string(const char* str, uint8_t* bus, uint8_t* slot, uint8_t* func);
+
+// pcie
+void pcie_init_system(uint64_t v_addr, uint8_t start_bus, uint8_t end_bus);
+void init_pcie(void);
+uint32_t pcie_read32(uint8_t bus, uint8_t device, uint8_t function, uint16_t reg_offset);
+void pcie_write32(uint8_t bus, uint8_t device, uint8_t function, uint16_t reg_offset, uint32_t value);
+void pcie_scan_bus_system(void (*pcie_callback)(uint8_t b, uint8_t d, uint8_t f, uint16_t ven, uint16_t dev_id));
 
 // system calls
 #define FS_READ	01

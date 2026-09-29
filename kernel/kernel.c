@@ -78,6 +78,8 @@ void kernel_main(void) {
     init_idt();
     duolog("[dogeing] initializing syscalls");
     init_syscalls();
+    duolog("[dogeing] initializing pcie");
+    init_pcie();
     log("[wow] all basic drivers done");
 
     log("WindogeOS has successfully booted. Start celebrating broski.");
