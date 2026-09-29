@@ -150,6 +150,52 @@ void dogeio_text_input(const char *prompt, char *buffer, size_t max_size) {
             continue;
         }
 
+        if (key == KEY_TAB) {
+            if (len + 8 < max_size) {
+                dogeio_text_cursor_hide();
+                
+                for (size_t i = len + 8; i > pos + 7; i--) {
+                    buffer[i] = buffer[i - 8];
+                }
+                
+                for (size_t i = 0; i < 8; i++) {
+                    buffer[pos + i] = ' ';
+                }
+                
+                len += 8;
+                buffer[len] = '\0';
+
+                
+                uint32_t saved_x = cursor_x;
+                uint32_t saved_y = cursor_y;
+
+                for (size_t i = pos; i < len; i++) {
+                    char ch = buffer[i];
+                    text_grid[cursor_y * TERMINAL_COLS + cursor_x] = ch;
+                    dogeio_text_putchar(ch, cursor_x, cursor_y);
+                    cursor_x++;
+                    if (cursor_x >= TERMINAL_COLS) {
+                        cursor_x = 0;
+                        cursor_y++;
+                    }
+                }
+                
+                cursor_x = saved_x;
+                cursor_y = saved_y;
+                for (size_t i = 0; i < 8; i++) {
+                    cursor_x++;
+                    if (cursor_x >= TERMINAL_COLS) {
+                        cursor_x = 0;
+                        cursor_y++;
+                    }
+                }
+                pos += 8;
+
+                dogeio_text_cursor_show();
+            }
+            continue;
+        }
+
         if (key == KEY_RIGHT) {
             if (pos < len) {
                 dogeio_text_cursor_hide();
