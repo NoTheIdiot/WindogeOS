@@ -150,7 +150,7 @@ void dogeio_text_input(const char *prompt, char *buffer, size_t max_size) {
             continue;
         }
 
-        if (key == KEY_TAB) {
+        if (key == KEY_TAB || key == 9 || key == 0x000F || key == 0x000D) {
             if (len + 8 < max_size) {
                 dogeio_text_cursor_hide();
                 
