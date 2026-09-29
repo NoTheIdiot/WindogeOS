@@ -1,6 +1,3 @@
-/*   FIH   */
-
-// get some basic functions and types
 #include <stdint.h>
 #include <string.h>
 #include <dogeio.h>
@@ -10,20 +7,17 @@
 #include <stddef.h>
 #include <system.h>
 
-// get the framebuffer array in the kernel
 extern volatile struct limine_framebuffer_request framebuffer_request;
 
-// terminal array exactly 8K bytes
 char text_grid[TERMINAL_ROWS * TERMINAL_COLS];
 uint32_t text_color_grid[TERMINAL_ROWS * TERMINAL_COLS];
 uint32_t bg_color_grid[TERMINAL_ROWS * TERMINAL_COLS];
 
-// other stuff
 uint32_t cursor_x = 0;
 uint32_t cursor_y = 1;
 bool dogeio_cursor_visible = false;
 uint32_t dogeio_background_color = 0x000000;
-uint32_t dogeio_text_color        = 0xFFCCCCCC;
+uint32_t dogeio_text_color = 0xFFCCCCCC;
 
 static const uint32_t ansi_colors[16] = {
     0x000000, 0xAA0000, 0x00AA00, 0xAA5500, 0x0000AA, 0xAA00AA, 0x00AAAA, 0xAAAAAA,
@@ -67,7 +61,43 @@ void dogeio_text_putchar_raw_glyph(char c, uint32_t x, uint32_t y) {
     }
 }
 
-// place a char, obviously.
+void dogeio_text_putchar_reverted_glyph(char c, uint32_t x, uint32_t y) {
+    if (framebuffer_request.response == NULL || framebuffer_request.response->framebuffer_count < 1) {
+        return;
+    }
+
+    if ((uint8_t)c >= 128) {
+        c = ' '; 
+    }
+
+    struct limine_framebuffer *framebuffer = framebuffer_request.response->framebuffers[0];
+    uint32_t* framebuffer_ptr = (uint32_t*)framebuffer->address;
+
+    uint32_t pixel_x = x * 8;
+    uint32_t pixel_y = y * 16;
+    uint64_t u64_pitch = framebuffer->pitch / 4;
+
+    if (pixel_x + 8 > framebuffer->width || pixel_y + 16 > framebuffer->height) {
+        return;
+    }
+
+    const uint8_t* glyph = terminal_font[(uint8_t)c];
+
+    for (uint32_t g_row = 0; g_row < 16; g_row++) {
+        uint8_t bits = glyph[g_row];
+        size_t row_offset = (pixel_y + g_row) * u64_pitch + pixel_x;
+        
+        framebuffer_ptr[row_offset + 0] = ((bits >> 7) & 1) ? dogeio_background_color : dogeio_text_color;
+        framebuffer_ptr[row_offset + 1] = ((bits >> 6) & 1) ? dogeio_background_color : dogeio_text_color;
+        framebuffer_ptr[row_offset + 2] = ((bits >> 5) & 1) ? dogeio_background_color : dogeio_text_color;
+        framebuffer_ptr[row_offset + 3] = ((bits >> 4) & 1) ? dogeio_background_color : dogeio_text_color;
+        framebuffer_ptr[row_offset + 4] = ((bits >> 3) & 1) ? dogeio_background_color : dogeio_text_color;
+        framebuffer_ptr[row_offset + 5] = ((bits >> 2) & 1) ? dogeio_background_color : dogeio_text_color;
+        framebuffer_ptr[row_offset + 6] = ((bits >> 1) & 1) ? dogeio_background_color : dogeio_text_color;
+        framebuffer_ptr[row_offset + 7] = (bits & 1)        ? dogeio_background_color : dogeio_text_color;
+    }
+}
+
 void dogeio_text_putchar(char c, uint32_t x, uint32_t y) {
     if (framebuffer_request.response == NULL || framebuffer_request.response->framebuffer_count < 1) {
         return;
@@ -77,7 +107,6 @@ void dogeio_text_putchar(char c, uint32_t x, uint32_t y) {
         c = ' '; 
     }
 
-    // check if out of bounds and if is, throw it to the void
     if (x >= TERMINAL_COLS || y >= TERMINAL_ROWS) {
         return;
     }
@@ -87,7 +116,6 @@ void dogeio_text_putchar(char c, uint32_t x, uint32_t y) {
     text_color_grid[idx] = dogeio_text_color;
     bg_color_grid[idx] = dogeio_background_color;
 
-    // point
     dogeio_text_putchar_raw_glyph(c, x, y);
 }
 
@@ -169,8 +197,9 @@ static void dogeio_text_scroll() {
         dogeio_text_color = saved_text_color;
         dogeio_background_color = saved_bg_color;
         menubar_draw();
-        if (dogeio_cursor_visible) {
-            dogeio_text_putchar_raw_glyph('_', cursor_x, cursor_y);
+        if (dogeio_cursor_visible && cursor_x < TERMINAL_COLS && cursor_y < TERMINAL_ROWS) {
+            uint32_t idx = cursor_y * TERMINAL_COLS + cursor_x;
+            dogeio_text_putchar_reverted_glyph(text_grid[idx], cursor_x, cursor_y);
         }
     }
 }
@@ -181,7 +210,6 @@ void dogeio_text_printchar(char c) {
         dogeio_text_putchar_raw_glyph(text_grid[current_idx], cursor_x, cursor_y);
     }
 
-    // newlines
     if (c == '\n') {
         text_grid[cursor_y * TERMINAL_COLS + cursor_x] = ' ';
         dogeio_text_putchar(' ', cursor_x, cursor_y);
@@ -194,7 +222,6 @@ void dogeio_text_printchar(char c) {
             cursor_y = TERMINAL_ROWS - 1;
         }
     }
-    // backspaces
     else if (c == '\b') {
         if (cursor_x < TERMINAL_COLS && cursor_y < TERMINAL_ROWS) {
             uint32_t old_idx = cursor_y * TERMINAL_COLS + cursor_x;
@@ -211,7 +238,6 @@ void dogeio_text_printchar(char c) {
         text_grid[cursor_y * TERMINAL_COLS + cursor_x] = ' ';
         dogeio_text_putchar(' ', cursor_x, cursor_y);
     } 
-    
     else if (c == '\t') {
         for (int i = 0; i < 4; i++) {
             if (cursor_x < TERMINAL_COLS && cursor_y < TERMINAL_ROWS) {
@@ -231,7 +257,6 @@ void dogeio_text_printchar(char c) {
             }
         }
     }
-    // standard printable characters path
     else {
         if (cursor_x < TERMINAL_COLS && cursor_y < TERMINAL_ROWS) {
             text_grid[cursor_y * TERMINAL_COLS + cursor_x] = c;
@@ -251,14 +276,16 @@ void dogeio_text_printchar(char c) {
     }
 
     if (dogeio_cursor_visible && cursor_x < TERMINAL_COLS && cursor_y < TERMINAL_ROWS) {
-        dogeio_text_putchar_raw_glyph('_', cursor_x, cursor_y);
+        uint32_t idx = cursor_y * TERMINAL_COLS + cursor_x;
+        dogeio_text_putchar_reverted_glyph(text_grid[idx], cursor_x, cursor_y);
     }
 }
 
 void dogeio_text_cursor_show() {
     dogeio_cursor_visible = true;
     if (cursor_x < TERMINAL_COLS && cursor_y < TERMINAL_ROWS) {
-        dogeio_text_putchar_raw_glyph('_', cursor_x, cursor_y);
+        uint32_t idx = cursor_y * TERMINAL_COLS + cursor_x;
+        dogeio_text_putchar_reverted_glyph(text_grid[idx], cursor_x, cursor_y);
     }
 }
 
@@ -271,7 +298,7 @@ void dogeio_text_cursor_hide() {
 }
 
 static size_t parse_ansi_escape(const char *str, size_t index) {
-    index += 2; // Skip past '\033['
+    index += 2;
     int param = 0;
 
     while (str[index] >= '0' && str[index] <= '9') {
@@ -281,8 +308,8 @@ static size_t parse_ansi_escape(const char *str, size_t index) {
 
     if (str[index] == 'm') {
         if (param == 0) {
-            dogeio_text_color = 0xFFCCCCCC;       // Reset FG
-            dogeio_background_color = 0x000000;   // Reset BG
+            dogeio_text_color = 0xFFCCCCCC;       
+            dogeio_background_color = 0x000000;   
         } else if (param >= 30 && param <= 37) {
             dogeio_text_color = ansi_colors[param - 30];
         } else if (param >= 90 && param <= 97) {

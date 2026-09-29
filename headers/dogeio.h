@@ -48,6 +48,8 @@ void dogeio_text_color_change(uint32_t color);
 void dogeio_text_background_change(uint32_t color);
 void dogeio_text_clear_raw(void);
 void dogeio_print_hex8(uint8_t val);
+void dogeio_text_cursor_show();
+void dogeio_text_cursor_hide();
 void dogeio_print_hex16(uint16_t val);
 
 #define KEY_UP        0x101
