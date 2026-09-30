@@ -29,5 +29,7 @@ Nothing special read commits and releases
   that's it, you might have to type in your sudo password
   for compile.py
 
-= Notes
-  nothing is wrong, why are your reading till here?
+= Contributing
+  Thanks for contributing for some reason...
+  You can do anything but remind me if there are alot of or major changes in 
+  your fork, thanks :D
