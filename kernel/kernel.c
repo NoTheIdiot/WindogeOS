@@ -82,6 +82,32 @@ void kernel_main(void) {
     init_pcie();
     duolog("[dogeing] initializing terminal workspaces");
     sys_init_terminals();
+    duolog("[dogeing] initializing nvme (if any avalialbe)");
+    for (uint16_t bus = 0; bus < 256; bus++) {
+        for (uint8_t device = 0; device < 32; device++) {
+            for (uint8_t function = 0; function < 8; function++) {
+                
+                uint32_t id_reg = pcie_read32((uint8_t)bus, device, function, 0x00);
+                uint16_t vendor_id = (uint16_t)(id_reg & 0xFFFF);
+                uint16_t device_id = (uint16_t)(id_reg >> 16);
+
+                if (vendor_id == 0xFFFF) {
+                    if (function == 0) {
+                        break; 
+                    }
+                    continue;
+                }
+
+                uint32_t class_reg = pcie_read32((uint8_t)bus, device, function, 0x08);
+                uint8_t class_code = (uint8_t)((class_reg >> 24) & 0xFF);
+                uint8_t subclass   = (uint8_t)((class_reg >> 16) & 0xFF);
+
+                if (class_code == 0x01 && subclass == 0x08) {
+                    nvme_pci_callback((uint8_t)bus, device, function, vendor_id, device_id);
+                }
+            }
+        }
+    }
     log("[wow] all basic drivers done");
 
     log("WindogeOS has successfully booted. Start celebrating broski.");

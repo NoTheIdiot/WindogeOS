@@ -104,6 +104,56 @@ uint32_t pcie_read32(uint8_t bus, uint8_t device, uint8_t function, uint16_t reg
 void pcie_write32(uint8_t bus, uint8_t device, uint8_t function, uint16_t reg_offset, uint32_t value);
 void pcie_scan_bus_system(void (*pcie_callback)(uint8_t b, uint8_t d, uint8_t f, uint16_t ven, uint16_t dev_id));
 
+// nvme stuff
+typedef struct {
+    uint32_t cap_low;
+    uint32_t cap_high;
+    uint32_t vs;
+    uint32_t intms;
+    uint32_t intmc;
+    uint32_t cc;
+    uint32_t reserved0;
+    uint32_t csts;
+    uint32_t nssr;
+    uint32_t aqa;
+    uint64_t asq;
+    uint64_t acq;
+    uint32_t reserved1;
+    uint32_t doorbells[]; 
+} __attribute__((packed)) nvme_regs_t;
+
+typedef struct {
+    uint8_t  opc;
+    uint8_t  fuse_psdt;
+    uint16_t cid;
+    uint32_t nsid;
+    uint64_t reserved0;
+    uint64_t mptr;
+    uint64_t prp1;
+    uint64_t prp2;
+    uint32_t cdw10;
+    uint32_t cdw11;
+    uint32_t cdw12;
+    uint32_t cdw13;
+    uint32_t cdw14;
+    uint32_t cdw15;
+} __attribute__((packed)) nvme_cmd_t;
+
+typedef struct {
+    uint32_t cdw0;
+    uint32_t reserved;
+    uint16_t sq_head;
+    uint16_t sq_id;
+    uint16_t cid;
+    uint16_t status;
+} __attribute__((packed)) nvme_cpl_t;
+
+void nvme_init(uintptr_t bar0_mem_base);
+void nvme_submit_admin_cmd(uint8_t* raw_cmd, uint8_t* target_cpl);
+void nvme_identify_drive(uintptr_t destination_physical_buffer);
+void init_nvme_device(uint8_t bus, uint8_t slot, uint8_t func);
+void nvme_pci_callback(uint8_t b, uint8_t d, uint8_t f, uint16_t ven, uint16_t dev_id);
+
 // system calls
 #define FS_READ	01
 #define FS_WRITE 02
