@@ -5,14 +5,9 @@ bits 64
 section .text
 global _start
 _start:
-    ; fs write
-    mov rax, FS_WRITE
-    lea rdi, [rel filename]
-    lea rsi, [rel message]
-    syscall
 
-    mov rax, SYS_EXIT
-    mov rdi, 0
+    ; it worked.
+    mov rax, SPECIAL
     syscall
 
 section .data

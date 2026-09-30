@@ -66,6 +66,11 @@ uint64_t syscall_handler(struct cpu_regs *regs) {
             break;
         }
 
+        case SPECIAL: {
+            dogeio_text_print("special");
+            break;
+        }
+
         default:
             ret_val = (uint64_t)-1; 
             break;

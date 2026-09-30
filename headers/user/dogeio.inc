@@ -6,6 +6,7 @@
 %define FS_DELETE 06 
 %define FS_RENAME 07
 %define FS_READ_RAW 08
+%define SPECIAL 50
 
 %define DOGEIO_PRINT 11
 %define DOGEIO_CLEAR 12

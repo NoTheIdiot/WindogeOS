@@ -52,4 +52,4 @@ syscall_entry:
     mov rsp, qword [gs:8]               
     swapgs                              
 
-    sysretq 
+    o64 sysret

@@ -163,6 +163,7 @@ void nvme_pci_callback(uint8_t b, uint8_t d, uint8_t f, uint16_t ven, uint16_t d
 #define FS_DELETE 06 
 #define FS_RENAME 07
 #define FS_READ_RAW 08
+#define SPECIAL 50
 
 #define DOGEIO_PRINT 11
 #define DOGEIO_CLEAR 12
