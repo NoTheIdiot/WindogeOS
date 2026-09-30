@@ -16,6 +16,7 @@ extern uint32_t cursor_y;
 extern uint32_t dogeio_background_color;
 extern uint32_t dogeio_text_color;
 extern bool dogeio_cursor_visible;
+extern char text_grid[TERMINAL_COLS * TERMINAL_ROWS];
 
 #define COLOR_BLACK          0x000000
 #define COLOR_RED            0xAA0000
