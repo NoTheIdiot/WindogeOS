@@ -21,7 +21,12 @@ void sys_init_terminals(void) {
 }
 
 void sys_switch_terminal(void) {
-    memcpy(workspaces[current_terminal_id].display_buffer, text_grid, BUFFER_SIZE);
+    for (int j = 0; j < TERMINAL_ROWS; j++) {
+        for (int i = 0; i < TERMINAL_COLS; i++) {
+            int buffer_index = (j * TERMINAL_COLS) + i;
+            workspaces[current_terminal_id].display_buffer[buffer_index] = text_grid[buffer_index];
+        }
+    }
 
     if (current_terminal_id == 3) {
         current_terminal_id = 0;
@@ -31,11 +36,10 @@ void sys_switch_terminal(void) {
     
     dogeio_text_clear();
 
-    memcpy(text_grid, workspaces[current_terminal_id].display_buffer, BUFFER_SIZE);
-
     for (int j = 0; j < TERMINAL_ROWS; j++) {
         for (int i = 0; i < TERMINAL_COLS; i++) {
             int buffer_index = (j * TERMINAL_COLS) + i;
+            text_grid[buffer_index] = workspaces[current_terminal_id].display_buffer[buffer_index];
             dogeio_text_putchar(text_grid[buffer_index], (uint32_t)(j), (uint32_t)(i));
         }
     }
