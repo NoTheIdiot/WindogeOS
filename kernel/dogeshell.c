@@ -1,3 +1,4 @@
+#include <boot/kernel.h>
 #include <time.h>
 #include <stdint.h>
 #include <stddef.h>
@@ -53,6 +54,7 @@ char* help[] = {
     "user-setup              | user setup and login",
     "edit   [file]           | edits a file",
     "pci                     | lists all pci devices",
+    "tab                     | switch terminal tabs",
     "run    [file]           | run a program",
     "=======================================================",
 };
@@ -444,6 +446,11 @@ int system_dogeshell_ex(char* command) {
     else if (str_startswith(command, "run")) {
         char* target = command + 4;
         system_run_exec(target, 65536);
+        handled = 0;
+    }
+
+    else if (str_strcmp(command, "tab") == 0) {
+        sys_switch_terminal();
         handled = 0;
     }
 

@@ -8,7 +8,7 @@
 #define BUFFER_SIZE (TERMINAL_COLS * TERMINAL_ROWS)
 
 typedef struct {
-    char display_buffer[BUFFER_SIZE];
+    char display_buffer[BUFFER_SIZE]; 
 } console_t;
 
 static console_t workspaces[MAX_TERMINALS];
@@ -28,11 +28,15 @@ void sys_switch_terminal(void) {
     } else {
         current_terminal_id++;
     }
+    
+    dogeio_text_clear();
 
-    for (int i = 0; i < TERMINAL_COLS; i++) {
-        for (int j = 0; j < TERMINAL_ROWS; j++) {
+    memcpy(text_grid, workspaces[current_terminal_id].display_buffer, BUFFER_SIZE);
+
+    for (int j = 0; j < TERMINAL_ROWS; j++) {
+        for (int i = 0; i < TERMINAL_COLS; i++) {
             int buffer_index = (j * TERMINAL_COLS) + i;
-            dogeio_text_putchar(workspaces[current_terminal_id].display_buffer[buffer_index], (uint32_t)(j), (uint32_t)(i));
+            dogeio_text_putchar(text_grid[buffer_index], (uint32_t)(j), (uint32_t)(i));
         }
     }
     

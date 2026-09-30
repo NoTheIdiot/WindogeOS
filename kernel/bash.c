@@ -324,6 +324,11 @@ int system_bash_ex(char* command) {
         }
     }
 
+    else if (str_strcmp(command, "tab") == 0) {
+        sys_switch_terminal();
+        handled = 0;
+    }
+
     else if (str_startswith(command, "pci")) {
         dogeio_text_println("ADDR      IDENTITY DESCRIPTION & [VENDOR:DEVICE ID]");
         dogeio_text_println("---------------------------------------------------------");
