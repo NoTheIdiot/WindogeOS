@@ -4,8 +4,7 @@ Also supposed to be a free and lightweight operating system.
 Also being easy to use on the command line.
 
 = Updates
-Also decided to rewrite the shell since it's junk
-Im going back to syscall, the programming language page faulted
+Nothing special read commits and releases
 
 = How to such compile and run?
 - Install the following
