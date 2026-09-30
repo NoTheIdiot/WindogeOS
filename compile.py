@@ -173,13 +173,17 @@ def main():
         if os.path.exists(img_file):
             os.remove(img_file)
 
-        cmd(f"dd if=/dev/zero bs=1M count=0 seek=32 of={img_file} 2>/dev/null")
+        cmd(f"dd if=/dev/zero bs=1M count=0 seek=4 of={img_file} 2>/dev/null")
 
         partition_type_p1 = "8300" if arch == "x86_64" else "ef00"
+        
+        p2_start = 4096
+        p2_end = 8158 
+        
         cmd(
             f"PATH=$PATH:/usr/sbin:/sbin sgdisk {img_file} "
             f"-n 1:2048:4095 -t 1:{partition_type_p1} "
-            f"-n 2:4096:65502 -t 2:0700 -m 1 2>/dev/null"
+            f"-n 2:{p2_start}:{p2_end} -t 2:0700 -m 1 2>/dev/null"
         )
 
         if arch == "x86_64" and os.path.exists("binaries/limine"):
@@ -209,9 +213,11 @@ def main():
                 cmd(f"mcopy -i {img_file}@@{boot_offset} {sys_binary} ::/EFI/BOOT/BOOTAA64.EFI")
 
         part2_img = "part2_exfat.img"
-        p2_sectors = 65502 - 4096 + 1
+        p2_sectors = p2_end - p2_start + 1
         cmd(f"dd if=/dev/zero of={part2_img} bs=512 count={p2_sectors} 2>/dev/null")
-        cmd(f"mkfs.exfat -L WINDOGEOS {part2_img}")
+        
+        cmd(f"mkfs.exfat -b 4K -L WINDOGEOS {part2_img}")
+
 
         if compiled_apps:
             mnt_dir = "/tmp/windoge_p2_mnt"
@@ -230,13 +236,14 @@ def main():
                 if os.path.exists(mnt_dir):
                     os.rmdir(mnt_dir)
 
-        cmd(f"dd if={part2_img} of={img_file} bs=512 seek=4096 conv=notrunc 2>/dev/null")
+        cmd(f"dd if={part2_img} of={img_file} bs=512 seek={p2_start} conv=notrunc 2>/dev/null")
 
         elapsed = time.perf_counter() - start_time
 
         print(f"\n[dogeing] Build success, doesn't mean it will work >:)")
         print(f"[dogeing] Output generated: {img_file}")
         print(f"[dogeing] Total build time: {elapsed:.2f} seconds ({elapsed / 60:.2f} mins)")
+
 
     finally:
         cleanup()
