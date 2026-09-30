@@ -1,3 +1,4 @@
+#include <boot/kernel.h>
 #include <stdint.h>
 #include <dogeio.h>
 #include <basicutil.h>
