@@ -7,7 +7,7 @@
 
 extern volatile struct limine_hhdm_request hhdm_request;
 #define USER_CODE_BASE  0x0000000000400000ULL
-#define USER_STACK_BASE 0x0000800000000000ULL
+#define USER_STACK_BASE 0x00007FFFF0000000ULL
 #define PAGE_SIZE       4096
 
 void cleanup_user_pages(void) {
@@ -66,7 +66,7 @@ void system_run_exec(char *filename, int program_size) {
     }
     map_user_page(USER_STACK_BASE, stack_phys);
 
-    uint64_t user_stack_top = USER_STACK_BASE + PAGE_SIZE;
+    uint64_t user_stack_top = (USER_STACK_BASE + PAGE_SIZE) - 8;
 
     dogeio_text_println("[Kernel] Dropping to Ring 3 execution...");
 
