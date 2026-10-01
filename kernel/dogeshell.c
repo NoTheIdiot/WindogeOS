@@ -55,6 +55,8 @@ char* help[] = {
     "edit   [file]           | edits a file",
     "pci                     | lists all pci devices",
     "tab                     | switch terminal tabs",
+    "hexdump                 | you know this... right?",
+    "bash                    | runs bash shell",
     "run    [file]           | run a program",
     "=======================================================",
 };
@@ -280,6 +282,7 @@ int system_dogeshell_ex(char* command) {
             handled = 0;
         }
     }
+
     else if ((arg = get_cmd_arg(command, "rename")) != NULL) {
         char first_arg[64] = {0};
         char second_arg[64] = {0};
@@ -452,6 +455,16 @@ int system_dogeshell_ex(char* command) {
     else if (str_strcmp(command, "tab") == 0) {
         sys_switch_terminal();
         handled = 0;
+    }
+
+    else if (str_startswith(command, "hexdump")) {
+        char* filename = command + 7;
+        if (util_hexdump(filename) == -1) {
+            dogeio_text_println("Error: file doesn't exist :(");
+            handled = -1;
+        } else {
+            handled = 0;
+        }
     }
 
     else if (str_strcmp(command, "bash") == 0) {
