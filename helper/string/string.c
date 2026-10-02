@@ -13,6 +13,29 @@ int str_strcmp(const char* str1, const char *str2) {
     return *(const unsigned char*)str1 - *(const unsigned char*)str2;
 }
 
+char* uint64_to_str(uint64_t value, char* buf) {
+    char* p = buf + 20; 
+    *p = '\0';
+
+    if (value == 0) {
+        *(--p) = '0';
+        return p;
+    }
+
+    while (value > UINT32_MAX) {
+        *(--p) = '0' + (char)(value % 10);
+        value /= 10;
+    }
+
+    uint32_t val32 = (uint32_t)value;
+    while (val32 > 0) {
+        *(--p) = '0' + (char)(val32 % 10);
+        val32 /= 10;
+    }
+
+    return p;
+}
+
 void clean_input_string(char* str) {
     if (!str) return;
     int len = 0;

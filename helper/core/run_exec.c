@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <basicutil.h>
 #include <dogeio.h>
+#include <string.h>
 #include <boot/limine.h>
 
 extern volatile struct limine_hhdm_request hhdm_request;
@@ -39,6 +40,7 @@ void system_run_exec(char *filename, int program_size) {
     }
 
     cleanup_user_pages();
+    duolog("[dogeing] cleaned user pages");
 
     uint64_t hhdm_offset = hhdm_request.response->offset;
 
@@ -48,8 +50,13 @@ void system_run_exec(char *filename, int program_size) {
         uint64_t offset = i * PAGE_SIZE;
 
         uint64_t code_phys = pmm_alloc_zeroed_page();
+        char code_phys_str[32];
+        uint64_to_str(code_phys, code_phys_str);
+        serial_print("[dogeing] mapped page ");
+        dogeio_text_print("[dogeing] mapped page ");
+        duolog(code_phys_str);
         if (!code_phys) {
-            dogeio_text_println("[Error] Out of physical memory loading binary.");
+            duolog("[Error] Out of physical memory loading binary.");
             return;
         }
 
@@ -62,7 +69,7 @@ void system_run_exec(char *filename, int program_size) {
 
         int read_bytes = fs_read_raw(filename, page_dst, (uint32_t)bytes_to_read);
         if (read_bytes < 0) {
-            dogeio_text_println("[Error] Failed to read binary from exFAT filesystem.");
+            duolog("[Error] Failed to read binary from exFAT filesystem.");
             return;
         }
 
@@ -70,15 +77,20 @@ void system_run_exec(char *filename, int program_size) {
     }
 
     uint64_t stack_phys = pmm_alloc_zeroed_page();
+    char stack_phys_str[32];
+    uint64_to_str(stack_phys, stack_phys_str);
+    dogeio_text_print("[dogeing] page mapped for stack ");
+    serial_print("[dogeing] page mapped for stack ");
+    duolog(stack_phys_str);
     if (!stack_phys) {
-        dogeio_text_println("[Error] Out of physical memory for user stack.");
+        duolog("[Error] Out of physical memory for user stack.");
         return;
     }
     map_user_page(USER_STACK_BASE, stack_phys);
 
     uint64_t user_stack_top = (USER_STACK_BASE + PAGE_SIZE) - 8;
 
-    dogeio_text_println("[Kernel] Dropping to Ring 3 execution...");
+    duolog("[dogeing] executing binary");
 
     __asm__ volatile("mov %%rsp, %0" : "=m"(kernel_program_launcher_rsp));
 
