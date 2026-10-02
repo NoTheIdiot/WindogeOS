@@ -26,7 +26,7 @@ extern char text_grid[TERMINAL_COLS * TERMINAL_ROWS];
 #define COLOR_MAGENTA        0xAA00AA
 #define COLOR_CYAN           0x00AAAA
 #define COLOR_WHITE          0xAAAAAA
-#define COLOR_DARK_GRAY     0x282828
+#define COLOR_DARK_GRAY      0x282828
 
 #define COLOR_BRIGHT_BLACK   0x555555
 #define COLOR_BRIGHT_RED     0xFF5555

@@ -1,0 +1,9 @@
+CompileFlags:
+  Add: [
+    "-target", "x86_64-unknown-none",
+    "-ffreestanding",
+    "-nostdinc",
+    "-nostdlib",
+    "-Iheaders"
+  ]
+  Compiler: clang

@@ -114,14 +114,17 @@ void system_fetch() {
     char ram_str[32]; 
     char ram_used_str[32];
     char storage_buf[32];
+    uint32_t old3 = dogeio_text_color;
     
     uint32_t total_clusters = 0;
     uint32_t free_clusters = 0;
     int metrics_status = exfat_get_space_metrics(&total_clusters, &free_clusters);
 
     for (int i = 0; i < 22; i++) {
+        dogeio_text_color_change(0xE1B16C);
         dogeio_text_print(doge_ascii[i]);
 
+        dogeio_text_color_change(old3);
         switch (i) {
             case 1:
                 dogeio_text_print(current_user);
