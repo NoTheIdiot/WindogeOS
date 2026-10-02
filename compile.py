@@ -39,6 +39,7 @@ def cleanup():
             pass
 
 def main():
+    run_cmd("clear")
     start_time = time.perf_counter()
 
     try:

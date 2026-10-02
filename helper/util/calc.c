@@ -20,11 +20,11 @@ int util_calc(char* string) {
             has_num = 1;
         } 
           
-        if (c == '+' || c == '-' || c == '*' || c == '/' || string[i+1] == '\0') {
+        if (c == '+' || c == '-' || c == '*' || c == '/' || c == '^' || string[i+1] == '\0') {
             if (has_num) {
                 
                 if (last_op == '+') {
-                    current_term = current_num;
+                    current_term += current_num;
                 } else if (last_op == '-') {
                     current_term = -current_num;
                 } else if (last_op == '*') {
@@ -35,9 +35,12 @@ int util_calc(char* string) {
                     } else {
                         current_term = 0; 
                     }
+                // the power of, idk if you use some other notation
+                } else if (last_op == '^') {
+                    current_term = (int)math_power((uint64_t)(current_term), current_num);
                 }
                 
-                if (c == '+' || c == '-' || string[i+1] == '\0') {
+                if (c == '+' || c == '-' || c == '*' || c == '*' || c == '/' || c == '^' || string[i+1] == '\0') {
                     total_result += current_term;
                     current_term = 0;
                 }

@@ -258,8 +258,17 @@ int system_dogeshell_ex(char* command) {
 			dogeio_text_println("Error: permission denied, because it's a system folder :(");
 			handled = -1;
         } else if (str_strcmp(fs_dirname(), "/users") == 0 && str_strcmp(current_user, target) != 0) {
-            dogeio_text_println("Error: permission denied, because why are you trying to see other accounts?");
-            handled = -1;
+            if (str_strcmp(target, "/") == 0 || str_strcmp(target, "..") == 0) {
+                if (!fs_chdir(target)) {
+                    handled = 0;
+                } else {
+                    dogeio_text_println("Error: much folder doesn't exist :(");
+                    handled = -2;
+                }
+            } else {
+                dogeio_text_println("Error: permission denied, because why are you trying to see other accounts?");
+                handled = -1;
+            }
         } else {
             if (!fs_chdir(target)) {
                 handled = 0;
