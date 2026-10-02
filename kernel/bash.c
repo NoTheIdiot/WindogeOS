@@ -78,25 +78,34 @@ int system_bash_ex(char* command) {
         handled = 0;
     }
 
-    else if (str_strcmp(command, "cd") == 0 || str_startswith(command, "cd ")) {
-        if (str_strlen(command) <= 3) {
-            dogeio_text_println("Much Error: No folder specified.");
-        } else {
-            char* target = command + 3;
-            if (!is_path_allowed(target)) {
-                dogeio_text_println("Much Error: Access denied to path.");
-            } else {
-                int result = fs_chdir(target);
-                if (result == -2) {
-                    dogeio_text_println("Much Error: Not a Folder.");
-                } else if (result == -1) {
-                    dogeio_text_println("Such Error: Folder not existing :(");
-                } else if (result != 1) {
-                    dogeio_text_println("Much Error: Could not change directory.");
+    else if (str_startswith(command, "cd")) {
+        char* target = command + 3;
+        if (str_startswith(target, "/system")) {
+            dogeio_text_println("Error: permission denied, because it's a system folder :(");
+            handled = -1;
+        } else if (str_strcmp(target, "system") == 0 && str_strcmp(fs_dirname(), "/") == 0) {
+			dogeio_text_println("Error: permission denied, because it's a system folder :(");
+			handled = -1;
+        } else if (str_strcmp(fs_dirname(), "/users") == 0 && str_strcmp(current_user, target) != 0) {
+            if (str_strcmp(target, "/") == 0 || str_strcmp(target, "..") == 0) {
+                if (!fs_chdir(target)) {
+                    handled = 0;
+                } else {
+                    dogeio_text_println("Error: much folder doesn't exist :(");
+                    handled = -2;
                 }
+            } else {
+                dogeio_text_println("Error: permission denied.");
+                handled = -1;
+            }
+        } else {
+            if (!fs_chdir(target)) {
+                handled = 0;
+            } else {
+                dogeio_text_println("Error: much folder doesn't exist :(");
+                handled = -2;
             }
         }
-        handled = 0;
     }
 
     else if (str_strcmp(command, "touch") == 0 || str_startswith(command, "touch ")) {
