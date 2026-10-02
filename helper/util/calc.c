@@ -32,6 +32,8 @@ int util_calc(char* string) {
                 has_num = 0;
             }
             last_op = c; 
+        } else if (c == ' ') {
+            continue; // ignore
         }
     }
 
