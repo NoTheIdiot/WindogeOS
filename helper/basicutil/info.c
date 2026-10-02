@@ -143,10 +143,14 @@ void system_fetch() {
                 dogeio_text_println(windoge_version);
                 break;
             case 5:
+                dogeio_text_print("Shell: ");
+                dogeio_text_println(dogeshell_version);
+                break;
+            case 6:
                 dogeio_text_print("CPU: ");
                 dogeio_text_println(cpuid());
                 break;
-            case 6:
+            case 7:
                 dogeio_text_print("RAM: ");
                 str_itoa((int)(get_used_ram() / 1024 / 1024), ram_used_str);
                 dogeio_text_print(ram_used_str);
@@ -156,7 +160,7 @@ void system_fetch() {
                 dogeio_text_print(ram_str);
                 dogeio_text_println(" MB");
                 break;
-            case 7:
+            case 8:
                 dogeio_text_print("Storage: ");
                 if (metrics_status == 0 && total_clusters > 0) {
                     uint32_t used_clusters = total_clusters - free_clusters;
@@ -170,7 +174,7 @@ void system_fetch() {
                     dogeio_text_println("Error reading exFAT");
                 }
                 break;
-            case 8:
+            case 9:
                 if (metrics_status == 0 && total_clusters > 0) {
                     uint32_t used_clusters = total_clusters - free_clusters;
                     uint32_t percentage = (used_clusters * 100U) / total_clusters;
@@ -193,6 +197,44 @@ void system_fetch() {
                     dogeio_text_println("");
                 }
                 break;
+            case 10:
+                dogeio_text_background_change(COLOR_RED);
+                dogeio_text_print("   ");
+                dogeio_text_background_change(COLOR_ORANGE);
+                dogeio_text_print("   ");
+                dogeio_text_background_change(COLOR_YELLOW);
+                dogeio_text_print("   ");
+                dogeio_text_background_change(COLOR_GREEN);
+                dogeio_text_print("   ");
+                dogeio_text_background_change(COLOR_BLUE);
+                dogeio_text_print("   ");
+                dogeio_text_background_change(COLOR_CYAN);
+                dogeio_text_print("   ");
+                dogeio_text_background_change(COLOR_MAGENTA);
+                dogeio_text_print("   ");
+                dogeio_text_background_change(COLOR_BLACK);
+                dogeio_text_println("");
+                break;
+            case 11:
+                dogeio_text_print(" ");
+                dogeio_text_background_change(COLOR_BRIGHT_RED);
+                dogeio_text_print("   ");
+                dogeio_text_background_change(COLOR_BRIGHT_ORANGE);
+                dogeio_text_print("   ");
+                dogeio_text_background_change(COLOR_BRIGHT_YELLOW);
+                dogeio_text_print("   ");
+                dogeio_text_background_change(COLOR_BRIGHT_GREEN);
+                dogeio_text_print("   ");
+                dogeio_text_background_change(COLOR_BRIGHT_BLUE);
+                dogeio_text_print("   ");
+                dogeio_text_background_change(COLOR_BRIGHT_CYAN);
+                dogeio_text_print("   ");
+                dogeio_text_background_change(COLOR_BRIGHT_MAGENTA);
+                dogeio_text_print("   ");
+                dogeio_text_background_change(COLOR_BLACK);
+                dogeio_text_println("");
+                break;
+                
             default:
                 dogeio_text_println("");
         }
