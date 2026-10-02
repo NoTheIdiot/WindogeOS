@@ -1,4 +1,21 @@
 #include <stdint.h>
+#include <math.h>
+
+void fpu_init(void) {
+    __asm__ volatile (
+        "clts\n\t"
+        "mov %cr0, %rax\n\t"
+        "and $~0x4, %rax\n\t"
+        "or $0x2, %rax\n\t"
+        "mov %rax, %cr0\n\t"
+        
+        "mov %cr4, %rax\n\t"
+        "or $(1 << 9 | 1 << 10), %rax\n\t"
+        "mov %rax, %cr4\n\t"
+        
+        "fninit\n\t"
+    );
+}
 
 uint64_t math_power(uint64_t base, int exponent) {
     if (exponent < 0) {

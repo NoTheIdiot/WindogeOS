@@ -5,6 +5,7 @@
 #include <dogeio.h>
 #include <bool.h>
 #include <stddef.h>
+#include <math.h>
 #include <basicutil.h>
 #include <boot/kernel.h>
 
@@ -82,6 +83,8 @@ void kernel_main(void) {
     init_pcie();
     duolog("[dogeing] initializing terminal workspaces");
     sys_init_terminals();
+    duolog("[dogeing] initializing floating point");
+    fpu_init();
     duolog("[dogeing] initializing nvme (if any avalialbe)");
     for (uint16_t bus = 0; bus < 256; bus++) {
         for (uint8_t device = 0; device < 32; device++) {

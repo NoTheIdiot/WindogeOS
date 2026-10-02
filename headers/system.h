@@ -174,5 +174,6 @@ void nvme_pci_callback(uint8_t b, uint8_t d, uint8_t f, uint16_t ven, uint16_t d
 
 // random utilities
 int util_hexdump(char* filename);
+int util_calc(char* string);
 
 #endif

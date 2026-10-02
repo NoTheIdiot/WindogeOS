@@ -56,6 +56,7 @@ char* help[] = {
     "pci                     | lists all pci devices",
     "tab                     | switch terminal tabs",
     "hexdump                 | you know this... right?",
+    "calc                    | calculator, just calculator.",
     "bash                    | runs bash shell",
     "run    [file]           | run a program",
     "=======================================================",
@@ -454,6 +455,21 @@ int system_dogeshell_ex(char* command) {
 
     else if (str_strcmp(command, "tab") == 0) {
         sys_switch_terminal();
+        handled = 0;
+    }
+    
+    else if (str_startswith(command, "calc")) {
+        char* args = command + 5; 
+    
+        if (args != NULL && *args != '\0') {
+            int result = util_calc(args);
+            char result_str[64]; 
+            str_itoa(result, result_str);
+            
+            dogeio_text_println(result_str);
+        } else {
+            dogeio_text_println("Usage: calc <expression> (e.g., calc 12+6-2)");
+        }
         handled = 0;
     }
 

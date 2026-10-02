@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+void fpu_init(void);
 uint64_t math_power(uint64_t base, int exponent);
 uint64_t math_square_power(uint64_t base);
 uint64_t math_root(uint64_t base, int root);
