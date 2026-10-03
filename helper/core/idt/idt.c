@@ -40,6 +40,47 @@ static idtr_t      idtr;
 extern uint64_t isr_stub_table[32];
 extern void idt_load(idtr_t *idtr_ptr);
 
+static void uint64_to_dec_forward(uint64_t value, char* buf) {
+    if (value == 0) {
+        buf[0] = '0';
+        buf[1] = '\0';
+        return;
+    }
+    char tmp[32];
+    int i = 0;
+    while (value > 0) {
+        tmp[i++] = '0' + (value % 10);
+        value /= 10;
+    }
+    int j = 0;
+    while (i > 0) {
+        buf[j++] = tmp[--i];
+    }
+    buf[j] = '\0';
+}
+
+static void uint64_to_hex_forward(uint64_t value, char* buf) {
+    char hex_digits[] = "0123456789ABCDEF";
+    buf[0] = '0';
+    buf[1] = 'x';
+    if (value == 0) {
+        buf[2] = '0';
+        buf[3] = '\0';
+        return;
+    }
+    char tmp[32];
+    int i = 0;
+    while (value > 0) {
+        tmp[i++] = hex_digits[value & 0xF];
+        value >>= 4;
+    }
+    int j = 2;
+    while (i > 0) {
+        buf[j++] = tmp[--i];
+    }
+    buf[j] = '\0';
+}
+
 void idt_set_gate(uint8_t vector, uint64_t handler, uint8_t ist, uint8_t flags) {
     idt[vector].offset_low      = (uint16_t)(handler & 0xFFFF);
     idt[vector].selector        = 0x08;               
@@ -51,31 +92,54 @@ void idt_set_gate(uint8_t vector, uint64_t handler, uint8_t ist, uint8_t flags) 
 }
 
 void isr_common_handler(interrupt_frame_t *frame) {
-    char hex_buf[32];
+    char str_buf[64];
+    char log_buf[128];
 
-    dogeio_text_print("\n--- PANIC: EXCEPTION ");
-    uint64_to_str(frame->vector, hex_buf);
-    dogeio_text_print(hex_buf);
-    dogeio_text_println(" ---");
+    dogeio_text_clear();
+    dogeio_text_color_change(COLOR_RED);
+    const char* error_panic[6] = {
+        "================================================================================================================================================================",
+        "=                                                                                                                                                              =",
+        "=                                                              Error: Kernel Panic                                                                             =",
+        "=                                                     May be an exception. Press enter to reboot.                                                              =",
+        "=                                                                                                                                                              =",
+        "================================================================================================================================================================"
+    };
 
-    dogeio_text_print("RIP: 0x");
-    uint64_to_str(frame->rip, hex_buf);
-    dogeio_text_println(hex_buf);
+    for (int i = 0; i < 6; i++) {
+        dogeio_text_print(error_panic[i]);
+    }
+    
+    uint64_to_dec_forward(frame->vector, str_buf);
+    str_strcpy(log_buf, "VECTOR: ");
+    str_strcat(log_buf, str_buf);
+    duolog(log_buf);
 
-    dogeio_text_print("ERR: 0x");
-    uint64_to_str(frame->error_code, hex_buf);
-    dogeio_text_println(hex_buf);
+    uint64_to_hex_forward(frame->rip, str_buf);
+    str_strcpy(log_buf, "RIP: ");
+    str_strcat(log_buf, str_buf);
+    duolog(log_buf);
+
+    uint64_to_hex_forward(frame->error_code, str_buf);
+    str_strcpy(log_buf, "ERR: ");
+    str_strcat(log_buf, str_buf);
+    duolog(log_buf);
 
     if (frame->vector == 14) {
         uint64_t cr2;
         __asm__ __volatile__("mov %%cr2, %0" : "=r"(cr2));
-        dogeio_text_print("CR2: 0x");
-        uint64_to_str(cr2, hex_buf);
-        dogeio_text_println(hex_buf);
+        uint64_to_hex_forward(cr2, str_buf);
+        str_strcpy(log_buf, "CR2: ");
+        str_strcat(log_buf, str_buf);
+        duolog(log_buf);
     }
     
     while (1) {
-        __asm__ __volatile__("cli; hlt");
+        uint16_t key = dogeio_get_key();
+
+        if (key == KEY_ENTER) {
+            core_reboot();
+        }
     }
 }
 

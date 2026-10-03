@@ -52,9 +52,10 @@ void system_run_exec(char *filename, int program_size) {
         uint64_t code_phys = pmm_alloc_zeroed_page();
         char code_phys_str[32];
         uint64_to_str(code_phys, code_phys_str);
+        char* actual_string_ptr = uint64_to_str(code_phys, code_phys_str);
         serial_print("[dogeing] mapped page ");
         dogeio_text_print("[dogeing] mapped page ");
-        duolog(code_phys_str);
+        duolog(actual_string_ptr);
         if (!code_phys) {
             duolog("[Error] Out of physical memory loading binary.");
             return;
@@ -78,10 +79,12 @@ void system_run_exec(char *filename, int program_size) {
 
     uint64_t stack_phys = pmm_alloc_zeroed_page();
     char stack_phys_str[32];
-    uint64_to_str(stack_phys, stack_phys_str);
+    char* actual_stack_ptr = uint64_to_str(stack_phys, stack_phys_str);
+    
     dogeio_text_print("[dogeing] page mapped for stack ");
     serial_print("[dogeing] page mapped for stack ");
-    duolog(stack_phys_str);
+    duolog(actual_stack_ptr);
+
     if (!stack_phys) {
         duolog("[Error] Out of physical memory for user stack.");
         return;

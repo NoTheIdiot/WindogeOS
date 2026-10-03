@@ -14,27 +14,30 @@ int str_strcmp(const char* str1, const char *str2) {
 }
 
 char* uint64_to_str(uint64_t value, char* buf) {
-    char* p = buf + 20; 
+    char* p = buf + 18; 
     *p = '\0';
+
+    char hex_digits[] = "0123456789ABCDEF";
 
     if (value == 0) {
         *(--p) = '0';
+        *(--p) = 'x';
         return p;
     }
 
-    while (value > UINT32_MAX) {
-        *(--p) = '0' + (char)(value % 10);
-        value /= 10;
+    while (value > 0) {
+        *(--p) = hex_digits[value & 0xF];
+        value >>= 4;
     }
 
-    uint32_t val32 = (uint32_t)value;
-    while (val32 > 0) {
-        *(--p) = '0' + (char)(val32 % 10);
-        val32 /= 10;
-    }
+    // Add the standard hexadecimal prefix
+    *(--p) = 'x';
+    *(--p) = '0';
 
     return p;
 }
+
+
 
 void clean_input_string(char* str) {
     if (!str) return;
