@@ -36,8 +36,23 @@ static per_cpu_data_t bsp_cpu_data;
 uint64_t kernel_program_launcher_rsp = 0;
 
 struct cpu_regs {
-    uint64_t rax, rbx, rcx, rdx, rsi, rdi, rbp, r8, r9, r10, r11, r12, r13, r14, r15, user_rsp;
-};
+    uint64_t rax;
+    uint64_t rbx;
+    uint64_t rcx;
+    uint64_t rdx;
+    uint64_t rsi;
+    uint64_t rdi;
+    uint64_t rbp;
+    uint64_t r8;
+    uint64_t r9;
+    uint64_t r10;
+    uint64_t r11;
+    uint64_t r12;
+    uint64_t r13;
+    uint64_t r14;
+    uint64_t r15;
+    uint64_t user_rsp;
+} __attribute__((packed));
 
 static inline bool is_user_address(const void *ptr) {
     return ptr != NULL && (uint64_t)ptr < 0x0000800000000000ULL;
@@ -87,7 +102,7 @@ uint64_t syscall_handler(struct cpu_regs *regs) {
         }
 
         case SPECIAL: {
-            dogeio_text_print("special");
+            dogeio_text_println("special");
             break;
         }
 

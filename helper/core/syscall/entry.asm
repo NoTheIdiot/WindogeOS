@@ -27,6 +27,8 @@ syscall_entry:
     push rbx
     push rax            
 
+    mov rcx, r10                        
+
     mov rdi, rsp                        
     
     call syscall_handler
@@ -48,6 +50,8 @@ syscall_entry:
     pop r13
     pop r14
     pop r15
+    
+    pop qword [gs:8]                    
     
     mov rsp, qword [gs:8]               
     swapgs                              

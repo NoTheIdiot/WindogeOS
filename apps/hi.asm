@@ -14,12 +14,17 @@ _start:
     push r11
     push rcx
 
-    mov rax, DOGEIO_PRINT
-    mov rdi, text
+    mov rax, SPECIAL
     syscall
 
-    pop rcx
-    pop r11
+    push r11
+    push rcx
+    
+    mov rax, SPECIAL
+    syscall
+
+    push r11
+    push rcx
 
     mov rax, SYS_EXIT
     syscall
