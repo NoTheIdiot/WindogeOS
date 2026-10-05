@@ -91,7 +91,7 @@ int   fs_mkdir(char* foldername);
 int   fs_exists(char* filename);
 int   fs_delete(char* filename);
 int   fs_delete_last_line(char* filename);
-int   fs_read(char* filename, char* output_buffer, uint32_t max_size);
+int   fs_read(char* filename, char* output_buffer, uint64_t max_size);
 int   fs_write(char* filename, char* input_buffer);
 int   fs_list_dir(int hidden);
 int   fs_rename(char* filename, char* newname);
@@ -100,7 +100,7 @@ int   fs_chdir(char* folder);
 char* fs_dirname(void);
 int   fs_mount(void);
 int   fs_list(const char* directory, int show_hidden);
-int   fs_read_raw(char* filename, uint8_t* output_buffer, uint32_t max_size);
+int   fs_read_raw(char* filename, uint8_t* output_buffer, uint64_t max_size);
 
 int exec_flat_binary(const char *filename, int argc, char **argv);
 

@@ -179,10 +179,6 @@ int fs_delete(char* filename) {
 }
 
 int fs_delete_last_line(char* filename) {
-    if (1) {
-
-    }
-
     char leaf[256];
     char saved_cwd[256];
     int walked = 0;
@@ -196,7 +192,7 @@ int fs_delete_last_line(char* filename) {
     return rc;
 }
 
-int fs_read(char* filename, char* output_buffer, uint32_t max_size) {
+int fs_read(char* filename, char* output_buffer, uint64_t max_size) {
     if (!output_buffer) return -1;
 
     char leaf[256];
@@ -212,7 +208,7 @@ int fs_read(char* filename, char* output_buffer, uint32_t max_size) {
     return rc;
 }
 
-int fs_read_raw(char* filename, uint8_t* output_buffer, uint32_t max_size) {
+int fs_read_raw(char* filename, uint8_t* output_buffer, uint64_t max_size) {
     if (!output_buffer) return -1;
 
     char leaf[256];

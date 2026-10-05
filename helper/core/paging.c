@@ -53,6 +53,21 @@ uint64_t pmm_alloc_zeroed_page(void) {
     return 0;
 }
 
+void cleanup_user_pages(void) {
+    if (hhdm_request.response == NULL) {
+        return;
+    }
+
+    uint64_t hhdm_offset = hhdm_request.response->offset;
+    uint64_t *pml4 = (uint64_t *)((read_cr3() & ~0xFFFULL) + hhdm_offset);
+
+    for (int i = 0; i < 256; i++) {
+        pml4[i] = 0;
+    }
+
+    write_cr3(read_cr3());
+}
+
 static inline uint64_t* get_or_alloc_table(uint64_t* table, size_t index, uint64_t hhdm_offset) {
     if (!(table[index] & PAGE_PRESENT)) {
         table[index] = pmm_alloc_zeroed_page() | PAGE_USER_FLAGS;

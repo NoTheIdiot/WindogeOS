@@ -458,7 +458,7 @@ int system_dogeshell_ex(char* command) {
 
     else if (str_startswith(command, "run")) {
         char* target = command + 4;
-        system_run_exec(target, 65536);
+        system_run_bin(target, 65536);
         handled = 0;
     }
 

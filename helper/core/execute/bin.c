@@ -13,22 +13,7 @@ extern uint64_t kernel_program_launcher_rsp;
 #define USER_STACK_BASE 0x00007FFFF0000000ULL
 #define PAGE_SIZE       4096
 
-void cleanup_user_pages(void) {
-    if (hhdm_request.response == NULL) {
-        return;
-    }
-
-    uint64_t hhdm_offset = hhdm_request.response->offset;
-    uint64_t *pml4 = (uint64_t *)((read_cr3() & ~0xFFFULL) + hhdm_offset);
-
-    for (int i = 0; i < 256; i++) {
-        pml4[i] = 0;
-    }
-
-    write_cr3(read_cr3());
-}
-
-void system_run_exec(char *filename, int program_size) {
+void system_run_bin(char *filename, int program_size) {
     if (!filename || program_size <= 0) {
         dogeio_text_println("[Error] Invalid binary filename or size.");
         return;
