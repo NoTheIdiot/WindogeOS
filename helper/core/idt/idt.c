@@ -96,18 +96,23 @@ void isr_common_handler(interrupt_frame_t *frame) {
     char log_buf[128];
 
     dogeio_text_clear();
-    dogeio_text_color_change(COLOR_RED);
-    const char* error_panic[6] = {
-        "================================================================================================================================================================",
-        "=                                                                                                                                                              =",
-        "=                                                              Error: Kernel Panic                                                                             =",
-        "=                                                     May be an exception. Press enter to reboot.                                                              =",
-        "=                                                                                                                                                              =",
-        "================================================================================================================================================================"
+    dogeio_text_color_change(COLOR_WHITE);
+    dogeio_text_background_change(COLOR_BLUE);
+    dogeio_text_clear();
+    const char* error_panic[9] = {
+        "     ##",
+        "##  #",
+        "   #",
+        "##  #",
+        "     ##",
+        "",
+        "Your Computer has ran into a problem and needs to such restart :(",
+        "Much crash, please press enter to reboot.",
+        ""
     };
 
-    for (int i = 0; i < 6; i++) {
-        dogeio_text_print(error_panic[i]);
+    for (int i = 0; i < 9; i++) {
+        dogeio_text_println(error_panic[i]);
     }
     
     uint64_to_dec_forward(frame->vector, str_buf);
