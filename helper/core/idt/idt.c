@@ -3,6 +3,7 @@
 #include <boot/kernel.h>
 #include <dogeio.h>
 #include <string.h>
+#include <bool.h>
 #include <basicutil.h>
 
 typedef struct __attribute__((packed)) {
@@ -39,6 +40,7 @@ static idtr_t      idtr;
 
 extern uint64_t isr_stub_table[32];
 extern void idt_load(idtr_t *idtr_ptr);
+bool is_kernel_dead = false;
 
 static void uint64_to_dec_forward(uint64_t value, char* buf) {
     if (value == 0) {
@@ -94,59 +96,101 @@ void idt_set_gate(uint8_t vector, uint64_t handler, uint8_t ist, uint8_t flags) 
 void isr_common_handler(interrupt_frame_t *frame) {
     char str_buf[64];
     char log_buf[128];
-
-    dogeio_text_clear();
-    dogeio_text_color_change(COLOR_WHITE);
-    dogeio_text_background_change(COLOR_BLUE);
-    dogeio_text_clear();
-    const char* error_panic[9] = {
-        "     ##",
-        "##  #",
-        "   #",
-        "##  #",
-        "     ##",
-        "",
-        "Your Computer has ran into a problem and needs to such restart :(",
-        "Much crash, please press enter to reboot.",
-        ""
-    };
-
-    for (int i = 0; i < 9; i++) {
-        dogeio_text_println(error_panic[i]);
-    }
-    
+    int selected_option = 0;
+    is_kernel_dead = true;
     uint64_to_dec_forward(frame->vector, str_buf);
     str_strcpy(log_buf, "VECTOR: ");
     str_strcat(log_buf, str_buf);
-    duolog(log_buf);
+    log(log_buf);
 
     uint64_to_hex_forward(frame->rip, str_buf);
     str_strcpy(log_buf, "RIP: ");
     str_strcat(log_buf, str_buf);
-    duolog(log_buf);
+    log(log_buf);
 
     uint64_to_hex_forward(frame->error_code, str_buf);
     str_strcpy(log_buf, "ERR: ");
     str_strcat(log_buf, str_buf);
-    duolog(log_buf);
-
+    log(log_buf);
+    
     if (frame->vector == 14) {
         uint64_t cr2;
         __asm__ __volatile__("mov %%cr2, %0" : "=r"(cr2));
         uint64_to_hex_forward(cr2, str_buf);
         str_strcpy(log_buf, "CR2: ");
         str_strcat(log_buf, str_buf);
-        duolog(log_buf);
+        log(log_buf);
     }
-    
-    while (1) {
-        uint16_t key = dogeio_get_key();
 
-        if (key == KEY_ENTER) {
-            core_reboot();
+    while (1) {
+        dogeio_text_clear();
+        dogeio_text_color_change(COLOR_WHITE);
+        dogeio_text_background_change(COLOR_BLUE);
+        dogeio_text_clear();
+
+        const char* error_panic[9] = {
+            "     ##",
+            "##  #",
+            "   #",
+            "##  #",
+            "     ##",
+            "",
+            "Your Computer has ran into a problem and needs to such restart :(",
+            "Much crash, please select an option and press Enter.",
+            ""
+        };
+
+        for (int i = 0; i < 9; i++) {
+            dogeio_text_println(error_panic[i]);
+        }
+        
+        dogeio_text_println(selected_option == 0 ? "-> [ Reboot Computer ]"   : "   [ Reboot Computer ]");
+        dogeio_text_println(selected_option == 1 ? "-> [ Shutdown Computer ]" : "   [ Shutdown Computer ]");
+        dogeio_text_println("");
+
+        uint64_to_dec_forward(frame->vector, str_buf);
+        str_strcpy(log_buf, "VECTOR: ");
+        str_strcat(log_buf, str_buf);
+        dogeio_text_println(log_buf);
+
+        uint64_to_hex_forward(frame->rip, str_buf);
+        str_strcpy(log_buf, "RIP: ");
+        str_strcat(log_buf, str_buf);
+        dogeio_text_println(log_buf);
+
+        uint64_to_hex_forward(frame->error_code, str_buf);
+        str_strcpy(log_buf, "ERR: ");
+        str_strcat(log_buf, str_buf);
+        dogeio_text_println(log_buf);
+
+        if (frame->vector == 14) {
+            uint64_t cr2;
+            __asm__ __volatile__("mov %%cr2, %0" : "=r"(cr2));
+            uint64_to_hex_forward(cr2, str_buf);
+            str_strcpy(log_buf, "CR2: ");
+            str_strcat(log_buf, str_buf);
+            dogeio_text_println(log_buf);
+        }
+
+        while (1) {
+            uint16_t key = dogeio_get_key();
+
+            if (key == KEY_UP || key == KEY_DOWN) {
+                selected_option = (selected_option == 0) ? 1 : 0;
+                break;
+            } 
+            else if (key == KEY_ENTER) {
+                if (selected_option == 0) {
+                    core_reboot();
+                } else if (selected_option == 1) {
+                    core_shutdown();
+                }
+            }
         }
     }
 }
+
+
 
 void init_idt(void) {
     for (int i = 0; i < 256; i++) {

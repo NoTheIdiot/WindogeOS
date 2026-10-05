@@ -16,4 +16,6 @@ void sys_init_terminals(void);
 void init_gdt_tss(void);
 void init_idt(void);
 
+extern bool is_kernel_dead;
+
 #endif

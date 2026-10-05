@@ -13,14 +13,21 @@ void menubar_draw(void) {
     uint32_t old_cursor_x = cursor_x;
     uint32_t old_cursor_y = cursor_y;
     dogeio_cursor_visible = false;
-
-    dogeio_text_color_change(0xFFFFFF);
-    dogeio_text_background_change(0x282828);
+    
+    const char* ver;
+    
+    if (is_kernel_dead == true) {
+        dogeio_text_color_change(COLOR_BRIGHT_RED);
+        dogeio_text_background_change(0x282828);
+        ver = "[KERNEL PANIC]";
+    } else {
+        dogeio_text_color_change(0xFFFFFF);
+        dogeio_text_background_change(0x282828);
+        ver = windoge_version ? windoge_version : "v0.1";
+    }
     
     cursor_x = 0;
     cursor_y = 0;
-
-    const char* ver = windoge_version ? windoge_version : "v0.1";
 
     char* current_date = date_get();
     char* current_time = time_get();
@@ -46,7 +53,7 @@ void menubar_draw(void) {
 
     int right_len = r_idx;
 
-    int left_section_target_len = TERMINAL_COLS - right_len - 1;
+    int left_section_target_len = TERMINAL_COLS - right_len - 2;
     if (left_section_target_len < 2) {
         left_section_target_len = 2;
     }
@@ -54,7 +61,7 @@ void menubar_draw(void) {
     char menu_buffer[TERMINAL_COLS + 1];
     dogeio_text_print(" ");
 
-    str_pad(menu_buffer, ver, left_section_target_len - 1, ' ');
+    str_pad(menu_buffer, ver, left_section_target_len, ' ');
 
     dogeio_text_print(menu_buffer);
     dogeio_text_print(right_section);

@@ -27,7 +27,7 @@ _start:
     push rcx
 
     mov rax, SYS_EXIT
-    mov rdi, 50
+    mov rdi, 16
     syscall
 
 section .data

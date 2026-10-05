@@ -76,7 +76,7 @@ uint64_t syscall_handler(struct cpu_regs *regs) {
             while(1);
         }
 
-        case FS_READ: {
+        case READ_FILE: {
             char* filepath = (char*)regs->rdi;
             char* buffer   = (char*)regs->rsi;
             uint32_t size  = (uint32_t)regs->rdx;
@@ -89,7 +89,7 @@ uint64_t syscall_handler(struct cpu_regs *regs) {
             break;
         }
 
-        case FS_WRITE: {
+        case WRITE_FILE: {
             char* filepath = (char*)regs->rdi;
             char* buffer   = (char*)regs->rsi;
 
@@ -100,14 +100,51 @@ uint64_t syscall_handler(struct cpu_regs *regs) {
             ret_val = (uint64_t)(int64_t)fs_write(filepath, buffer);
             break;
         }
+        
+        case CREATE_FILE: {
+            char* filename = (char*)regs->rdi;
+            
+            if (!is_user_address(filename)) {
+                return (uint64_t)-1;
+            }
+            
+            ret_val = (uint64_t)(int64_t)fs_create(filename);
+            break;
+        }
+        
+        case PRINT: {
+            char* text = (char*)regs->rdi;
+            
+            if (!is_user_address(text)) {
+                return (uint64_t)-1;
+            }
+            
+            dogeio_text_print(text);
+            ret_val = 1;
+            break;
+        }
+        
+        case PRINTLN: {
+            char* text = (char*)regs->rdi;
+            
+            if (!is_user_address(text)) {
+                return (uint64_t)-1;
+            }
+            
+            dogeio_text_println(text);
+            ret_val = 1;
+            break;
+        }
 
         case SPECIAL: {
-            dogeio_text_println("special");
+            duolog("special");
             break;
         }
 
         default:
-            ret_val = (uint64_t)-1; 
+            // for some reason a signature for unknown syscall
+            duolog("[error] unknown syscall attempted to execute.");
+            ret_val = (uint64_t)0xFFFF;
             break;
     }
 

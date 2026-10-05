@@ -155,22 +155,15 @@ void init_nvme_device(uint8_t bus, uint8_t slot, uint8_t func);
 void nvme_pci_callback(uint8_t b, uint8_t d, uint8_t f, uint16_t ven, uint16_t dev_id);
 
 // system calls
-#define FS_READ	01
-#define FS_WRITE 02
-#define FS_EXISTS 03
-#define FS_CREATE 04
-#define FS_MKDIR 05
-#define FS_DELETE 06 
-#define FS_RENAME 07
-#define FS_READ_RAW 08
-#define SPECIAL 50
+#define READ_FILE    01
+#define WRITE_FILE   02
+#define CREATE_FILE  03
 
-#define DOGEIO_PRINT 11
-#define DOGEIO_CLEAR 12
-#define DOGEIO_INPUT 13
-#define DOGEIO_COLOR 14
-#define DOGEIO_BACKGROUND 15
-#define DOGEIO_CLEAR_RAW 16
+#define PRINT        11
+#define PRINTLN      12
+
+#define SPECIAL      50
+#define SYS_EXIT     60
 
 // actual running
 int system_run_elf(char* filename, uint64_t size);

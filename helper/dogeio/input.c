@@ -32,17 +32,20 @@ uint16_t dogeio_get_key(void) {
 
     while (1) {
         while ((ports_inb(0x64) & 1) == 0) {
-            char* current_time = time_get();
-            if (str_strcmp(current_time, last_seen_time) != 0) {
-                menubar_draw();
-                for (int i = 0; i < 15; i++) {
-                    last_seen_time[i] = current_time[i];
-                    if (current_time[i] == '\0') {
-                        break;
+            if (is_kernel_dead == false) {
+                char* current_time = time_get();
+                if (str_strcmp(current_time, last_seen_time) != 0) {
+                    menubar_draw();
+                    for (int i = 0; i < 15; i++) {
+                        last_seen_time[i] = current_time[i];
+                        if (current_time[i] == '\0') {
+                            break;
+                        }
                     }
+                    last_seen_time[15] = '\0';
                 }
-                last_seen_time[15] = '\0';
             }
+            menubar_draw();
         }
 
         uint8_t code = ports_inb(0x60);
