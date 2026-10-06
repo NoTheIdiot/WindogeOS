@@ -28,6 +28,7 @@
 #define USER_IO_LIMIT 65536
 #define USER_STRING_LIMIT 4096
 #define USER_PATH_LIMIT 256
+#define USER_INPUT_LIMIT 256
 
 extern void syscall_entry(void);
 extern void syscall_exit_to_launcher(uint64_t exit_code) __attribute__((noreturn));
@@ -213,8 +214,86 @@ uint64_t syscall_handler(struct cpu_regs *regs) {
             if (!copy_user_string(regs->rdi, filename, sizeof(filename), NULL)) {
                 return (uint64_t)-1;
             }
-            
+
             ret_val = (uint64_t)(int64_t)fs_create(filename);
+            break;
+        }
+
+        case DELETE_FILE: {
+            char filename[USER_PATH_LIMIT];
+            if (!copy_user_string(regs->rdi, filename, sizeof(filename), NULL)) {
+                return (uint64_t)-1;
+            }
+
+            ret_val = (uint64_t)(int64_t)fs_delete(filename);
+            break;
+        }
+
+        case CREATE_DIR: {
+            char filename[USER_PATH_LIMIT];
+            if (!copy_user_string(regs->rdi, filename, sizeof(filename), NULL)) {
+                return (uint64_t)-1;
+            }
+
+            ret_val = (uint64_t)(int64_t)fs_mkdir(filename);
+            break;
+        }
+
+        case RENAME_FILE: {
+            char filename[USER_PATH_LIMIT];
+            char new_name[USER_PATH_LIMIT];
+
+            if (!copy_user_string(regs->rdi, filename, sizeof(filename), NULL)) {
+                return (uint64_t)-1;
+            }
+
+            if (!copy_user_string(regs->rsi, new_name, sizeof(new_name), NULL)) {
+                return (uint64_t)-1;
+            }
+
+            ret_val = (uint64_t)(int64_t)fs_rename(filename, new_name);
+            break;
+        }
+
+        case FILE_EXISTS: {
+            char filename[USER_PATH_LIMIT];
+            if (!copy_user_string(regs->rdi, filename, sizeof(filename), NULL)) {
+                return (uint64_t)-1;
+            }
+
+            ret_val = (uint64_t)(int64_t)fs_exists(filename);
+            break;
+        }
+
+        case CHANGE_DIR: {
+            char path[USER_PATH_LIMIT];
+            if (!copy_user_string(regs->rdi, path, sizeof(path), NULL)) {
+                return (uint64_t)-1;
+            }
+
+            ret_val = (uint64_t)(int64_t)fs_chdir(path);
+            break;
+        }
+
+        case DELETE_LAST_LINE: {
+            char filename[USER_PATH_LIMIT];
+            if (!copy_user_string(regs->rdi, filename, sizeof(filename), NULL)) {
+                return (uint64_t)-1;
+            }
+
+            ret_val = (uint64_t)(int64_t)fs_delete_last_line(filename);
+            break;
+        }
+
+        case COPY_FILE: {
+            char source[USER_PATH_LIMIT];
+            char destination[USER_PATH_LIMIT];
+            if (!copy_user_string(regs->rdi, source, sizeof(source), NULL) ||
+                !copy_user_string(regs->rsi, destination, sizeof(destination), NULL)) {
+                return (uint64_t)-1;
+            }
+
+            ret_val = (uint64_t)(int64_t)fs_copy(source, destination);
             break;
         }
         
@@ -242,10 +321,58 @@ uint64_t syscall_handler(struct cpu_regs *regs) {
             break;
         }
 
-        case SPECIAL: {
-            duolog("special");
+        case CLEAR: {
+            dogeio_text_clear();
+            ret_val = 1;
             break;
         }
+
+        case INPUT: {
+            char prompt[USER_STRING_LIMIT];
+            uint64_t capacity = regs->rdx;
+            if (!copy_user_string(regs->rdi, prompt, sizeof(prompt), NULL) ||
+                capacity == 0 || capacity > USER_INPUT_LIMIT ||
+                !user_range_accessible(regs->rsi, capacity, true)) {
+                return (uint64_t)-1;
+            }
+
+            dogeio_text_input(prompt, (char *)regs->rsi, (size_t)capacity);
+            size_t input_length;
+            if (!user_string_length(regs->rsi, capacity, &input_length)) {
+                return (uint64_t)-1;
+            }
+            ret_val = input_length;
+            break;
+        }
+
+        case GET_KEY:
+            ret_val = dogeio_get_key();
+            break;
+
+        case PRINT_AT: {
+            char text[USER_STRING_LIMIT];
+            uint32_t x = (uint32_t)regs->rsi;
+            uint32_t y = (uint32_t)regs->rdx;
+            uint32_t color = (uint32_t)regs->r10;
+            if (x >= TERMINAL_COLS || y >= TERMINAL_ROWS ||
+                !copy_user_string(regs->rdi, text, sizeof(text), NULL)) {
+                return (uint64_t)-1;
+            }
+
+            dogeio_text_print_at(text, x, y, color);
+            ret_val = 1;
+            break;
+        }
+
+        case TEXT_COLOR:
+            dogeio_text_color_change((uint32_t)regs->rdi);
+            ret_val = 1;
+            break;
+
+        case BACKGROUND_COLOR:
+            dogeio_text_background_change((uint32_t)regs->rdi);
+            ret_val = 1;
+            break;
 
         default:
             // for some reason a signature for unknown syscall

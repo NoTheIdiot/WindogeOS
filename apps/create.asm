@@ -2,27 +2,14 @@ bits 64
 
 %include "headers/user/dogeio.inc"
 
-%assign SYS_EXIT 60
-
 section .text
 global _start
 _start:
 
-    mov rax, special
+    mov rax, create_file
+    mov rdi, filename
     syscall
-
-    push r11
-    push rcx
-
-    mov rax, special
-    syscall
-
-    push r11
-    push rcx
     
-    mov rax, special
-    syscall
-
     push r11
     push rcx
 
@@ -33,10 +20,11 @@ _start:
     push r11
     push rcx
 
-    mov rax, SYS_EXIT
-    mov rdi, 0
+    mov rax, sys_exit
+    mov rdi, 1
     syscall
 
 section .data
 align 16
-text: db "WindogeOS", 0
+filename: db "file.txt", 0
+text: db "file created", 0

@@ -159,11 +159,23 @@ void nvme_pci_callback(uint8_t b, uint8_t d, uint8_t f, uint16_t ven, uint16_t d
 #define READ_FILE    01
 #define WRITE_FILE   02
 #define CREATE_FILE  03
+#define DELETE_FILE  04
+#define CREATE_DIR   05
+#define RENAME_FILE  06
+#define FILE_EXISTS  07
+#define CHANGE_DIR   8
+#define DELETE_LAST_LINE 9
+#define COPY_FILE    10
 
 #define PRINT        11
 #define PRINTLN      12
+#define CLEAR        13
+#define INPUT        14
+#define GET_KEY      15
+#define PRINT_AT     16
+#define TEXT_COLOR   17
+#define BACKGROUND_COLOR 18
 
-#define SPECIAL      50
 #define SYS_EXIT     60
 
 // actual running
