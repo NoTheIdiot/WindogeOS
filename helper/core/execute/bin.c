@@ -24,7 +24,7 @@ void system_run_bin_impl(char *filename, int program_size) {
     }
 
     cleanup_user_pages();
-    duolog("[dogeing] cleaned user pages");
+    log("[dogeing] cleaned user pages");
 
     uint64_t hhdm_offset = hhdm_request.response->offset;
 
@@ -39,10 +39,9 @@ void system_run_bin_impl(char *filename, int program_size) {
         uint64_to_str(code_phys, code_phys_str);
         char* actual_string_ptr = uint64_to_str(code_phys, code_phys_str);
         serial_print("[dogeing] mapped page ");
-        dogeio_text_print("[dogeing] mapped page ");
-        duolog(actual_string_ptr);
+        log(actual_string_ptr);
         if (!code_phys) {
-            duolog("[Error] Out of physical memory loading binary.");
+            log("[Error] Out of physical memory loading binary.");
             return;
         }
 
@@ -55,7 +54,7 @@ void system_run_bin_impl(char *filename, int program_size) {
 
         int read_bytes = fs_read_raw_at(filename, page_dst, offset, bytes_to_read);
         if (read_bytes < 0 || (size_t)read_bytes > bytes_to_read) {
-            duolog("[Error] Failed to read binary from exFAT filesystem.");
+            log("[Error] Failed to read binary from exFAT filesystem.");
             cleanup_user_pages();
             return;
         }
@@ -73,7 +72,7 @@ void system_run_bin_impl(char *filename, int program_size) {
     }
 
     if (loaded_bytes == 0) {
-        duolog("[Error] Binary file is empty or could not be read.");
+        log("[Error] Binary file is empty or could not be read.");
         cleanup_user_pages();
         return;
     }
@@ -82,12 +81,11 @@ void system_run_bin_impl(char *filename, int program_size) {
     char stack_phys_str[32];
     char* actual_stack_ptr = uint64_to_str(stack_phys, stack_phys_str);
     
-    dogeio_text_print("[dogeing] page mapped for stack ");
     serial_print("[dogeing] page mapped for stack ");
-    duolog(actual_stack_ptr);
+    log(actual_stack_ptr);
 
     if (!stack_phys) {
-        duolog("[Error] Out of physical memory for user stack.");
+        log("[Error] Out of physical memory for user stack.");
         cleanup_user_pages();
         return;
     }
@@ -95,7 +93,7 @@ void system_run_bin_impl(char *filename, int program_size) {
 
     uint64_t user_stack_top = (USER_STACK_BASE + PAGE_SIZE) - 8;
 
-    duolog("[dogeing] executing binary");
+    log("[dogeing] executing binary");
 
     to_userland_ring3(USER_CODE_BASE, user_stack_top);
 }

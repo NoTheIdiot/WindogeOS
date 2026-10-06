@@ -18,5 +18,4 @@
 %define text_color 17
 %define background_color 18
 
-%define special 50
 %define sys_exit 60

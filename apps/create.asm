@@ -1,6 +1,6 @@
 bits 64
 
-%include "headers/user/dogeio.inc"
+%include "apps/include/dogeio.inc"
 
 section .text
 global _start
