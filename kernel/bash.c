@@ -384,7 +384,7 @@ int system_bash_ex(char* command) {
         if (!is_path_allowed(binary)) {
             dogeio_text_println("Error: Access denied.");
         } else {
-            system_run_bin(binary, 65536);
+            system_run_bin(binary, MAX_FLAT_BINARY_SIZE);
         }
         handled = 0;
     }

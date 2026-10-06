@@ -803,6 +803,83 @@ int exfat_print_directory(int hidden) {
     return 0;
 }
 
+int exfat_list_files(char (*names)[256], size_t capacity) {
+    uint8_t cluster_buf[4096];
+    uint64_t base_lba = exfat_cluster_lba(g_current_cluster);
+    size_t count = 0;
+
+    if (names == NULL && capacity != 0) {
+        return -1;
+    }
+
+    for (uint32_t sector_index = 0; sector_index < 8; sector_index++) {
+        if (exfat_sector_read(base_lba + sector_index,
+                              cluster_buf + (sector_index * 512)) != 0) {
+            return -1;
+        }
+    }
+
+    for (size_t offset = 0; offset <= sizeof(cluster_buf) - 96;
+         offset += 32) {
+        if (cluster_buf[offset] == 0x00) {
+            break;
+        }
+        if (cluster_buf[offset] != EXFAT_TYPE_FILE) {
+            continue;
+        }
+
+        exfat_dentry_file_t *file =
+            (exfat_dentry_file_t *)&cluster_buf[offset];
+        if ((file->file_attributes & 0x10) != 0) {
+            offset += (size_t)file->secondary_count * 32;
+            continue;
+        }
+
+        char name[256] = {0};
+        size_t name_length = 0;
+        bool supported_name = true;
+        for (uint8_t secondary = 2; secondary <= file->secondary_count;
+             secondary++) {
+            size_t name_offset = offset + ((size_t)secondary * 32);
+            if (name_offset + 32 > sizeof(cluster_buf)) {
+                supported_name = false;
+                break;
+            }
+            exfat_dentry_name_t *name_entry =
+                (exfat_dentry_name_t *)&cluster_buf[name_offset];
+            if (name_entry->entry_type != EXFAT_TYPE_NAME) {
+                continue;
+            }
+            for (size_t character = 0;
+                 character < 15 && name_length < sizeof(name) - 1;
+                 character++) {
+                uint16_t codepoint = name_entry->unicode_name[character];
+                if (codepoint == 0) {
+                    break;
+                }
+                if (codepoint > 0x7F) {
+                    supported_name = false;
+                    break;
+                }
+                name[name_length++] = (char)codepoint;
+            }
+            if (!supported_name) {
+                break;
+            }
+        }
+
+        if (supported_name && name_length > 0) {
+            if (count < capacity) {
+                str_strcpy(names[count], name);
+            }
+            count++;
+        }
+        offset += (size_t)file->secondary_count * 32;
+    }
+
+    return count > (size_t)INT32_MAX ? -1 : (int)count;
+}
+
 int exfat_change_directory(const char *path) {
     if (!path || path[0] == '\0') return 0;
 

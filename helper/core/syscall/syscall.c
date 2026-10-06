@@ -322,7 +322,9 @@ uint64_t syscall_handler(struct cpu_regs *regs) {
         }
 
         case CLEAR: {
+            log("[syscall] CLEAR entered");
             dogeio_text_clear();
+            log("[syscall] CLEAR returned");
             ret_val = 1;
             break;
         }

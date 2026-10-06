@@ -263,22 +263,94 @@ int fs_list_dir(int hidden) {
     return exfat_print_directory(hidden);
 }
 
-int fs_copy(char* source, char* dest) {
-    static uint8_t raw_buffer[65536];
-    int64_t bytes_read = fs_read_raw(source, raw_buffer, sizeof(raw_buffer));
-    if (bytes_read < 0) {
+int fs_list_files(const char *directory, char (*names)[256], size_t capacity) {
+    if (directory == NULL || directory[0] == '\0' ||
+        (names == NULL && capacity != 0)) {
         return -1;
     }
 
+    char saved_cwd[256];
+    const char *current = exfat_get_working_dir();
+    if (current == NULL || str_strlen(current) >= sizeof(saved_cwd)) {
+        return -1;
+    }
+    str_strcpy(saved_cwd, current);
+
+    if (exfat_change_directory(directory) != 0) {
+        return -1;
+    }
+
+    int count = exfat_list_files(names, capacity);
+    if (exfat_change_directory(saved_cwd) != 0) {
+        return -1;
+    }
+    if (count < 0 || (size_t)count > capacity) {
+        return -1;
+    }
+    return count;
+}
+
+static int fs_append_bytes(char *filename, uint8_t *data, uint32_t size) {
+    char leaf[256];
+    char saved_cwd[256];
+    int walked = 0;
+
+    if (fs_enter_path(filename, leaf, sizeof(leaf), saved_cwd, &walked) != 0) {
+        return -1;
+    }
+    int rc = exfat_append_file(leaf, data, size);
+    fs_leave_path(saved_cwd, walked);
+    return rc;
+}
+
+int fs_copy(char* source, char* dest) {
+    uint8_t raw_buffer[4096];
+    uint64_t offset = 0;
+
     if (fs_exists(dest)) {
-        fs_delete(dest);
+        if (fs_delete(dest) != 1) {
+            return -1;
+        }
     }
 
     if (fs_create(dest) != 0) {
         return -1;
     }
 
-    if (fs_write_bytes(dest, (char*)raw_buffer, (uint32_t)bytes_read) != 0) {
+    while (true) {
+        int bytes_read = fs_read_raw_at(source, raw_buffer, offset,
+                                        sizeof(raw_buffer));
+        if (bytes_read < 0) {
+            fs_delete(dest);
+            return -1;
+        }
+        if (bytes_read == 0) {
+            break;
+        }
+        if (fs_append_bytes(dest, raw_buffer, (uint32_t)bytes_read) != 0) {
+            fs_delete(dest);
+            return -1;
+        }
+        offset += (uint64_t)bytes_read;
+    }
+
+    return 0;
+}
+
+int fs_move(char* source, char* dest) {
+    if (source == NULL || source[0] == '\0' ||
+        dest == NULL || dest[0] == '\0' ||
+        str_strcmp(source, dest) == 0 ||
+        !fs_exists(source) || fs_exists(dest)) {
+        return -1;
+    }
+
+    if (fs_copy(source, dest) != 0) {
+        return -1;
+    }
+
+    if (fs_delete(source) != 1) {
+        fs_delete(dest);
         return -1;
     }
 

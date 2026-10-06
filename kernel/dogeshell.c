@@ -59,6 +59,7 @@ char* help[] = {
     "calc                    | calculator, just calculator.",
     "bash                    | runs bash shell",
     "run    [file]           | run a program",
+    "name[.bin]              | run an app from /apps (no arguments yet)",
     "=======================================================",
 };
 
@@ -79,6 +80,64 @@ static const char* get_cmd_arg(const char* command, const char* cmd_name) {
         return arg;
     }
     return NULL;
+}
+
+static int run_app_command(const char *command) {
+    char app_name[128];
+    size_t name_length = 0;
+
+    while (command[name_length] != '\0' && command[name_length] != ' ' &&
+           command[name_length] != '\t') {
+        if (name_length >= sizeof(app_name) - 1 ||
+            command[name_length] == '/' || command[name_length] == '\\') {
+            return 1;
+        }
+        app_name[name_length] = command[name_length];
+        name_length++;
+    }
+    app_name[name_length] = '\0';
+    if (name_length == 0) {
+        return 1;
+    }
+
+    const char *arguments = command + name_length;
+    while (*arguments == ' ' || *arguments == '\t') {
+        arguments++;
+    }
+    if (*arguments != '\0') {
+        dogeio_text_println("Applications do not support command-line arguments yet.");
+        return -1;
+    }
+
+    bool has_bin_extension = false;
+    if (name_length >= 4) {
+        const char *extension = app_name + name_length - 4;
+        has_bin_extension =
+            extension[0] == '.' &&
+            (extension[1] == 'b' || extension[1] == 'B') &&
+            (extension[2] == 'i' || extension[2] == 'I') &&
+            (extension[3] == 'n' || extension[3] == 'N');
+    }
+    if (!has_bin_extension) {
+        if (name_length + 4 >= sizeof(app_name)) {
+            return 1;
+        }
+        app_name[name_length++] = '.';
+        app_name[name_length++] = 'b';
+        app_name[name_length++] = 'i';
+        app_name[name_length++] = 'n';
+        app_name[name_length] = '\0';
+    }
+
+    char path[sizeof("/apps/") + sizeof(app_name)];
+    str_strcpy(path, "/apps/");
+    str_strcat(path, app_name);
+    if (!fs_exists(path)) {
+        return 1;
+    }
+
+    system_run_bin(path, MAX_FLAT_BINARY_SIZE);
+    return 0;
 }
 
 int system_dogeshell_ex(char* command) {
@@ -458,7 +517,7 @@ int system_dogeshell_ex(char* command) {
 
     else if (str_startswith(command, "run")) {
         char* target = command + 4;
-        system_run_bin(target, 65536);
+        system_run_bin(target, MAX_FLAT_BINARY_SIZE);
         handled = 0;
     }
 
@@ -495,6 +554,13 @@ int system_dogeshell_ex(char* command) {
     else if (str_strcmp(command, "bash") == 0) {
         system_bash();
         handled = 0;
+    }
+
+    if (handled == 1) {
+        int app_result = run_app_command(command);
+        if (app_result != 1) {
+            handled = app_result;
+        }
     }
 
     if (handled == 0 || handled == -1) {

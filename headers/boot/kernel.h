@@ -7,6 +7,9 @@
 
 // useless visual only things
 // though it's not really useless.....
+#define MAX_TERMINALS 4
+extern int current_terminal_id;
+
 void menubar_draw(void);
 void sys_switch_terminal(void);
 void sys_init_terminals(void);

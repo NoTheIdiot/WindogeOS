@@ -2,9 +2,14 @@
 #include "../library/string.h"
 
 void _start(void) {
-    char command[64];
+    char command[64] = {0};
     while (1) {
-        input("sh> ", command, 64);
+        command[0] = '\0';
+        if (input("sh> ", command, sizeof(command)) == (uint64_t)-1) {
+            println("input failed");
+            continue;
+        }
+        command[sizeof(command) - 1] = '\0';
 
         if (str_startswith(command, "echo")) {
             println(command + 6);

@@ -119,45 +119,40 @@ void dogeio_text_putchar(char c, uint32_t x, uint32_t y) {
     dogeio_text_putchar_raw_glyph(c, x, y);
 }
 
-void dogeio_text_clear() {
+static void dogeio_text_clear_cells(void) {
+    log("[clear] resetting terminal grid");
     for (uint32_t i = 0; i < (TERMINAL_ROWS * TERMINAL_COLS); i++) {
         text_grid[i] = ' ';
         text_color_grid[i] = dogeio_text_color;
         bg_color_grid[i] = dogeio_background_color;
     }
-    
-    if (framebuffer_request.response != NULL && framebuffer_request.response->framebuffer_count >= 1) {
-        struct limine_framebuffer *framebuffer = framebuffer_request.response->framebuffers[0];
-        uint32_t* fb_ptr = (uint32_t*)framebuffer->address;
-        size_t total_pixels = (framebuffer->pitch / 4) * framebuffer->height;
-        
-        for (size_t i = 0; i < total_pixels; i++) {
-            fb_ptr[i] = dogeio_background_color;
-        }
+
+    log("[clear] redrawing framebuffer cells");
+    if (framebuffer_request.response == NULL ||
+        framebuffer_request.response->framebuffer_count < 1) {
+        log("[clear] framebuffer unavailable");
+        return;
     }
 
+    for (uint32_t y = 0; y < TERMINAL_ROWS; y++) {
+        for (uint32_t x = 0; x < TERMINAL_COLS; x++) {
+            dogeio_text_putchar_raw_glyph(' ', x, y);
+        }
+    }
+    log("[clear] framebuffer redraw complete");
+}
+
+void dogeio_text_clear() {
+    dogeio_text_clear_cells();
     cursor_x = 0;
     cursor_y = 1;
+    log("[clear] drawing menu bar");
     menubar_draw();
+    log("[clear] menu bar complete");
 }
 
 void dogeio_text_clear_raw() {
-    for (uint32_t i = 0; i < (TERMINAL_ROWS * TERMINAL_COLS); i++) {
-        text_grid[i] = ' ';
-        text_color_grid[i] = dogeio_text_color;
-        bg_color_grid[i] = dogeio_background_color;
-    }
-    
-    if (framebuffer_request.response != NULL && framebuffer_request.response->framebuffer_count >= 1) {
-        struct limine_framebuffer *framebuffer = framebuffer_request.response->framebuffers[0];
-        uint32_t* fb_ptr = (uint32_t*)framebuffer->address;
-        size_t total_pixels = (framebuffer->pitch / 4) * framebuffer->height;
-        
-        for (size_t i = 0; i < total_pixels; i++) {
-            fb_ptr[i] = dogeio_background_color;
-        }
-    }
-
+    dogeio_text_clear_cells();
     cursor_x = 0;
     cursor_y = 0;
 }
@@ -301,8 +296,14 @@ static size_t parse_ansi_escape(const char *str, size_t index) {
     index += 2;
     int param = 0;
 
-    while (str[index] >= '0' && str[index] <= '9') {
-        param = param * 10 + (str[index] - '0');
+    while (str[index] != '\0' && str[index] >= '0' && str[index] <= '9') {
+        int digit = str[index] - '0';
+        if (param <= 107) {
+            param = param * 10 + digit;
+            if (param > 107) {
+                param = 108;
+            }
+        }
         index++;
     }
 
@@ -323,11 +324,14 @@ static size_t parse_ansi_escape(const char *str, size_t index) {
         dogeio_text_clear();
     }
 
-    return index;
+    return str[index] == '\0' ? index - 1 : index;
 }
 
 void dogeio_text_print(const char *str) {
     if (framebuffer_request.response == NULL || framebuffer_request.response->framebuffer_count < 1) {
+        return;
+    }
+    if (str == NULL) {
         return;
     }
 

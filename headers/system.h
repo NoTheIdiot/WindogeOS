@@ -5,6 +5,8 @@
 #include <bool.h>
 #include <stddef.h>
 
+#define MAX_FLAT_BINARY_SIZE (16 * 1024 * 1024)
+
 int system_dogeshell_ex(char* command);
 void system_dogeshell();
 void system_bash();
@@ -61,6 +63,7 @@ int64_t     exfat_read_file_at(const char *name, uint8_t *out_buf, uint64_t offs
 int         exfat_delete_node(const char *name);
 int         exfat_truncate_last_line(const char *name);
 int         exfat_print_directory(int hidden);
+int         exfat_list_files(char (*names)[256], size_t capacity);
 int         exfat_change_directory(const char *path);
 const char* exfat_get_working_dir(void);
 int         exfat_mount(void);

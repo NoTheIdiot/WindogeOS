@@ -10,7 +10,6 @@ extern volatile struct limine_hhdm_request hhdm_request;
 #define USER_CODE_BASE  0x0000000000400000ULL
 #define USER_STACK_BASE 0x00007FFFF0000000ULL
 #define PAGE_SIZE       4096
-#define MAX_FLAT_BINARY_SIZE (16 * 1024 * 1024)
 
 void system_run_bin_impl(char *filename, int program_size) {
     if (!filename || program_size <= 0 || program_size > MAX_FLAT_BINARY_SIZE) {

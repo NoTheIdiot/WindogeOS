@@ -248,10 +248,11 @@ static inline uint8_t str_to_u8(char *str) {
 
     uint32_t value = 0;
     while (*str >= '0' && *str <= '9') {
-        value = value * 10u + (uint32_t)(*str - '0');
-        if (value > 255u) {
+        uint32_t digit = (uint32_t)(*str - '0');
+        if (value > (255u - digit) / 10u) {
             return 255;
         }
+        value = value * 10u + digit;
         str++;
     }
     return (uint8_t)value;
@@ -275,10 +276,11 @@ static inline void u16_to_str(uint16_t value, char *out) {
 static inline uint16_t str_to_u16(const char *str) {
     uint32_t value = 0;
     while (*str >= '0' && *str <= '9') {
-        value = value * 10u + (uint32_t)(*str - '0');
-        if (value > 65535u) {
+        uint32_t digit = (uint32_t)(*str - '0');
+        if (value > (65535u - digit) / 10u) {
             return 65535;
         }
+        value = value * 10u + digit;
         str++;
     }
     return (uint16_t)value;

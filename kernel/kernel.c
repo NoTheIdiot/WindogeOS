@@ -38,6 +38,63 @@ volatile uint64_t limine_requests_end_marker[] = LIMINE_REQUESTS_END_MARKER;
 
 char computer_name[64];
 
+static void install_root_apps(void) {
+    static char root_files[48][256];
+
+    if (!fs_exists("/apps") && fs_mkdir("/apps") != 0) {
+        log("[setup] unable to create /apps");
+        return;
+    }
+
+    int file_count = fs_list_files("/", root_files,
+                                   sizeof(root_files) / sizeof(root_files[0]));
+    if (file_count < 0) {
+        log("[setup] unable to list root files");
+        return;
+    }
+
+    int moved_count = 0;
+    for (int i = 0; i < file_count; i++) {
+        const char *name = root_files[i];
+        size_t name_length = str_strlen(name);
+        if (name_length < 4) {
+            continue;
+        }
+
+        const char *extension = name + name_length - 4;
+        if (extension[0] != '.' ||
+            (extension[1] != 'b' && extension[1] != 'B') ||
+            (extension[2] != 'i' && extension[2] != 'I') ||
+            (extension[3] != 'n' && extension[3] != 'N')) {
+            continue;
+        }
+
+        char source[sizeof("/") + sizeof(root_files[0])];
+        char destination[sizeof("/apps/") + sizeof(root_files[0])];
+        str_strcpy(source, "/");
+        str_strcat(source, name);
+        str_strcpy(destination, "/apps/");
+        str_strcat(destination, name);
+
+        if (fs_move(source, destination) == 0) {
+            moved_count++;
+            serial_print("[setup] moved app: ");
+            serial_print(name);
+            serial_print("\n");
+        } else {
+            serial_print("[setup] failed to move app: ");
+            serial_print(name);
+            serial_print("\n");
+        }
+    }
+
+    char count_string[16];
+    str_itoa(moved_count, count_string);
+    serial_print("[setup] apps moved to /apps: ");
+    serial_print(count_string);
+    serial_print("\n");
+}
+
 void kernel_main(void) {
     serial_init();
     log("[Wow] Serial Initialize Sucess, very wow.");
@@ -71,7 +128,14 @@ void kernel_main(void) {
     } else {
         log("Something went wrong, guess im formating");
         fs_format();
+        if (!fs_mount()) {
+            log("[setup] unable to mount filesystem after formatting");
+            halt();
+        }
     }
+
+    log("[setup] installing root applications");
+    install_root_apps();
 
     log("[dogeing] initializing gdt + tss");
     init_gdt_tss();
@@ -215,8 +279,8 @@ void kernel_main(void) {
     while (true) {
         char password[64];
 
-        dogeio_text_input("username> ", username, 64);
-        dogeio_text_input("password> ", password, 64);
+        dogeio_text_input("[username]> ", username, 64);
+        dogeio_text_input("[passwprd]> ", password, 64);
 
         clean_input_string(username);
         clean_input_string(password);

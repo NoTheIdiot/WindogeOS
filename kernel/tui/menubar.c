@@ -5,13 +5,12 @@
 #include <string.h>
 #include <system.h>
 
-#define TERMINAL_COLS 160
-
 void menubar_draw(void) {
     uint32_t old_text_color = dogeio_text_color;
     uint32_t old_bg_color = dogeio_background_color;
     uint32_t old_cursor_x = cursor_x;
     uint32_t old_cursor_y = cursor_y;
+    bool old_cursor_visible = dogeio_cursor_visible;
     dogeio_cursor_visible = false;
     
     const char* ver;
@@ -53,6 +52,20 @@ void menubar_draw(void) {
 
     int right_len = r_idx;
 
+    char left_section[64];
+    size_t left_len = 0;
+    while (ver[left_len] != '\0' && left_len < sizeof(left_section) - 7) {
+        left_section[left_len] = ver[left_len];
+        left_len++;
+    }
+    left_section[left_len++] = ' ';
+    left_section[left_len++] = '[';
+    left_section[left_len++] = (char)('1' + current_terminal_id);
+    left_section[left_len++] = '/';
+    left_section[left_len++] = (char)('0' + MAX_TERMINALS);
+    left_section[left_len++] = ']';
+    left_section[left_len] = '\0';
+
     int left_section_target_len = TERMINAL_COLS - right_len - 2;
     if (left_section_target_len < 2) {
         left_section_target_len = 2;
@@ -61,8 +74,7 @@ void menubar_draw(void) {
     char menu_buffer[TERMINAL_COLS + 1];
     dogeio_text_print(" ");
 
-    str_pad(menu_buffer, ver, left_section_target_len, ' ');
-
+    str_pad(menu_buffer, left_section, left_section_target_len, ' ');
     dogeio_text_print(menu_buffer);
     dogeio_text_print(right_section);
     dogeio_text_print(" ");
@@ -71,5 +83,8 @@ void menubar_draw(void) {
     dogeio_text_background_change(old_bg_color);
     cursor_x = old_cursor_x;
     cursor_y = old_cursor_y;
-    dogeio_cursor_visible = true;
+    dogeio_cursor_visible = false;
+    if (old_cursor_visible) {
+        dogeio_text_cursor_show();
+    }
 }

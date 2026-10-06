@@ -17,6 +17,8 @@ extern uint32_t dogeio_background_color;
 extern uint32_t dogeio_text_color;
 extern bool dogeio_cursor_visible;
 extern char text_grid[TERMINAL_COLS * TERMINAL_ROWS];
+extern uint32_t text_color_grid[TERMINAL_ROWS * TERMINAL_COLS];
+extern uint32_t bg_color_grid[TERMINAL_ROWS * TERMINAL_COLS];
 
 #define COLOR_BLACK          0x000000
 #define COLOR_RED            0xAA0000
@@ -98,9 +100,11 @@ int   fs_write(char* filename, char* input_buffer);
 int   fs_list_dir(int hidden);
 int   fs_rename(char* filename, char* newname);
 int   fs_copy(char* source, char* dest);
+int   fs_move(char* source, char* dest);
 int   fs_chdir(char* folder);
 char* fs_dirname(void);
 int   fs_mount(void);
+int   fs_list_files(const char *directory, char (*names)[256], size_t capacity);
 int   fs_list(const char* directory, int show_hidden);
 int   fs_read_raw(char* filename, uint8_t* output_buffer, uint64_t max_size);
 int   fs_read_raw_at(char* filename, uint8_t* output_buffer, uint64_t offset, uint64_t max_size);
