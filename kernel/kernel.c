@@ -73,19 +73,19 @@ void kernel_main(void) {
         fs_format();
     }
 
-    duolog("[dogeing] initializing gdt + tss");
+    log("[dogeing] initializing gdt + tss");
     init_gdt_tss();
-    duolog("[dogeing] initializing idt");
+    log("[dogeing] initializing idt");
     init_idt();
-    duolog("[dogeing] initializing syscalls");
+    log("[dogeing] initializing syscalls");
     init_syscalls();
-    duolog("[dogeing] initializing pcie");
+    log("[dogeing] initializing pcie");
     init_pcie();
-    duolog("[dogeing] initializing terminal workspaces");
+    log("[dogeing] initializing terminal workspaces");
     sys_init_terminals();
-    duolog("[dogeing] initializing floating point");
+    log("[dogeing] initializing floating point");
     fpu_init();
-    duolog("[dogeing] initializing nvme (if any avalialbe)");
+    log("[dogeing] initializing nvme (if any avalialbe)");
     for (uint16_t bus = 0; bus < 256; bus++) {
         for (uint8_t device = 0; device < 32; device++) {
             for (uint8_t function = 0; function < 8; function++) {
@@ -121,9 +121,15 @@ void kernel_main(void) {
         fs_set_auth_override(1);
 
         char proceed[1];
+        dogeio_text_color_change(0xE1B16C);
+        for (int i = 0; i < 22; i++) {
+            dogeio_text_println(doge_ascii[i]);
+        }
+        dogeio_text_color_change(0xFFCCCCCC);
+        dogeio_text_println("Welcome to WindogeOS setup! Such doge very OS.");
         dogeio_text_input("Press enter to start setup.", proceed, 1);
 
-        duolog("\n[dogeing] creating folders");
+        log("\n[dogeing] creating folders");
         if (!fs_exists("/system")) {
             fs_mkdir("/system");
         }
@@ -133,8 +139,11 @@ void kernel_main(void) {
         if (!fs_exists("/users")) {
             fs_mkdir("/users");
         }
+        if (!fs_exists("/apps")) {
+            fs_mkdir("/apps");
+        }
 
-        duolog("[dogeing] creating boot file");
+        log("[dogeing] creating boot file");
         fs_create(".windoge");
 
         char username_new[64];
@@ -143,7 +152,7 @@ void kernel_main(void) {
 
         while (true) {
             dogeio_text_println("\nCreate the admin password.");
-            dogeio_text_input("admin password> ", root_new, 64);
+            dogeio_text_input("[admin]> ", root_new, 64);
             clean_input_string(root_new);
             if (root_new[0] == '\0') {
                 dogeio_text_println("Password cannot be empty.");
@@ -156,7 +165,7 @@ void kernel_main(void) {
 
         while (true) {
             dogeio_text_println("username must be non-empty.");
-            dogeio_text_input("username> ", username_new, 64);
+            dogeio_text_input("[username]> ", username_new, 64);
             clean_input_string(username_new);
 
             if (username_new[0] == '\0') {
@@ -169,7 +178,7 @@ void kernel_main(void) {
                 continue;
             }
 
-            dogeio_text_input("password> ", password_new, 64);
+            dogeio_text_input("[password]> ", password_new, 64);
             clean_input_string(password_new);
             if (password_new[0] == '\0') {
                 dogeio_text_println("password cannot be empty.");
@@ -181,11 +190,11 @@ void kernel_main(void) {
         dogeio_text_println("Name your wow computer.");
         dogeio_text_input("> ", computer_name, 64);
 
-        duolog("[dogeing] creating accounts");
+        log("[dogeing] creating accounts");
         system_create_user(username_new, password_new, 1);
 
-        duolog("[wow] setup complete");
-        duolog("[dogeing] prompting reboot ");
+        log("[wow] setup complete");
+        log("[dogeing] prompting reboot ");
 
         dogeio_text_clear();
         char nothing[1];
@@ -198,6 +207,11 @@ void kernel_main(void) {
     dogeio_text_println("Welcome to WindogeOS v0.01");
 
     char username[64];
+    dogeio_text_color_change(0xE1B16C);
+        for (int i = 0; i < 22; i++) {
+            dogeio_text_println(doge_ascii[i]);
+        }
+        dogeio_text_color_change(0xFFCCCCCC);
     while (true) {
         char password[64];
 
