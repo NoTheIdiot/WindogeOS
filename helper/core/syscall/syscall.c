@@ -5,6 +5,7 @@
 #include <bool.h>
 #include <core.h>
 #include <basicutil.h>
+#include <boot/limine.h>
 
 #define MSR_IA32_EFER            0xC0000080
 #define MSR_IA32_STAR            0xC0000081
@@ -23,8 +24,14 @@
 #define USER_CODE_BASE  0x0000000000400000ULL
 #define USER_STACK_BASE 0x00007FFFF0000000ULL
 #define PAGE_SIZE       4096
+#define USER_ADDRESS_LIMIT 0x0000800000000000ULL
+#define USER_IO_LIMIT 65536
+#define USER_STRING_LIMIT 4096
+#define USER_PATH_LIMIT 256
 
 extern void syscall_entry(void);
+extern void syscall_exit_to_launcher(uint64_t exit_code) __attribute__((noreturn));
+extern volatile struct limine_hhdm_request hhdm_request;
 
 typedef struct {
     uint64_t kernel_rsp;
@@ -34,6 +41,7 @@ typedef struct {
 static uint8_t syscall_stack[16384] __attribute__((aligned(16)));
 static per_cpu_data_t bsp_cpu_data;
 uint64_t kernel_program_launcher_rsp = 0;
+uint64_t kernel_program_launcher_rflags = 0;
 
 struct cpu_regs {
     uint64_t rax;
@@ -54,8 +62,104 @@ struct cpu_regs {
     uint64_t user_rsp;
 } __attribute__((packed));
 
-static inline bool is_user_address(const void *ptr) {
-    return ptr != NULL && (uint64_t)ptr < 0x0000800000000000ULL;
+static bool user_page_accessible(uint64_t address, bool write_access) {
+    if (address >= USER_ADDRESS_LIMIT || hhdm_request.response == NULL) {
+        return false;
+    }
+
+    uint64_t hhdm_offset = hhdm_request.response->offset;
+    uint64_t *table = (uint64_t *)((read_cr3() & ~0xFFFULL) + hhdm_offset);
+    const size_t indices[] = {
+        (address >> 39) & 0x1FF,
+        (address >> 30) & 0x1FF,
+        (address >> 21) & 0x1FF,
+        (address >> 12) & 0x1FF
+    };
+
+    for (size_t level = 0; level < 4; level++) {
+        uint64_t entry = table[indices[level]];
+        if ((entry & 0x5) != 0x5 || (write_access && !(entry & 0x2))) {
+            return false;
+        }
+
+        if ((level == 1 || level == 2) && (entry & (1ULL << 7))) {
+            return true;
+        }
+
+        if (level < 3) {
+            table = (uint64_t *)((entry & ~0xFFFULL) + hhdm_offset);
+        }
+    }
+
+    return true;
+}
+
+static bool user_range_accessible(uint64_t address, uint64_t length, bool write_access) {
+    if (length == 0) {
+        return address < USER_ADDRESS_LIMIT;
+    }
+    if (address == 0 || address >= USER_ADDRESS_LIMIT ||
+        length - 1 > (USER_ADDRESS_LIMIT - 1) - address) {
+        return false;
+    }
+
+    uint64_t last_address = address + length - 1;
+    uint64_t page = address & ~((uint64_t)PAGE_SIZE - 1);
+    uint64_t last_page = last_address & ~((uint64_t)PAGE_SIZE - 1);
+
+    while (true) {
+        if (!user_page_accessible(page, write_access)) {
+            return false;
+        }
+        if (page == last_page) {
+            return true;
+        }
+        page += PAGE_SIZE;
+    }
+}
+
+static bool copy_user_string(uint64_t address, char *buffer, size_t capacity,
+                             size_t *string_length) {
+    if (buffer == NULL || capacity == 0 || address == 0) {
+        return false;
+    }
+
+    for (size_t i = 0; i < capacity; i++) {
+        if (address >= USER_ADDRESS_LIMIT || i >= USER_ADDRESS_LIMIT - address ||
+            !user_range_accessible(address + i, 1, false)) {
+            return false;
+        }
+
+        buffer[i] = ((const char *)address)[i];
+        if (buffer[i] == '\0') {
+            if (string_length != NULL) {
+                *string_length = i;
+            }
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static bool user_string_length(uint64_t address, size_t capacity, size_t *string_length) {
+    if (address == 0 || string_length == NULL) {
+        return false;
+    }
+
+    for (size_t i = 0; i < capacity; i++) {
+        if (address >= USER_ADDRESS_LIMIT || i >= USER_ADDRESS_LIMIT - address ||
+            !user_range_accessible(address + i, 1, false)) {
+            return false;
+        }
+
+        if (((const char *)address)[i] == '\0') {
+            *string_length = i;
+            return true;
+        }
+    }
+
+    return false;
 }
 
 uint64_t syscall_handler(struct cpu_regs *regs) {
@@ -64,47 +168,49 @@ uint64_t syscall_handler(struct cpu_regs *regs) {
 
     switch (sc_num) {
         case SYS_EXIT: {
-            uint64_t exit_code = regs->rdi;
-            __asm__ volatile (
-                "mov %0, %%rax\n\t"
-                "mov %1, %%rsp\n\t"
-                "ret"
-                :
-                : "r"(exit_code), "m"(kernel_program_launcher_rsp)
-                : "rax"
-            );
-            while(1);
+            if (kernel_program_launcher_rsp == 0) {
+                return (uint64_t)-1;
+            }
+            cleanup_user_pages();
+            syscall_exit_to_launcher(regs->rdi);
         }
 
         case READ_FILE: {
-            char* filepath = (char*)regs->rdi;
-            char* buffer   = (char*)regs->rsi;
-            uint32_t size  = (uint32_t)regs->rdx;
+            char filepath[USER_PATH_LIMIT];
+            uint64_t size = regs->rdx;
 
-            if (!is_user_address(filepath) || !is_user_address(buffer)) {
+            if (!copy_user_string(regs->rdi, filepath, sizeof(filepath), NULL) ||
+                size > USER_IO_LIMIT ||
+                (size != 0 && !user_range_accessible(regs->rsi, size, true))) {
                 return (uint64_t)-1;
             }
 
-            ret_val = (uint64_t)(int64_t)fs_read(filepath, buffer, size);
+            if (size == 0) {
+                return 0;
+            }
+
+            ret_val = (uint64_t)(int64_t)fs_read(filepath, (char *)regs->rsi, size);
             break;
         }
 
         case WRITE_FILE: {
-            char* filepath = (char*)regs->rdi;
-            char* buffer   = (char*)regs->rsi;
+            char filepath[USER_PATH_LIMIT];
+            size_t buffer_length;
 
-            if (!is_user_address(filepath) || !is_user_address(buffer)) {
+            if (!copy_user_string(regs->rdi, filepath, sizeof(filepath), NULL) ||
+                !user_string_length(regs->rsi, USER_IO_LIMIT + 1, &buffer_length) ||
+                buffer_length > USER_IO_LIMIT) {
                 return (uint64_t)-1;
             }
 
-            ret_val = (uint64_t)(int64_t)fs_write(filepath, buffer);
+            ret_val = (uint64_t)(int64_t)fs_write(filepath, (char *)regs->rsi);
             break;
         }
         
         case CREATE_FILE: {
-            char* filename = (char*)regs->rdi;
-            
-            if (!is_user_address(filename)) {
+            char filename[USER_PATH_LIMIT];
+
+            if (!copy_user_string(regs->rdi, filename, sizeof(filename), NULL)) {
                 return (uint64_t)-1;
             }
             
@@ -113,9 +219,9 @@ uint64_t syscall_handler(struct cpu_regs *regs) {
         }
         
         case PRINT: {
-            char* text = (char*)regs->rdi;
-            
-            if (!is_user_address(text)) {
+            char text[USER_STRING_LIMIT];
+
+            if (!copy_user_string(regs->rdi, text, sizeof(text), NULL)) {
                 return (uint64_t)-1;
             }
             
@@ -125,9 +231,9 @@ uint64_t syscall_handler(struct cpu_regs *regs) {
         }
         
         case PRINTLN: {
-            char* text = (char*)regs->rdi;
-            
-            if (!is_user_address(text)) {
+            char text[USER_STRING_LIMIT];
+
+            if (!copy_user_string(regs->rdi, text, sizeof(text), NULL)) {
                 return (uint64_t)-1;
             }
             

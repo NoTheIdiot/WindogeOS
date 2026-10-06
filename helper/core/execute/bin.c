@@ -7,14 +7,13 @@
 #include <boot/limine.h>
 
 extern volatile struct limine_hhdm_request hhdm_request;
-extern uint64_t kernel_program_launcher_rsp;
-
 #define USER_CODE_BASE  0x0000000000400000ULL
 #define USER_STACK_BASE 0x00007FFFF0000000ULL
 #define PAGE_SIZE       4096
+#define MAX_FLAT_BINARY_SIZE (16 * 1024 * 1024)
 
-void system_run_bin(char *filename, int program_size) {
-    if (!filename || program_size <= 0) {
+void system_run_bin_impl(char *filename, int program_size) {
+    if (!filename || program_size <= 0 || program_size > MAX_FLAT_BINARY_SIZE) {
         dogeio_text_println("[Error] Invalid binary filename or size.");
         return;
     }
@@ -30,6 +29,7 @@ void system_run_bin(char *filename, int program_size) {
     uint64_t hhdm_offset = hhdm_request.response->offset;
 
     size_t required_pages = ((size_t)program_size + PAGE_SIZE - 1) / PAGE_SIZE;
+    size_t loaded_bytes = 0;
 
     for (size_t i = 0; i < required_pages; i++) {
         uint64_t offset = i * PAGE_SIZE;
@@ -53,13 +53,29 @@ void system_run_bin(char *filename, int program_size) {
 
         uint8_t *page_dst = (uint8_t *)(code_phys + hhdm_offset);
 
-        int read_bytes = fs_read_raw(filename, page_dst, (uint32_t)bytes_to_read);
-        if (read_bytes < 0) {
+        int read_bytes = fs_read_raw_at(filename, page_dst, offset, bytes_to_read);
+        if (read_bytes < 0 || (size_t)read_bytes > bytes_to_read) {
             duolog("[Error] Failed to read binary from exFAT filesystem.");
+            cleanup_user_pages();
             return;
         }
 
+        if (read_bytes == 0) {
+            break;
+        }
+
         map_user_page(USER_CODE_BASE + offset, code_phys);
+        loaded_bytes += (size_t)read_bytes;
+
+        if ((size_t)read_bytes < bytes_to_read) {
+            break;
+        }
+    }
+
+    if (loaded_bytes == 0) {
+        duolog("[Error] Binary file is empty or could not be read.");
+        cleanup_user_pages();
+        return;
     }
 
     uint64_t stack_phys = pmm_alloc_zeroed_page();
@@ -72,6 +88,7 @@ void system_run_bin(char *filename, int program_size) {
 
     if (!stack_phys) {
         duolog("[Error] Out of physical memory for user stack.");
+        cleanup_user_pages();
         return;
     }
     map_user_page(USER_STACK_BASE, stack_phys);
@@ -79,8 +96,6 @@ void system_run_bin(char *filename, int program_size) {
     uint64_t user_stack_top = (USER_STACK_BASE + PAGE_SIZE) - 8;
 
     duolog("[dogeing] executing binary");
-
-    __asm__ volatile("mov %%rsp, %0" : "=m"(kernel_program_launcher_rsp));
 
     to_userland_ring3(USER_CODE_BASE, user_stack_top);
 }

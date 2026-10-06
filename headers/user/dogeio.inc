@@ -1,18 +1,9 @@
-%define FS_READ	01
-%define FS_WRITE 02
-%define FS_EXISTS 03
-%define FS_CREATE 04
-%define FS_MKDIR 05
-%define FS_DELETE 06 
-%define FS_RENAME 07
-%define FS_READ_RAW 08
-%define SPECIAL 50
+%define read_file 01
+%define write_file 02
+%define create_file 03
 
-%define DOGEIO_PRINT 11
-%define DOGEIO_CLEAR 12
-%define DOGEIO_INPUT 13
-%define DOGEIO_COLOR 14
-%define DOGEIO_BACKGROUND 15
-%define DOGEIO_CLEAR_RAW 16
+%define print 11
+%define println 12
 
-%define SYS_EXIT 0
+%define special 50
+%define sys_exit 60

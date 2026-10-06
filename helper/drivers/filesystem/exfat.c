@@ -644,25 +644,32 @@ int exfat_append_file(const char *name, const uint8_t *data, uint64_t count) {
 }
 
 // UPDATED: Return type upgraded to int64_t to prevent signed 32-bit overflow on files >2 GiB
-int64_t exfat_read_file(const char *name, uint8_t *out_buf, uint64_t max_bytes) {
+int64_t exfat_read_file_at(const char *name, uint8_t *out_buf, uint64_t offset, uint64_t max_bytes) {
+    if (!out_buf && max_bytes != 0) return -1;
+
     exfat_target_t target;
     if (exfat_resolve_entry(name, &target) != 0) return -1;
 
+    if (offset >= target.size || max_bytes == 0) return 0;
+
     uint8_t sector[512];
-    uint64_t base_lba = exfat_cluster_lba(target.cluster);
-    uint64_t bytes_to_read = (target.size < max_bytes) ? target.size : max_bytes;
+    uint64_t base_lba = exfat_cluster_lba(target.cluster) + (offset / sizeof(sector));
+    uint64_t bytes_to_read = target.size - offset;
+    if (bytes_to_read > max_bytes) bytes_to_read = max_bytes;
 
     uint8_t *dst = out_buf;
     uint64_t left = bytes_to_read;
-    uint64_t sector_idx = 0;
+    uint32_t sector_offset = (uint32_t)(offset % sizeof(sector));
 
     while (left > 0) {
-        if (exfat_sector_read(base_lba + sector_idx, sector) != 0) return -1;
-        uint32_t chunk = (left > 512) ? 512 : (uint32_t)left;
-        memcpy(dst, sector, chunk);
+        if (exfat_sector_read(base_lba, sector) != 0) return -1;
+        uint32_t chunk = (uint32_t)(sizeof(sector) - sector_offset);
+        if (chunk > left) chunk = (uint32_t)left;
+        memcpy(dst, sector + sector_offset, chunk);
         dst += chunk;
         left -= chunk;
-        sector_idx++;
+        base_lba++;
+        sector_offset = 0;
     }
 
     char numbuf[32];
@@ -673,6 +680,10 @@ int64_t exfat_read_file(const char *name, uint8_t *out_buf, uint64_t max_bytes) 
     log(log_buf);
 
     return (int64_t)bytes_to_read;
+}
+
+int64_t exfat_read_file(const char *name, uint8_t *out_buf, uint64_t max_bytes) {
+    return exfat_read_file_at(name, out_buf, 0, max_bytes);
 }
 
 int exfat_delete_node(const char *name) {

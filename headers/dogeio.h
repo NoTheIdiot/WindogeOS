@@ -103,6 +103,7 @@ char* fs_dirname(void);
 int   fs_mount(void);
 int   fs_list(const char* directory, int show_hidden);
 int   fs_read_raw(char* filename, uint8_t* output_buffer, uint64_t max_size);
+int   fs_read_raw_at(char* filename, uint8_t* output_buffer, uint64_t offset, uint64_t max_size);
 
 int exec_flat_binary(const char *filename, int argc, char **argv);
 

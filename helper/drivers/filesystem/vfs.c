@@ -224,6 +224,22 @@ int fs_read_raw(char* filename, uint8_t* output_buffer, uint64_t max_size) {
     return rc;
 }
 
+int fs_read_raw_at(char* filename, uint8_t* output_buffer, uint64_t offset, uint64_t max_size) {
+    if (!output_buffer) return -1;
+
+    char leaf[256];
+    char saved_cwd[256];
+    int walked = 0;
+
+    if (fs_enter_path(filename, leaf, sizeof(leaf), saved_cwd, &walked) != 0) {
+        return -1;
+    }
+
+    int rc = (int)exfat_read_file_at(leaf, output_buffer, offset, max_size);
+    fs_leave_path(saved_cwd, walked);
+    return rc;
+}
+
 int fs_write_bytes(char* filename, char* input_buffer, uint32_t size) {
     char leaf[256];
     char saved_cwd[256];

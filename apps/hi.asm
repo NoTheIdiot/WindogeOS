@@ -8,26 +8,33 @@ section .text
 global _start
 _start:
 
-    mov rax, SPECIAL
+    mov rax, special
     syscall
 
     push r11
     push rcx
 
-    mov rax, SPECIAL
+    mov rax, special
     syscall
 
     push r11
     push rcx
     
-    mov rax, SPECIAL
+    mov rax, special
+    syscall
+
+    push r11
+    push rcx
+
+    mov rax, println
+    mov rdi, text
     syscall
 
     push r11
     push rcx
 
     mov rax, SYS_EXIT
-    mov rdi, 16
+    mov rdi, 0
     syscall
 
 section .data
