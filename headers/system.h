@@ -10,6 +10,9 @@
 int system_dogeshell_ex(char* command);
 void system_dogeshell();
 void system_bash();
+void system_settings(void);
+void system_load_settings(void);
+void system_start_default_shell(void);
 
 void system_fetch();
 extern char* windoge_version;
@@ -19,9 +22,9 @@ extern char* dogeshell_version;
 extern char computer_name[64];
 
 void system_editor(char* filename);
-void system_settings();
 
 uint64_t get_ram_end_address(void);
+uint64_t get_ram(void);
 int system_create_user(char* name, char* password, int permission_id);
 int system_verify_user(const char* name, char* password);
 int system_can_access_path(const char* username, const char* target_path);

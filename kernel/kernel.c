@@ -293,6 +293,8 @@ void kernel_main(void) {
         dogeio_text_println("Wrong password or user doesn't exist :(");
     }
 
+    system_load_settings();
+
     char userpath[128];
     str_strcpy(userpath, "/users/");
     str_strcat(userpath, username);
@@ -304,7 +306,7 @@ void kernel_main(void) {
         "================================================================================================================================================================",
         "=                                                                                                                                                              =",
         "=                                                              Welcome to WindogeOS v0.1!                                                                      =",
-        "=                                                  type 'help' for more help in the dogeshell                                                                  =",
+        "=                                                       type 'settings' to configure system preferences                                                        =",
         "=                                                                                                                                                              =",
         "================================================================================================================================================================"
     };
@@ -313,8 +315,8 @@ void kernel_main(void) {
         dogeio_text_print(starting[i]);
     }
 
-    log("Starting Dogeshell");
-    system_dogeshell();
+    log("Starting the default shell");
+    system_start_default_shell();
 
     core_shutdown();
 }

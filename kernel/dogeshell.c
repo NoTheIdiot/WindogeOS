@@ -10,7 +10,6 @@
 #include <image.h>
 #include <bool.h>
 
-uint32_t saved_color = 0xFFCCCCCC;
 char user[64];
 static char buffer[8192];
 
@@ -51,7 +50,7 @@ char* help[] = {
     "",
     "System Utilities",
     "=======================================================",
-    "user-setup              | user setup and login",
+    "settings                | change system preferences",
     "edit   [file]           | edits a file",
     "pci                     | lists all pci devices",
     "tab                     | switch terminal tabs",
@@ -62,6 +61,245 @@ char* help[] = {
     "name[.bin]              | run an app from /apps (no arguments yet)",
     "=======================================================",
 };
+
+typedef struct {
+    const char *label;
+    const char *value;
+    uint32_t color;
+} settings_color_t;
+
+static const settings_color_t settings_colors[] = {
+    {"Gray", "gray", 0xFFCCCCCC},
+    {"White", "white", 0xFFFFFFFF},
+    {"Red", "red", 0xFFFF5555},
+    {"Green", "green", 0xFF55FF55},
+    {"Yellow", "yellow", 0xFFFFED29},
+    {"Blue", "blue", 0xFF5555FF},
+    {"Magenta", "magenta", 0xFFFF55FF},
+    {"Cyan", "cyan", 0xFF55FFFF},
+};
+
+static char settings_path[] = "/.windoge";
+static size_t selected_color;
+static int default_shell_is_bash;
+
+uint32_t saved_color = 0xFFCCCCCC;
+
+static void settings_draw_menu(const char *title, const char *const *items,
+                               size_t item_count, size_t selected) {
+    dogeio_text_clear();
+    dogeio_text_println(title);
+    dogeio_text_println("");
+    for (size_t i = 0; i < item_count; i++) {
+        dogeio_text_print(i == selected ? "  > " : "    ");
+        dogeio_text_println(items[i]);
+    }
+    dogeio_text_println("");
+    dogeio_text_println("Use Up/Down and Enter. Backspace returns.");
+}
+
+static uint16_t settings_wait_key(void) {
+    uint16_t key;
+    do {
+        key = dogeio_get_key();
+    } while (key == KEY_UNKNOWN);
+    return key;
+}
+
+static void settings_load_value(const char *value) {
+    for (size_t i = 0; i < sizeof(settings_colors) / sizeof(settings_colors[0]); i++) {
+        if (str_strcmp(value, settings_colors[i].value) == 0) {
+            selected_color = i;
+            saved_color = settings_colors[i].color;
+            return;
+        }
+    }
+}
+
+void system_load_settings(void) {
+    char contents[128];
+    int bytes_read;
+
+    selected_color = 0;
+    saved_color = settings_colors[0].color;
+    default_shell_is_bash = 0;
+
+    if (!fs_exists(settings_path)) {
+        return;
+    }
+
+    bytes_read = fs_read(settings_path, contents, sizeof(contents) - 1);
+    if (bytes_read < 0) {
+        dogeio_text_println("Settings error: unable to read /.windoge.");
+        dogeio_text_color_change(saved_color);
+        return;
+    }
+    contents[bytes_read] = '\0';
+
+    char *line = contents;
+    while (*line != '\0') {
+        char *line_end = line;
+        while (*line_end != '\0' && *line_end != '\n' && *line_end != '\r') {
+            line_end++;
+        }
+        char line_buffer[32];
+        size_t line_length = (size_t)(line_end - line);
+        if (line_length < sizeof(line_buffer)) {
+            str_strncpy(line_buffer, line, line_length + 1);
+            line_buffer[line_length] = '\0';
+            if (str_startswith(line_buffer, "text_color=")) {
+                settings_load_value(line_buffer + 11);
+            } else if (str_strcmp(line_buffer, "shell=bash") == 0) {
+                default_shell_is_bash = 1;
+            } else if (str_strcmp(line_buffer, "shell=dogeshell") == 0) {
+                default_shell_is_bash = 0;
+            }
+        }
+        line = line_end;
+        while (*line == '\n' || *line == '\r') {
+            line++;
+        }
+    }
+    dogeio_text_color_change(saved_color);
+}
+
+static int settings_save(void) {
+    char contents[64] = "text_color=";
+    str_strcat(contents, settings_colors[selected_color].value);
+    str_strcat(contents, "\nshell=");
+    str_strcat(contents, default_shell_is_bash ? "bash\n" : "dogeshell\n");
+
+    if (!fs_exists(settings_path) &&
+        fs_create(settings_path) != 0) {
+        return -1;
+    }
+    return fs_write(settings_path, contents);
+}
+
+static void settings_show_system_information(void) {
+    char ram_buffer[32];
+    dogeio_text_clear();
+    dogeio_text_println("[ System Information ]");
+    dogeio_text_print("[Version]> ");
+    dogeio_text_println(windoge_version);
+    dogeio_text_print("[CPU]> ");
+    dogeio_text_println(cpuid());
+    dogeio_text_print("[RAM]> ");
+    dogeio_text_print(uint64_to_str(get_ram() / 1024 / 1024, ram_buffer));
+    dogeio_text_println(" MB");
+    dogeio_text_println("");
+    dogeio_text_println("Press any key to return.");
+    settings_wait_key();
+}
+
+static void settings_draw_color_menu(size_t selected) {
+    size_t color_count = sizeof(settings_colors) / sizeof(settings_colors[0]);
+    dogeio_text_clear();
+    dogeio_text_println("[ Default Text Color ]");
+    dogeio_text_println("");
+    for (size_t i = 0; i < color_count; i++) {
+        dogeio_text_print(i == selected ? "  > " : "    ");
+        dogeio_text_println(settings_colors[i].label);
+    }
+    dogeio_text_println("");
+    dogeio_text_println("Use Up/Down and Enter. Backspace returns.");
+}
+
+static void settings_select_color(void) {
+    size_t selected = selected_color;
+    size_t color_count = sizeof(settings_colors) / sizeof(settings_colors[0]);
+
+    while (true) {
+        settings_draw_color_menu(selected);
+        uint16_t key = settings_wait_key();
+        if (key == KEY_UP) {
+            selected = selected == 0 ? color_count - 1 : selected - 1;
+        } else if (key == KEY_DOWN) {
+            selected = (selected + 1) % color_count;
+        } else if (key == KEY_BACKSPACE || key == (uint16_t)'q') {
+            return;
+        } else if (key == KEY_ENTER) {
+            selected_color = selected;
+            saved_color = settings_colors[selected_color].color;
+            dogeio_text_color_change(saved_color);
+            if (settings_save() != 0) {
+                dogeio_text_println("Unable to save settings to /.windoge.");
+            } else {
+                dogeio_text_println("Default text color saved.");
+            }
+            settings_wait_key();
+            return;
+        }
+    }
+}
+
+static void settings_select_shell(void) {
+    static const char *shell_labels[] = {"Dogeshell", "Bash"};
+    size_t selected = default_shell_is_bash ? 1 : 0;
+
+    while (true) {
+        settings_draw_menu("[ Default Shell ]", shell_labels,
+                           sizeof(shell_labels) / sizeof(shell_labels[0]), selected);
+        uint16_t key = settings_wait_key();
+        if (key == KEY_UP || key == KEY_DOWN) {
+            selected = selected == 0 ? 1 : 0;
+        } else if (key == KEY_BACKSPACE || key == (uint16_t)'q') {
+            return;
+        } else if (key == KEY_ENTER) {
+            default_shell_is_bash = selected == 1;
+            if (settings_save() != 0) {
+                dogeio_text_println("Unable to save settings to /.windoge.");
+            } else {
+                dogeio_text_println("Default shell saved. It will be used after reboot.");
+            }
+            settings_wait_key();
+            return;
+        }
+    }
+}
+
+void system_settings(void) {
+    static const char *menu_items[] = {
+        "System Information",
+        "Default Text Color",
+        "Default Shell",
+        "Exit",
+    };
+    const size_t menu_count = sizeof(menu_items) / sizeof(menu_items[0]);
+    size_t selected = 0;
+
+    while (true) {
+        settings_draw_menu("[ WindogeOS Settings ]", menu_items, menu_count, selected);
+        uint16_t key = settings_wait_key();
+        if (key == KEY_UP) {
+            selected = selected == 0 ? menu_count - 1 : selected - 1;
+        } else if (key == KEY_DOWN) {
+            selected = (selected + 1) % menu_count;
+        } else if (key == KEY_BACKSPACE || key == (uint16_t)'q') {
+            break;
+        } else if (key == KEY_ENTER) {
+            if (selected == 0) {
+                settings_show_system_information();
+            } else if (selected == 1) {
+                settings_select_color();
+            } else if (selected == 2) {
+                settings_select_shell();
+            } else {
+                break;
+            }
+        }
+    }
+    dogeio_text_clear();
+    dogeio_text_color_change(saved_color);
+}
+
+void system_start_default_shell(void) {
+    if (default_shell_is_bash) {
+        system_bash();
+    } else {
+        system_dogeshell();
+    }
+}
 
 static void get_history_path(char* dest) {
     str_strcpy(dest, "/users/");
@@ -470,48 +708,8 @@ int system_dogeshell_ex(char* command) {
         handled = 0;
     }
 
-    else if (str_strcmp(command, "user-setup") == 0) {
-        uint16_t get_key;
-        char username[64];
-        char password[64];
-
-        dogeio_text_println("WindogeOS users setup");
-        dogeio_text_println("[1] add user");
-        dogeio_text_println("[2] login");
-        dogeio_text_println("[3] exit");
-        while (true) {
-            get_key = dogeio_get_key();
-
-            if (get_key == (uint16_t)('1')) {
-                dogeio_text_println("Create the much username.");
-                dogeio_text_input("> ", username, 64);
-
-                dogeio_text_println("Create the wow password.");
-                dogeio_text_input("> ", password, 64);
-                system_create_user(username, password, 1);
-                break;
-            } else if (get_key == (uint16_t)('2')) {
-                dogeio_text_println("Login into an account");
-                while (true) {
-
-                    dogeio_text_input("username> ", username, 64);
-                    dogeio_text_input("password> ", password, 64);
-
-                    clean_input_string(username);
-                    clean_input_string(password);
-
-                    if (system_verify_user(username, password)) {
-                        str_strcpy(current_user, username);
-                        fs_set_auth_override(0);
-                        break;
-                    }
-                    dogeio_text_println("Wrong password or user doesn't exist :(");
-                }
-                break;
-            } else if (get_key == (uint16_t)('3')) {
-                break;
-            }
-        }
+    else if (str_strcmp(command, "settings") == 0) {
+        system_settings();
         handled = 0;
     }
 

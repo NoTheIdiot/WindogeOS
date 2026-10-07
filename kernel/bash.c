@@ -264,6 +264,11 @@ int system_bash_ex(char* command) {
         handled = 0;
     }
 
+    else if (str_strcmp(command, "settings") == 0) {
+        system_settings();
+        handled = 0;
+    }
+
     else if (str_startswith(command, "date")) {
         const char* t = time_get();
         if (!t || t[0] == '\0') {
