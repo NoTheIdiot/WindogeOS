@@ -106,6 +106,8 @@ uint16_t dogeio_get_key(void) {
             char c = global_shift_pressed ? map_upper[code] : map_lower[code];
             if (c != 0) {
                 if (global_ctrl_pressed) {
+                    if (c == 'o') return KEY_CTRL_O;
+                    if (c == 'n') return KEY_CTRL_N;
                     if (c >= 'a' && c <= 'z') {
                         return (uint16_t)(c - 'a' + 1);
                     } else if (c >= 'A' && c <= 'Z') {

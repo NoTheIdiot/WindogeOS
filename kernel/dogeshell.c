@@ -659,7 +659,20 @@ int system_dogeshell_ex(char* command) {
         if (str_strlen(arg) == 0) {
             dogeio_text_println("Error: no filename specified :(");
             handled = -1;
-        } else {
+        } 
+        
+        else if (str_strcmp(arg, "--help") == 0) {
+            dogeio_text_println("Dogeedit v2.1");
+            dogeio_text_println("edit <file>");
+            handled = 0;
+        }
+
+        else if (str_strcmp(arg, "--version") == 0) {
+            dogeio_text_println("Dogeedit v2.1");
+            handled = 0;
+        }
+
+        else {
             if (!fs_exists((char*)arg)) {
                 fs_create((char*)arg);
             }

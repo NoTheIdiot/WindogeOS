@@ -67,6 +67,8 @@ void dogeio_print_hex16(uint16_t val);
 #define KEY_UNKNOWN   0x000
 #define KEY_F1        0x105
 #define KEY_F2        0x106
+#define KEY_CTRL_O    0x110
+#define KEY_CTRL_N    0x111
 
 #define FS_PERM_READ   0x01u
 #define FS_PERM_WRITE  0x02u
