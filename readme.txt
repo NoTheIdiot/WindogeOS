@@ -1,5 +1,5 @@
 = About WindogeOS
-Doge filled OS that fits in a floppy, probably useless.
+Doge filled OS that fits in a (3) floppies, probably useless.
 Also supposed to be a free and lightweight operating system.
 Also being easy to use on the command line.
 
