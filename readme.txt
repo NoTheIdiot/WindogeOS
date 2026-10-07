@@ -3,15 +3,12 @@ Doge filled OS that fits in a floppy, probably useless.
 Also supposed to be a free and lightweight operating system.
 Also being easy to use on the command line.
 
-= The hell's inside?
-This piece of probably useless software has the following
-- exFAT file system
-- basic text editor
-- RTC time
-- basic syscalls that blows up with args
-- uses limine 64 bit so it's not slow as fu
-- full idt, gdt and tss
-- shell that actually makes since
+= Minimum requirements
+Any x86_64 CPU will work, and also you will ned at least
+3MB of RAM and 4MB of disk, and it will run pretty well.
+
+= Recommended Specs
+Any CPU, 4MB of RAM and 8MB of disk for the best experience.
 
 = Updates
 Nothing special read commits and releases
