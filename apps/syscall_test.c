@@ -1,0 +1,214 @@
+#include "../library/dogeio.h"
+
+#define TEST_DIR_PREFIX "doge_syscall_test_"
+#define TEST_SOURCE_NAME "source.txt"
+#define TEST_COPY_NAME "copy.txt"
+#define TEST_RENAMED_NAME "renamed.txt"
+#define TEST_BUFFER_SIZE 64
+
+static uint32_t failures;
+
+static void report(const char *name, int passed) {
+    print("[");
+    print(passed ? "PASS" : "FAIL");
+    print("] ");
+    println(name);
+    if (!passed) {
+        failures++;
+    }
+}
+
+static int result_succeeded(uint64_t result) {
+    return (int64_t)result >= 0;
+}
+
+static int bytes_match(const char *actual, const char *expected, size_t length) {
+    for (size_t i = 0; i < length; i++) {
+        if (actual[i] != expected[i]) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+static void make_path(char *path, const char *directory, const char *filename) {
+    str_strcpy(path, directory);
+    str_strcat(path, "/");
+    str_strcat(path, filename);
+}
+
+void _start(void) {
+    char test_dir[48];
+    char source_path[80];
+    char copy_path[80];
+    char renamed_path[80];
+    char suffix[4];
+    char file_buffer[TEST_BUFFER_SIZE] = {0};
+    char input_buffer[TEST_BUFFER_SIZE] = {0};
+    int have_test_dir = 0;
+    int have_source = 0;
+    int have_copy = 0;
+    int have_renamed = 0;
+
+    uint64_t clear_result = clear();
+    report("CLEAR", result_succeeded(clear_result));
+    println("WindogeOS syscall test");
+    println("Filesystem tests use a temporary directory.");
+    println("");
+
+    int available_name_found = 0;
+    for (int candidate = 0; candidate < 100; candidate++) {
+        str_strcpy(test_dir, TEST_DIR_PREFIX);
+        str_itoa(candidate, suffix);
+        str_strcat(test_dir, suffix);
+        if (!file_exists(test_dir)) {
+            available_name_found = 1;
+            break;
+        }
+    }
+    report("FILE_EXISTS (unused temporary name)", available_name_found);
+
+    uint64_t mkdir_result = available_name_found ? create_dir(test_dir) : (uint64_t)-1;
+    have_test_dir = available_name_found && mkdir_result == 0;
+    report("CREATE_DIR", have_test_dir);
+
+    if (have_test_dir) {
+        make_path(source_path, test_dir, TEST_SOURCE_NAME);
+        make_path(copy_path, test_dir, TEST_COPY_NAME);
+        make_path(renamed_path, test_dir, TEST_RENAMED_NAME);
+
+        uint64_t create_result = create_file(source_path);
+        have_source = create_result == 0;
+        report("CREATE_FILE", have_source);
+
+        uint64_t exists_result = file_exists(source_path);
+        report("FILE_EXISTS (created file)", exists_result == 1);
+
+        uint64_t write_result = have_source
+            ? write_file(source_path, "first\nsecond\n")
+            : (uint64_t)-1;
+        report("WRITE_FILE", result_succeeded(write_result));
+
+        memset(file_buffer, 0, sizeof(file_buffer));
+        uint64_t read_result = result_succeeded(write_result)
+            ? read_file(source_path, file_buffer, sizeof(file_buffer))
+            : (uint64_t)-1;
+        int read_ok = result_succeeded(read_result) &&
+                      read_result == 13 &&
+                      bytes_match(file_buffer, "first\nsecond\n", 13);
+        report("READ_FILE", read_ok);
+
+        uint64_t truncate_result = result_succeeded(read_result)
+            ? delete_last_line(source_path)
+            : (uint64_t)-1;
+        report("DELETE_LAST_LINE", result_succeeded(truncate_result));
+
+        memset(file_buffer, 0, sizeof(file_buffer));
+        read_result = result_succeeded(truncate_result)
+            ? read_file(source_path, file_buffer, sizeof(file_buffer))
+            : (uint64_t)-1;
+        int truncate_ok = result_succeeded(read_result) &&
+                          read_result == 6 &&
+                          bytes_match(file_buffer, "first\n", 6);
+        report("DELETE_LAST_LINE result", truncate_ok);
+
+        uint64_t copy_result = truncate_ok
+            ? copy_file(source_path, copy_path)
+            : (uint64_t)-1;
+        have_copy = result_succeeded(copy_result);
+        report("COPY_FILE", have_copy);
+
+        uint64_t rename_result = have_copy
+            ? rename_file(copy_path, renamed_path)
+            : (uint64_t)-1;
+        have_renamed = rename_result == 1;
+        have_copy = have_copy && !have_renamed;
+        report("RENAME_FILE", have_renamed);
+
+        uint64_t change_result = change_dir(test_dir);
+        int changed_into_test_dir = change_result == 0;
+        if (changed_into_test_dir) {
+            change_result = change_dir("..");
+        }
+        report("CHANGE_DIR", changed_into_test_dir && change_result == 0);
+
+        if (have_source) {
+            uint64_t delete_result = delete_file(source_path);
+            report("DELETE_FILE (source)", delete_result == 1);
+            have_source = delete_result != 1;
+        } else {
+            report("DELETE_FILE (source)", 0);
+        }
+
+        if (have_renamed) {
+            uint64_t delete_result = delete_file(renamed_path);
+            report("DELETE_FILE (renamed copy)", delete_result == 1);
+            have_renamed = delete_result != 1;
+        } else if (have_copy) {
+            uint64_t delete_result = delete_file(copy_path);
+            report("DELETE_FILE (copied file)", delete_result == 1);
+            have_copy = delete_result != 1;
+        } else {
+            report("DELETE_FILE (copied file)", 0);
+        }
+
+        if (!have_source && !have_copy && !have_renamed) {
+            uint64_t delete_dir_result = delete_file(test_dir);
+            report("DELETE_FILE (temporary directory)", delete_dir_result == 1);
+        } else {
+            report("DELETE_FILE (temporary directory)", 0);
+        }
+    } else {
+        report("CREATE_FILE", 0);
+        report("FILE_EXISTS (created file)", 0);
+        report("WRITE_FILE", 0);
+        report("READ_FILE", 0);
+        report("DELETE_LAST_LINE", 0);
+        report("DELETE_LAST_LINE result", 0);
+        report("COPY_FILE", 0);
+        report("RENAME_FILE", 0);
+        report("CHANGE_DIR", 0);
+        report("DELETE_FILE (source)", 0);
+        report("DELETE_FILE (copied file)", 0);
+        report("DELETE_FILE (temporary directory)", 0);
+    }
+
+    println("");
+    println("Console syscall checks:");
+    report("PRINT", result_succeeded(print("PRINT syscall executed.\n")));
+    report("PRINTLN", result_succeeded(println("PRINTLN syscall executed.")));
+
+    uint64_t text_color_result = text_color(0xFFFF5555);
+    report("TEXT_COLOR", result_succeeded(text_color_result));
+    text_color(0xFFCCCCCC);
+    uint64_t background_color_result = background_color(0x000040);
+    report("BACKGROUND_COLOR", result_succeeded(background_color_result));
+    background_color(0x000000);
+
+    report("PRINT_AT",
+           result_succeeded(print_at("PRINT_AT syscall executed.", 0, 2,
+                                     0xFFCCCCCC)));
+
+    println("INPUT test: type a short line, then press Enter.");
+    uint64_t input_result = input("input> ", input_buffer, sizeof(input_buffer));
+    int input_ok = (int64_t)input_result >= 0 &&
+                   input_result < sizeof(input_buffer);
+    report("INPUT", input_ok);
+
+    println("GET_KEY test: press any supported key.");
+    uint64_t key_result = get_key();
+    report("GET_KEY", key_result != 0);
+
+    println("WindogeOS syscall test finished.");
+
+    if (failures == 0) {
+        println("All syscall checks passed.");
+        sys_exit(0);
+    }
+
+    print("Syscall checks failed: ");
+    char failure_count[12];
+    str_u64toa(failures, failure_count);
+    println(failure_count);
+    sys_exit(1);
+}

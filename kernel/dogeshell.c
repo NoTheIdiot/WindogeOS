@@ -258,11 +258,19 @@ static void settings_select_shell(void) {
     }
 }
 
+static void settings_run_test(void) {
+    char* save = fs_dirname();
+    fs_chdir("/");
+    system_dogeshell_ex("run syscall_test.bin");
+    fs_chdir(save);
+}
+
 void system_settings(void) {
     static const char *menu_items[] = {
         "System Information",
         "Default Text Color",
         "Default Shell",
+        "Test System",
         "Exit",
     };
     const size_t menu_count = sizeof(menu_items) / sizeof(menu_items[0]);
@@ -284,6 +292,8 @@ void system_settings(void) {
                 settings_select_color();
             } else if (selected == 2) {
                 settings_select_shell();
+            } else if (selected == 3) {
+                settings_run_test();
             } else {
                 break;
             }
