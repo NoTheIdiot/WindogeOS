@@ -14,6 +14,10 @@ void system_settings(void);
 void system_load_settings(void);
 void system_start_default_shell(void);
 
+static inline int system(char* command) {
+    return system_dogeshell_ex(command);
+}
+
 void system_fetch();
 extern char* windoge_version;
 extern char current_user[64];
@@ -181,6 +185,10 @@ void nvme_pci_callback(uint8_t b, uint8_t d, uint8_t f, uint16_t ven, uint16_t d
 #define PRINT_AT     16
 #define TEXT_COLOR   17
 #define BACKGROUND_COLOR 18
+
+// stdlib
+#define SHELL        21
+#define EXEC         22
 
 #define SYS_EXIT     60
 

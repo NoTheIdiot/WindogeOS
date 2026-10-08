@@ -376,6 +376,29 @@ uint64_t syscall_handler(struct cpu_regs *regs) {
             ret_val = 1;
             break;
 
+        case SHELL: {
+            char text[USER_STRING_LIMIT];
+            if (!copy_user_string(regs->rdi, text, sizeof(text), NULL)) {
+                return (uint64_t)-1;
+            }
+            ret_val = (uint64_t)(int64_t)system(text);
+            break;
+        }
+
+        case EXEC: {
+            char filename[USER_STRING_LIMIT];
+            if (!copy_user_string(regs->rdi, filename, sizeof(filename), NULL)) {
+                return (uint64_t)-1;
+            }
+            if (!fs_exists(filename)) {
+                ret_val = (uint64_t)-1;
+                break;
+            }
+            system_run_bin(filename, MAX_FLAT_BINARY_SIZE);
+            ret_val = 1;
+            break;
+        }
+
         default:
             // for some reason a signature for unknown syscall
             duolog("[error] unknown syscall attempted to execute.");

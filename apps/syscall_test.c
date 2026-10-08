@@ -1,4 +1,6 @@
 #include "../library/dogeio.h"
+#include "../library/string.h"
+#include <stddef.h>
 
 #define TEST_DIR_PREFIX "doge_syscall_test_"
 #define TEST_SOURCE_NAME "source.txt"

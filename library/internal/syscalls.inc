@@ -1,0 +1,24 @@
+%define READ_FILE 1
+%define WRITE_FILE 2
+%define CREATE_FILE 3
+%define DELETE_FILE 4
+%define CREATE_DIR 5
+%define RENAME_FILE 6
+%define FILE_EXISTS 7
+%define CHANGE_DIR 8
+%define DELETE_LAST_LINE 9
+%define COPY_FILE 10
+
+%define PRINT 11
+%define PRINTLN 12
+%define CLEAR 13
+%define INPUT 14
+%define GET_KEY 15
+%define PRINT_AT 16
+%define TEXT_COLOR 17
+%define BACKGROUND_COLOR 18
+
+%define SHELL 21
+%define EXEC 22
+
+%define EXIT 60
