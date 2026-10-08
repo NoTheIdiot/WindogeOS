@@ -8,6 +8,7 @@
 #define MAX_FLAT_BINARY_SIZE (16 * 1024 * 1024)
 
 int system_dogeshell_ex(char* command);
+int system_bash_ex(char* command);
 void system_dogeshell();
 void system_bash();
 void system_settings(void);
