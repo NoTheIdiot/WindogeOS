@@ -543,6 +543,7 @@ static void dogeshell_print_help(void) {
         "  exit                     | leave Dogeshell",
         "============================================================",
         "",
+        "Use ; between commands. Quoted or escaped semicolons are literal.",
         "Paths may be quoted; use ~ for your home directory."
     };
     for (size_t i = 0; i < sizeof(help) / sizeof(help[0]); i++) {
@@ -1086,9 +1087,12 @@ static int dogeshell_execute(int argc, char **argv) {
 
 int system_dogeshell_ex(char *command) {
     char input[DOGESHELL_LINE_SIZE] = {0};
-    char storage[DOGESHELL_LINE_SIZE] = {0};
-    char *arguments[DOGESHELL_ARGUMENT_COUNT];
-    int argument_count;
+    size_t separators[DOGESHELL_LINE_SIZE];
+    size_t separator_count = 0;
+    size_t input_length;
+    size_t segment_start = 0;
+    char quote = '\0';
+    int status = 0;
 
     if (command == NULL || command[0] == '\0') {
         return 0;
@@ -1102,14 +1106,63 @@ int system_dogeshell_ex(char *command) {
         dogeio_text_println("Warning: unable to save command history.");
     }
 
-    argument_count = dogeshell_tokenize(input, storage, sizeof(storage),
-                                        arguments, DOGESHELL_ARGUMENT_COUNT);
-    if (argument_count < 0) {
-        dogeio_text_println("Syntax error: unmatched quote, escape, or too many arguments.");
+    input_length = dogeshell_strlen(input);
+    for (size_t i = 0; i < input_length; i++) {
+        char character = input[i];
+        if (character == '\\' && quote != '\'') {
+            if (i + 1 == input_length) {
+                dogeio_text_println("Syntax error: trailing escape.");
+                dogeshell_last_status = 2;
+                return dogeshell_last_status;
+            }
+            i++;
+            continue;
+        }
+        if (quote != '\0') {
+            if (character == quote) {
+                quote = '\0';
+            }
+            continue;
+        }
+        if (character == '\'' || character == '"') {
+            quote = character;
+        } else if (character == ';') {
+            separators[separator_count++] = i;
+        }
+    }
+    if (quote != '\0') {
+        dogeio_text_println("Syntax error: unmatched quote.");
         dogeshell_last_status = 2;
         return dogeshell_last_status;
     }
-    dogeshell_last_status = dogeshell_execute(argument_count, arguments);
+
+    for (size_t segment_index = 0;
+         segment_index <= separator_count && !dogeshell_exit_requested;
+         segment_index++) {
+        char storage[DOGESHELL_LINE_SIZE] = {0};
+        char *arguments[DOGESHELL_ARGUMENT_COUNT];
+        size_t segment_end = segment_index < separator_count
+                                 ? separators[segment_index]
+                                 : input_length;
+        int argument_count;
+
+        input[segment_end] = '\0';
+        argument_count = dogeshell_tokenize(input + segment_start, storage,
+                                            sizeof(storage), arguments,
+                                            DOGESHELL_ARGUMENT_COUNT);
+        if (argument_count < 0) {
+            dogeio_text_println("Syntax error: too many arguments.");
+            dogeshell_last_status = 2;
+            return dogeshell_last_status;
+        }
+        if (argument_count > 0) {
+            status = dogeshell_execute(argument_count, arguments);
+            dogeshell_last_status = status;
+        }
+        segment_start = segment_end + (segment_index < separator_count ? 1U : 0U);
+    }
+
+    dogeshell_last_status = status;
     return dogeshell_last_status;
 }
 
