@@ -208,6 +208,21 @@ uint64_t syscall_handler(struct cpu_regs *regs) {
             ret_val = (uint64_t)(int64_t)fs_write(filepath, (char *)regs->rsi);
             break;
         }
+
+        case APPEND_FILE: {
+            char filepath[USER_PATH_LIMIT];
+            uint64_t size = regs->rdx;
+
+            if (!copy_user_string(regs->rdi, filepath, sizeof(filepath), NULL) ||
+                size > USER_IO_LIMIT ||
+                (size != 0 && !user_range_accessible(regs->rsi, size, false))) {
+                return (uint64_t)-1;
+            }
+
+            ret_val = (uint64_t)(int64_t)fs_append_data(
+                filepath, (const uint8_t *)regs->rsi, (uint32_t)size);
+            break;
+        }
         
         case CREATE_FILE: {
             char filename[USER_PATH_LIMIT];
@@ -273,6 +288,24 @@ uint64_t syscall_handler(struct cpu_regs *regs) {
             }
 
             ret_val = (uint64_t)(int64_t)fs_chdir(path);
+            break;
+        }
+
+        case GET_CWD: {
+            const char *cwd = fs_dirname();
+            uint64_t capacity = regs->rsi;
+            if (cwd == NULL || capacity == 0) {
+                return (uint64_t)-1;
+            }
+
+            size_t cwd_length = str_strlen(cwd);
+            if ((uint64_t)cwd_length >= capacity ||
+                !user_range_accessible(regs->rdi, (uint64_t)cwd_length + 1, true)) {
+                return (uint64_t)-1;
+            }
+
+            memcpy((char *)regs->rdi, cwd, cwd_length + 1);
+            ret_val = (uint64_t)cwd_length;
             break;
         }
 

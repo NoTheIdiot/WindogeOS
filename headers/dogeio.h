@@ -105,6 +105,7 @@ int   fs_delete(char* filename);
 int   fs_delete_last_line(char* filename);
 int   fs_read(char* filename, char* output_buffer, uint64_t max_size);
 int   fs_write(char* filename, char* input_buffer);
+int   fs_append_data(char* filename, const uint8_t* input_buffer, uint32_t size);
 int   fs_list_dir(int hidden);
 int   fs_rename(char* filename, char* newname);
 int   fs_copy(char* source, char* dest);

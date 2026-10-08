@@ -47,6 +47,7 @@ void _start(void) {
     char suffix[4];
     char file_buffer[TEST_BUFFER_SIZE] = {0};
     char input_buffer[TEST_BUFFER_SIZE] = {0};
+    char cwd_buffer[256] = {0};
     int have_test_dir = 0;
     int have_source = 0;
     int have_copy = 0;
@@ -114,7 +115,19 @@ void _start(void) {
                           bytes_match(file_buffer, "first\n", 6);
         report("DELETE_LAST_LINE result", truncate_ok);
 
-        uint64_t copy_result = truncate_ok
+        uint64_t append_result = truncate_ok
+            ? append_file(source_path, "second\n", 7)
+            : (uint64_t)-1;
+        memset(file_buffer, 0, sizeof(file_buffer));
+        read_result = result_succeeded(append_result)
+            ? read_file(source_path, file_buffer, sizeof(file_buffer))
+            : (uint64_t)-1;
+        int append_ok = result_succeeded(read_result) &&
+                        read_result == 13 &&
+                        bytes_match(file_buffer, "first\nsecond\n", 13);
+        report("APPEND_FILE", append_ok);
+
+        uint64_t copy_result = append_ok
             ? copy_file(source_path, copy_path)
             : (uint64_t)-1;
         have_copy = result_succeeded(copy_result);
@@ -129,6 +142,12 @@ void _start(void) {
 
         uint64_t change_result = change_dir(test_dir);
         int changed_into_test_dir = change_result == 0;
+        uint64_t cwd_length = changed_into_test_dir
+            ? get_cwd(cwd_buffer, sizeof(cwd_buffer))
+            : (uint64_t)-1;
+        int cwd_ok = (int64_t)cwd_length >= 0 &&
+                     str_strcmp(cwd_buffer, test_dir) == 0;
+        report("GET_CWD", cwd_ok);
         if (changed_into_test_dir) {
             change_result = change_dir("..");
         }
@@ -167,8 +186,10 @@ void _start(void) {
         report("READ_FILE", 0);
         report("DELETE_LAST_LINE", 0);
         report("DELETE_LAST_LINE result", 0);
+        report("APPEND_FILE", 0);
         report("COPY_FILE", 0);
         report("RENAME_FILE", 0);
+        report("GET_CWD", 0);
         report("CHANGE_DIR", 0);
         report("DELETE_FILE (source)", 0);
         report("DELETE_FILE (copied file)", 0);

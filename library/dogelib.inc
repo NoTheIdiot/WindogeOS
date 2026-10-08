@@ -30,3 +30,18 @@
     mov rsi, %2
     syscall
 %endmacro
+
+%macro append_file 3
+    mov rax, APPEND_FILE
+    mov rdi, %1
+    mov rsi, %2
+    mov rdx, %3
+    syscall
+%endmacro
+
+%macro get_cwd 2
+    mov rax, GET_CWD
+    mov rdi, %1
+    mov rsi, %2
+    syscall
+%endmacro

@@ -16,6 +16,14 @@
     syscall
 %endmacro
 
+%macro fs_append 3
+    mov rax, APPEND_FILE
+    mov rdi, %1
+    mov rsi, %2
+    mov rdx, %3
+    syscall
+%endmacro
+
 %macro fs_create 1
     mov rax, CREATE_FILE
     mov rdi, %1
@@ -50,6 +58,13 @@
 %macro fs_chdir 1
     mov rax, CHANGE_DIR
     mov rdi, %1
+    syscall
+%endmacro
+
+%macro fs_get_cwd 2
+    mov rax, GET_CWD
+    mov rdi, %1
+    mov rsi, %2
     syscall
 %endmacro
 

@@ -290,12 +290,13 @@ int fs_list_files(const char *directory, char (*names)[256], size_t capacity) {
     return count;
 }
 
-static int fs_append_bytes(char *filename, uint8_t *data, uint32_t size) {
+int fs_append_data(char *filename, const uint8_t *data, uint32_t size) {
     char leaf[256];
     char saved_cwd[256];
     int walked = 0;
 
-    if (fs_enter_path(filename, leaf, sizeof(leaf), saved_cwd, &walked) != 0) {
+    if ((data == NULL && size != 0) ||
+        fs_enter_path(filename, leaf, sizeof(leaf), saved_cwd, &walked) != 0) {
         return -1;
     }
     int rc = exfat_append_file(leaf, data, size);
@@ -327,7 +328,7 @@ int fs_copy(char* source, char* dest) {
         if (bytes_read == 0) {
             break;
         }
-        if (fs_append_bytes(dest, raw_buffer, (uint32_t)bytes_read) != 0) {
+        if (fs_append_data(dest, raw_buffer, (uint32_t)bytes_read) != 0) {
             fs_delete(dest);
             return -1;
         }

@@ -28,6 +28,8 @@
 #define SHELL              21
 #define EXEC               22
 #define STAT               23
+#define APPEND_FILE        24
+#define GET_CWD            25
 
 #define SYS_EXIT           60
 

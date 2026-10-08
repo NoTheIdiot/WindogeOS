@@ -18,6 +18,11 @@ static inline uint64_t write_file(const char *path, const char *text) {
     return syscall_2(WRITE_FILE, (uint64_t)path, (uint64_t)text);
 }
 
+static inline uint64_t append_file(const char *path, const void *buffer,
+                                   uint64_t size) {
+    return syscall_3(APPEND_FILE, (uint64_t)path, (uint64_t)buffer, size);
+}
+
 static inline uint64_t create_file(const char *path) {
     return syscall_1(CREATE_FILE, (uint64_t)path);
 }
@@ -52,6 +57,10 @@ static inline uint64_t file_exists(const char *path) {
 
 static inline uint64_t change_dir(const char *path) {
     return syscall_1(CHANGE_DIR, (uint64_t)path);
+}
+
+static inline uint64_t get_cwd(char *buffer, uint64_t capacity) {
+    return syscall_2(GET_CWD, (uint64_t)buffer, capacity);
 }
 
 static inline uint64_t delete_last_line(const char *path) {
