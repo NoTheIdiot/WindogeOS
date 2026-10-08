@@ -4,6 +4,12 @@
 #include <stdint.h>
 #include "internal/syscalls.h"
 
+typedef struct {
+    uint64_t size;
+    uint64_t is_dir;
+    uint64_t exists;
+} dogec_stat_t;
+
 static inline uint64_t read_file(const char *path, void *buffer, uint64_t size) {
     return syscall_3(READ_FILE, (uint64_t)path, (uint64_t)buffer, size);
 }
@@ -22,6 +28,18 @@ static inline uint64_t delete_file(const char *path) {
 
 static inline uint64_t create_dir(const char *path) {
     return syscall_1(CREATE_DIR, (uint64_t)path);
+}
+
+static inline uint64_t mkdir_recursive(const char *path) {
+    return syscall_1(MKDIR_RECURSIVE, (uint64_t)path);
+}
+
+static inline uint64_t get_time(uint64_t *out_time) {
+    return syscall_1(GET_TIME, (uint64_t)out_time);
+}
+
+static inline uint64_t stat(const char *path, dogec_stat_t *out_stat) {
+    return syscall_2(STAT, (uint64_t)path, (uint64_t)out_stat);
 }
 
 static inline uint64_t rename_file(const char *path, const char *new_path) {

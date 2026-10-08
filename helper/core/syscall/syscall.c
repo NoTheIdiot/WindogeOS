@@ -6,6 +6,7 @@
 #include <core.h>
 #include <basicutil.h>
 #include <boot/limine.h>
+#include <time.h>
 
 #define MSR_IA32_EFER            0xC0000080
 #define MSR_IA32_STAR            0xC0000081
@@ -375,6 +376,59 @@ uint64_t syscall_handler(struct cpu_regs *regs) {
             dogeio_text_background_change((uint32_t)regs->rdi);
             ret_val = 1;
             break;
+
+        case MKDIR_RECURSIVE: {
+            char path[USER_PATH_LIMIT];
+            if (!copy_user_string(regs->rdi, path, sizeof(path), NULL)) {
+                return (uint64_t)-1;
+            }
+
+            char *cursor = path;
+            while (*cursor != '\0') {
+                if (*cursor == '/') {
+                    char saved = *cursor;
+                    *cursor = '\0';
+                    if (path[0] != '\0' && !fs_exists(path)) {
+                        if (fs_mkdir(path) != 0) {
+                            *cursor = saved;
+                            return (uint64_t)-1;
+                        }
+                    }
+                    *cursor = saved;
+                }
+                cursor++;
+            }
+
+            ret_val = (uint64_t)(int64_t)fs_mkdir(path);
+            break;
+        }
+
+        case GET_TIME: {
+            if (regs->rdi == 0 || !user_range_accessible(regs->rdi, sizeof(uint64_t), true)) {
+                return (uint64_t)-1;
+            }
+            *(uint64_t *)regs->rdi = time_get_epoch_seconds();
+            ret_val = 0;
+            break;
+        }
+
+        case STAT: {
+            char path[USER_PATH_LIMIT];
+            if (!copy_user_string(regs->rdi, path, sizeof(path), NULL) ||
+                regs->rsi == 0 || !user_range_accessible(regs->rsi, sizeof(dogec_stat_t), true)) {
+                return (uint64_t)-1;
+            }
+
+            dogec_stat_t *stat_out = (dogec_stat_t *)regs->rsi;
+            memset(stat_out, 0, sizeof(*stat_out));
+            stat_out->exists = fs_exists(path) ? 1ULL : 0ULL;
+            if (stat_out->exists) {
+                stat_out->size = 0;
+                stat_out->is_dir = 0;
+            }
+            ret_val = stat_out->exists ? 0ULL : (uint64_t)-1;
+            break;
+        }
 
         case SHELL: {
             char text[USER_STRING_LIMIT];

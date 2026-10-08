@@ -61,6 +61,18 @@ void time_update_time(void) {
     }
 }
 
+uint64_t time_get_epoch_seconds(void) {
+    time_update_time();
+
+    uint64_t seconds = (uint64_t)time.second;
+    seconds += (uint64_t)time.minute * 60ULL;
+    seconds += (uint64_t)time.hour * 3600ULL;
+    seconds += ((uint64_t)time.day - 1ULL) * 86400ULL;
+    seconds += ((uint64_t)time.month - 1ULL) * 2629800ULL;
+    seconds += ((uint64_t)time.year - 1970ULL) * 31557600ULL;
+    return seconds;
+}
+
 char* time_get(void) {
     time_update_time();
 
