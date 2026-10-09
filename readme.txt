@@ -5,10 +5,10 @@ Also being easy to use on the command line.
 
 = Minimum requirements
 Any x86_64 CPU will work, and also you will ned at least
-3MB of RAM and 4MB of disk, and it will run pretty well.
+4MB of RAM and 4MB of disk, and it will run pretty well.
 
 = Recommended Specs
-Any CPU, 4MB of RAM and 8MB of disk for the best experience.
+Any CPU, 6MB of RAM and 8MB of disk for the best experience.
 
 = Updates
 Nothing special read commits and releases
