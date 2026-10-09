@@ -289,7 +289,7 @@ void kernel_main(void) {
         char password[64];
 
         dogeio_text_input("[username]> ", username, 64);
-        dogeio_text_input("[passwprd]> ", password, 64);
+        dogeio_text_input("[password]> ", password, 64);
 
         clean_input_string(username);
         clean_input_string(password);
