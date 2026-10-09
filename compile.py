@@ -263,11 +263,12 @@ def main():
             loop_dev = subprocess.check_output(f"sudo losetup -f --show {part2_img}", shell=True).decode().strip()
             cmd(f"sudo mount.exfat-fuse {loop_dev} {mnt_dir}")
             try:
+                cmd(f"sudo mkdir -p {mnt_dir}/apps")
                 for app_bin in compiled_apps:
                     if os.path.exists(app_bin):
                         app_name = os.path.basename(app_bin)
-                        cmd(f"sudo cp {app_bin} {mnt_dir}/{app_name}")
-                        print(f"[dogeing] Injected binary to exFAT: {app_name}")
+                        cmd(f"sudo cp {app_bin} {mnt_dir}/apps/{app_name}")
+                        print(f"[dogeing] Injected binary to exFAT /apps: {app_name}")
             finally:
                 cmd(f"sudo umount {mnt_dir}")
                 cmd(f"sudo losetup -d {loop_dev}")

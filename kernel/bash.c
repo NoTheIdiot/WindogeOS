@@ -1141,9 +1141,17 @@ static int execute_command(int argc, char **argv) {
         if (append_text(path, sizeof(path), &path_length, app_name) != 0) {
             return 1;
         }
+        if (!fs_exists(path)) {
+            path[0] = '/';
+            path[1] = '\0';
+            path_length = 1;
+            if (append_text(path, sizeof(path), &path_length, app_name) != 0) {
+                return 1;
+            }
+        }
         if (fs_exists(path)) {
-            system_run_bin_args(path, MAX_FLAT_BINARY_SIZE,
-                                argc - 1, argv + 1);
+            system_run_bin_args(path, MAX_FLAT_BINARY_SIZE, argc - 1,
+                                argv + 1);
             return 0;
         }
     }

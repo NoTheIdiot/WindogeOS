@@ -641,9 +641,17 @@ static int dogeshell_find_app(const char *command, char *app_path,
         return 1;
     }
     if (dogeshell_append(path, sizeof(path), &path_length, "/apps/") != 0 ||
-        dogeshell_append(path, sizeof(path), &path_length, filename) != 0 ||
-        !fs_exists(path)) {
+        dogeshell_append(path, sizeof(path), &path_length, filename) != 0) {
         return 1;
+    }
+    if (!fs_exists(path)) {
+        path[0] = '/';
+        path[1] = '\0';
+        path_length = 1;
+        if (dogeshell_append(path, sizeof(path), &path_length, filename) != 0 ||
+            !fs_exists(path)) {
+            return 1;
+        }
     }
     if (dogeshell_copy(app_path, app_path_capacity, path) != 0) {
         return 1;

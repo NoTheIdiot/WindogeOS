@@ -53,7 +53,7 @@ static void install_root_apps(void) {
         return;
     }
 
-    int moved_count = 0;
+    int copied_count = 0;
     for (int i = 0; i < file_count; i++) {
         const char *name = root_files[i];
         size_t name_length = str_strlen(name);
@@ -76,21 +76,30 @@ static void install_root_apps(void) {
         str_strcpy(destination, "/apps/");
         str_strcat(destination, name);
 
-        if (fs_move(source, destination) == 0) {
-            moved_count++;
-            serial_print("[setup] moved app: ");
+        if (fs_copy(source, destination) != 0 ||
+            !fs_exists(destination)) {
+            serial_print("[setup] failed to copy app into /apps: ");
             serial_print(name);
             serial_print("\n");
-        } else {
-            serial_print("[setup] failed to move app: ");
-            serial_print(name);
-            serial_print("\n");
+            continue;
         }
+
+        if (fs_delete(source) != 1) {
+            serial_print("[setup] copied app but failed to delete root original: ");
+            serial_print(name);
+            serial_print("\n");
+            continue;
+        }
+
+        copied_count++;
+        serial_print("[setup] copied app into /apps and deleted root original: ");
+        serial_print(name);
+        serial_print("\n");
     }
 
     char count_string[16];
-    str_itoa(moved_count, count_string);
-    serial_print("[setup] apps moved to /apps: ");
+    str_itoa(copied_count, count_string);
+    serial_print("[setup] apps copied to /apps and removed from root: ");
     serial_print(count_string);
     serial_print("\n");
 }

@@ -65,9 +65,14 @@ static int fs_split_path(const char *path, char *out_parent, size_t parent_size,
     if (last_slash == 0) {
         str_strcpy(out_parent, "/");
     } else {
-        size_t copy_len = (size_t)last_slash < (parent_size - 1) ? (size_t)last_slash : (parent_size - 1);
-        str_strncpy(out_parent, clean, copy_len);
-        out_parent[copy_len] = '\0';
+        size_t parent_length = (size_t)last_slash;
+        if (parent_length >= parent_size) {
+            return -1;
+        }
+        for (size_t i = 0; i < parent_length; i++) {
+            out_parent[i] = clean[i];
+        }
+        out_parent[parent_length] = '\0';
     }
 
     return 0;

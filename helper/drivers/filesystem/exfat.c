@@ -304,6 +304,24 @@ static void exfat_free_block(uint32_t cluster) {
     exfat_free_blocks(cluster, 1);
 }
 
+static bool exfat_name_equal(const char *left, const char *right) {
+    while (*left != '\0' && *right != '\0') {
+        char left_char = *left++;
+        char right_char = *right++;
+
+        if (left_char >= 'A' && left_char <= 'Z') {
+            left_char = (char)(left_char - 'A' + 'a');
+        }
+        if (right_char >= 'A' && right_char <= 'Z') {
+            right_char = (char)(right_char - 'A' + 'a');
+        }
+        if (left_char != right_char) {
+            return false;
+        }
+    }
+    return *left == '\0' && *right == '\0';
+}
+
 int exfat_resolve_entry(const char *target_name, exfat_target_t *out) {
     uint8_t cluster_buf[4096];
     uint64_t base_lba = exfat_cluster_lba(g_current_cluster);
@@ -332,7 +350,7 @@ int exfat_resolve_entry(const char *target_name, exfat_target_t *out) {
                 }
             }
 
-            if (str_strcmp(name_buf, target_name) == 0) {
+            if (exfat_name_equal(name_buf, target_name)) {
                 if (out) {
                     out->entry_lba = base_lba + ((uint64_t)i / 512);
                     out->entry_offset = (uint64_t)(i % 512);
