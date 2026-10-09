@@ -158,7 +158,7 @@ void kernel_main(void) {
     sys_init_terminals();
     log("[dogeing] initializing floating point");
     fpu_init();
-    log("[dogeing] initializing nvme (if any avalialbe)");
+    log("[dogeing] initializing nvme (if any available)");
     for (uint16_t bus = 0; bus < 256; bus++) {
         for (uint8_t device = 0; device < 32; device++) {
             for (uint8_t function = 0; function < 8; function++) {
@@ -314,8 +314,8 @@ void kernel_main(void) {
     const char* starting[6] = {
         "================================================================================================================================================================",
         "=                                                                                                                                                              =",
-        "=                                                              Welcome to WindogeOS v0.1!                                                                      =",
-        "=                                                       type 'settings' to configure system preferences                                                        =",
+        "=                                                               Welcome to WindogeOS v0.1!                                                                     =",
+        "=                                                    type 'settings' to configure system preferences                                                           =",
         "=                                                                                                                                                              =",
         "================================================================================================================================================================"
     };
