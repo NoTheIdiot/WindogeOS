@@ -182,6 +182,8 @@ int system_run_elf_impl(char *filename, uint64_t size) {
                 goto failure;
             }
 
+            map_user_page(page_vaddr, page_phys);
+
             uint64_t copy_start = page_vaddr > phdr->p_vaddr ?
                                   page_vaddr : phdr->p_vaddr;
             uint64_t page_limit = page_vaddr + PAGE_SIZE;
@@ -200,8 +202,6 @@ int system_run_elf_impl(char *filename, uint64_t size) {
                     goto failure;
                 }
             }
-
-            map_user_page(page_vaddr, page_phys);
         }
     }
 

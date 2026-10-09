@@ -15,6 +15,8 @@
 extern volatile struct limine_memmap_request memmap_request;
 extern volatile struct limine_hhdm_request   hhdm_request;
 
+static uint64_t free_page_head;
+
 uint64_t pmm_alloc_zeroed_page(void) {
     static uint64_t alloc_index = 0;
     static uint64_t alloc_offset = 0;
@@ -27,6 +29,13 @@ uint64_t pmm_alloc_zeroed_page(void) {
 
     struct limine_memmap_response *memmap = memmap_request.response;
     uint64_t hhdm_offset = hhdm_request.response->offset;
+
+    if (free_page_head != 0) {
+        uint64_t phys_addr = free_page_head;
+        free_page_head = *(uint64_t *)(phys_addr + hhdm_offset);
+        memset((void *)(phys_addr + hhdm_offset), 0, 4096);
+        return phys_addr;
+    }
 
     for (; alloc_index < memmap->entry_count; alloc_index++) {
         struct limine_memmap_entry *entry = memmap->entries[alloc_index];
@@ -53,6 +62,37 @@ uint64_t pmm_alloc_zeroed_page(void) {
     return 0;
 }
 
+static void pmm_free_page(uint64_t phys_addr, uint64_t hhdm_offset) {
+    if (phys_addr == 0 || (phys_addr & 0xFFFULL) != 0) {
+        return;
+    }
+
+    uint64_t *page = (uint64_t *)(phys_addr + hhdm_offset);
+    *page = free_page_head;
+    free_page_head = phys_addr;
+}
+
+static void free_user_table(uint64_t phys_addr, unsigned int level,
+                            uint64_t hhdm_offset) {
+    uint64_t *table = (uint64_t *)(phys_addr + hhdm_offset);
+
+    for (size_t i = 0; i < 512; i++) {
+        uint64_t entry = table[i];
+        if ((entry & PAGE_PRESENT) == 0 || (entry & PAGE_USER) == 0) {
+            continue;
+        }
+
+        uint64_t child_phys = entry & ~0xFFFULL;
+        if (level == 1) {
+            pmm_free_page(child_phys, hhdm_offset);
+        } else {
+            free_user_table(child_phys, level - 1U, hhdm_offset);
+        }
+    }
+
+    pmm_free_page(phys_addr, hhdm_offset);
+}
+
 void cleanup_user_pages(void) {
     if (hhdm_request.response == NULL) {
         return;
@@ -60,12 +100,23 @@ void cleanup_user_pages(void) {
 
     uint64_t hhdm_offset = hhdm_request.response->offset;
     uint64_t *pml4 = (uint64_t *)((read_cr3() & ~0xFFFULL) + hhdm_offset);
+    uint64_t user_tables[256] = {0};
 
-    for (int i = 0; i < 256; i++) {
-        pml4[i] = 0;
+    for (size_t i = 0; i < 256; i++) {
+        if ((pml4[i] & (PAGE_PRESENT | PAGE_USER)) ==
+            (PAGE_PRESENT | PAGE_USER)) {
+            user_tables[i] = pml4[i] & ~0xFFFULL;
+            pml4[i] = 0;
+        }
     }
 
     write_cr3(read_cr3());
+
+    for (size_t i = 0; i < 256; i++) {
+        if (user_tables[i] != 0) {
+            free_user_table(user_tables[i], 3, hhdm_offset);
+        }
+    }
 }
 
 static inline uint64_t* get_or_alloc_table(uint64_t* table, size_t index, uint64_t hhdm_offset) {

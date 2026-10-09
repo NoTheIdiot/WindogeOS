@@ -102,6 +102,7 @@ void system_run_bin_args_impl(char *filename, int program_size, int argc, char *
         }
 
         uint8_t *page_dst = (uint8_t *)(code_phys + hhdm_offset);
+        map_user_page(USER_CODE_BASE + offset, code_phys);
 
         int read_bytes = fs_read_raw_at(filename, page_dst, offset, bytes_to_read);
         if (read_bytes < 0 || (size_t)read_bytes > bytes_to_read) {
@@ -114,7 +115,6 @@ void system_run_bin_args_impl(char *filename, int program_size, int argc, char *
             break;
         }
 
-        map_user_page(USER_CODE_BASE + offset, code_phys);
         loaded_bytes += (size_t)read_bytes;
 
         if ((size_t)read_bytes < bytes_to_read) {
