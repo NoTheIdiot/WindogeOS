@@ -10,10 +10,13 @@ extern volatile struct limine_hhdm_request hhdm_request;
 #define USER_CODE_BASE  0x0000000000400000ULL
 #define USER_STACK_BASE 0x00007FFFF0000000ULL
 #define PAGE_SIZE       4096
+#define USER_STACK_PAGE_COUNT 8
+#define USER_STACK_SIZE (PAGE_SIZE * USER_STACK_PAGE_COUNT)
+#define USER_ARGUMENT_AREA_SIZE (USER_STACK_SIZE / 2)
 
 static size_t bin_argument_length(const char *argument) {
     size_t length = 0;
-    while (argument[length] != '\0' && length < 256) {
+    while (length < 256 && argument[length] != '\0') {
         length++;
     }
     return length;
@@ -23,10 +26,10 @@ void system_run_bin_impl(char *filename, int program_size) {
     system_run_bin_args_impl(filename, program_size, 0, NULL);
 }
 
-static int prepare_user_arguments(uint8_t *stack_page, int argc, char **argv,
+static int prepare_user_arguments(uint8_t *stack_memory, int argc, char **argv,
                                   uint64_t *user_argv) {
     uint64_t argument_addresses[32];
-    size_t cursor = PAGE_SIZE;
+    size_t cursor = 0;
 
     if (argc < 0 || argc > 32 || (argc > 0 && argv == NULL)) {
         return -1;
@@ -37,24 +40,26 @@ static int prepare_user_arguments(uint8_t *stack_page, int argc, char **argv,
             return -1;
         }
         size_t length = bin_argument_length(argv[i]);
-        if (length == 256 || length + 1 > cursor) {
+        if (length == 256 || cursor > USER_ARGUMENT_AREA_SIZE ||
+            length + 1 > USER_ARGUMENT_AREA_SIZE - cursor) {
             return -1;
         }
-        cursor -= length + 1;
         argument_addresses[i] = USER_STACK_BASE + cursor;
         for (size_t j = 0; j < length; j++) {
-            stack_page[cursor + j] = (uint8_t)argv[i][j];
+            stack_memory[cursor + j] = (uint8_t)argv[i][j];
         }
-        stack_page[cursor + length] = '\0';
+        stack_memory[cursor + length] = '\0';
+        cursor += length + 1;
     }
 
-    cursor &= ~(sizeof(uint64_t) - 1U);
+    cursor = (cursor + sizeof(uint64_t) - 1U) &
+             ~(sizeof(uint64_t) - 1U);
     size_t vector_size = ((size_t)argc + 1U) * sizeof(uint64_t);
-    if (vector_size > cursor) {
+    if (cursor > USER_ARGUMENT_AREA_SIZE ||
+        vector_size > USER_ARGUMENT_AREA_SIZE - cursor) {
         return -1;
     }
-    cursor -= vector_size;
-    uint64_t *vector = (uint64_t *)(stack_page + cursor);
+    uint64_t *vector = (uint64_t *)(stack_memory + cursor);
     for (int i = 0; i < argc; i++) {
         vector[i] = argument_addresses[i];
     }
@@ -128,29 +133,27 @@ void system_run_bin_args_impl(char *filename, int program_size, int argc, char *
         return;
     }
 
-    uint64_t stack_phys = pmm_alloc_zeroed_page();
-    char stack_phys_str[32];
-    char* actual_stack_ptr = uint64_to_str(stack_phys, stack_phys_str);
-    
-    serial_print("[dogeing] page mapped for stack ");
-    log(actual_stack_ptr);
-
-    if (!stack_phys) {
-        log("[Error] Out of physical memory for user stack.");
-        cleanup_user_pages();
-        return;
+    serial_print("[dogeing] mapping user stack pages");
+    for (size_t i = 0; i < USER_STACK_PAGE_COUNT; i++) {
+        uint64_t stack_phys = pmm_alloc_zeroed_page();
+        if (!stack_phys) {
+            log("[Error] Out of physical memory for user stack.");
+            cleanup_user_pages();
+            return;
+        }
+        map_user_page(USER_STACK_BASE + i * PAGE_SIZE, stack_phys);
     }
-    map_user_page(USER_STACK_BASE, stack_phys);
 
+    /* Keep argv in the lower half, away from the downward-growing stack. */
     uint64_t user_argv;
-    if (prepare_user_arguments((uint8_t *)(stack_phys + hhdm_offset),
+    if (prepare_user_arguments((uint8_t *)USER_STACK_BASE,
                                argc, argv, &user_argv) != 0) {
         dogeio_text_println("[Error] Application arguments exceed the user stack.");
         cleanup_user_pages();
         return;
     }
 
-    uint64_t user_stack_top = (USER_STACK_BASE + PAGE_SIZE) - 8;
+    uint64_t user_stack_top = (USER_STACK_BASE + USER_STACK_SIZE) - 8;
 
     log("[dogeing] executing binary");
 
