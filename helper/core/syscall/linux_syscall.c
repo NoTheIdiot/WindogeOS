@@ -5,6 +5,7 @@
 #include <string.h>
 #include <time.h>
 
+// bullshit
 #define LINUX_SYS_READ          0
 #define LINUX_SYS_WRITE         1
 #define LINUX_SYS_OPEN          2
