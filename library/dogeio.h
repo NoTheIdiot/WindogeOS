@@ -14,6 +14,12 @@ static inline uint64_t read_file(const char *path, void *buffer, uint64_t size) 
     return syscall_3(READ_FILE, (uint64_t)path, (uint64_t)buffer, size);
 }
 
+static inline uint64_t read_file_at(const char *path, void *buffer,
+                                    uint64_t offset, uint64_t size) {
+    return syscall_4(READ_FILE_AT, (uint64_t)path, (uint64_t)buffer,
+                     offset, size);
+}
+
 static inline uint64_t write_file(const char *path, const char *text) {
     return syscall_2(WRITE_FILE, (uint64_t)path, (uint64_t)text);
 }
@@ -69,6 +75,10 @@ static inline uint64_t delete_last_line(const char *path) {
 
 static inline uint64_t copy_file(const char *source, const char *destination) {
     return syscall_2(COPY_FILE, (uint64_t)source, (uint64_t)destination);
+}
+
+static inline uint64_t move_file(const char *source, const char *destination) {
+    return syscall_2(MOVE_FILE, (uint64_t)source, (uint64_t)destination);
 }
 
 static inline uint64_t print(const char *text) {

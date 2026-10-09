@@ -195,6 +195,25 @@ uint64_t syscall_handler(struct cpu_regs *regs) {
             break;
         }
 
+        case READ_FILE_AT: {
+            char filepath[USER_PATH_LIMIT];
+            uint64_t size = regs->r10;
+
+            if (!copy_user_string(regs->rdi, filepath, sizeof(filepath), NULL) ||
+                size > USER_IO_LIMIT ||
+                (size != 0 && !user_range_accessible(regs->rsi, size, true))) {
+                return (uint64_t)-1;
+            }
+
+            if (size == 0) {
+                return 0;
+            }
+
+            ret_val = (uint64_t)(int64_t)fs_read_raw_at(
+                filepath, (uint8_t *)regs->rsi, regs->rdx, size);
+            break;
+        }
+
         case WRITE_FILE: {
             char filepath[USER_PATH_LIMIT];
             size_t buffer_length;
@@ -328,6 +347,18 @@ uint64_t syscall_handler(struct cpu_regs *regs) {
             }
 
             ret_val = (uint64_t)(int64_t)fs_copy(source, destination);
+            break;
+        }
+
+        case MOVE_FILE: {
+            char source[USER_PATH_LIMIT];
+            char destination[USER_PATH_LIMIT];
+            if (!copy_user_string(regs->rdi, source, sizeof(source), NULL) ||
+                !copy_user_string(regs->rsi, destination, sizeof(destination), NULL)) {
+                return (uint64_t)-1;
+            }
+
+            ret_val = (uint64_t)(int64_t)fs_move(source, destination);
             break;
         }
         

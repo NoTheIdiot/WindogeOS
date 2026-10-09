@@ -52,6 +52,7 @@ void _start(void) {
     int have_source = 0;
     int have_copy = 0;
     int have_renamed = 0;
+    int have_moved = 0;
 
     uint64_t clear_result = clear();
     report("CLEAR", result_succeeded(clear_result));
@@ -127,6 +128,14 @@ void _start(void) {
                         bytes_match(file_buffer, "first\nsecond\n", 13);
         report("APPEND_FILE", append_ok);
 
+        memset(file_buffer, 0, sizeof(file_buffer));
+        uint64_t read_at_result = append_ok
+            ? read_file_at(source_path, file_buffer, 6, 7)
+            : (uint64_t)-1;
+        report("READ_FILE_AT",
+               result_succeeded(read_at_result) && read_at_result == 7 &&
+               bytes_match(file_buffer, "second\n", 7));
+
         uint64_t copy_result = append_ok
             ? copy_file(source_path, copy_path)
             : (uint64_t)-1;
@@ -139,6 +148,16 @@ void _start(void) {
         have_renamed = rename_result == 1;
         have_copy = have_copy && !have_renamed;
         report("RENAME_FILE", have_renamed);
+
+        uint64_t move_result = have_renamed
+            ? move_file(renamed_path, copy_path)
+            : (uint64_t)-1;
+        have_moved = result_succeeded(move_result) &&
+                     file_exists(copy_path) == 1 &&
+                     file_exists(renamed_path) == 0;
+        have_renamed = have_renamed && !have_moved;
+        have_copy = have_moved;
+        report("MOVE_FILE", have_moved);
 
         uint64_t change_result = change_dir(test_dir);
         int changed_into_test_dir = change_result == 0;
@@ -167,10 +186,10 @@ void _start(void) {
             have_renamed = delete_result != 1;
         } else if (have_copy) {
             uint64_t delete_result = delete_file(copy_path);
-            report("DELETE_FILE (copied file)", delete_result == 1);
+            report("DELETE_FILE (moved file)", delete_result == 1);
             have_copy = delete_result != 1;
         } else {
-            report("DELETE_FILE (copied file)", 0);
+            report("DELETE_FILE (moved file)", 0);
         }
 
         if (!have_source && !have_copy && !have_renamed) {
@@ -187,12 +206,14 @@ void _start(void) {
         report("DELETE_LAST_LINE", 0);
         report("DELETE_LAST_LINE result", 0);
         report("APPEND_FILE", 0);
+        report("READ_FILE_AT", 0);
         report("COPY_FILE", 0);
         report("RENAME_FILE", 0);
+        report("MOVE_FILE", 0);
         report("GET_CWD", 0);
         report("CHANGE_DIR", 0);
         report("DELETE_FILE (source)", 0);
-        report("DELETE_FILE (copied file)", 0);
+        report("DELETE_FILE (moved file)", 0);
         report("DELETE_FILE (temporary directory)", 0);
     }
 

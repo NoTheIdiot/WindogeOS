@@ -9,6 +9,15 @@
     syscall
 %endmacro
 
+%macro fs_read_at 4
+    mov rax, READ_FILE_AT
+    mov rdi, %1
+    mov rsi, %2
+    mov rdx, %3
+    mov r10, %4
+    syscall
+%endmacro
+
 %macro fs_write 2
     mov rax, WRITE_FILE
     mov rdi, %1
@@ -76,6 +85,13 @@
 
 %macro fs_copy 2
     mov rax, COPY_FILE
+    mov rdi, %1
+    mov rsi, %2
+    syscall
+%endmacro
+
+%macro fs_move 2
+    mov rax, MOVE_FILE
     mov rdi, %1
     mov rsi, %2
     syscall

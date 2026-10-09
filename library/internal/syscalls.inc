@@ -25,5 +25,7 @@
 %define STAT 23
 %define APPEND_FILE 24
 %define GET_CWD 25
+%define READ_FILE_AT 26
+%define MOVE_FILE 27
 
 %define EXIT 60
