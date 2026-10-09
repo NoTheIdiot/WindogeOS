@@ -5,13 +5,16 @@
 #include <system.h>
 #include <basicutil.h>
 #include <boot/limine.h>
+#include <boot/syscall_internal.h>
 
 #define ELF_CLASS_64 2
 #define ELF_DATA_LSB 1
 #define ELF_VERSION_CURRENT 1
+#define ELF_OSABI_LINUX 3
 #define ELF_TYPE_EXEC 2
 #define ELF_MACHINE_X86_64 62
 #define PT_LOAD 1
+#define PT_NOTE 4
 #define PF_X 1
 #define PAGE_SIZE 4096ULL
 #define USER_ADDRESS_LIMIT 0x0000800000000000ULL
@@ -48,6 +51,12 @@ typedef struct __attribute__((packed)) {
     uint64_t p_align;
 } elf64_phdr;
 
+typedef struct __attribute__((packed)) {
+    uint32_t namesz;
+    uint32_t descsz;
+    uint32_t type;
+} elf64_note_header;
+
 extern volatile struct limine_hhdm_request hhdm_request;
 
 static uint64_t align_down_page(uint64_t value) {
@@ -56,6 +65,68 @@ static uint64_t align_down_page(uint64_t value) {
 
 static uint64_t align_up_page(uint64_t value) {
     return (value + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+}
+
+static bool elf_uses_linux_abi(char *filename, const elf64_ehdr *ehdr,
+                               const elf64_phdr *phdrs, uint64_t file_size) {
+    if (ehdr->e_ident[7] == ELF_OSABI_LINUX) {
+        return true;
+    }
+
+    for (uint16_t i = 0; i < ehdr->e_phnum; i++) {
+        const elf64_phdr *phdr = &phdrs[i];
+        if (phdr->p_type != PT_NOTE || phdr->p_offset > file_size ||
+            phdr->p_filesz > file_size - phdr->p_offset) {
+            continue;
+        }
+
+        uint64_t cursor = 0;
+        while (cursor <= phdr->p_filesz &&
+               phdr->p_filesz - cursor >= sizeof(elf64_note_header)) {
+            elf64_note_header note;
+            int read_bytes = fs_read_raw_at(
+                filename, (uint8_t *)&note,
+                phdr->p_offset + cursor, sizeof(note));
+            if (read_bytes != (int)sizeof(note)) {
+                break;
+            }
+            cursor += sizeof(note);
+
+            uint64_t name_size = ((uint64_t)note.namesz + 3ULL) & ~3ULL;
+            uint64_t desc_size = ((uint64_t)note.descsz + 3ULL) & ~3ULL;
+            if (name_size > phdr->p_filesz - cursor ||
+                desc_size > phdr->p_filesz - cursor - name_size) {
+                break;
+            }
+
+            if (note.type == 1 && note.namesz == 4 &&
+                note.descsz >= sizeof(uint32_t)) {
+                char name[4];
+                uint32_t os;
+                read_bytes = fs_read_raw_at(
+                    filename, (uint8_t *)name,
+                    phdr->p_offset + cursor, sizeof(name));
+                if (read_bytes != (int)sizeof(name)) {
+                    break;
+                }
+                if (name[0] == 'G' && name[1] == 'N' &&
+                    name[2] == 'U' && name[3] == '\0') {
+                    read_bytes = fs_read_raw_at(
+                        filename, (uint8_t *)&os,
+                        phdr->p_offset + cursor + name_size,
+                        sizeof(os));
+                    if (read_bytes != (int)sizeof(os)) {
+                        break;
+                    }
+                    if (os == 0) {
+                        return true;
+                    }
+                }
+            }
+            cursor += name_size + desc_size;
+        }
+    }
+    return false;
 }
 
 int system_run_elf_impl(char *filename, uint64_t size) {
@@ -75,6 +146,7 @@ int system_run_elf_impl(char *filename, uint64_t size) {
         return -2;
     }
 
+    syscall_set_linux_abi(false);
     cleanup_user_pages();
 
     int result = -3;
@@ -118,6 +190,7 @@ int system_run_elf_impl(char *filename, uint64_t size) {
     }
 
     uint64_t total_pages = 0;
+    uint64_t highest_load_address = 0;
     bool entry_is_executable = false;
 
     for (uint16_t i = 0; i < ehdr.e_phnum; i++) {
@@ -145,6 +218,9 @@ int system_run_elf_impl(char *filename, uint64_t size) {
         }
 
         uint64_t seg_end = phdr->p_vaddr + phdr->p_memsz;
+        if (seg_end > highest_load_address) {
+            highest_load_address = seg_end;
+        }
         uint64_t page_start = align_down_page(phdr->p_vaddr);
         uint64_t page_end = align_up_page(seg_end);
         uint64_t segment_pages = (page_end - page_start) / PAGE_SIZE;
@@ -218,7 +294,13 @@ int system_run_elf_impl(char *filename, uint64_t size) {
     }
     map_user_page(USER_STACK_VADDR, stack_phys);
 
+    bool linux_abi = elf_uses_linux_abi(filename, &ehdr, phdrs, size);
+    syscall_set_linux_abi(linux_abi);
+    if (linux_abi) {
+        linux_syscall_set_heap_base(align_up_page(highest_load_address));
+    }
     to_userland_ring3(ehdr.e_entry, USER_STACK_VADDR + PAGE_SIZE - 8);
+    syscall_set_linux_abi(false);
 
 failure:
     cleanup_user_pages();

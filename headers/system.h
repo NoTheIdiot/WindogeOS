@@ -41,6 +41,12 @@ extern void to_userland_ring3_args(uint64_t user_rip, uint64_t user_rsp,
 // paging
 void setup_ring3_memory(uint64_t user_code_virt, uint64_t user_stack_virt, const uint8_t *user_code, size_t code_size);
 void map_user_page(uint64_t virt_addr, uint64_t phys_addr);
+bool protect_user_page(uint64_t virt_addr, bool present, bool write_access,
+                       bool execute_access);
+bool user_page_mapped(uint64_t virt_addr);
+bool unmap_user_page(uint64_t virt_addr);
+bool suspend_user_pages(uint64_t *page_table_context);
+bool restore_user_pages(const uint64_t *page_table_context);
 uint64_t pmm_alloc_zeroed_page(void);
 void cleanup_user_pages(void);
 extern void to_userland_ring3(uint64_t user_rip, uint64_t user_rsp) __attribute__((noreturn));
@@ -200,7 +206,27 @@ void nvme_pci_callback(uint8_t b, uint8_t d, uint8_t f, uint16_t ven, uint16_t d
 #define GET_CWD      25
 #define READ_FILE_AT 26
 #define MOVE_FILE    27
+#define MAP_USER_MEMORY    28
+#define PROTECT_USER_MEMORY 29
+#define UNMAP_USER_MEMORY  30
+#define GET_PID            31
+#define GET_UID            32
+#define GET_GID            33
+#define GET_EUID           34
+#define GET_EGID           35
+#define GET_UNAME          36
+#define RANDOM_BYTES       37
+#define GET_USER_NAME      38
+#define EXEC_ARGS          39
+#define EXEC_ELF           40
 
+#define USER_MEMORY_READ    0x1ULL
+#define USER_MEMORY_WRITE   0x2ULL
+#define USER_MEMORY_EXEC    0x4ULL
+#define USER_MEMORY_MAX_SIZE (16ULL * 1024 * 1024)
+
+/* Native process IDs are currently single-process: PID is 1 and UID/GID are 0. */
+/* RANDOM_BYTES requires CPU RDRAND support; EXEC_ARGS takes (path, argc, argv). */
 #define SYS_EXIT     60
 
 // actual running

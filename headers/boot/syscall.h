@@ -7,6 +7,15 @@
 
 #include <stdint.h>
 
+typedef struct {
+    char sysname[65];
+    char nodename[65];
+    char release[65];
+    char version[65];
+    char machine[65];
+    char domainname[65];
+} windoge_utsname_t;
+
 static inline uint64_t _syscall(uint64_t num, uint64_t arg1) {
     uint64_t ret;
     __asm__ volatile (

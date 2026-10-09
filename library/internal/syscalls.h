@@ -32,6 +32,29 @@
 #define GET_CWD            25
 #define READ_FILE_AT       26
 #define MOVE_FILE          27
+#define MAP_USER_MEMORY    28
+#define PROTECT_USER_MEMORY 29
+#define UNMAP_USER_MEMORY  30
+#define GET_PID            31
+#define GET_UID            32
+#define GET_GID            33
+#define GET_EUID           34
+#define GET_EGID           35
+#define GET_UNAME          36
+#define RANDOM_BYTES       37
+#define GET_USER_NAME      38
+#define EXEC_ARGS          39
+#define EXEC_ELF           40
+
+#define USER_MEMORY_READ    0x1
+#define USER_MEMORY_WRITE   0x2
+#define USER_MEMORY_EXEC    0x4
+#define USER_MEMORY_MAX_SIZE (16 * 1024 * 1024)
+
+/* User memory calls use page-aligned addresses; map/protect also take permission flags. */
+/* Native process IDs are currently single-process: PID is 1 and UID/GID are 0. */
+/* RANDOM_BYTES takes (buffer, length, 0); it requires CPU RDRAND support. */
+/* EXEC_ARGS takes (path, argc, argv); EXEC_ELF takes a path to an ELF file. */
 
 #define SYS_EXIT           60
 

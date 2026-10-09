@@ -3,6 +3,7 @@
 
 #include "stdint.h"
 #include "internal/syscalls.h"
+#include <boot/syscall.h>
 
 typedef struct {
     uint64_t size;
@@ -47,6 +48,18 @@ static inline uint64_t mkdir_recursive(const char *path) {
 
 static inline uint64_t get_time(uint64_t *out_time) {
     return syscall_1(GET_TIME, (uint64_t)out_time);
+}
+
+static inline uint64_t doge_uname(windoge_utsname_t *out_uname) {
+    return syscall_1(GET_UNAME, (uint64_t)out_uname);
+}
+
+static inline uint64_t doge_random_bytes(void *buffer, uint64_t size) {
+    return syscall_3(RANDOM_BYTES, (uint64_t)buffer, size, 0);
+}
+
+static inline uint64_t doge_get_user_name(char *buffer, uint64_t capacity) {
+    return syscall_2(GET_USER_NAME, (uint64_t)buffer, capacity);
 }
 
 static inline uint64_t stat(const char *path, dogec_stat_t *out_stat) {

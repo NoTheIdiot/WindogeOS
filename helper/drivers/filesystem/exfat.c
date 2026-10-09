@@ -365,6 +365,17 @@ int exfat_resolve_entry(const char *target_name, exfat_target_t *out) {
     }
     return -1;
 }
+
+int exfat_get_info(const char *name, uint64_t *size, bool *is_dir) {
+    exfat_target_t target;
+    if (name == NULL || size == NULL || is_dir == NULL ||
+        exfat_resolve_entry(name, &target) != 0) {
+        return -1;
+    }
+    *size = target.size;
+    *is_dir = target.is_dir;
+    return 0;
+}
 #pragma clang diagnostic pop
 
 int exfat_mount(void) {

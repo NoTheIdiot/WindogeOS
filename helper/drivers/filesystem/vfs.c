@@ -7,6 +7,7 @@
 #include <system.h>
 
 extern int exfat_resolve_entry(const char *target_name, void *out);
+extern int exfat_get_info(const char *name, uint64_t *size, bool *is_dir);
 
 static void fs_sanitize_path(const char *in, char *out, size_t out_size) {
     if (!in || !out || out_size == 0) return;
@@ -165,6 +166,29 @@ int fs_exists(char* filename) {
     }
 
     int rc = (exfat_resolve_entry(leaf, NULL) == 0) ? 1 : 0;
+    fs_leave_path(saved_cwd, walked);
+    return rc;
+}
+
+int fs_get_info(char *filename, uint64_t *size, bool *is_dir) {
+    char leaf[256];
+    char saved_cwd[256];
+    int walked = 0;
+
+    if (filename == NULL || size == NULL || is_dir == NULL) {
+        return -1;
+    }
+
+    if (str_strcmp(filename, "/") == 0 || str_strcmp(filename, ".") == 0) {
+        *size = 0;
+        *is_dir = true;
+        return 0;
+    }
+
+    if (fs_enter_path(filename, leaf, sizeof(leaf), saved_cwd, &walked) != 0) {
+        return -1;
+    }
+    int rc = exfat_get_info(leaf, size, is_dir);
     fs_leave_path(saved_cwd, walked);
     return rc;
 }
