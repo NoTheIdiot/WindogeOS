@@ -68,7 +68,7 @@ def main():
         common_flags = (
             "-g -Wall -Wextra -Werror -Wconversion -std=gnu11 -nostdinc -ffreestanding "
             "-fno-stack-protector -fno-stack-check -fno-lto -fno-PIC -fno-pie "
-            "-ffunction-sections -fdata-sections -Iheaders"
+            "-ffunction-sections -fdata-sections -Iheaders -Ilibrary -Iapps"
         )
 
         c_source = []
@@ -85,6 +85,12 @@ def main():
                             asm_source.append(source_path)
 
         app_sources = []
+        app_library_paths = {
+            os.path.abspath(os.path.normpath(src))
+            for src in getattr(cfg, "app_library_sources", [])
+            if arch in getattr(cfg, "app_library_arches", {}).get(src, [arch])
+        }
+        app_source_arches = getattr(cfg, "app_source_arches", {})
         app_folders = getattr(cfg, "source_folders_apps", ["apps", "userland"])
         for app_dir in app_folders:
             abs_app_dir = os.path.abspath(app_dir)
@@ -92,6 +98,12 @@ def main():
                 for root, _, files in os.walk(abs_app_dir):
                     for file in files:
                         file_path = os.path.join(root, file)
+                        normalized_path = os.path.abspath(os.path.normpath(file_path))
+                        if normalized_path in app_library_paths:
+                            continue
+                        relative_path = os.path.normpath(os.path.relpath(file_path))
+                        if arch not in app_source_arches.get(relative_path, [arch]):
+                            continue
                         if file.endswith(".c"):
                             app_sources.append((file_path, "c"))
                         elif file.endswith(".asm"):
@@ -115,6 +127,13 @@ def main():
                 f"{analyzer_bin} {analyze_flag} {arch_cfg['app_flags']} {common_flags} {src}"
                 for src, ftype in app_sources if ftype == "c"
             ]
+            for lib_src in app_library_paths:
+                if lib_src.endswith(".c"):
+                    lib_flags = " -Wno-conversion" if os.path.basename(lib_src) == "chasm.c" else ""
+                    analyze_cmds.append(
+                        f"{analyzer_bin} {analyze_flag} {arch_cfg['app_flags']} "
+                        f"{common_flags}{lib_flags} {lib_src}"
+                    )
             if analyze_cmds:
                 run_parallel(analyze_cmds)
 
@@ -143,12 +162,29 @@ def main():
 
         if app_sources:
             print(f"[3/4] Compiling {len(app_sources)} Application(s) (parallel)...")
+            app_library_objects = []
+            library_compile_cmds = []
+            for lib_src in app_library_paths:
+                if lib_src.endswith(".c"):
+                    lib_obj = lib_src.replace(os.sep, "_").replace(".c", ".o")
+                    app_library_objects.append(lib_obj)
+                    lib_flags = " -Wno-conversion" if os.path.basename(lib_src) == "chasm.c" else ""
+                    library_compile_cmds.append(
+                        f"{tools['c_compiler']} {arch_cfg['app_flags']} {common_flags}"
+                        f"{lib_flags} -c {lib_src} -o {lib_obj}"
+                    )
+            run_parallel(library_compile_cmds)
+
             app_cmds = []
             for app_src, ftype in app_sources:
                 ext = ".c" if ftype == "c" else ".asm"
                 app_obj = app_src.replace(ext, ".o")
-                app_elf = app_src.replace(ext, ".elf")
-                app_bin = app_src.replace(ext, ".bin")
+                binary_name = getattr(cfg, "app_binary_names", {}).get(
+                    os.path.normpath(os.path.relpath(app_src)),
+                    os.path.splitext(os.path.basename(app_src))[0],
+                )
+                app_elf = os.path.join(os.path.dirname(app_src), binary_name + ".elf")
+                app_bin = os.path.join(os.path.dirname(app_src), binary_name + ".bin")
                 compiled_apps.append(app_bin)
 
                 if ftype == "c":
@@ -158,7 +194,8 @@ def main():
 
                 chain_cmd = (
                     f"{compile_step} && "
-                    f"{tools['linker']} {arch_cfg['linker_flags']} --no-relax -T {arch_cfg['app_linker_script']} {app_obj} -o {app_elf} && "
+                    f"{tools['linker']} {arch_cfg['linker_flags']} --no-relax --gc-sections "
+                    f"-T {arch_cfg['app_linker_script']} {app_obj} {' '.join(app_library_objects)} -o {app_elf} && "
                     f"{tools['objcopy']} -O binary {app_elf} {app_bin} && "
                     f"rm -f {app_obj} {app_elf}"
                 )

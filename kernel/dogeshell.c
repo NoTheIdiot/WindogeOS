@@ -538,7 +538,7 @@ static void dogeshell_print_help(void) {
         "  calc <expression>        | evaluate a calculator expression",
         "  hexdump <file>           | display file bytes",
         "  run <file>               | run a flat binary",
-        "  <app>[.bin]              | run an app from /apps",
+        "  <app>[.bin] [args...]    | run an app from /apps",
         "  bash                     | open Bash; exit returns here",
         "  exit                     | leave Dogeshell",
         "============================================================",
@@ -1075,8 +1075,9 @@ static int dogeshell_execute(int argc, char **argv) {
     } else {
         char app_path[160];
         if (dogeshell_find_app(argv[0], app_path, sizeof(app_path)) == 0) {
-            dogeio_text_println("Applications do not support command-line arguments yet.");
-            return 1;
+            system_run_bin_args(app_path, MAX_FLAT_BINARY_SIZE, argc - 1,
+                                argv + 1);
+            return 0;
         }
     }
 

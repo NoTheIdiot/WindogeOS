@@ -1,7 +1,7 @@
 #ifndef SYSCALLS_H
 #define SYSCALLS_H
 
-#include <stdint.h>
+#include "../stdint.h"
 
 #define READ_FILE          1
 #define WRITE_FILE         2

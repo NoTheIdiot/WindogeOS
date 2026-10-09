@@ -34,6 +34,11 @@ int system_create_user(char* name, char* password, int permission_id);
 int system_verify_user(const char* name, char* password);
 int system_can_access_path(const char* username, const char* target_path);
 void system_run_exec(char *filename, int program_size);
+void system_run_bin_args(char *filename, int program_size, int argc, char **argv);
+void system_run_bin_args_impl(char *filename, int program_size, int argc, char **argv);
+extern void to_userland_ring3_args(uint64_t user_rip, uint64_t user_rsp,
+                                   uint64_t argc, uint64_t argv)
+    __attribute__((noreturn));
 
 // paging
 void setup_ring3_memory(uint64_t user_code_virt, uint64_t user_stack_virt, const uint8_t *user_code, size_t code_size);

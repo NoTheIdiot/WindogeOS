@@ -11,7 +11,59 @@ extern volatile struct limine_hhdm_request hhdm_request;
 #define USER_STACK_BASE 0x00007FFFF0000000ULL
 #define PAGE_SIZE       4096
 
+static size_t bin_argument_length(const char *argument) {
+    size_t length = 0;
+    while (argument[length] != '\0' && length < 256) {
+        length++;
+    }
+    return length;
+}
+
 void system_run_bin_impl(char *filename, int program_size) {
+    system_run_bin_args_impl(filename, program_size, 0, NULL);
+}
+
+static int prepare_user_arguments(uint8_t *stack_page, int argc, char **argv,
+                                  uint64_t *user_argv) {
+    uint64_t argument_addresses[32];
+    size_t cursor = PAGE_SIZE;
+
+    if (argc < 0 || argc > 32 || (argc > 0 && argv == NULL)) {
+        return -1;
+    }
+
+    for (int i = 0; i < argc; i++) {
+        if (argv[i] == NULL) {
+            return -1;
+        }
+        size_t length = bin_argument_length(argv[i]);
+        if (length == 256 || length + 1 > cursor) {
+            return -1;
+        }
+        cursor -= length + 1;
+        argument_addresses[i] = USER_STACK_BASE + cursor;
+        for (size_t j = 0; j < length; j++) {
+            stack_page[cursor + j] = (uint8_t)argv[i][j];
+        }
+        stack_page[cursor + length] = '\0';
+    }
+
+    cursor &= ~(sizeof(uint64_t) - 1U);
+    size_t vector_size = ((size_t)argc + 1U) * sizeof(uint64_t);
+    if (vector_size > cursor) {
+        return -1;
+    }
+    cursor -= vector_size;
+    uint64_t *vector = (uint64_t *)(stack_page + cursor);
+    for (int i = 0; i < argc; i++) {
+        vector[i] = argument_addresses[i];
+    }
+    vector[argc] = 0;
+    *user_argv = USER_STACK_BASE + cursor;
+    return 0;
+}
+
+void system_run_bin_args_impl(char *filename, int program_size, int argc, char **argv) {
     if (!filename || program_size <= 0 || program_size > MAX_FLAT_BINARY_SIZE) {
         dogeio_text_println("[Error] Invalid binary filename or size.");
         return;
@@ -90,9 +142,18 @@ void system_run_bin_impl(char *filename, int program_size) {
     }
     map_user_page(USER_STACK_BASE, stack_phys);
 
+    uint64_t user_argv;
+    if (prepare_user_arguments((uint8_t *)(stack_phys + hhdm_offset),
+                               argc, argv, &user_argv) != 0) {
+        dogeio_text_println("[Error] Application arguments exceed the user stack.");
+        cleanup_user_pages();
+        return;
+    }
+
     uint64_t user_stack_top = (USER_STACK_BASE + PAGE_SIZE) - 8;
 
     log("[dogeing] executing binary");
 
-    to_userland_ring3(USER_CODE_BASE, user_stack_top);
+    to_userland_ring3_args(USER_CODE_BASE, user_stack_top, (uint64_t)argc,
+                           user_argv);
 }

@@ -1,8 +1,8 @@
 #ifndef USER_STRING_H
 #define USER_STRING_H
 
-#include <stddef.h>
-#include <stdint.h>
+#include "stddef.h"
+#include "stdint.h"
 
 #ifndef restrict
 #define restrict __restrict

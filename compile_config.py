@@ -50,3 +50,7 @@ common_flags = (
 # and the apps source folder where the apps are compiled from
 source_folders_regular = ["kernel", "helper"]
 source_folders_apps    = ["apps"]
+app_library_sources   = ["apps/chasm.c"]
+app_library_arches    = {"apps/chasm.c": ["x86_64"]}
+app_binary_names      = {"apps/chasm_cli.c": "chasm"}
+app_source_arches     = {"apps/chasm_cli.c": ["x86_64"]}

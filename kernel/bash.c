@@ -1073,7 +1073,7 @@ static int execute_command(int argc, char **argv) {
         return 0;
     }
 
-    if (argc == 1 && str_strcmp(argv[0], ".") != 0 &&
+    if (argc > 0 && str_strcmp(argv[0], ".") != 0 &&
         str_strcmp(argv[0], "..") != 0) {
         size_t command_length = text_length(argv[0]);
         int explicit_path = 0;
@@ -1092,7 +1092,8 @@ static int execute_command(int argc, char **argv) {
                 return 126;
             }
             if (fs_exists(argv[0])) {
-                system_run_bin(argv[0], MAX_FLAT_BINARY_SIZE);
+                system_run_bin_args(argv[0], MAX_FLAT_BINARY_SIZE,
+                                    argc - 1, argv + 1);
                 return 0;
             }
             dogeio_text_print("bash: ");
@@ -1141,7 +1142,8 @@ static int execute_command(int argc, char **argv) {
             return 1;
         }
         if (fs_exists(path)) {
-            system_run_bin(path, MAX_FLAT_BINARY_SIZE);
+            system_run_bin_args(path, MAX_FLAT_BINARY_SIZE,
+                                argc - 1, argv + 1);
             return 0;
         }
     }

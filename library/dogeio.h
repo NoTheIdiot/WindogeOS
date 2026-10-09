@@ -1,7 +1,7 @@
 #ifndef USER_DOGEIO_H
 #define USER_DOGEIO_H
 
-#include <stdint.h>
+#include "stdint.h"
 #include "internal/syscalls.h"
 
 typedef struct {
