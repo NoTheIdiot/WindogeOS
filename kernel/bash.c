@@ -1039,12 +1039,12 @@ static int execute_command(int argc, char **argv) {
             return 1;
         }
         if (str_strcmp(argv[1], "--help") == 0) {
-            dogeio_text_println("Dogeedit v2.1");
+            dogeio_text_println("Dogeedit v2.2");
             dogeio_text_println("edit <file>");
             return 0;
         }
         if (str_strcmp(argv[1], "--version") == 0) {
-            dogeio_text_println("Dogeedit v2.1");
+            dogeio_text_println("Dogeedit v2.2");
             return 0;
         }
         if (!authorize_path(argv[1])) {
@@ -1054,7 +1054,15 @@ static int execute_command(int argc, char **argv) {
             dogeio_text_println("bash: edit: unable to create file");
             return 1;
         }
-        system_editor(argv[1]);
+        char editor_path[32] = "/apps/editor.bin";
+        if (!fs_exists(editor_path)) {
+            text_copy(editor_path, sizeof(editor_path), "/editor.bin");
+        }
+        if (!fs_exists(editor_path)) {
+            dogeio_text_println("bash: edit: editor app is not installed");
+            return 127;
+        }
+        system_run_bin_args(editor_path, MAX_FLAT_BINARY_SIZE, 1, &argv[1]);
         return 0;
     }
     if (str_strcmp(argv[0], "run") == 0) {

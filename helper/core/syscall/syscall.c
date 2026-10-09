@@ -40,7 +40,7 @@ typedef struct {
     uint64_t user_rsp_scratch;
 } __attribute__((packed)) per_cpu_data_t;
 
-static uint8_t syscall_stack[16384] __attribute__((aligned(16)));
+static uint8_t syscall_stack[65536] __attribute__((aligned(16)));
 static per_cpu_data_t bsp_cpu_data;
 uint64_t kernel_program_launcher_rsp = 0;
 uint64_t kernel_program_launcher_rflags = 0;

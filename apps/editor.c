@@ -1,29 +1,66 @@
-#include <string.h>
-#include <bool.h>
-#include <system.h>
-#include <dogeio.h>
+#include "../library/dogeio.h"
+#include "../library/string.h"
+#include "../library/stddef.h"
+#include "../library/bool.h"
+
+#define TERMINAL_COLS 160
+#define TERMINAL_ROWS 50
+#define COLOR_BLACK 0x000000U
+#define COLOR_WHITE 0xAAAAAAU
+#define COLOR_DARK_GRAY 0x282828U
+
+#define KEY_UP 0x101
+#define KEY_DOWN 0x102
+#define KEY_LEFT 0x103
+#define KEY_RIGHT 0x104
+#define KEY_BACKSPACE 0x008
+#define KEY_ENTER 0x00A
+#define KEY_CTRL_O 0x110
+#define KEY_CTRL_N 0x111
 
 #define MAX_LINES       1000
 #define MAX_LINE_LEN    256
+#define MAX_FILE_SIZE   8192
 
 #define TOP_MARGIN      1  
 #define BOTTOM_MARGIN   1  
 #define VIEWPORT_ROWS   (TERMINAL_ROWS - TOP_MARGIN - BOTTOM_MARGIN)
-#define VIEWPORT_COLS   TERMINAL_COLS
+#define VIEWPORT_COLS  TERMINAL_COLS
 
-static char lines[MAX_LINES][MAX_LINE_LEN];
-static uint32_t line_lens[MAX_LINES];
-static uint32_t total_lines = 1;
+static char lines[MAX_LINES][MAX_LINE_LEN]
+    __attribute__((section(".data.editor"))) = {{1}};
+static uint32_t line_lens[MAX_LINES]
+    __attribute__((section(".data.editor"))) = {1};
+static uint32_t total_lines __attribute__((section(".data.editor"))) = 1;
 
-static uint32_t cursor_col = 0; 
-static uint32_t cursor_row = 0; 
+static uint32_t cursor_col __attribute__((section(".data.editor"))) = 1;
+static uint32_t cursor_row __attribute__((section(".data.editor"))) = 1;
 
-static uint32_t scroll_row = 0; 
-static uint32_t scroll_col = 0; 
+static uint32_t scroll_row __attribute__((section(".data.editor"))) = 1;
+static uint32_t scroll_col __attribute__((section(".data.editor"))) = 1;
 
-static char current_filename[128] = "untitled.txt";
-static bool is_modified = false;
-static bool should_quit = false;
+static char current_filename[128] __attribute__((section(".data.editor"))) =
+    "untitled.txt";
+static bool is_modified __attribute__((section(".data.editor"))) = true;
+static bool should_quit __attribute__((section(".data.editor"))) = true;
+
+static int text_equal(const char *left, const char *right) {
+    while (*left != '\0' && *right != '\0' && *left == *right) {
+        left++;
+        right++;
+    }
+    return *left == '\0' && *right == '\0';
+}
+
+static int copy_text(char *destination, size_t capacity,
+                     const char *source) {
+    size_t length = str_strlen(source);
+    if (length == 0 || length >= capacity) {
+        return -1;
+    }
+    memcpy(destination, source, length + 1);
+    return 0;
+}
 
 static void reset_editor_buffer(void) {
     for (size_t i = 0; i < MAX_LINES; i++) {
@@ -51,10 +88,12 @@ static bool load_file_from_disk(const char *filename) {
     char requested_filename[sizeof(current_filename)];
     memcpy(requested_filename, filename, name_len + 1);
 
-    static char raw_buf[8192];
-    int bytes_read = 0;
-    if (fs_exists(requested_filename)) {
-        bytes_read = fs_read(requested_filename, raw_buf, sizeof(raw_buf) - 1);
+    static char raw_buf[MAX_FILE_SIZE]
+        __attribute__((section(".data.editor"))) = {1};
+    int64_t bytes_read = 0;
+    if (file_exists(requested_filename) == 1) {
+        bytes_read = (int64_t)read_file(requested_filename, raw_buf,
+                                        sizeof(raw_buf) - 1);
         if (bytes_read < 0) {
             return false;
         }
@@ -68,7 +107,7 @@ static bool load_file_from_disk(const char *filename) {
     }
 
     uint32_t r = 0, c = 0;
-    for (int i = 0; i < bytes_read && r < MAX_LINES; i++) {
+    for (int64_t i = 0; i < bytes_read && r < MAX_LINES; i++) {
         char ch = raw_buf[i];
         if (ch == '\r') continue;
 
@@ -96,7 +135,8 @@ static bool load_file_from_disk(const char *filename) {
 }
 
 static bool save_file_to_disk(void) {
-    static char save_buf[8192];
+    static char save_buf[MAX_FILE_SIZE]
+        __attribute__((section(".data.editor"))) = {1};
     uint32_t ptr = 0;
 
     for (uint32_t i = 0; i < total_lines; i++) {
@@ -111,15 +151,12 @@ static bool save_file_to_disk(void) {
     }
     save_buf[ptr] = '\0';
 
-    if (fs_exists(current_filename)) {
-        fs_delete(current_filename);
-    }
-
-    if (fs_create(current_filename) < 0) {
+    if (file_exists(current_filename) != 1 &&
+        (int64_t)create_file(current_filename) < 0) {
         return false;
     }
 
-    if (fs_write(current_filename, save_buf) < 0) {
+    if ((int64_t)write_file(current_filename, save_buf) < 0) {
         return false;
     }
 
@@ -128,28 +165,24 @@ static bool save_file_to_disk(void) {
 }
 
 static void render_status_bar(void) {
-    uint32_t orig_bg = dogeio_background_color;
-    uint32_t orig_fg = dogeio_text_color;
-
-    dogeio_text_background_change(COLOR_DARK_GRAY);
-    dogeio_text_color_change(COLOR_WHITE);
-
     uint32_t status_y = TERMINAL_ROWS - 1;
     char blank_line[TERMINAL_COLS + 1];
     memset(blank_line, ' ', TERMINAL_COLS);
     blank_line[TERMINAL_COLS] = '\0';
-    dogeio_text_print_at(blank_line, 0, status_y, COLOR_WHITE);
+    (void)background_color(COLOR_DARK_GRAY);
+    (void)print_at(blank_line, 0, status_y, COLOR_WHITE);
 
-    dogeio_text_print_at(current_filename, 1, status_y, COLOR_WHITE);
+    (void)print_at(current_filename, 1, status_y, COLOR_WHITE);
     if (is_modified) {
-        dogeio_text_print_at("[*]", (uint32_t)(str_strlen(current_filename)) + 2, status_y, COLOR_DARK_GRAY);
+        (void)print_at("[*]", (uint32_t)(str_strlen(current_filename)) + 2,
+                       status_y, COLOR_WHITE);
     }
     
     const char *controls = "^S: Save | ^X: Quit | ^O: Open | ^N: New";
-    dogeio_text_print_at(controls, TERMINAL_COLS - (uint32_t)(str_strlen(controls)) - 1, status_y, COLOR_WHITE);
-
-    dogeio_text_background_change(orig_bg);
-    dogeio_text_color_change(orig_fg);
+    (void)print_at(controls,
+                   TERMINAL_COLS - (uint32_t)(str_strlen(controls)) - 1,
+                   status_y, COLOR_WHITE);
+    (void)background_color(COLOR_BLACK);
 }
 
 static void render_editor(void) {
@@ -191,7 +224,7 @@ static void render_editor(void) {
         }
         line_buf[VIEWPORT_COLS] = '\0';
 
-        dogeio_text_print_at(line_buf, 0, target_y, dogeio_text_color);
+        (void)print_at(line_buf, 0, target_y, COLOR_WHITE);
     }
 
     render_status_bar();
@@ -205,13 +238,10 @@ static void render_editor(void) {
             c = lines[cursor_row][cursor_col];
         }
         char cur_str[2] = { c, '\0' };
-        dogeio_text_background_change(COLOR_WHITE);
-        dogeio_text_print_at(cur_str, vis_cursor_x, vis_cursor_y, COLOR_BLACK);
-        dogeio_text_background_change(COLOR_BLACK);
-        dogeio_text_color_change(COLOR_WHITE);
+        (void)background_color(COLOR_WHITE);
+        (void)print_at(cur_str, vis_cursor_x, vis_cursor_y, COLOR_BLACK);
+        (void)background_color(COLOR_BLACK);
     }
-
-    dogeio_cursor_visible = false;
 }
 
 static void insert_char(char c) {
@@ -284,13 +314,17 @@ static bool editor_confirm_changes(void) {
     }
 
     char answer[8];
-    dogeio_text_input("Save current changes before continuing? (y/n/c) ", answer, sizeof(answer));
+    memset(answer, 0, sizeof(answer));
+    if ((int64_t)input("Save current changes before continuing? (y/n/c) ",
+                       answer, sizeof(answer)) < 0) {
+        return false;
+    }
     if (answer[0] == 'y' || answer[0] == 'Y') {
         if (save_file_to_disk()) {
             return true;
         }
-        dogeio_text_println("Unable to save the current file; operation cancelled.");
-        dogeio_get_key();
+        println("Unable to save the current file; operation cancelled.");
+        (void)get_key();
         return false;
     }
     return answer[0] == 'n' || answer[0] == 'N';
@@ -298,33 +332,39 @@ static bool editor_confirm_changes(void) {
 
 static void editor_open_file(void) {
     char filename[sizeof(current_filename)];
-    dogeio_text_input("Open file: ", filename, sizeof(filename));
+    memset(filename, 0, sizeof(filename));
+    if ((int64_t)input("Open file: ", filename, sizeof(filename)) < 0) {
+        return;
+    }
     if (filename[0] == '\0') {
         return;
     }
-    if (!fs_exists(filename)) {
-        dogeio_text_println("File not found; current document was not changed.");
-        dogeio_get_key();
+    if (file_exists(filename) != 1) {
+        println("File not found; current document was not changed.");
+        (void)get_key();
         return;
     }
     if (!editor_confirm_changes()) {
         return;
     }
     if (!load_file_from_disk(filename)) {
-        dogeio_text_println("Unable to read file; current document was not changed.");
-        dogeio_get_key();
+        println("Unable to read file; current document was not changed.");
+        (void)get_key();
     }
 }
 
 static void editor_new_file(void) {
     char filename[sizeof(current_filename)];
-    dogeio_text_input("New file name: ", filename, sizeof(filename));
+    memset(filename, 0, sizeof(filename));
+    if ((int64_t)input("New file name: ", filename, sizeof(filename)) < 0) {
+        return;
+    }
     if (filename[0] == '\0') {
         return;
     }
-    if (fs_exists(filename)) {
-        dogeio_text_println("File already exists; use Ctrl+O to open it.");
-        dogeio_get_key();
+    if (file_exists(filename) == 1) {
+        println("File already exists; use Ctrl+O to open it.");
+        (void)get_key();
         return;
     }
     if (!editor_confirm_changes()) {
@@ -333,25 +373,34 @@ static void editor_new_file(void) {
     load_file_from_disk(filename);
 }
 
-void system_editor(char* filename) {
-    if (!filename || filename[0] == '\0') {
-        dogeio_text_println("Error: Invalid filename.");
-        return;
+void _start(int argc, char **argv) {
+    if (argc == 1 && argv != NULL && argv[0] != NULL &&
+        (text_equal(argv[0], "--help") ||
+         text_equal(argv[0], "--version"))) {
+        println(text_equal(argv[0], "--help") ? "Usage: edit <file>"
+                                               : "Dogeedit v2.2");
+        sys_exit(0);
+    }
+    if (argc != 1 || argv == NULL || argv[0] == NULL ||
+        argv[0][0] == '\0' ||
+        copy_text(current_filename, sizeof(current_filename), argv[0]) != 0) {
+        println("Usage: edit <file>");
+        sys_exit(2);
     }
 
-    dogeio_text_background_change(COLOR_BLACK);
-    dogeio_text_color_change(COLOR_WHITE);
+    (void)background_color(COLOR_BLACK);
+    (void)text_color(COLOR_WHITE);
 
     should_quit = false;
-    if (!load_file_from_disk(filename)) {
-        dogeio_text_println("Unable to read file.");
-        return;
+    if (!load_file_from_disk(current_filename)) {
+        println("Unable to read file.");
+        sys_exit(1);
     }
 
     while (!should_quit) {
         render_editor();
 
-        uint16_t key = dogeio_get_key();
+        uint16_t key = (uint16_t)get_key();
 
         switch (key) {
             case KEY_UP:
@@ -399,7 +448,10 @@ void system_editor(char* filename) {
                 break;
 
             case 0x13:
-                save_file_to_disk();
+                if (!save_file_to_disk()) {
+                    println("Unable to save the current file.");
+                    (void)get_key();
+                }
                 break;
 
             case 0x18:
@@ -422,5 +474,5 @@ void system_editor(char* filename) {
         }
     }
 
-    dogeio_text_clear();
+    sys_exit(0);
 }

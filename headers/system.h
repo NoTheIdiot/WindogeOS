@@ -26,8 +26,6 @@ extern uint32_t old;
 extern char* dogeshell_version;
 extern char computer_name[64];
 
-void system_editor(char* filename);
-
 uint64_t get_ram_end_address(void);
 uint64_t get_ram(void);
 int system_create_user(char* name, char* password, int permission_id);

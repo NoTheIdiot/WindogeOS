@@ -990,12 +990,12 @@ static int dogeshell_execute(int argc, char **argv) {
             return 1;
         }
         if (str_strcmp(argv[1], "--help") == 0) {
-            dogeio_text_println("Dogeedit v2.1");
+            dogeio_text_println("Dogeedit v2.2");
             dogeio_text_println("edit <file>");
             return 0;
         }
         if (str_strcmp(argv[1], "--version") == 0) {
-            dogeio_text_println("Dogeedit v2.1");
+            dogeio_text_println("Dogeedit v2.2");
             return 0;
         }
         if (!dogeshell_authorize_path(argv[1], path, sizeof(path))) {
@@ -1005,7 +1005,15 @@ static int dogeshell_execute(int argc, char **argv) {
             dogeio_text_println("Error: unable to create file.");
             return 1;
         }
-        system_editor(path);
+        char editor_path[160];
+        if (dogeshell_find_app("editor", editor_path,
+                               sizeof(editor_path)) != 0) {
+            dogeio_text_println("Error: editor app is not installed.");
+            return 127;
+        }
+        char *editor_args[] = {path};
+        system_run_bin_args(editor_path, MAX_FLAT_BINARY_SIZE, 1,
+                            editor_args);
         return 0;
     }
     if (str_strcmp(argv[0], "settings") == 0) {
