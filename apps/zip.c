@@ -81,13 +81,18 @@ uint32_t calculate_crc32(const uint8_t *data, size_t length) {
     return ~crc;
 }
 
-size_t compress_stored(const char *filename, const uint8_t *file_data, size_t file_size, uint8_t *out_buf) {
-    uint8_t *ptr = out_buf;
+size_t compress_stored(const char *filename, char* output, size_t file_size) {
+    if (!file_exists(filename)) {
+        return -(size_t)1;
+    }
+    uint8_t file_data[MAX_SIZE];
+    read_file_raw(filename, file_data, file_size);
+    uint8_t *ptr = file_data;
     uint16_t name_len = (uint16_t)private_strlen(filename);
     uint32_t crc = calculate_crc32(file_data, file_size);
     uint32_t truncated_size = (uint32_t)file_size;
 
-    uint32_t local_header_offset = (uint32_t)(ptr - out_buf);
+    uint32_t local_header_offset = (uint32_t)(ptr - file_data);
     LocalHeader *lh = (LocalHeader *)ptr;
     lh->signature = 0x04034B50;
     lh->version_needed = 10;
@@ -107,7 +112,7 @@ size_t compress_stored(const char *filename, const uint8_t *file_data, size_t fi
     private_memcpy(ptr, file_data, file_size);
     ptr += file_size;
 
-    uint32_t central_dir_offset = (uint32_t)(ptr - out_buf);
+    uint32_t central_dir_offset = (uint32_t)(ptr - file_data);
     CentralDirHeader *cd = (CentralDirHeader *)ptr;
     cd->signature = 0x02014B50;
     cd->version_made = 20;
@@ -130,7 +135,7 @@ size_t compress_stored(const char *filename, const uint8_t *file_data, size_t fi
 
     private_memcpy(ptr, filename, name_len);
     ptr += name_len;
-    uint32_t central_dir_size = (uint32_t)(ptr - out_buf) - central_dir_offset;
+    uint32_t central_dir_size = (uint32_t)(ptr - file_data) - central_dir_offset;
 
     EOCD *eocd = (EOCD *)ptr;
     eocd->signature = 0x06054B50;
@@ -142,11 +147,12 @@ size_t compress_stored(const char *filename, const uint8_t *file_data, size_t fi
     eocd->cd_offset = central_dir_offset;
     eocd->comment_len = 0;
     ptr += sizeof(EOCD);
+    write_file_raw(output, file_data, sizeof(file_data));
 
-    return (size_t)(ptr - out_buf);
+    return (size_t)(ptr - file_data);
 }
 
-int decompress_stored(char* filename, uint8_t *out_dest, size_t *out_size) {
+int decompress_stored(char* filename, char* output, uint8_t *out_dest, size_t *out_size) {
     if (!file_exists(filename)) {
         return -1;
     }
@@ -170,6 +176,8 @@ int decompress_stored(char* filename, uint8_t *out_dest, size_t *out_size) {
 
     private_memcpy(out_dest, payload_ptr, lh->comp_size);
     *out_size = (size_t)lh->comp_size;
+    create_file(output);
+    write_file_raw(output, out_dest, sizeof(out_dest));
     
     return 0; 
 }
