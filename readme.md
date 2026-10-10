@@ -6,9 +6,11 @@ Also being easy to use on the command line.
 ## Minimum requirements
 Any x86_64 CPU will work, and also you will ned at least
 4MB of RAM and 4MB of disk, and it will run pretty well.
+Dogescript full functionality requires about 6MB of RAM.
 
 ## Recommended Specs
 Any CPU, 6MB of RAM and 8MB of disk for the best experience.
+Dogescript for advanced scripts also needs 8MB of RAM.
 
 ## Updates
 Nothing special read commits and releases
