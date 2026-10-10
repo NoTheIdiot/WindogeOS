@@ -36,58 +36,6 @@ Nothing special read commits and releases
   that's it, you might have to type in your sudo password
   for compile.py
 
-## Applications
-- `file_manager [directory]` interactively lists and manages files and directories.
-  Use `help` inside the app to see its commands.
-- `hexdump <file>` prints a file as hexadecimal bytes and readable ASCII.
-- `dogescript <file> [arguments...]` runs a Dogescript script. See
-  [Dogescript scripting](#dogescript-scripting) for its commands and syntax.
-- `pages <file>` reads a text file one screen at a time. Use Up/Down or
-  Space/`b` to navigate, `g` to return to the beginning, and `q` to quit.
-
-## Dogescript scripting, for some reason?
-
-Dogescript provides variables, input/output, arithmetic, file operations,
-conditions, loops, and access to Dogeshell commands. Scripts are limited to
-65535 bytes and 255 characters per line. Blank lines and lines whose first
-non-space character is `#` are ignored. Quoted strings and backslash escapes
-are supported. It ruined my sanity.
-
-```text
-# Variables and arguments
-set name "$1"
-echo "Hello, $name"
-
-# Arithmetic, comparisons, and branching
-set count 1
-math count $count + 1
-if $count >= 2
-    println "The count is at least two"
-else
-    println "The count is less than two"
-endif
-
-# Loops
-repeat 3
-    echo "Repeated"
-endrepeat
-
-while $count < 5
-    inc count
-endwhile
-
-# File helpers
-write /tmp/greeting.txt "Hello, $name"
-read greeting /tmp/greeting.txt
-println $greeting
-```
-
-Variables can be expanded as `$name` or `${name}`. `$0` is the script path,
-`$1` through `$N` are the arguments after the script path, and `$argc` is their
-count. Other commands are passed to Dogeshell. Execution stops on the first
-failed command unless the script uses `exit`; `assert` and `fail` also return
-failure. A 500000-command execution limit prevents runaway scripts.
-
 ## Contributing
 Thanks for contributing for some reason...
 You can do anything but remind me if there are alot of or major 
