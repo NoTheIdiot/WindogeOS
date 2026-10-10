@@ -33,6 +33,15 @@ static int bytes_match(const char *actual, const char *expected, size_t length) 
     return 1;
 }
 
+static int has_name(char names[][256], uint64_t count, const char *expected) {
+    for (uint64_t i = 0; i < count; i++) {
+        if (str_strcmp(names[i], expected) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 static void make_path(char *path, const char *directory, const char *filename) {
     str_strcpy(path, directory);
     str_strcat(path, "/");
@@ -102,6 +111,23 @@ void _start(void) {
                       bytes_match(file_buffer, "first\nsecond\n", 13);
         report("READ_FILE", read_ok);
 
+        dogec_stat_t source_stat;
+        dogec_stat_t directory_stat;
+        source_stat.size = 0;
+        source_stat.is_dir = 0;
+        source_stat.exists = 0;
+        directory_stat.size = 0;
+        directory_stat.is_dir = 0;
+        directory_stat.exists = 0;
+        uint64_t source_stat_result = stat(source_path, &source_stat);
+        uint64_t directory_stat_result = stat(test_dir, &directory_stat);
+        report("STAT (file size and type)",
+               result_succeeded(source_stat_result) &&
+               source_stat.size == 13 && source_stat.is_dir == 0);
+        report("STAT (directory type)",
+               result_succeeded(directory_stat_result) &&
+               directory_stat.is_dir == 1);
+
         uint64_t truncate_result = result_succeeded(read_result)
             ? delete_last_line(source_path)
             : (uint64_t)-1;
@@ -155,8 +181,10 @@ void _start(void) {
         have_moved = result_succeeded(move_result) &&
                      file_exists(copy_path) == 1 &&
                      file_exists(renamed_path) == 0;
-        have_renamed = have_renamed && !have_moved;
-        have_copy = have_moved;
+        if (have_moved) {
+            have_renamed = 0;
+            have_copy = 1;
+        }
         report("MOVE_FILE", have_moved);
 
         uint64_t change_result = change_dir(test_dir);
@@ -167,6 +195,20 @@ void _start(void) {
         int cwd_ok = (int64_t)cwd_length >= 0 &&
                      str_strcmp(cwd_buffer, test_dir) == 0;
         report("GET_CWD", cwd_ok);
+        char listed_names[4][256];
+        for (size_t i = 0; i < sizeof(listed_names) / sizeof(listed_names[0]);
+             i++) {
+            listed_names[i][0] = '\0';
+        }
+        uint64_t list_result = changed_into_test_dir
+            ? list_dir(listed_names, 4)
+            : (uint64_t)-1;
+        int list_ok = result_succeeded(list_result) &&
+                      list_result <=
+                          sizeof(listed_names) / sizeof(listed_names[0]) &&
+                      has_name(listed_names, list_result, TEST_SOURCE_NAME) &&
+                      has_name(listed_names, list_result, TEST_COPY_NAME);
+        report("LIST_DIR (files)", list_ok);
         if (changed_into_test_dir) {
             change_result = change_dir("..");
         }
@@ -203,6 +245,8 @@ void _start(void) {
         report("FILE_EXISTS (created file)", 0);
         report("WRITE_FILE", 0);
         report("READ_FILE", 0);
+        report("STAT (file size and type)", 0);
+        report("STAT (directory type)", 0);
         report("DELETE_LAST_LINE", 0);
         report("DELETE_LAST_LINE result", 0);
         report("APPEND_FILE", 0);
@@ -211,6 +255,7 @@ void _start(void) {
         report("RENAME_FILE", 0);
         report("MOVE_FILE", 0);
         report("GET_CWD", 0);
+        report("LIST_DIR (files)", 0);
         report("CHANGE_DIR", 0);
         report("DELETE_FILE (source)", 0);
         report("DELETE_FILE (moved file)", 0);

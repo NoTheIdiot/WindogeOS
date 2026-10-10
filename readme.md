@@ -36,6 +36,11 @@ Nothing special read commits and releases
   that's it, you might have to type in your sudo password
   for compile.py
 
+## Applications
+- `file_manager [directory]` interactively lists and manages files and directories.
+  Use `help` inside the app to see its commands.
+- `hexdump <file>` prints a file as hexadecimal bytes and readable ASCII.
+
 ## Contributing
 Thanks for contributing for some reason...
 You can do anything but remind me if there are alot of or major 

@@ -81,6 +81,7 @@ int         exfat_delete_node(const char *name);
 int         exfat_truncate_last_line(const char *name);
 int         exfat_print_directory(int hidden);
 int         exfat_list_files(char (*names)[256], size_t capacity);
+int         exfat_list_entries(char (*names)[256], size_t capacity);
 int         exfat_change_directory(const char *path);
 const char* exfat_get_working_dir(void);
 int         exfat_mount(void);
@@ -219,6 +220,7 @@ void nvme_pci_callback(uint8_t b, uint8_t d, uint8_t f, uint16_t ven, uint16_t d
 #define GET_USER_NAME      38
 #define EXEC_ARGS          39
 #define EXEC_ELF           40
+#define LIST_DIR           41
 
 #define USER_MEMORY_READ    0x1ULL
 #define USER_MEMORY_WRITE   0x2ULL

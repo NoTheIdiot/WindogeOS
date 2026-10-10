@@ -1045,20 +1045,6 @@ static int dogeshell_execute(int argc, char **argv) {
         dogeio_text_println(result_text);
         return 0;
     }
-    if (str_strcmp(argv[0], "hexdump") == 0) {
-        if (argc != 2) {
-            dogeio_text_println("Usage: hexdump <file>");
-            return 1;
-        }
-        if (!dogeshell_authorize_path(argv[1], path, sizeof(path))) {
-            return 1;
-        }
-        if (util_hexdump(path) != 0) {
-            dogeio_text_println("Error: file doesn't exist or cannot be read.");
-            return 1;
-        }
-        return 0;
-    }
     if (str_strcmp(argv[0], "bash") == 0) {
         system_bash();
         return 0;

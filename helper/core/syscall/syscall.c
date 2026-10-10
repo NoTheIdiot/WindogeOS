@@ -804,12 +804,34 @@ uint64_t syscall_handler(syscall_registers_t *regs) {
 
             dogec_stat_t *stat_out = (dogec_stat_t *)regs->rsi;
             memset(stat_out, 0, sizeof(*stat_out));
-            stat_out->exists = fs_exists(path) ? 1ULL : 0ULL;
-            if (stat_out->exists) {
-                stat_out->size = 0;
-                stat_out->is_dir = 0;
+            uint64_t size = 0;
+            bool is_dir = false;
+            if (fs_get_info(path, &size, &is_dir) == 0) {
+                stat_out->size = size;
+                stat_out->is_dir = is_dir ? 1ULL : 0ULL;
+                stat_out->exists = 1;
+                ret_val = 0;
+            } else {
+                ret_val = (uint64_t)-1;
             }
-            ret_val = stat_out->exists ? 0ULL : (uint64_t)-1;
+            break;
+        }
+
+        case LIST_DIR: {
+            uint64_t capacity = regs->rsi;
+            if (capacity == 0 ||
+                capacity > USER_IO_LIMIT / 256 ||
+                !user_range_accessible(regs->rdi, capacity * 256, true)) {
+                return (uint64_t)-1;
+            }
+
+            const char *current_directory = fs_dirname();
+            if (current_directory == NULL) {
+                return (uint64_t)-1;
+            }
+            ret_val = (uint64_t)(int64_t)fs_list_entries(
+                current_directory, (char (*)[256])regs->rdi,
+                (size_t)capacity);
             break;
         }
 

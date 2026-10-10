@@ -292,7 +292,9 @@ int fs_list_dir(int hidden) {
     return exfat_print_directory(hidden);
 }
 
-int fs_list_files(const char *directory, char (*names)[256], size_t capacity) {
+static int fs_list_entries_common(const char *directory,
+                                  char (*names)[256], size_t capacity,
+                                  bool include_directories) {
     if (directory == NULL || directory[0] == '\0' ||
         (names == NULL && capacity != 0)) {
         return -1;
@@ -309,7 +311,8 @@ int fs_list_files(const char *directory, char (*names)[256], size_t capacity) {
         return -1;
     }
 
-    int count = exfat_list_files(names, capacity);
+    int count = include_directories ? exfat_list_entries(names, capacity)
+                                    : exfat_list_files(names, capacity);
     if (exfat_change_directory(saved_cwd) != 0) {
         return -1;
     }
@@ -317,6 +320,14 @@ int fs_list_files(const char *directory, char (*names)[256], size_t capacity) {
         return -1;
     }
     return count;
+}
+
+int fs_list_files(const char *directory, char (*names)[256], size_t capacity) {
+    return fs_list_entries_common(directory, names, capacity, false);
+}
+
+int fs_list_entries(const char *directory, char (*names)[256], size_t capacity) {
+    return fs_list_entries_common(directory, names, capacity, true);
 }
 
 int fs_append_data(char *filename, const uint8_t *data, uint32_t size) {

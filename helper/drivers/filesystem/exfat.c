@@ -832,7 +832,8 @@ int exfat_print_directory(int hidden) {
     return 0;
 }
 
-int exfat_list_files(char (*names)[256], size_t capacity) {
+static int exfat_list_entries_impl(char (*names)[256], size_t capacity,
+                                   bool include_directories) {
     uint8_t cluster_buf[4096];
     uint64_t base_lba = exfat_cluster_lba(g_current_cluster);
     size_t count = 0;
@@ -859,7 +860,8 @@ int exfat_list_files(char (*names)[256], size_t capacity) {
 
         exfat_dentry_file_t *file =
             (exfat_dentry_file_t *)&cluster_buf[offset];
-        if ((file->file_attributes & 0x10) != 0) {
+        if (!include_directories &&
+            (file->file_attributes & 0x10) != 0) {
             offset += (size_t)file->secondary_count * 32;
             continue;
         }
@@ -907,6 +909,14 @@ int exfat_list_files(char (*names)[256], size_t capacity) {
     }
 
     return count > (size_t)INT32_MAX ? -1 : (int)count;
+}
+
+int exfat_list_files(char (*names)[256], size_t capacity) {
+    return exfat_list_entries_impl(names, capacity, false);
+}
+
+int exfat_list_entries(char (*names)[256], size_t capacity) {
+    return exfat_list_entries_impl(names, capacity, true);
 }
 
 int exfat_change_directory(const char *path) {

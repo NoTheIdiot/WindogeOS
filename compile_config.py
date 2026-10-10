@@ -55,8 +55,12 @@ app_library_arches    = {"apps/chasm.c": ["x86_64"]}
 app_binary_names      = {
     "apps/chasm_cli.c": "chasm",
     "apps/editor.c": "editor",
+    "apps/file_manager.c": "file_manager",
+    "apps/hexdump.c": "hexdump",
 }
 app_source_arches     = {
     "apps/chasm_cli.c": ["x86_64"],
     "apps/editor.c": ["x86_64"],
+    "apps/file_manager.c": ["x86_64"],
+    "apps/hexdump.c": ["x86_64"],
 }

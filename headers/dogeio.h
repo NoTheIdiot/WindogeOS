@@ -116,6 +116,7 @@ int   fs_chdir(char* folder);
 char* fs_dirname(void);
 int   fs_mount(void);
 int   fs_list_files(const char *directory, char (*names)[256], size_t capacity);
+int   fs_list_entries(const char *directory, char (*names)[256], size_t capacity);
 int   fs_list(const char* directory, int show_hidden);
 int   fs_read_raw(char* filename, uint8_t* output_buffer, uint64_t max_size);
 int   fs_read_raw_at(char* filename, uint8_t* output_buffer, uint64_t offset, uint64_t max_size);
