@@ -25,6 +25,14 @@
     syscall
 %endmacro
 
+%macro fs_write_raw 3
+    mov rax, WRITE_FILE_RAW
+    mov rdi, %1
+    mov rsi, %2
+    mov rdx, %3
+    syscall
+%endmacro
+
 %macro fs_append 3
     mov rax, APPEND_FILE
     mov rdi, %1

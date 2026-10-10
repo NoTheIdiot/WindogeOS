@@ -36,14 +36,32 @@ static inline uint64_t read_file(const char *path, void *buffer, uint64_t size) 
     return syscall_3(READ_FILE, (uint64_t)path, (uint64_t)buffer, size);
 }
 
+/* Raw reads return bytes without adding a string terminator. */
+static inline uint64_t read_file_raw(const char *path, uint8_t *buffer,
+                                     uint64_t size) {
+    return syscall_3(READ_FILE, (uint64_t)path, (uint64_t)buffer, size);
+}
+
 static inline uint64_t read_file_at(const char *path, void *buffer,
                                     uint64_t offset, uint64_t size) {
     return syscall_4(READ_FILE_AT, (uint64_t)path, (uint64_t)buffer,
                      offset, size);
 }
 
+static inline uint64_t read_file_raw_at(const char *path, uint8_t *buffer,
+                                        uint64_t offset, uint64_t size) {
+    return syscall_4(READ_FILE_AT, (uint64_t)path, (uint64_t)buffer,
+                     offset, size);
+}
+
 static inline uint64_t write_file(const char *path, const char *text) {
     return syscall_2(WRITE_FILE, (uint64_t)path, (uint64_t)text);
+}
+
+/* Raw writes replace the file with exactly size bytes. */
+static inline uint64_t write_file_raw(const char *path, const uint8_t *buffer,
+                                      uint64_t size) {
+    return syscall_3(WRITE_FILE_RAW, (uint64_t)path, (uint64_t)buffer, size);
 }
 
 static inline uint64_t append_file(const char *path, const void *buffer,

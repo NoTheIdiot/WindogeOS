@@ -33,6 +33,16 @@ static int bytes_match(const char *actual, const char *expected, size_t length) 
     return 1;
 }
 
+static int raw_bytes_match(const uint8_t *actual, const uint8_t *expected,
+                           size_t length) {
+    for (size_t i = 0; i < length; i++) {
+        if (actual[i] != expected[i]) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
 static int has_name(char names[][256], uint64_t count, const char *expected) {
     for (uint64_t i = 0; i < count; i++) {
         if (str_strcmp(names[i], expected) == 0) {
@@ -55,6 +65,9 @@ void _start(void) {
     char renamed_path[80];
     char suffix[4];
     char file_buffer[TEST_BUFFER_SIZE] = {0};
+    uint8_t raw_file_buffer[TEST_BUFFER_SIZE] = {0};
+    uint8_t raw_offset_buffer[3] = {0};
+    const uint8_t raw_test_data[] = {0x41, 0x00, 0xFF, 0x42, 0x7F};
     char input_buffer[TEST_BUFFER_SIZE] = {0};
     char cwd_buffer[256] = {0};
     int have_test_dir = 0;
@@ -110,6 +123,41 @@ void _start(void) {
                       read_result == 13 &&
                       bytes_match(file_buffer, "first\nsecond\n", 13);
         report("READ_FILE", read_ok);
+
+        uint64_t raw_write_result = read_ok
+            ? write_file_raw(source_path, raw_test_data,
+                             sizeof(raw_test_data))
+            : (uint64_t)-1;
+        int raw_write_ok = raw_write_result == 0;
+        report("WRITE_FILE_RAW (binary bytes)", raw_write_ok);
+
+        uint64_t raw_read_result = raw_write_ok
+            ? read_file_raw(source_path, raw_file_buffer,
+                            sizeof(raw_file_buffer))
+            : (uint64_t)-1;
+        int raw_read_ok = result_succeeded(raw_read_result) &&
+                          raw_read_result == sizeof(raw_test_data) &&
+                          raw_bytes_match(raw_file_buffer, raw_test_data,
+                                          sizeof(raw_test_data));
+        report("READ_FILE_RAW (binary bytes)", raw_read_ok);
+
+        uint64_t raw_read_at_result = raw_read_ok
+            ? read_file_raw_at(source_path, raw_offset_buffer, 2,
+                               sizeof(raw_offset_buffer))
+            : (uint64_t)-1;
+        const uint8_t raw_offset_expected[] = {0xFF, 0x42, 0x7F};
+        int raw_read_at_ok = result_succeeded(raw_read_at_result) &&
+                             raw_read_at_result ==
+                                 sizeof(raw_offset_buffer) &&
+                             raw_bytes_match(raw_offset_buffer,
+                                             raw_offset_expected,
+                                             sizeof(raw_offset_expected));
+        report("READ_FILE_RAW_AT (binary bytes)", raw_read_at_ok);
+
+        uint64_t restore_result = raw_write_ok
+            ? write_file(source_path, "first\nsecond\n")
+            : (uint64_t)-1;
+        report("WRITE_FILE restore text", result_succeeded(restore_result));
 
         dogec_stat_t source_stat;
         dogec_stat_t directory_stat;

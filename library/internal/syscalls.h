@@ -46,6 +46,7 @@
 #define EXEC_ARGS          39
 #define EXEC_ELF           40
 #define LIST_DIR           41
+#define WRITE_FILE_RAW     42
 
 #define USER_MEMORY_READ    0x1
 #define USER_MEMORY_WRITE   0x2

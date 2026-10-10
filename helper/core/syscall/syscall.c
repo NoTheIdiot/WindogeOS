@@ -449,6 +449,21 @@ uint64_t syscall_handler(syscall_registers_t *regs) {
             break;
         }
 
+        case WRITE_FILE_RAW: {
+            char filepath[USER_PATH_LIMIT];
+            uint64_t size = regs->rdx;
+
+            if (!copy_user_string(regs->rdi, filepath, sizeof(filepath), NULL) ||
+                size > USER_IO_LIMIT ||
+                (size != 0 && !user_range_accessible(regs->rsi, size, false))) {
+                return (uint64_t)-1;
+            }
+
+            ret_val = (uint64_t)(int64_t)fs_write_bytes(
+                filepath, (char *)regs->rsi, (uint32_t)size);
+            break;
+        }
+
         case APPEND_FILE: {
             char filepath[USER_PATH_LIMIT];
             uint64_t size = regs->rdx;

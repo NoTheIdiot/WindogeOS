@@ -67,4 +67,5 @@ app_source_arches     = {
     "apps/dogescript.c": ["x86_64"],
     "apps/hexdump.c": ["x86_64"],
     "apps/pages.c": ["x86_64"],
+    "apps/zip.c" : ["x86_64"]
 }
