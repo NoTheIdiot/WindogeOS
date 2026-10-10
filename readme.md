@@ -45,13 +45,13 @@ Nothing special read commits and releases
 - `pages <file>` reads a text file one screen at a time. Use Up/Down or
   Space/`b` to navigate, `g` to return to the beginning, and `q` to quit.
 
-## Dogescript scripting
+## Dogescript scripting, for some reason?
 
 Dogescript provides variables, input/output, arithmetic, file operations,
 conditions, loops, and access to Dogeshell commands. Scripts are limited to
 65535 bytes and 255 characters per line. Blank lines and lines whose first
 non-space character is `#` are ignored. Quoted strings and backslash escapes
-are supported.
+are supported. It ruined my sanity.
 
 ```text
 # Variables and arguments
@@ -81,16 +81,6 @@ write /tmp/greeting.txt "Hello, $name"
 read greeting /tmp/greeting.txt
 println $greeting
 ```
-
-Built-in commands are `echo`, `print`, `println`, `set`, `unset`, `input`,
-`math`, `inc`, `dec`, `read`, `write`, `append`, `exists`, `isdir`, `assert`,
-`fail`, and `exit`. `read` stores text files up to 255 bytes in a variable.
-`exists <path> -> <variable>` and `isdir <path> -> <variable>` store `1` or `0`.
-`math <variable> <integer> <+|-|*|/> <integer>` performs checked signed
-64-bit integer arithmetic. Conditions use `==`, `!=`, `<`, `<=`, `>`, or `>=`;
-two integer operands are compared numerically, otherwise they are compared as
-text. `if` blocks use `else` and `endif`; loops use `while`/`endwhile` or
-`repeat <count>`/`endrepeat`, with `break` and `continue`.
 
 Variables can be expanded as `$name` or `${name}`. `$0` is the script path,
 `$1` through `$N` are the arguments after the script path, and `$argc` is their
