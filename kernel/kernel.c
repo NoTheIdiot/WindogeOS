@@ -8,6 +8,7 @@
 #include <math.h>
 #include <basicutil.h>
 #include <boot/kernel.h>
+#include <sysinfo.h>
 
 __attribute__((used, section(".limine_requests_start")))
 volatile uint64_t limine_requests_start_marker[] = LIMINE_REQUESTS_START_MARKER;
@@ -63,9 +64,9 @@ static void install_root_apps(void) {
 
         const char *extension = name + name_length - 4;
         if (extension[0] != '.' ||
-            (extension[1] != 'b' && extension[1] != 'B') ||
-            (extension[2] != 'i' && extension[2] != 'I') ||
-            (extension[3] != 'n' && extension[3] != 'N')) {
+           (extension[1] != 'b' && extension[1] != 'B') ||
+           (extension[2] != 'i' && extension[2] != 'I') ||
+           (extension[3] != 'n' && extension[3] != 'N')) {
             continue;
         }
 
@@ -135,7 +136,7 @@ void kernel_main(void) {
     if (fs_mount()) {
         log("Drive mounted");
     } else {
-        log("Something went wrong, guess im formating");
+        log("Something went wrong, guess im formatting");
         fs_format();
         if (!fs_mount()) {
             log("[setup] unable to mount filesystem after formatting");
@@ -158,7 +159,8 @@ void kernel_main(void) {
     sys_init_terminals();
     log("[dogeing] initializing floating point");
     fpu_init();
-    log("[dogeing] initializing nvme (if any avalialbe)");
+    log("[dogeing] initializing nvme (if any available)");
+    // This should be moved to a helper in the future.
     for (uint16_t bus = 0; bus < 256; bus++) {
         for (uint8_t device = 0; device < 32; device++) {
             for (uint8_t function = 0; function < 8; function++) {
@@ -199,7 +201,7 @@ void kernel_main(void) {
             dogeio_text_println(doge_ascii[i]);
         }
         dogeio_text_color_change(0xFFCCCCCC);
-        dogeio_text_println("Welcome to WindogeOS setup! Such doge very OS.");
+        dogeio_text_println("Welcome to WindogeOS setup! Such doge, very OS.");
         dogeio_text_input("Press enter to start setup.", proceed, 1);
 
         log("\n[dogeing] creating folders");
@@ -224,8 +226,8 @@ void kernel_main(void) {
         char root_new[64];
 
         while (true) {
-            dogeio_text_println("\nCreate the admin password.");
-            dogeio_text_input("[admin]> ", root_new, 64);
+            dogeio_text_println("\nSet the admin password.");
+            dogeio_text_input("admin password: ", root_new, 64);
             clean_input_string(root_new);
             if (root_new[0] == '\0') {
                 dogeio_text_println("Password cannot be empty.");
@@ -237,8 +239,8 @@ void kernel_main(void) {
         system_create_user("admin", root_new, 0);
 
         while (true) {
-            dogeio_text_println("username must be non-empty.");
-            dogeio_text_input("[username]> ", username_new, 64);
+            dogeio_text_println("\nCreate system username and password.");
+            dogeio_text_input("username: ", username_new, 64);
             clean_input_string(username_new);
 
             if (username_new[0] == '\0') {
@@ -250,8 +252,8 @@ void kernel_main(void) {
                 dogeio_text_println("username cannot be admin.");
                 continue;
             }
-
-            dogeio_text_input("[password]> ", password_new, 64);
+            
+            dogeio_text_input("password: ", password_new, 64);
             clean_input_string(password_new);
             if (password_new[0] == '\0') {
                 dogeio_text_println("password cannot be empty.");
@@ -260,24 +262,23 @@ void kernel_main(void) {
             break;
         }
 
-        dogeio_text_println("Name your wow computer.");
-        dogeio_text_input("> ", computer_name, 64);
+        dogeio_text_input("\nName your computer: ", computer_name, 64);
 
         log("[dogeing] creating accounts");
         system_create_user(username_new, password_new, 1);
 
         log("[wow] setup complete");
-        log("[dogeing] prompting reboot ");
+        log("[dogeing] prompting for reboot");
 
-        dogeio_text_clear();
         char nothing[1];
-        dogeio_text_input("Press enter to reboot.", nothing, 1);
+        dogeio_text_input("\n\nPress enter to reboot... ", nothing, 1);
         fs_set_auth_override(0);
         core_reboot();
     }
 
     fs_set_auth_override(1);
-    dogeio_text_println("Welcome to WindogeOS v0.01");
+    dogeio_text_print("Welcome to WindogeOS ");
+    dogeio_text_println(windoge_version);
 
     char username[64];
     dogeio_text_color_change(0xE1B16C);
@@ -288,8 +289,8 @@ void kernel_main(void) {
     while (true) {
         char password[64];
 
-        dogeio_text_input("[username]> ", username, 64);
-        dogeio_text_input("[password]> ", password, 64);
+        dogeio_text_input("username: ", username, 64);
+        dogeio_text_input("password: ", password, 64);
 
         clean_input_string(username);
         clean_input_string(password);
@@ -299,7 +300,7 @@ void kernel_main(void) {
             fs_set_auth_override(0);
             break;
         }
-        dogeio_text_println("Wrong password or user doesn't exist :(");
+        dogeio_text_println("wrong username or password :(");
     }
 
     system_load_settings();
@@ -314,8 +315,8 @@ void kernel_main(void) {
     const char* starting[6] = {
         "================================================================================================================================================================",
         "=                                                                                                                                                              =",
-        "=                                                              Welcome to WindogeOS v0.1!                                                                      =",
-        "=                                                       type 'settings' to configure system preferences                                                        =",
+        "=                                                                     Welcome to WindogeOS!                                                                    =",
+        "=                                                       Type 'settings' to configure system preferences                                                        =",
         "=                                                                                                                                                              =",
         "================================================================================================================================================================"
     };

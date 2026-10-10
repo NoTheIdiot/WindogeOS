@@ -270,19 +270,25 @@ void system_settings(void) {
         } else if (key == KEY_BACKSPACE || key == (uint16_t)'q') {
             break;
         } else if (key == KEY_ENTER) {
-            if (selected == 0) {
+            switch (selected) {
+            case 0:
                 settings_show_system_information();
-            } else if (selected == 1) {
+                break;
+            case 1:
                 settings_select_color();
-            } else if (selected == 2) {
+                break;
+            case 2:
                 settings_select_shell();
-            } else if (selected == 4) {
-                settings_run_test();
-            } else if (selected == 3) {
+                break;
+            case 3:
                 dogeio_text_clear();
                 dogeshell_list_pci(); 
                 settings_wait_key();
-            } else {
+                break;
+            case 4:
+                settings_run_test();
+                break;
+            default:
                 break;
             }
         }
