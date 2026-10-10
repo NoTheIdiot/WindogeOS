@@ -79,7 +79,6 @@ uint32_t calculate_crc32(const uint8_t *data, size_t length) {
     return ~crc;
 }
 
-/* Explicitly initialized static buffers in .data to avoid .bss loader faults */
 static uint8_t file_data[MAX_SIZE] __attribute__((section(".data.zip"))) = {0};
 static uint8_t zip_buf[MAX_SIZE] __attribute__((section(".data.zip"))) = {0};
 
@@ -87,7 +86,11 @@ size_t compress_stored(const char *filename, const char *output) {
     if (!filename || !output) return (size_t)-1;
 
     dogec_stat_t st;
-    memset(&st, 0, sizeof(st));
+    char *st_ptr = (char *)&st;
+    for (size_t i = 0; i < sizeof(st); i++) {
+        st_ptr[i] = 0;
+    }
+
     if (stat(filename, &st) != 0 || !st.exists || st.is_dir) {
         return (size_t)-1;
     }
@@ -100,7 +103,14 @@ size_t compress_stored(const char *filename, const char *output) {
     uint32_t crc = calculate_crc32(file_data, file_size);
 
     uint8_t *ptr = zip_buf;
-    uint16_t name_len = (uint16_t)str_strlen(filename);
+    
+    size_t name_len_val = 0;
+    const char *f_ptr = filename;
+    while (*f_ptr != '\0') {
+        name_len_val++;
+        f_ptr++;
+    }
+    uint16_t name_len = (uint16_t)name_len_val;
     uint32_t truncated_size = (uint32_t)file_size;
 
     uint32_t local_header_offset = (uint32_t)(ptr - zip_buf);
@@ -118,10 +128,14 @@ size_t compress_stored(const char *filename, const char *output) {
     lh->extra_len = 0;
     ptr += sizeof(LocalHeader);
 
-    memcpy(ptr, filename, name_len);
+    for (size_t i = 0; i < name_len; i++) {
+        ptr[i] = (uint8_t)filename[i];
+    }
     ptr += name_len;
 
-    memcpy(ptr, file_data, file_size);
+    for (size_t i = 0; i < file_size; i++) {
+        ptr[i] = file_data[i];
+    }
     ptr += file_size;
 
     uint32_t central_dir_offset = (uint32_t)(ptr - zip_buf);
@@ -145,7 +159,9 @@ size_t compress_stored(const char *filename, const char *output) {
     cd->local_header_off = local_header_offset;
     ptr += sizeof(CentralDirHeader);
 
-    memcpy(ptr, filename, name_len);
+    for (size_t i = 0; i < name_len; i++) {
+        ptr[i] = (uint8_t)filename[i];
+    }
     ptr += name_len;
     uint32_t central_dir_size = (uint32_t)(ptr - zip_buf) - central_dir_offset;
 
@@ -170,7 +186,11 @@ int decompress_stored(const char *filename, const char *output) {
     if (!filename || !output) return -1;
 
     dogec_stat_t st;
-    memset(&st, 0, sizeof(st));
+    char *st_ptr = (char *)&st;
+    for (size_t i = 0; i < sizeof(st); i++) {
+        st_ptr[i] = 0;
+    }
+
     if (stat(filename, &st) != 0 || !st.exists) {
         return -1;
     }
@@ -232,11 +252,24 @@ void _start(int argc, char **argv) {
         while (1) {}
     }
 
+    #pragma clang diagnostic push
+    #pragma clang diagnostic ignored "-Wunused-variable"
     const char *input = argv[0];
     const char *output = argv[1];
     
-    size_t len = str_strlen(output);
-    int is_zip_out = (len > 4 && text_equal(output + len - 4, ".zip"));
+    size_t len = 0;
+    const char *p = output;
+    while (*p != '\0') {
+        len++;
+        p++;
+    }
+
+    int is_zip_out = (len > 4 && 
+                      output[len - 4] == '.' && 
+                      output[len - 3] == 'z' && 
+                      output[len - 2] == 'i' && 
+                      output[len - 1] == 'p');
+    #pragma clang diagnostic pop
     
     if (is_zip_out) {
         size_t res = compress_stored(input, output);
