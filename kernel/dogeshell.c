@@ -54,6 +54,40 @@ static uint16_t settings_wait_key(void) {
     return key;
 }
 
+int dogeshell_list_pci(void) {
+    dogeio_text_println("ADDR      IDENTITY DESCRIPTION & [VENDOR:DEVICE ID]");
+    dogeio_text_println("---------------------------------------------------------");
+    for (uint16_t bus = 0; bus < 256; bus++) {
+        for (uint8_t slot = 0; slot < 32; slot++) {
+            for (uint8_t function = 0; function < 8; function++) {
+                uint16_t vendor = pci_read_16((uint8_t)bus, slot, function, 0x00);
+                if (vendor == 0xFFFF) {
+                    if (function == 0) {
+                        break;
+                    }
+                    continue;
+                }
+                uint16_t device = pci_read_16((uint8_t)bus, slot, function, 0x02);
+                uint8_t class_code = pci_read_8((uint8_t)bus, slot, function, 0x0B);
+                char function_text[2] = {(char)('0' + function), '\0'};
+                dogeio_print_hex8((uint8_t)bus);
+                dogeio_text_print(":");
+                dogeio_print_hex8(slot);
+                dogeio_text_print(".");
+                dogeio_text_print(function_text);
+                dogeio_text_print("    ");
+                dogeio_text_print(pci_class_to_name(class_code));
+                dogeio_text_print(" [");
+                dogeio_print_hex16(vendor);
+                dogeio_text_print(":");
+                dogeio_print_hex16(device);
+                dogeio_text_println("]");
+            }
+        }
+    }
+    return 0;
+}
+
 static void settings_load_value(const char *value) {
     for (size_t i = 0; i < sizeof(settings_colors) / sizeof(settings_colors[0]); i++) {
         if (str_strcmp(value, settings_colors[i].value) == 0) {
@@ -218,6 +252,7 @@ void system_settings(void) {
         "System Information",
         "Default Text Color",
         "Default Shell",
+        "PCI/PCIE devices",
         "Test System",
         "Exit",
     };
@@ -240,8 +275,12 @@ void system_settings(void) {
                 settings_select_color();
             } else if (selected == 2) {
                 settings_select_shell();
-            } else if (selected == 3) {
+            } else if (selected == 4) {
                 settings_run_test();
+            } else if (selected == 3) {
+                dogeio_text_clear();
+                dogeshell_list_pci(); 
+                settings_wait_key();
             } else {
                 break;
             }
@@ -655,40 +694,6 @@ static int dogeshell_find_app(const char *command, char *app_path,
     }
     if (dogeshell_copy(app_path, app_path_capacity, path) != 0) {
         return 1;
-    }
-    return 0;
-}
-
-static int dogeshell_list_pci(void) {
-    dogeio_text_println("ADDR      IDENTITY DESCRIPTION & [VENDOR:DEVICE ID]");
-    dogeio_text_println("---------------------------------------------------------");
-    for (uint16_t bus = 0; bus < 256; bus++) {
-        for (uint8_t slot = 0; slot < 32; slot++) {
-            for (uint8_t function = 0; function < 8; function++) {
-                uint16_t vendor = pci_read_16((uint8_t)bus, slot, function, 0x00);
-                if (vendor == 0xFFFF) {
-                    if (function == 0) {
-                        break;
-                    }
-                    continue;
-                }
-                uint16_t device = pci_read_16((uint8_t)bus, slot, function, 0x02);
-                uint8_t class_code = pci_read_8((uint8_t)bus, slot, function, 0x0B);
-                char function_text[2] = {(char)('0' + function), '\0'};
-                dogeio_print_hex8((uint8_t)bus);
-                dogeio_text_print(":");
-                dogeio_print_hex8(slot);
-                dogeio_text_print(".");
-                dogeio_text_print(function_text);
-                dogeio_text_print("    ");
-                dogeio_text_print(pci_class_to_name(class_code));
-                dogeio_text_print(" [");
-                dogeio_print_hex16(vendor);
-                dogeio_text_print(":");
-                dogeio_print_hex16(device);
-                dogeio_text_println("]");
-            }
-        }
     }
     return 0;
 }
