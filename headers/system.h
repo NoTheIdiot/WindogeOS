@@ -20,10 +20,10 @@ static inline int system(char* command) {
 }
 
 void system_fetch();
-extern char* windoge_version;
+extern const char *windoge_version;
 extern char current_user[64];
 extern uint32_t old;
-extern char* dogeshell_version;
+extern const char* dogeshell_version;
 extern char computer_name[64];
 
 uint64_t get_ram_end_address(void);
