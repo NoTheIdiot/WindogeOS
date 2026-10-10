@@ -40,6 +40,8 @@ Nothing special read commits and releases
 - `file_manager [directory]` interactively lists and manages files and directories.
   Use `help` inside the app to see its commands.
 - `hexdump <file>` prints a file as hexadecimal bytes and readable ASCII.
+- `pages <file>` reads a text file one screen at a time. Use Up/Down or
+  Space/`b` to navigate, `g` to return to the beginning, and `q` to quit.
 
 ## Contributing
 Thanks for contributing for some reason...

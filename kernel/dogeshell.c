@@ -30,6 +30,7 @@ static const settings_color_t settings_colors[] = {
 static char settings_path[] = "/.windoge";
 static size_t selected_color;
 static int default_shell_is_bash;
+static char dogeshell_app_names[64][256];
 
 uint32_t saved_color = 0xFFCCCCCC;
 
@@ -574,6 +575,7 @@ static void dogeshell_print_help(void) {
         "  fetch, settings, tab     | system UI and terminal controls",
         "  edit <file>              | open the text editor",
         "  pci                      | list PCI devices",
+        "  apps                     | list installed apps in /apps",
         "  calc <expression>        | evaluate a calculator expression",
         "  hexdump <file>           | display file bytes",
         "  run <file>               | run a flat binary",
@@ -694,6 +696,41 @@ static int dogeshell_find_app(const char *command, char *app_path,
     }
     if (dogeshell_copy(app_path, app_path_capacity, path) != 0) {
         return 1;
+    }
+    return 0;
+}
+
+static int dogeshell_list_apps(void) {
+    int app_count = fs_list_files(
+        "/apps", dogeshell_app_names,
+        sizeof(dogeshell_app_names) / sizeof(dogeshell_app_names[0]));
+    if (app_count < 0) {
+        dogeio_text_println("Error: unable to list /apps.");
+        return 1;
+    }
+
+    int printed_count = 0;
+    for (int i = 0; i < app_count; i++) {
+        size_t name_length = str_strlen(dogeshell_app_names[i]);
+        if (name_length < 4) {
+            continue;
+        }
+
+        const char *extension = dogeshell_app_names[i] + name_length - 4;
+        if (extension[0] != '.' ||
+            (extension[1] != 'b' && extension[1] != 'B') ||
+            (extension[2] != 'i' && extension[2] != 'I') ||
+            (extension[3] != 'n' && extension[3] != 'N')) {
+            continue;
+        }
+
+        dogeio_text_print("  ");
+        dogeio_text_println(dogeshell_app_names[i]);
+        printed_count++;
+    }
+
+    if (printed_count == 0) {
+        dogeio_text_println("No apps are installed in /apps.");
     }
     return 0;
 }
@@ -1031,6 +1068,13 @@ static int dogeshell_execute(int argc, char **argv) {
     }
     if (str_strcmp(argv[0], "pci") == 0) {
         return dogeshell_list_pci();
+    }
+    if (str_strcmp(argv[0], "apps") == 0) {
+        if (argc != 1) {
+            dogeio_text_println("Usage: apps");
+            return 1;
+        }
+        return dogeshell_list_apps();
     }
     if (str_strcmp(argv[0], "calc") == 0) {
         char expression[DOGESHELL_LINE_SIZE];
