@@ -868,16 +868,7 @@ static int execute_command(int argc, char **argv) {
         dogeio_text_println(" bytes");
         return 0;
     }
-    if (str_strcmp(argv[0], "hexdump") == 0) {
-        if (argc != 2) {
-            dogeio_text_println("bash: hexdump: usage: hexdump <file>");
-            return 1;
-        }
-        if (!authorize_path(argv[1])) {
-            return 1;
-        }
-        return util_hexdump(argv[1]) == 0 ? 0 : 1;
-    }
+
     if (str_strcmp(argv[0], "pci") == 0) {
         dogeio_text_println("ADDR      DEVICE [VENDOR:DEVICE ID]");
         dogeio_text_println("------------------------------------");
