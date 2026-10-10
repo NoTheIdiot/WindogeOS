@@ -11,6 +11,27 @@ typedef struct {
     uint64_t exists;
 } dogec_stat_t;
 
+#define COLOR_BLACK          0x000000
+#define COLOR_RED            0xAA0000
+#define COLOR_GREEN          0x00AA00
+#define COLOR_YELLOW         0xFFFF00
+#define COLOR_BLUE           0x0000AA
+#define COLOR_MAGENTA        0xAA00AA
+#define COLOR_CYAN           0x00AAAA
+#define COLOR_WHITE          0xAAAAAA
+#define COLOR_DARK_GRAY      0x282828
+#define COLOR_ORANGE         0xFFA500
+
+#define COLOR_BRIGHT_BLACK   0x555555
+#define COLOR_BRIGHT_RED     0xFF5555
+#define COLOR_BRIGHT_GREEN   0x55FF55
+#define COLOR_BRIGHT_YELLOW  0xFFED29
+#define COLOR_BRIGHT_ORANGE  0xFFA500
+#define COLOR_BRIGHT_BLUE    0x5555FF
+#define COLOR_BRIGHT_MAGENTA 0xFF55FF
+#define COLOR_BRIGHT_CYAN    0x55FFFF
+#define COLOR_BRIGHT_WHITE   0xFFFFFF
+
 static inline uint64_t read_file(const char *path, void *buffer, uint64_t size) {
     return syscall_3(READ_FILE, (uint64_t)path, (uint64_t)buffer, size);
 }
