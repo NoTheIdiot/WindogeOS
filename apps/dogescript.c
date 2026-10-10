@@ -6,7 +6,7 @@
 
 #define DOGESCRIPT_MAX_SCRIPT_SIZE 65535
 #define DOGESCRIPT_MAX_LINE_SIZE 256
-#define DOGESCRIPT_MAX_LINES 65536
+#define DOGESCRIPT_READ_BUFFER_SIZE 512
 #define DOGESCRIPT_MAX_TOKENS 16
 #define DOGESCRIPT_MAX_SHELL_COMMAND_SIZE 4096
 #define DOGESCRIPT_MAX_VARIABLES 32
@@ -28,15 +28,21 @@ typedef enum {
 
 typedef struct {
     loop_kind_t kind;
-    uint32_t start_line;
-    uint32_t end_line;
+    uint32_t start_offset;
+    uint32_t body_offset;
+    uint32_t end_offset;
+    uint32_t after_end_offset;
     uint64_t remaining;
 } loop_frame_t;
 
-static char script_contents[DOGESCRIPT_MAX_SCRIPT_SIZE + 1]
-    __attribute__((section(".data.dogescript"))) = {1};
-static uint32_t line_offsets[DOGESCRIPT_MAX_LINES]
-    __attribute__((section(".data.dogescript"))) = {1};
+typedef struct {
+    const char *path;
+    uint64_t file_size;
+    uint64_t cache_start;
+    size_t cache_length;
+    uint8_t cache[DOGESCRIPT_READ_BUFFER_SIZE];
+} script_reader_t;
+
 static dogescript_variable_t variables[DOGESCRIPT_MAX_VARIABLES]
     __attribute__((section(".data.dogescript"))) = {{{1}, {1}}};
 static size_t variable_count
@@ -434,56 +440,67 @@ static int condition_value(size_t count, char **tokens, size_t first,
     return 0;
 }
 
-static int load_script_lines(uint64_t script_size, size_t *line_count) {
-    size_t position = 0;
-    *line_count = 0;
-    while (position < script_size) {
-        if (*line_count == DOGESCRIPT_MAX_LINES) {
+static int read_script_byte(script_reader_t *reader, uint64_t offset,
+                            uint8_t *value) {
+    if (offset >= reader->file_size) {
+        return 0;
+    }
+    if (offset < reader->cache_start ||
+        offset - reader->cache_start >= reader->cache_length) {
+        uint64_t chunk_start =
+            offset - (offset % (uint64_t)sizeof(reader->cache));
+        uint64_t amount = reader->file_size - chunk_start;
+        if (amount > sizeof(reader->cache)) {
+            amount = sizeof(reader->cache);
+        }
+        int64_t bytes_read = (int64_t)read_file_at(
+            reader->path, reader->cache, chunk_start, amount);
+        if (bytes_read < 0 || (uint64_t)bytes_read != amount) {
             return -1;
         }
-        line_offsets[(*line_count)++] = (uint32_t)position;
-        size_t line_length = 0;
-        while (position < script_size && script_contents[position] != '\n') {
-            if (script_contents[position] == '\0') {
-                println("dogescript: script contains a null byte");
-                return -1;
-            }
-            position++;
-            line_length++;
-            if (line_length >= DOGESCRIPT_MAX_LINE_SIZE) {
-                println("dogescript: line exceeds the 255-character limit");
-                return -1;
-            }
-        }
-        if (position < script_size) {
-            position++;
-        }
+        reader->cache_start = chunk_start;
+        reader->cache_length = (size_t)amount;
     }
-    return 0;
+    *value = reader->cache[(size_t)(offset - reader->cache_start)];
+    return 1;
 }
 
-static int get_line(size_t line_number, size_t line_count, char *line) {
-    if (line_number >= line_count) {
-        return -1;
+static int get_line(script_reader_t *reader, uint64_t offset, char *line,
+                    uint64_t *next_offset) {
+    size_t length = 0;
+    uint64_t position = offset;
+    while (position < reader->file_size) {
+        uint8_t character;
+        int result = read_script_byte(reader, position, &character);
+        if (result != 1) {
+            println("dogescript: unable to read script");
+            return -1;
+        }
+        if (character == '\0') {
+            println("dogescript: script contains a null byte");
+            return -1;
+        }
+        position++;
+        if (character == '\n') {
+            break;
+        }
+        if (length + 1 >= DOGESCRIPT_MAX_LINE_SIZE) {
+            println("dogescript: line exceeds the 255-character limit");
+            return -1;
+        }
+        line[length++] = (char)character;
     }
-    size_t start = line_offsets[line_number];
-    size_t end = line_number + 1 < line_count
-                     ? line_offsets[line_number + 1] - 1
-                     : text_length(script_contents);
-    size_t length = end - start;
-    if (length > 0 && script_contents[start + length - 1] == '\r') {
+    if (length > 0 && line[length - 1] == '\r') {
         length--;
     }
-    for (size_t i = 0; i < length; i++) {
-        line[i] = script_contents[start + i];
-    }
     line[length] = '\0';
+    *next_offset = position;
     return 0;
 }
 
-static int get_tokens(size_t line_number, size_t line_count,
-                      char *line, char **tokens, size_t *count) {
-    if (get_line(line_number, line_count, line) != 0) {
+static int get_tokens(script_reader_t *reader, uint64_t offset, char *line,
+                      char **tokens, size_t *count, uint64_t *next_offset) {
+    if (get_line(reader, offset, line, next_offset) != 0) {
         return -1;
     }
     size_t first = 0;
@@ -497,61 +514,95 @@ static int get_tokens(size_t line_number, size_t line_count,
     return tokenize_line(line + first, tokens, count);
 }
 
-static int find_control_end(size_t start, size_t line_count,
+static uint64_t get_line_number(script_reader_t *reader, uint64_t offset) {
+    uint64_t line_number = 1;
+    for (uint64_t position = 0; position < offset; position++) {
+        uint8_t character;
+        if (read_script_byte(reader, position, &character) != 1) {
+            return 0;
+        }
+        if (character == '\n') {
+            line_number++;
+        }
+    }
+    return line_number;
+}
+
+static int find_control_end(script_reader_t *reader, uint64_t start,
                             const char *opening, const char *closing,
-                            size_t *end) {
+                            uint64_t *end, uint64_t *after_end) {
     char line[DOGESCRIPT_MAX_LINE_SIZE];
     char *tokens[DOGESCRIPT_MAX_TOKENS];
     size_t count;
     size_t depth = 0;
-    for (size_t i = start + 1; i < line_count; i++) {
-        if (get_tokens(i, line_count, line, tokens, &count) != 0) {
+    uint64_t position;
+    if (get_line(reader, start, line, &position) != 0) {
+        return -1;
+    }
+    while (position < reader->file_size) {
+        uint64_t next_position;
+        if (get_tokens(reader, position, line, tokens, &count,
+                       &next_position) != 0) {
             return -1;
         }
         if (count == 0) {
+            position = next_position;
             continue;
         }
         if (text_equal(tokens[0], opening)) {
             depth++;
         } else if (text_equal(tokens[0], closing)) {
             if (depth == 0) {
-                *end = i;
+                *end = position;
+                *after_end = next_position;
                 return 0;
             }
             depth--;
         }
+        position = next_position;
     }
     return -1;
 }
 
-static int find_if_end(size_t start, size_t line_count, size_t *end,
-                       size_t *else_line) {
+static int find_if_end(script_reader_t *reader, uint64_t start, uint64_t *end,
+                       uint64_t *after_end, uint64_t *else_position,
+                       uint64_t *after_else) {
     char line[DOGESCRIPT_MAX_LINE_SIZE];
     char *tokens[DOGESCRIPT_MAX_TOKENS];
     size_t count;
     size_t depth = 0;
-    *else_line = line_count;
-    for (size_t i = start + 1; i < line_count; i++) {
-        if (get_tokens(i, line_count, line, tokens, &count) != 0) {
+    uint64_t position;
+    if (get_line(reader, start, line, &position) != 0) {
+        return -1;
+    }
+    *else_position = UINT64_MAX;
+    while (position < reader->file_size) {
+        uint64_t next_position;
+        if (get_tokens(reader, position, line, tokens, &count,
+                       &next_position) != 0) {
             return -1;
         }
         if (count == 0) {
+            position = next_position;
             continue;
         }
         if (text_equal(tokens[0], "if")) {
             depth++;
         } else if (text_equal(tokens[0], "endif")) {
             if (depth == 0) {
-                *end = i;
+                *end = position;
+                *after_end = next_position;
                 return 0;
             }
             depth--;
         } else if (text_equal(tokens[0], "else") && depth == 0) {
-            if (*else_line != line_count) {
+            if (*else_position != UINT64_MAX) {
                 return -1;
             }
-            *else_line = i;
+            *else_position = position;
+            *after_else = next_position;
         }
+        position = next_position;
     }
     return -1;
 }
@@ -852,11 +903,44 @@ static int run_script(const char *path, int argc, char **argv) {
     active_argc = argc;
     active_argv = argv;
     active_script_path = path;
+    char resolved_path[256];
+    if (path[0] == '/') {
+        if (copy_text(resolved_path, sizeof(resolved_path), path) != 0) {
+            println("dogescript: script path is too long");
+            return 1;
+        }
+    } else {
+        char working_directory[256];
+        clear_text(working_directory, sizeof(working_directory));
+        if ((int64_t)get_cwd(working_directory,
+                             sizeof(working_directory)) < 0 ||
+            working_directory[0] != '/' ||
+            copy_text(resolved_path, sizeof(resolved_path),
+                      working_directory) != 0) {
+            println("dogescript: unable to resolve script path");
+            return 1;
+        }
+        size_t path_length = text_length(resolved_path);
+        if ((path_length > 1 &&
+             append_checked(resolved_path, sizeof(resolved_path),
+                            &path_length, '/') != 0)) {
+            println("dogescript: script path is too long");
+            return 1;
+        }
+        size_t script_path_length = text_length(path);
+        if (path_length + script_path_length >= sizeof(resolved_path)) {
+            println("dogescript: script path is too long");
+            return 1;
+        }
+        for (size_t i = 0; i <= script_path_length; i++) {
+            resolved_path[path_length + i] = path[i];
+        }
+    }
     dogec_stat_t file_stat;
     file_stat.size = 0;
     file_stat.is_dir = 0;
     file_stat.exists = 0;
-    if ((int64_t)stat(path, &file_stat) < 0) {
+    if ((int64_t)stat(resolved_path, &file_stat) < 0) {
         print("dogescript: unable to access ");
         println(path);
         return 1;
@@ -869,27 +953,21 @@ static int run_script(const char *path, int argc, char **argv) {
         println("dogescript: script exceeds the 65535-byte size limit");
         return 1;
     }
-    int64_t bytes_read =
-        (int64_t)read_file(path, script_contents, file_stat.size);
-    if (bytes_read < 0 || (uint64_t)bytes_read != file_stat.size) {
-        println("dogescript: unable to read the complete script");
-        return 1;
-    }
-    script_contents[file_stat.size] = '\0';
+    script_reader_t reader;
+    reader.path = resolved_path;
+    reader.file_size = file_stat.size;
+    reader.cache_start = UINT64_MAX;
+    reader.cache_length = 0;
 
-    size_t line_count;
-    if (load_script_lines(file_stat.size, &line_count) != 0) {
-        return 1;
-    }
     loop_frame_t loop_stack[DOGESCRIPT_MAX_LOOP_DEPTH];
     size_t loop_depth = 0;
-    size_t program_counter = 0;
+    uint64_t program_counter = 0;
     size_t executed_steps = 0;
     int exit_requested = 0;
     int exit_status = 0;
     int64_t number;
 
-    while (program_counter < line_count && !exit_requested) {
+    while (program_counter < reader.file_size && !exit_requested) {
         if (++executed_steps > DOGESCRIPT_MAX_STEPS) {
             println("dogescript: execution step limit exceeded");
             return 1;
@@ -897,12 +975,14 @@ static int run_script(const char *path, int argc, char **argv) {
         char line[DOGESCRIPT_MAX_LINE_SIZE];
         char *tokens[DOGESCRIPT_MAX_TOKENS];
         size_t count;
-        if (get_tokens(program_counter, line_count, line, tokens, &count) != 0) {
+        uint64_t next_offset;
+        if (get_tokens(&reader, program_counter, line, tokens, &count,
+                       &next_offset) != 0) {
             println("dogescript: invalid quoting, variable, or token count");
             return 1;
         }
         if (count == 0) {
-            program_counter++;
+            program_counter = next_offset;
             continue;
         }
         if (text_equal(tokens[0], "if") ||
@@ -913,70 +993,78 @@ static int run_script(const char *path, int argc, char **argv) {
                 return 1;
             }
             if (text_equal(tokens[0], "if")) {
-                size_t end_line;
-                size_t else_line;
-                if (find_if_end(program_counter, line_count, &end_line,
-                                &else_line) != 0) {
+                uint64_t end_offset;
+                uint64_t after_end;
+                uint64_t else_offset;
+                uint64_t after_else = UINT64_MAX;
+                if (find_if_end(&reader, program_counter, &end_offset,
+                                &after_end, &else_offset, &after_else) != 0) {
                     println("dogescript: missing or repeated endif/else");
                     return 1;
                 }
                 if (!condition) {
-                    program_counter = else_line < line_count
-                                          ? else_line + 1
-                                          : end_line + 1;
+                    program_counter = else_offset != UINT64_MAX
+                                          ? after_else
+                                          : after_end;
                 } else {
-                    program_counter++;
+                    program_counter = next_offset;
                 }
                 continue;
             }
-            size_t end_line;
+            uint64_t end_offset;
+            uint64_t after_end;
             if (loop_depth > 0 &&
                 loop_stack[loop_depth - 1].kind == LOOP_WHILE &&
-                loop_stack[loop_depth - 1].start_line == program_counter) {
-                end_line = loop_stack[loop_depth - 1].end_line;
-            } else if (find_control_end(program_counter, line_count, "while",
-                                        "endwhile", &end_line) != 0) {
+                loop_stack[loop_depth - 1].start_offset == program_counter) {
+                end_offset = loop_stack[loop_depth - 1].end_offset;
+                after_end = loop_stack[loop_depth - 1].after_end_offset;
+            } else if (find_control_end(&reader, program_counter, "while",
+                                        "endwhile", &end_offset,
+                                        &after_end) != 0) {
                 println("dogescript: missing endwhile");
                 return 1;
             }
             if (!condition) {
                 if (loop_depth > 0 &&
                     loop_stack[loop_depth - 1].kind == LOOP_WHILE &&
-                    loop_stack[loop_depth - 1].start_line == program_counter) {
+                    loop_stack[loop_depth - 1].start_offset == program_counter) {
                     loop_depth--;
                 }
-                program_counter = end_line + 1;
+                program_counter = after_end;
                 continue;
             }
             if (loop_depth == 0 ||
-                loop_stack[loop_depth - 1].start_line != program_counter) {
+                loop_stack[loop_depth - 1].start_offset != program_counter) {
                 if (loop_depth == DOGESCRIPT_MAX_LOOP_DEPTH) {
                     println("dogescript: loop nesting limit exceeded");
                     return 1;
                 }
                 loop_stack[loop_depth].kind = LOOP_WHILE;
-                loop_stack[loop_depth].start_line = (uint32_t)program_counter;
-                loop_stack[loop_depth].end_line = (uint32_t)end_line;
+                loop_stack[loop_depth].start_offset = (uint32_t)program_counter;
+                loop_stack[loop_depth].body_offset = (uint32_t)next_offset;
+                loop_stack[loop_depth].end_offset = (uint32_t)end_offset;
+                loop_stack[loop_depth].after_end_offset = (uint32_t)after_end;
                 loop_stack[loop_depth].remaining = 0;
                 loop_depth++;
             }
-            program_counter++;
+            program_counter = next_offset;
             continue;
         }
         if (text_equal(tokens[0], "repeat")) {
-            size_t end_line;
+            uint64_t end_offset;
+            uint64_t after_end;
             if (count != 2 || parse_integer(tokens[1], &number) != 0 ||
                 number < 0 || (uint64_t)number > DOGESCRIPT_MAX_REPEAT) {
                 println("dogescript: usage: repeat <count up to 100000>");
                 return 1;
             }
-            if (find_control_end(program_counter, line_count, "repeat",
-                                 "endrepeat", &end_line) != 0) {
+            if (find_control_end(&reader, program_counter, "repeat",
+                                 "endrepeat", &end_offset, &after_end) != 0) {
                 println("dogescript: missing endrepeat");
                 return 1;
             }
             if (number == 0) {
-                program_counter = end_line + 1;
+                program_counter = after_end;
                 continue;
             }
             if (loop_depth == DOGESCRIPT_MAX_LOOP_DEPTH) {
@@ -984,51 +1072,53 @@ static int run_script(const char *path, int argc, char **argv) {
                 return 1;
             }
             loop_stack[loop_depth].kind = LOOP_REPEAT;
-            loop_stack[loop_depth].start_line = (uint32_t)program_counter;
-            loop_stack[loop_depth].end_line = (uint32_t)end_line;
+            loop_stack[loop_depth].start_offset = (uint32_t)program_counter;
+            loop_stack[loop_depth].body_offset = (uint32_t)next_offset;
+            loop_stack[loop_depth].end_offset = (uint32_t)end_offset;
+            loop_stack[loop_depth].after_end_offset = (uint32_t)after_end;
             loop_stack[loop_depth].remaining = (uint64_t)number;
             loop_depth++;
-            program_counter++;
+            program_counter = next_offset;
             continue;
         }
         if (text_equal(tokens[0], "else")) {
-            size_t end_line;
-            size_t else_line;
-            if (find_if_end(program_counter, line_count, &end_line,
-                            &else_line) != 0) {
+            uint64_t end_offset;
+            uint64_t after_end;
+            if (find_control_end(&reader, program_counter, "if", "endif",
+                                 &end_offset, &after_end) != 0) {
                 println("dogescript: unmatched else");
                 return 1;
             }
-            program_counter = end_line + 1;
+            program_counter = after_end;
             continue;
         }
         if (text_equal(tokens[0], "endif")) {
-            program_counter++;
+            program_counter = next_offset;
             continue;
         }
         if (text_equal(tokens[0], "endwhile")) {
             if (loop_depth == 0 ||
                 loop_stack[loop_depth - 1].kind != LOOP_WHILE ||
-                loop_stack[loop_depth - 1].end_line != program_counter) {
+                loop_stack[loop_depth - 1].end_offset != program_counter) {
                 println("dogescript: unmatched endwhile");
                 return 1;
             }
-            program_counter = loop_stack[loop_depth - 1].start_line;
+            program_counter = loop_stack[loop_depth - 1].start_offset;
             continue;
         }
         if (text_equal(tokens[0], "endrepeat")) {
             if (loop_depth == 0 ||
                 loop_stack[loop_depth - 1].kind != LOOP_REPEAT ||
-                loop_stack[loop_depth - 1].end_line != program_counter) {
+                loop_stack[loop_depth - 1].end_offset != program_counter) {
                 println("dogescript: unmatched endrepeat");
                 return 1;
             }
             if (loop_stack[loop_depth - 1].remaining > 1) {
                 loop_stack[loop_depth - 1].remaining--;
-                program_counter = loop_stack[loop_depth - 1].start_line + 1;
+                program_counter = loop_stack[loop_depth - 1].body_offset;
             } else {
                 loop_depth--;
-                program_counter++;
+                program_counter = next_offset;
             }
             continue;
         }
@@ -1041,11 +1131,11 @@ static int run_script(const char *path, int argc, char **argv) {
             loop_frame_t frame = loop_stack[loop_depth - 1];
             if (text_equal(tokens[0], "break")) {
                 loop_depth--;
-                program_counter = (size_t)frame.end_line + 1;
+                program_counter = frame.after_end_offset;
             } else if (frame.kind == LOOP_WHILE) {
-                program_counter = frame.start_line;
+                program_counter = frame.start_offset;
             } else {
-                program_counter = frame.end_line;
+                program_counter = frame.end_offset;
             }
             continue;
         }
@@ -1057,13 +1147,18 @@ static int run_script(const char *path, int argc, char **argv) {
             size_t message_length =
                 sizeof("dogescript: command failed on line ") - 1;
             char number_text[21];
-            str_u64toa((uint64_t)program_counter + 1, number_text);
+            uint64_t line_number = get_line_number(&reader, program_counter);
+            if (line_number == 0) {
+                println("dogescript: unable to determine failing line");
+                return 1;
+            }
+            str_u64toa(line_number, number_text);
             message_length = append_text(message, message_length, number_text);
             message[message_length] = '\0';
             println(message);
             return 1;
         }
-        program_counter++;
+        program_counter = next_offset;
     }
     return exit_status;
 }
