@@ -10,6 +10,9 @@
 
 static inline void *memcpy(void *restrict dest, const void *restrict src,
                            size_t n) {
+    if (dest == NULL || src == NULL || n == 0) {
+        return dest;
+    }
     uint8_t *restrict dest_bytes = dest;
     const uint8_t *restrict src_bytes = src;
 
@@ -20,6 +23,9 @@ static inline void *memcpy(void *restrict dest, const void *restrict src,
 }
 
 static inline void *memset(void *dest, int value, size_t n) {
+    if (dest == NULL || n == 0) {
+        return dest;
+    }
     uint8_t *dest_bytes = dest;
 
     for (size_t i = 0; i < n; i++) {
@@ -29,6 +35,9 @@ static inline void *memset(void *dest, int value, size_t n) {
 }
 
 static inline void *memmove(void *dest, const void *src, size_t n) {
+    if (dest == NULL || src == NULL || n == 0) {
+        return dest;
+    }
     uint8_t *dest_bytes = dest;
     const uint8_t *src_bytes = src;
 
@@ -45,6 +54,10 @@ static inline void *memmove(void *dest, const void *src, size_t n) {
 }
 
 static inline int memcmp(const void *left, const void *right, size_t n) {
+    if (left == NULL || right == NULL || n == 0) {
+        if (left == right) return 0;
+        return (left == NULL) ? -1 : 1;
+    }
     const uint8_t *left_bytes = left;
     const uint8_t *right_bytes = right;
 
@@ -57,6 +70,10 @@ static inline int memcmp(const void *left, const void *right, size_t n) {
 }
 
 static inline int str_strcmp(const char *str1, const char *str2) {
+    if (str1 == NULL || str2 == NULL) {
+        if (str1 == str2) return 0;
+        return (str1 == NULL) ? -1 : 1;
+    }
     while (*str1 != '\0' && *str1 == *str2) {
         str1++;
         str2++;
@@ -65,6 +82,13 @@ static inline int str_strcmp(const char *str1, const char *str2) {
 }
 
 static inline int str_strncmp(const char *str1, const char *str2, size_t n) {
+    if (n == 0) {
+        return 0;
+    }
+    if (str1 == NULL || str2 == NULL) {
+        if (str1 == str2) return 0;
+        return (str1 == NULL) ? -1 : 1;
+    }
     while (n > 0 && *str1 != '\0' && *str1 == *str2) {
         str1++;
         str2++;
@@ -88,6 +112,9 @@ static inline size_t str_strlen(const char *str) {
 }
 
 static inline int str_startswith(const char *str, const char *prefix) {
+    if (str == NULL || prefix == NULL) {
+        return (str == prefix);
+    }
     while (*prefix != '\0') {
         if (*str != *prefix) {
             return 0;
@@ -99,12 +126,21 @@ static inline int str_startswith(const char *str, const char *prefix) {
 }
 
 static inline void str_strcpy(char *dest, const char *src) {
+    if (dest == NULL || src == NULL) {
+        return;
+    }
     while ((*dest++ = *src++) != '\0') {
     }
 }
 
 static inline char *str_strncpy(char *dest, const char *src, size_t n) {
-    if (n == 0) {
+    if (dest == NULL || n == 0) {
+        return dest;
+    }
+    if (src == NULL) {
+        for (size_t i = 0; i < n; i++) {
+            dest[i] = '\0';
+        }
         return dest;
     }
 
@@ -121,6 +157,9 @@ static inline char *str_strncpy(char *dest, const char *src, size_t n) {
 }
 
 static inline char *str_strcat(char *dest, const char *src) {
+    if (dest == NULL || src == NULL) {
+        return dest;
+    }
     char *result = dest;
     while (*dest != '\0') {
         dest++;
@@ -132,10 +171,15 @@ static inline char *str_strcat(char *dest, const char *src) {
 
 static inline void str_pad(char *dest, const char *src, int target_len,
                            char pad_char) {
+    if (dest == NULL || target_len <= 0) {
+        return;
+    }
     int i = 0;
-    while (src[i] != '\0' && i < target_len) {
-        dest[i] = src[i];
-        i++;
+    if (src != NULL) {
+        while (src[i] != '\0' && i < target_len) {
+            dest[i] = src[i];
+            i++;
+        }
     }
     while (i < target_len) {
         dest[i] = pad_char;
@@ -158,6 +202,9 @@ static inline void clean_input_string(char *str) {
 }
 
 static inline void str_itoa(int value, char *str) {
+    if (str == NULL) {
+        return;
+    }
     size_t i = 0;
     int negative = value < 0;
     uint32_t magnitude = negative ? 0u - (uint32_t)value : (uint32_t)value;
@@ -180,6 +227,9 @@ static inline void str_itoa(int value, char *str) {
 }
 
 static inline void str_u64toa(uint64_t value, char *str) {
+    if (str == NULL) {
+        return;
+    }
     size_t i = 0;
     do {
         str[i++] = (char)('0' + (value % 10u));
@@ -195,6 +245,9 @@ static inline void str_u64toa(uint64_t value, char *str) {
 }
 
 static inline char *uint64_to_str(uint64_t value, char *buf) {
+    if (buf == NULL) {
+        return NULL;
+    }
     static const char hex_digits[] = "0123456789ABCDEF";
     char *cursor = buf + 18;
     *cursor = '\0';
@@ -210,6 +263,9 @@ static inline char *uint64_to_str(uint64_t value, char *buf) {
 }
 
 static inline int str_atoi(char *str) {
+    if (str == NULL) {
+        return 0;
+    }
     int negative = 0;
     uint32_t value = 0;
     uint32_t limit;
@@ -259,6 +315,9 @@ static inline uint8_t str_to_u8(char *str) {
 }
 
 static inline void u16_to_str(uint16_t value, char *out) {
+    if (out == NULL) {
+        return;
+    }
     char digits[5];
     size_t length = 0;
 
@@ -274,6 +333,9 @@ static inline void u16_to_str(uint16_t value, char *out) {
 }
 
 static inline uint16_t str_to_u16(const char *str) {
+    if (str == NULL) {
+        return 0;
+    }
     uint32_t value = 0;
     while (*str >= '0' && *str <= '9') {
         uint32_t digit = (uint32_t)(*str - '0');
@@ -296,6 +358,12 @@ static inline uint8_t str_chartou8(char value) {
 
 static inline void str_split_filename(const char *input, char *name,
                                       char *ext) {
+    if (input == NULL) {
+        if (name != NULL) name[0] = '\0';
+        if (ext != NULL) ext[0] = '\0';
+        return;
+    }
+
     size_t length = 0;
     size_t dot_index = SIZE_MAX;
 
@@ -306,17 +374,21 @@ static inline void str_split_filename(const char *input, char *name,
         length++;
     }
 
-    size_t name_length = dot_index == SIZE_MAX ? length : dot_index;
-    for (size_t i = 0; i < name_length; i++) {
-        name[i] = input[i];
+    if (name != NULL) {
+        size_t name_length = dot_index == SIZE_MAX ? length : dot_index;
+        for (size_t i = 0; i < name_length; i++) {
+            name[i] = input[i];
+        }
+        name[name_length] = '\0';
     }
-    name[name_length] = '\0';
 
-    size_t ext_length = dot_index == SIZE_MAX ? 0 : length - dot_index - 1;
-    for (size_t i = 0; i < ext_length; i++) {
-        ext[i] = input[dot_index + 1 + i];
+    if (ext != NULL) {
+        size_t ext_length = dot_index == SIZE_MAX ? 0 : length - dot_index - 1;
+        for (size_t i = 0; i < ext_length; i++) {
+            ext[i] = input[dot_index + 1 + i];
+        }
+        ext[ext_length] = '\0';
     }
-    ext[ext_length] = '\0';
 }
 
 #endif
