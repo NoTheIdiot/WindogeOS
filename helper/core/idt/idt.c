@@ -122,7 +122,7 @@ void isr_common_handler(interrupt_frame_t *frame) {
         log(log_buf);
     }
 
-    while (1) {
+    while (true) {
         dogeio_text_clear();
         dogeio_text_color_change(COLOR_WHITE);
         dogeio_text_background_change(COLOR_BLUE);
@@ -172,7 +172,7 @@ void isr_common_handler(interrupt_frame_t *frame) {
             dogeio_text_println(log_buf);
         }
 
-        while (1) {
+        while (true) {
             uint16_t key = dogeio_get_key();
 
             if (key == KEY_UP || key == KEY_DOWN) {

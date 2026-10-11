@@ -1,9 +1,9 @@
 #include <stdint.h>
+#include <system.h>
 #include <dogeio.h>
 #include <boot/kernel.h>
 #include <time.h>
 #include <string.h>
-#include <system.h>
 
 void menubar_draw(void) {
     uint32_t old_text_color = dogeio_text_color;
@@ -22,7 +22,7 @@ void menubar_draw(void) {
     } else {
         dogeio_text_color_change(0xFFFFFF);
         dogeio_text_background_change(0x282828);
-        ver = windoge_version ? windoge_version : "v0.1";
+        ver = windoge_version;
     }
     
     cursor_x = 0;
