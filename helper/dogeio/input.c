@@ -30,7 +30,7 @@ uint16_t dogeio_get_key(void) {
     char last_seen_time[16] = {0};
     bool escaped = false;
 
-    while (1) {
+    while (true) {
         while ((ports_inb(0x64) & 1) == 0) {
             if (is_kernel_dead == false) {
                 char* current_time = time_get();
@@ -50,31 +50,29 @@ uint16_t dogeio_get_key(void) {
 
         uint8_t code = ports_inb(0x60);
 
-        if (code == 0xE0) {
+        switch (code) {
+        case 0xE0:
             escaped = true;
             continue;
-        }
-
-        if (code == 0x2A || code == 0x36) {
+            
+        case 0x2A:
+        case 0x36:
             global_shift_pressed = true;
             escaped = false;
             continue;
-        }
         
-        if (code == 0xAA || code == 0xB6) {
+        case 0xAA:
+        case 0xB6:
             global_shift_pressed = false;
             escaped = false;
             continue;
-        }
         
-        if (code == 0x1D) {
+        case 0x1D:
             global_ctrl_pressed = true;
             escaped = false;
             continue;
-        }
-
        
-        if (code == 0x9D) {
+        case 0x9D:
             global_ctrl_pressed = false;
             escaped = false;
             continue;
@@ -87,20 +85,24 @@ uint16_t dogeio_get_key(void) {
 
         if (escaped) {
             escaped = false;
-            if (code == 0x48) return KEY_UP;
-            if (code == 0x50) return KEY_DOWN;
-            if (code == 0x4B) return KEY_LEFT;
-            if (code == 0x4D) return KEY_RIGHT;
+            switch (code) {
+            case 0x48: return KEY_UP;
+            case 0x50: return KEY_DOWN;
+            case 0x4B: return KEY_LEFT;
+            case 0x4D: return KEY_RIGHT;
+            }
             continue;
         }
 
-        if (code == 0x1C) return KEY_ENTER;
-        if (code == 0x0E) return KEY_BACKSPACE;
+        switch (code) {
+        case 0x1C: return KEY_ENTER;
+        case 0x0E: return KEY_BACKSPACE;
 
-        if (code == 0x48) return KEY_UP;
-        if (code == 0x50) return KEY_DOWN;
-        if (code == 0x4B) return KEY_LEFT;
-        if (code == 0x4D) return KEY_RIGHT;
+        case 0x48: return KEY_UP;
+        case 0x50: return KEY_DOWN;
+        case 0x4B: return KEY_LEFT;
+        case 0x4D: return KEY_RIGHT;
+        }
 
         if (code < 58) {
             char c = global_shift_pressed ? map_upper[code] : map_lower[code];
@@ -132,7 +134,7 @@ void dogeio_text_input(const char *prompt, char *buffer, size_t max_size) {
 
     dogeio_text_cursor_show();
 
-    while (1) {
+    while (true) {
         uint16_t key = dogeio_get_key();
 
         if (key == KEY_ENTER) {

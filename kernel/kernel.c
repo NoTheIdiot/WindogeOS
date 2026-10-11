@@ -249,7 +249,7 @@ void kernel_main(void) {
             }
 
             if (str_strcmp(username_new, "admin") == 0) {
-                dogeio_text_println("username cannot be admin.");
+                dogeio_text_println("username cannot be 'admin'.");
                 continue;
             }
             
@@ -262,7 +262,14 @@ void kernel_main(void) {
             break;
         }
 
-        dogeio_text_input("\nName your computer: ", computer_name, 64);
+        while (true) {
+            dogeio_text_input("\nName your computer: ", computer_name, 64);
+            if (computer_name[0] == '\0') {
+                dogeio_text_println("computer name cannot be empty.");
+                continue;
+            }
+            break;
+        }
 
         log("[dogeing] creating accounts");
         system_create_user(username_new, password_new, 1);
