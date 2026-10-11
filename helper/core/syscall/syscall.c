@@ -881,6 +881,12 @@ uint64_t syscall_handler(syscall_registers_t *regs) {
             break;
         }
 
+        case SPECIAL:
+            dogeio_text_println("TESTING");
+            log("TESTING");
+            ret_val = 1;
+            break;
+
         default:
             // for some reason a signature for unknown syscall
             duolog("[error] unknown syscall attempted to execute.");

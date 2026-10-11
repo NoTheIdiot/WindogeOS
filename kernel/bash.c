@@ -1012,18 +1012,7 @@ static int execute_command(int argc, char **argv) {
         }
         return 0;
     }
-    if (str_strcmp(argv[0], "calc") == 0) {
-        char expression[BASH_LINE_SIZE];
-        char result_text[16];
-        if (argc < 2 || join_arguments(argc, argv, 1, expression,
-                                      sizeof(expression)) != 0) {
-            dogeio_text_println("bash: calc: expected an expression");
-            return 1;
-        }
-        str_itoa(util_calc(expression), result_text);
-        dogeio_text_println(result_text);
-        return 0;
-    }
+    
     if (str_strcmp(argv[0], "edit") == 0) {
         if (argc != 2) {
             dogeio_text_println("bash: edit: usage: edit <file>");

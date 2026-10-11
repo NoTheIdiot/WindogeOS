@@ -29,4 +29,6 @@
 %define MOVE_FILE 27
 %define WRITE_FILE_RAW 42
 
+%define SPECIAL 90
+
 %define EXIT 60

@@ -1082,19 +1082,7 @@ static int dogeshell_execute(int argc, char **argv) {
         }
         return dogeshell_list_apps();
     }
-    if (str_strcmp(argv[0], "calc") == 0) {
-        char expression[DOGESHELL_LINE_SIZE];
-        char result_text[32];
-        if (argc < 2 ||
-            dogeshell_join_arguments(argc, argv, 1, expression,
-                                     sizeof(expression)) != 0) {
-            dogeio_text_println("Usage: calc <expression>");
-            return 1;
-        }
-        str_itoa(util_calc(expression), result_text);
-        dogeio_text_println(result_text);
-        return 0;
-    }
+    
     if (str_strcmp(argv[0], "bash") == 0) {
         system_bash();
         return 0;
