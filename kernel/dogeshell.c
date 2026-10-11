@@ -56,7 +56,7 @@ static uint16_t settings_wait_key(void) {
 }
 
 int dogeshell_list_pci(void) {
-    dogeio_text_println("ADDR      IDENTITY DESCRIPTION & [VENDOR:DEVICE ID]");
+    dogeio_text_println("ADDRESS   IDENTITY DESCRIPTION & [VENDOR:DEVICE ID]");
     dogeio_text_println("---------------------------------------------------------");
     for (uint16_t bus = 0; bus < 256; bus++) {
         for (uint8_t slot = 0; slot < 32; slot++) {
@@ -86,6 +86,7 @@ int dogeshell_list_pci(void) {
             }
         }
     }
+    dogeio_text_println("\nPress any key to return...");
     return 0;
 }
 
@@ -171,7 +172,7 @@ static void settings_show_system_information(void) {
     dogeio_text_print(uint64_to_str(get_ram() / 1024 / 1024, ram_buffer));
     dogeio_text_println(" MB");
     dogeio_text_println("");
-    dogeio_text_println("Press any key to return.");
+    dogeio_text_println("Press any key to return...");
     settings_wait_key();
 }
 
@@ -195,13 +196,17 @@ static void settings_select_color(void) {
     while (true) {
         settings_draw_color_menu(selected);
         uint16_t key = settings_wait_key();
-        if (key == KEY_UP) {
+        switch (key) {
+        case KEY_UP:
             selected = selected == 0 ? color_count - 1 : selected - 1;
-        } else if (key == KEY_DOWN) {
+            break;
+        case KEY_DOWN:
             selected = (selected + 1) % color_count;
-        } else if (key == KEY_BACKSPACE || key == (uint16_t)'q') {
+            break;
+        case KEY_BACKSPACE:
+        case (uint16_t)'q':
             return;
-        } else if (key == KEY_ENTER) {
+        case KEY_ENTER:
             selected_color = selected;
             saved_color = settings_colors[selected_color].color;
             dogeio_text_color_change(saved_color);
@@ -224,11 +229,16 @@ static void settings_select_shell(void) {
         settings_draw_menu("[ Default Shell ]", shell_labels,
                            sizeof(shell_labels) / sizeof(shell_labels[0]), selected);
         uint16_t key = settings_wait_key();
-        if (key == KEY_UP || key == KEY_DOWN) {
+
+        switch (key) {
+        case KEY_UP:
+        case KEY_DOWN:
             selected = selected == 0 ? 1 : 0;
-        } else if (key == KEY_BACKSPACE || key == (uint16_t)'q') {
+            break;
+        case KEY_BACKSPACE:
+        case (uint16_t)'q':
             return;
-        } else if (key == KEY_ENTER) {
+        case KEY_ENTER:
             default_shell_is_bash = selected == 1;
             if (settings_save() != 0) {
                 dogeio_text_println("Unable to save settings to /.windoge.");
@@ -263,13 +273,19 @@ void system_settings(void) {
     while (true) {
         settings_draw_menu("[ WindogeOS Settings ]", menu_items, menu_count, selected);
         uint16_t key = settings_wait_key();
-        if (key == KEY_UP) {
+        switch (key) {
+        case KEY_UP:
             selected = selected == 0 ? menu_count - 1 : selected - 1;
-        } else if (key == KEY_DOWN) {
-            selected = (selected + 1) % menu_count;
-        } else if (key == KEY_BACKSPACE || key == (uint16_t)'q') {
             break;
-        } else if (key == KEY_ENTER) {
+        case KEY_DOWN:
+            selected = (selected + 1) % menu_count;
+            break;
+        case KEY_BACKSPACE:
+        case (uint16_t)'q':
+            dogeio_text_clear();
+            dogeio_text_color_change(saved_color);
+            return;
+        case KEY_ENTER:
             switch (selected) {
             case 0:
                 settings_show_system_information();
@@ -289,12 +305,12 @@ void system_settings(void) {
                 settings_run_test();
                 break;
             default:
-                break;
+                dogeio_text_clear();
+                dogeio_text_color_change(saved_color);
+                return;
             }
         }
     }
-    dogeio_text_clear();
-    dogeio_text_color_change(saved_color);
 }
 
 void system_start_default_shell(void) {
