@@ -134,6 +134,54 @@ void str_itoa(int n, char* str) {
     }
 }
 
+void str_ltoa(uint64_t num, char* str) {
+    char temp[32];
+    int i = 0;
+    
+    if (num == 0) {
+        str[0] = '0';
+        str[1] = '\0';
+        return;
+    }
+    
+    while (num > 0) {
+        temp[i++] = (num % 10) + '0';
+        num /= 10;
+    }
+    
+    int j = 0;
+    while (i > 0) {
+        str[j++] = temp[--i];
+    }
+    str[j] = '\0';
+}
+
+void str_kutoa(uint64_t value, char *str) {
+    int i = 0;
+
+    if (value == 0) {
+        str[i++] = '0';
+        str[i] = '\0';
+        return;
+    }
+
+    while (value > 0) {
+        str[i++] = (value % 10) + '0';
+        value /= 10;
+    }
+    str[i] = '\0';
+
+    int start = 0;
+    int end = i - 1;
+    while (start < end) {
+        char temp = str[start];
+        str[start] = str[end];
+        str[end] = temp;
+        start++;
+        end--;
+    }
+}
+
 void str_u64toa(uint64_t n, char* str) {
     int i = 0;
     

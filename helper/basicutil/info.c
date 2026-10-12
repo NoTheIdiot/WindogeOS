@@ -59,7 +59,7 @@ char* cpuid(void) {
 }
 
 uint64_t get_ram(void) {
-    if (memmap_request.response == NULL) {
+    if (memmap_request.response == NULL || memmap_request.response->entry_count == 0) {
         return 0; 
     }
 
@@ -69,13 +69,14 @@ uint64_t get_ram(void) {
     for (uint64_t i = 0; i < entries; i++) {
         struct limine_memmap_entry *entry = memmap_request.response->entries[i];
 
-        if (entry->type == LIMINE_MEMMAP_USABLE) {
+        if (entry->type == LIMINE_MEMMAP_USABLE || entry->type == LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE) {
             total_ram_bytes += entry->length;
         }
     }
 
     return total_ram_bytes;
 }
+
 
 uint64_t get_ram_end_address(void) {
     if (memmap_request.response == NULL) {

@@ -22,6 +22,8 @@ size_t str_strlen(const char* str);
 void str_pad(char *dest, const char *src, int target_len, char pad_char);
 void str_itoa(int n, char* str);
 uint8_t str_to_u8(char *str);
+void str_ltoa(uint64_t num, char* str);
+void str_kutoa(uint64_t value, char *str);
 int str_strncmp(const char *str1, const char *str2, size_t n);
 int str_startswith(const char *str, const char *prefix);
 int str_atoi(char* s);

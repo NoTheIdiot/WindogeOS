@@ -69,13 +69,16 @@ uint32_t calculate_crc32(const uint8_t* data, size_t length) {
     return ~crc;
 }
 
-size_t zip_compress_store(uint8_t* out_buf, 
-                          const char* filename, uint16_t name_len,
-                          const uint8_t* file_data, uint32_t data_len) {
-    if (out_buf == NULL || filename == NULL || file_data == NULL || data_len == 0) {
+size_t zip_compress_store(const char* filename, uint32_t data_len) {
+    if (filename == NULL || data_len == 0) {
         return 0;
     }
+    // 16 KB of DATA
+    uint8_t out_buf[16384];
     uint8_t* p = out_buf;
+    uint8_t file_data[data_len]; 
+    read_file_raw(filename, file_data, data_len);
+    uint16_t name_len = (uint16_t)(str_strlen(filename));
     uint32_t file_crc = calculate_crc32(file_data, data_len);
 
     zip_local_header_t* local = (zip_local_header_t*)p;
@@ -204,6 +207,9 @@ void _start(int argc, char** argv) {
         print("Usage: zip <file>\n");
         sys_exit(0);
     }
-
+    
+    if (argc == 2 && str_strcmp(argv[0], "--help") != 0) {
+        
+    }
     sys_exit(0);
 }
