@@ -209,7 +209,7 @@ void _start(int argc, char** argv) {
     }
     
     if (argc == 2 && str_strcmp(argv[0], "--help") != 0) {
-        
+        println("hold on haven't finished this");
     }
     sys_exit(0);
 }
