@@ -63,18 +63,17 @@ uint64_t get_ram(void) {
         return 0; 
     }
 
-    uint64_t total_ram_bytes = 0;
     uint64_t entries = memmap_request.response->entry_count;
+    uint64_t type_counts[8] = {0}; 
 
     for (uint64_t i = 0; i < entries; i++) {
         struct limine_memmap_entry *entry = memmap_request.response->entries[i];
-
-        if (entry->type == LIMINE_MEMMAP_USABLE || entry->type == LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE) {
-            total_ram_bytes += entry->length;
+        if (entry->type < 8) {
+            type_counts[entry->type] += entry->length;
         }
     }
 
-    return total_ram_bytes;
+    return (type_counts[0] + type_counts[7]) / 1024;
 }
 
 
@@ -152,14 +151,25 @@ void system_fetch() {
                 break;
             case 7:
                 dogeio_text_print("RAM: ");
-                str_itoa((int)(get_used_ram() / 1024 / 1024), ram_used_str);
+                
+                uint64_t ram_used_mib = get_used_ram() / 1024 / 1024;
+                uint64_t ram_total_kb = get_ram();
+
+                str_kutoa(ram_used_mib, ram_used_str);
                 dogeio_text_print(ram_used_str);
-                dogeio_text_print(" MB");
-                dogeio_text_print(" / ");
-                str_itoa((int)(get_ram() / 1024 / 1024), ram_str);
-                dogeio_text_print(ram_str);
-                dogeio_text_println(" MB");
+                dogeio_text_print(" MB / ");
+                
+                if (ram_total_kb >= 1024) {
+                    str_kutoa(ram_total_kb / 1024, ram_str);
+                    dogeio_text_print(ram_str);
+                    dogeio_text_println(" MB");
+                } else {
+                    str_kutoa(ram_total_kb, ram_str);
+                    dogeio_text_print(ram_str);
+                    dogeio_text_println(" KB");
+                }
                 break;
+
             case 8:
                 dogeio_text_print("Storage: ");
                 if (metrics_status == 0 && total_clusters > 0) {

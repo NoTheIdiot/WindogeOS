@@ -7,8 +7,11 @@
 #include <system.h>
 #include <core.h>
 #include <basicutil.h>
+#include <boot/limine.h>
 #include <image.h>
 #include <bool.h>
+
+extern volatile struct limine_memmap_request memmap_request;
 
 typedef struct {
     const char *label;
@@ -54,6 +57,35 @@ static uint16_t settings_wait_key(void) {
     } while (key == KEY_UNKNOWN);
     return key;
 }
+
+void get_all_fucking_ram(void) {
+    if (memmap_request.response == NULL || memmap_request.response->entry_count == 0) {
+        return; 
+    }
+
+    uint64_t entries = memmap_request.response->entry_count;
+    uint64_t type_counts[8] = {0}; 
+
+    for (uint64_t i = 0; i < entries; i++) {
+        struct limine_memmap_entry *entry = memmap_request.response->entries[i];
+        if (entry->type < 8) {
+            type_counts[entry->type] += entry->length;
+        }
+    }
+
+    char debug_buf[32];
+    dogeio_text_println("\n--- Memory Map Breakdown ---");
+    for (int t = 0; t < 8; t++) {
+        dogeio_text_print("Type ");
+        str_kutoa((uint64_t)t, debug_buf); 
+        dogeio_text_print(debug_buf);
+        dogeio_text_print(": ");
+        str_kutoa(type_counts[t] / 1024, debug_buf); 
+        dogeio_text_print(debug_buf);
+        dogeio_text_println(" KB");
+    }
+}
+
 
 int dogeshell_list_pci(void) {
     dogeio_text_println("ADDRESS   IDENTITY DESCRIPTION & [VENDOR:DEVICE ID]");
@@ -1027,11 +1059,7 @@ static int dogeshell_execute(int argc, char **argv) {
         return 0;
     }
     if (str_strcmp(argv[0], "raminfo") == 0) {
-        char ram_text[32];
-        uint64_to_str(get_ram(), ram_text);
-        dogeio_text_print("RAM: ");
-        dogeio_text_print(ram_text);
-        dogeio_text_println(" bytes");
+        get_all_fucking_ram();
         return 0;
     }
     if (str_strcmp(argv[0], "fetch") == 0) {
