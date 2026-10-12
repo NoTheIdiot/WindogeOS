@@ -54,7 +54,9 @@ typedef struct {
 #pragma pack(pop)
 
 uint32_t calculate_crc32(const uint8_t* data, size_t length) {
+    // check if data is NULL
     if (data == NULL || length == 0) return 0;
+    syscall_0(SPECIAL);
     uint32_t crc = 0xFFFFFFFF;
     for (size_t i = 0; i < length; i++) {
         crc ^= data[i];
@@ -66,9 +68,11 @@ uint32_t calculate_crc32(const uint8_t* data, size_t length) {
             }
         }
     }
+    syscall_0(SPECIAL);
     return ~crc;
 }
 
+// el problemedo
 size_t zip_compress_store(const char* filename, uint32_t data_len) {
     if (filename == NULL || data_len == 0) {
         return 0;
@@ -80,6 +84,7 @@ size_t zip_compress_store(const char* filename, uint32_t data_len) {
     read_file_raw(filename, file_data, data_len);
     uint16_t name_len = (uint16_t)(str_strlen(filename));
     uint32_t file_crc = calculate_crc32(file_data, data_len);
+    syscall_0(SPECIAL);
 
     zip_local_header_t* local = (zip_local_header_t*)p;
     local->signature = 0x04034b50;
@@ -119,6 +124,7 @@ size_t zip_compress_store(const char* filename, uint32_t data_len) {
     cd->external_file_attr = 0;
     cd->local_header_offset = 0; 
     p += sizeof(zip_cd_header_t);
+    syscall_0(SPECIAL);
     
     memcpy(p, filename, name_len); p += name_len;
     uint32_t cd_end = (uint32_t)(p - out_buf);
@@ -133,6 +139,7 @@ size_t zip_compress_store(const char* filename, uint32_t data_len) {
     eocd->cd_offset = cd_offset;
     eocd->comment_length = 0;
     p += sizeof(zip_eocd_t);
+    syscall_0(SPECIAL);
 
     return (size_t)(p - out_buf);
 }
@@ -208,8 +215,10 @@ void _start(int argc, char** argv) {
         sys_exit(0);
     }
     
-    if (argc == 2 && str_strcmp(argv[0], "--help") != 0) {
-        println("hold on haven't finished this");
+    if (argc == 1 && str_strcmp(argv[0], "--help") != 0) {
+        // problem here
+        zip_compress_store(argv[0], 4096);
+        sys_exit(2);
     }
     sys_exit(0);
 }
