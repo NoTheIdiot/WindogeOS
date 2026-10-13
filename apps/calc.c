@@ -8,7 +8,7 @@ void _start(int argc, char** argv) {
         sys_exit(1);
     } 
     
-    if (str_strcmp(argv[0], "--help") == 0) {
+    if (argv[0] != NULL && str_strcmp(argv[0], "--help") == 0) {
         print("Calculator\n");
         print("Usage: calc <expression>\n");
         print("Example: calc \"2 + 3 * 4\"\n");

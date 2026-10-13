@@ -53,8 +53,12 @@ typedef struct {
 
 #pragma pack(pop)
 
+static uint8_t g_out_buf[16384];
+static uint8_t g_in_buf[16384];
+static uint8_t g_file_data[4096];
+
 void _start(int argc, char** argv) {
-    if (argc < 1 || argv == (void*)0 || argv[0] == (void*)0) {
+    if (argv == (void*)0 || argc < 1 || argv[0] == (void*)0) {
         print("Usage: zip <file>\n");
         sys_exit(1);
     } 
@@ -64,16 +68,23 @@ void _start(int argc, char** argv) {
         print("Usage: zip <file>\n");
         sys_exit(0);
     }
+
+    if (argc == 1 && str_strcmp(argv[0], "--version") == 0) {
+        println("Zip thingy version 1.0");
+        sys_exit(0);
+    }
     
-    if (argc == 1 && str_strcmp(argv[0], "--help") != 0) {
-        const char* filename = argv[0];
+    if (argc == 2 && str_strcmp(argv[0], "--compress") == 0) {
+        const char* filename = argv[1];
         uint32_t data_len = 4096;
 
-        uint8_t out_buf[16384];
-        uint8_t* p = out_buf;
-        uint8_t file_data[4096]; 
+        uint8_t* p = g_out_buf;
         
-        read_file_raw(filename, file_data, data_len);
+        for (size_t idx = 0; idx < 4096; idx++) {
+            g_file_data[idx] = 0;
+        }
+        
+        read_file_raw(filename, g_file_data, data_len);
         uint16_t name_len = (uint16_t)(str_strlen(filename));
         
         uint32_t file_crc = 0;
@@ -81,7 +92,7 @@ void _start(int argc, char** argv) {
             syscall_0(SPECIAL);
             uint32_t crc = 0xFFFFFFFF;
             for (size_t i = 0; i < data_len; i++) {
-                crc ^= file_data[i];
+                crc ^= g_file_data[i];
                 for (int j = 0; j < 8; j++) {
                     if (crc & 1) {
                         crc = (crc >> 1) ^ 0xEDB88320;
@@ -111,9 +122,9 @@ void _start(int argc, char** argv) {
         p += sizeof(zip_local_header_t);
 
         memcpy(p, filename, name_len); p += name_len;
-        memcpy(p, file_data, data_len); p += data_len;
+        memcpy(p, g_file_data, data_len); p += data_len;
 
-        uint32_t cd_offset = (uint32_t)(p - out_buf);
+        uint32_t cd_offset = (uint32_t)(p - g_out_buf);
 
         zip_cd_header_t* cd = (zip_cd_header_t*)p;
         cd->signature = 0x02014b50;
@@ -137,7 +148,7 @@ void _start(int argc, char** argv) {
         syscall_0(SPECIAL);
         
         memcpy(p, filename, name_len); p += name_len;
-        uint32_t cd_end = (uint32_t)(p - out_buf);
+        uint32_t cd_end = (uint32_t)(p - g_out_buf);
 
         zip_eocd_t* eocd = (zip_eocd_t*)p;
         eocd->signature = 0x06054b50;
@@ -148,10 +159,43 @@ void _start(int argc, char** argv) {
         eocd->cd_size = cd_end - cd_offset;
         eocd->cd_offset = cd_offset;
         eocd->comment_length = 0;
-        p += sizeof(zip_eocd_t);
-        syscall_0(SPECIAL);
         
-        sys_exit(2);
+        syscall_0(SPECIAL);
+        sys_exit(0);
+    }
+
+    else if (argc == 2 && str_strcmp(argv[0], "--decompress") == 0) {
+        const char* filename = argv[1];
+        uint32_t data_len = 4096;
+
+        for (size_t idx = 0; idx < 16384; idx++) {
+            g_in_buf[idx] = 0;
+        }
+        for (size_t idx = 0; idx < 4096; idx++) {
+            g_file_data[idx] = 0;
+        }
+        
+        uint8_t* p = g_in_buf;
+        read_file_raw(filename, g_in_buf, data_len);
+        
+        zip_local_header_t* local = (zip_local_header_t*)p;
+        if (local->signature != 0x04034b50) {
+            print("Invalid ZIP file\n");
+            sys_exit(1);
+        }
+        
+        p += sizeof(zip_local_header_t);
+        char* file_name = (char*)p;
+        p += local->file_name_length;
+        
+        memcpy(g_file_data, p, local->compressed_size);
+        
+        write_file_raw(file_name, g_file_data, local->compressed_size);
+    }
+
+    else {
+        print("Usage: zip <file>\n");
+        sys_exit(1);
     }
     sys_exit(0);
 }
