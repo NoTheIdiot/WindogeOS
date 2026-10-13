@@ -3,6 +3,7 @@
 #include <boot/kernel.h>
 #include <dogeio.h>
 #include <string.h>
+#include <system.h>
 #include <bool.h>
 #include <basicutil.h>
 
@@ -15,6 +16,8 @@ typedef struct __attribute__((packed)) {
     uint32_t offset_high;     
     uint32_t reserved;        
 } idt_entry_t;
+
+extern uint64_t sys_exit(uint64_t status);
 
 typedef struct __attribute__((packed)) {
     uint16_t limit;
@@ -97,6 +100,51 @@ void isr_common_handler(interrupt_frame_t *frame) {
     char str_buf[64];
     char log_buf[128];
     int selected_option = 0;
+
+    if ((frame->cs & 0x03u) == 3) {
+        uint64_to_dec_forward(frame->vector, str_buf);
+        str_strcpy(log_buf, "[User Fault] VECTOR: ");
+        str_strcat(log_buf, str_buf);
+        log(log_buf);
+
+        uint64_to_hex_forward(frame->rip, str_buf);
+        str_strcat(log_buf, " | RIP: ");
+        str_strcat(log_buf, str_buf);
+        log(log_buf);
+
+        if (frame->vector == 14) {
+            uint64_t cr2;
+            __asm__ __volatile__("mov %%cr2, %0" : "=r"(cr2));
+            uint64_to_hex_forward(cr2, str_buf);
+            str_strcat(log_buf, " | CR2: ");
+            str_strcat(log_buf, str_buf);
+            log(log_buf);
+        }
+
+        dogeio_text_println("");
+        dogeio_text_color_change(COLOR_BRIGHT_RED);
+        
+        switch (frame->vector) {
+            case 0:  dogeio_text_print("[Fault] Divide-by-Zero error in program."); break;
+            case 6:  dogeio_text_print("[Fault] Invalid opcode instruction executed."); break;
+            case 13: dogeio_text_print("[Fault] General Protection Violation."); break;
+            case 14: dogeio_text_print("[Fault] Segmentation / Page Fault violation."); break;
+            default: dogeio_text_print("[Fault] Application exception intercepted."); break;
+        }
+        
+        dogeio_text_color_change(COLOR_WHITE);
+        dogeio_text_println(" Safely recovery back to prompt...");
+
+        is_kernel_dead = false;
+
+        extern void system_dogeshell(void);
+        system_dogeshell();
+
+        while (1) {
+            __asm__ __volatile__("hlt");
+        }
+    }
+
     is_kernel_dead = true;
     uint64_to_dec_forward(frame->vector, str_buf);
     str_strcpy(log_buf, "VECTOR: ");
@@ -189,7 +237,6 @@ void isr_common_handler(interrupt_frame_t *frame) {
         }
     }
 }
-
 
 
 void init_idt(void) {
