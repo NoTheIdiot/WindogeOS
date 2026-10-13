@@ -878,6 +878,63 @@ static int dogeshell_execute(int argc, char **argv) {
         }
         return fs_list(path, show_hidden) == 0 ? 0 : 1;
     }
+
+    if (str_strcmp(argv[0], "pack") == 0) {
+        if (argc == 2) {
+            if (str_strcmp(argv[1], "--help") == 0) {
+                dogeio_text_println("RLEPACK (Kernel Package Utility)");
+                dogeio_text_println("Usage: pack [file]");
+                return 1;
+            }
+        }
+
+        if (argc != 2 || argv[1] == NULL || argv[1][0] == '\0') {
+            dogeio_text_println("Usage: pack [file]");
+            return 2;
+        }
+
+        char *target_filename = argv[1];
+        uint64_t file_size = 0;
+        bool is_dir = false;
+
+        if (fs_get_info(target_filename, &file_size, &is_dir) != 0) {
+            dogeio_text_println("Error: Target file does not exist.");
+            return -1;
+        }
+
+        if (is_dir) {
+            dogeio_text_println("Error: Cannot pack a directory.");
+            return -1;
+        }
+
+        uint64_t len = str_strlen(target_filename);
+        char out_name[256];
+        for (int i = 0; i < 256; i++) out_name[i] = '\0';
+
+        if (len >= 250) {
+            dogeio_text_println("Error: Filename too long.");
+            return -1;
+        }
+
+        if (len > 4 && str_strcmp(target_filename + len - 4, ".rle") == 0) {
+            dogeio_text_println("Action: Decompressing archive stream...");
+            
+            str_strcpy(out_name, target_filename);
+            out_name[len - 4] = '\0';
+
+            kernel_rle_decompress(target_filename, file_size, out_name);
+        } 
+        else {
+            dogeio_text_println("Action: Compressing raw binary target...");
+
+            str_strcpy(out_name, target_filename);
+            str_strcat(out_name, ".rle");
+
+            kernel_rle_compress(target_filename, file_size, out_name);
+        }
+        return 0;
+    }
+
     if (str_strcmp(argv[0], "create") == 0 || str_strcmp(argv[0], "touch") == 0) {
         if (argc != 2) {
             dogeio_text_println("Usage: create <file>");

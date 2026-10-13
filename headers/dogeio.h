@@ -122,5 +122,7 @@ int   fs_read_raw(char* filename, uint8_t* output_buffer, uint64_t max_size);
 int   fs_read_raw_at(char* filename, uint8_t* output_buffer, uint64_t offset, uint64_t max_size);
 
 int exec_flat_binary(const char *filename, int argc, char **argv);
+void kernel_rle_decompress(char *src_path, uint64_t src_size, char *dst_path);
+void kernel_rle_compress(char *src_path, uint64_t src_size, char *dst_path);
 
 #endif
