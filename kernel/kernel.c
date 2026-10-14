@@ -216,6 +216,9 @@ void kernel_main(void) {
         }
         if (!fs_exists("/apps")) {
             fs_mkdir("/apps");
+            fs_chdir("apps");
+            fs_mkdir("packages");
+            fs_chdir("/");
         }
 
         log("[dogeing] creating boot file");
