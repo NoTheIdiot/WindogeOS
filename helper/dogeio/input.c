@@ -1,11 +1,12 @@
 #include <stdint.h>
 #include <bool.h>
-#include <stddef.h>
-#include <basicutil.h>
 #include <dogeio.h>
-#include <string.h>
-#include <time.h>
-#include <boot/kernel.h>
+#include <stddef.h>
+
+#define KBD_BUFFER_SIZE 256
+
+extern bool is_kernel_dead;
+extern void menubar_draw(void);
 
 const char map_lower[] = {
     0,  0, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', 0,
@@ -21,34 +22,43 @@ const char map_upper[] = {
    'Z', 'X', 'C', 'V', 'B', 'N', 'M', '<', '>', '?', 0, '*', 0, ' '
 };
 
-extern char text_grid[TERMINAL_ROWS * TERMINAL_COLS];
+static volatile uint8_t kbd_buffer[KBD_BUFFER_SIZE];
+static volatile size_t kbd_head = 0;
+static volatile size_t kbd_tail = 0;
 
-static bool global_shift_pressed = false;
-static bool global_ctrl_pressed  = false;
+static volatile bool global_shift_pressed = false;
+static volatile bool global_ctrl_pressed  = false;
+
+void dogeio_push_scancode(uint8_t scancode) {
+    size_t next = (kbd_head + 1) % KBD_BUFFER_SIZE;
+    if (next != kbd_tail) {
+        kbd_buffer[kbd_head] = scancode;
+        kbd_head = next;
+    }
+}
+
+static uint8_t dogeio_pop_scancode(void) {
+    __asm__ __volatile__("" : : : "memory");
+
+    if (kbd_head == kbd_tail) {
+        return 0;
+    }
+    uint8_t scancode = kbd_buffer[kbd_tail];
+    kbd_tail = (kbd_tail + 1) % KBD_BUFFER_SIZE;
+    return scancode;
+}
 
 uint16_t dogeio_get_key(void) {
-    char last_seen_time[16] = {0};
     bool escaped = false;
 
     while (true) {
-        while ((ports_inb(0x64) & 1) == 0) {
-            if (is_kernel_dead == false) {
-                char* current_time = time_get();
-                if (str_strcmp(current_time, last_seen_time) != 0) {
-                    menubar_draw();
-                    for (int i = 0; i < 15; i++) {
-                        last_seen_time[i] = current_time[i];
-                        if (current_time[i] == '\0') {
-                            break;
-                        }
-                    }
-                    last_seen_time[15] = '\0';
-                }
-            }
-            menubar_draw();
-        }
+        uint8_t code = dogeio_pop_scancode();
 
-        uint8_t code = ports_inb(0x60);
+        if (code == 0) {
+            menubar_draw();
+            __asm__ __volatile__("sti; hlt" : : : "memory");
+            continue;
+        }
 
         switch (code) {
         case 0xE0:
@@ -120,6 +130,7 @@ uint16_t dogeio_get_key(void) {
             }
         }
     }
+    
     return KEY_UNKNOWN;
 }
 
@@ -172,7 +183,6 @@ void dogeio_text_input(const char *prompt, char *buffer, size_t max_size) {
                 len += 8;
                 buffer[len] = '\0';
 
-                
                 uint32_t saved_x = cursor_x;
                 uint32_t saved_y = cursor_y;
 

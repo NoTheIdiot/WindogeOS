@@ -55,6 +55,7 @@ void dogeio_text_clear_raw(void);
 void dogeio_print_hex8(uint8_t val);
 void dogeio_text_cursor_show();
 void dogeio_text_cursor_hide();
+void dogeio_push_scancode(uint8_t scancode);
 void dogeio_print_hex16(uint16_t val);
 
 #define KEY_UP        0x101

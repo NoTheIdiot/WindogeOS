@@ -188,6 +188,8 @@ void kernel_main(void) {
     }
     log("[wow] all basic drivers done");
 
+    __asm__ volatile ("sti");
+    log("[wow] interrupts enabled");
     log("WindogeOS has successfully booted. Start celebrating broski.");
     menubar_draw();
 

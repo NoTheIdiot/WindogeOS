@@ -23,7 +23,6 @@ isr_stub_%1:
     jmp isr_common_stub
 %endmacro
 
-
 ISR_NOERRCODE 0   
 ISR_NOERRCODE 1   
 ISR_NOERRCODE 2   
@@ -48,6 +47,12 @@ ISR_NOERRCODE 20
 ISR_ERRCODE   21  
 %assign i 22
 %rep 10
+ISR_NOERRCODE i
+%assign i i+1
+%endrep
+
+%assign i 32
+%rep 16
 ISR_NOERRCODE i
 %assign i i+1
 %endrep
@@ -89,13 +94,13 @@ isr_common_stub:
     pop rax
 
     add rsp, 16            
-    iretq
+    iretq 
 
 section .rodata
 global isr_stub_table
 isr_stub_table:
 %assign i 0
-%rep 32
+%rep 48
     dq isr_stub_%[i]
 %assign i i+1
 %endrep

@@ -96,7 +96,27 @@ void idt_set_gate(uint8_t vector, uint64_t handler, uint8_t ist, uint8_t flags) 
     idt[vector].reserved        = 0;
 }
 
+volatile uint8_t last_scancode = 0;
+
+extern void dogeio_push_scancode(uint8_t scancode);
+
 void isr_common_handler(interrupt_frame_t *frame) {
+
+    if (frame->vector >= 32 && frame->vector <= 47) {
+        if (frame->vector == 33) {
+            uint8_t scancode = 0;
+            __asm__ __volatile__("inb %1, %0" : "=a"(scancode) : "Nd"(0x60));
+            dogeio_push_scancode(scancode);
+        }
+        
+        if (frame->vector >= 40) {
+            __asm__ __volatile__("outb %0, %1" : : "a"((uint8_t)0x20), "Nd"((uint16_t)0xA0));
+        }
+        __asm__ __volatile__("outb %0, %1" : : "a"((uint8_t)0x20), "Nd"((uint16_t)0x20));
+
+        return; 
+    }
+
     char str_buf[64];
     char log_buf[128];
     int selected_option = 0;
@@ -238,13 +258,30 @@ void isr_common_handler(interrupt_frame_t *frame) {
     }
 }
 
+void pic_remap(void) {
+    __asm__ __volatile__("outb %0, %1" : : "a"((uint8_t)0x11), "Nd"((uint16_t)0x20));
+    __asm__ __volatile__("outb %0, %1" : : "a"((uint8_t)0x11), "Nd"((uint16_t)0xA0));
+    
+    __asm__ __volatile__("outb %0, %1" : : "a"((uint8_t)0x20), "Nd"((uint16_t)0x21));
+    __asm__ __volatile__("outb %0, %1" : : "a"((uint8_t)0x28), "Nd"((uint16_t)0xA1));
+    
+    __asm__ __volatile__("outb %0, %1" : : "a"((uint8_t)0x04), "Nd"((uint16_t)0x21));
+    __asm__ __volatile__("outb %0, %1" : : "a"((uint8_t)0x02), "Nd"((uint16_t)0xA1));
+    
+    __asm__ __volatile__("outb %0, %1" : : "a"((uint8_t)0x01), "Nd"((uint16_t)0x21));
+    __asm__ __volatile__("outb %0, %1" : : "a"((uint8_t)0x01), "Nd"((uint16_t)0xA1));
+
+    __asm__ __volatile__("outb %0, %1" : : "a"((uint8_t)0xFD), "Nd"((uint16_t)0x21));
+    __asm__ __volatile__("outb %0, %1" : : "a"((uint8_t)0xFF), "Nd"((uint16_t)0xA1));
+}
+
 
 void init_idt(void) {
     for (int i = 0; i < 256; i++) {
         idt_set_gate((uint8_t)i, 0, 0, 0);
     }
     
-    for (uint8_t vector = 0; vector < 32; vector++) {
+    for (uint8_t vector = 0; vector < 48; vector++) {
         uint8_t ist_index = 0;
         if (vector == 8) {
             ist_index = 1;
@@ -252,8 +289,27 @@ void init_idt(void) {
         idt_set_gate(vector, isr_stub_table[vector], ist_index, IDT_GATE_INT32);
     }
     
+    pic_remap();
+    
     idtr.limit = sizeof(idt) - 1;
     idtr.base  = (uint64_t)&idt;
-    
     idt_load(&idtr);
+    
+    while ((ports_inb(0x64) & 2) != 0);
+    __asm__ __volatile__("outb %0, %1" : : "a"((uint8_t)0x20), "Nd"((uint16_t)0x64));
+    
+    while ((ports_inb(0x64) & 1) == 0);
+    uint8_t status = 0;
+    __asm__ __volatile__("inb %1, %0" : "=a"(status) : "Nd"(0x60));
+    
+    status |= 0x01; 
+    
+    while ((ports_inb(0x64) & 2) != 0);
+    __asm__ __volatile__("outb %0, %1" : : "a"((uint8_t)0x60), "Nd"((uint16_t)0x64));
+    
+    while ((ports_inb(0x64) & 2) != 0);
+    __asm__ __volatile__("outb %0, %1" : : "a"(status), "Nd"((uint16_t)0x60));
+
+    __asm__ __volatile__("sti");
 }
+
