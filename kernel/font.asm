@@ -1,7 +1,10 @@
 bits 64
 section .data
-global font
+global terminus
+global ubuntu_mono
 align 4
-font:
-	incbin "fonts/font.psf"
-font_end:
+terminus:
+	incbin "fonts/Terminus.psf"
+
+ubuntu_mono:
+    incbin "fonts/UbuntuMono.psf"

@@ -24,27 +24,35 @@ static const uint32_t ansi_colors[16] = {
     0x555555, 0xFF5555, 0x55FF55, 0xFFFF55, 0x5555FF, 0xFF55FF, 0x55FFFF, 0xFFFFFFFF
 };
 
+extern const uint8_t ubuntu_mono[];
+extern const uint8_t terminus[];
 
-extern const uint8_t font[];
+static const uint8_t* current_font = terminus;
+
+void dogeio_set_font(const uint8_t* font) {
+    if (font != NULL) {
+        current_font = font;
+    }
+}
 
 static const uint8_t* get_glyph_pointer(char c) {
     if ((uint8_t)c >= 128) {
         c = ' ';
     }
 
-    uint32_t magic = *(const uint32_t*)font;
+    uint32_t magic = *(const uint32_t*)current_font;
 
     if ((magic & 0xFFFF) == 0x0436) {
-        uint8_t bytes_per_glyph = font[3]; 
-        return &font[4 + ((uint8_t)c * bytes_per_glyph)];
+        uint8_t bytes_per_glyph = current_font[3]; 
+        return &current_font[4 + ((uint8_t)c * bytes_per_glyph)];
     }
     else if (magic == 0x864ab572) {
-        uint32_t header_size = *(const uint32_t*)&font[8];
-        uint32_t bytes_per_glyph = *(const uint32_t*)&font[20];
-        return &font[header_size + ((uint8_t)c * bytes_per_glyph)];
+        uint32_t header_size = *(const uint32_t*)&current_font[8];
+        uint32_t bytes_per_glyph = *(const uint32_t*)&current_font[20];
+        return &current_font[header_size + ((uint8_t)c * bytes_per_glyph)];
     }
 
-    return font;
+    return current_font;
 }
 
 static void dogeio_render_glyph(char c, uint32_t x, uint32_t y, uint32_t fg_color, uint32_t bg_color) {
