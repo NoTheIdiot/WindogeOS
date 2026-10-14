@@ -24,13 +24,32 @@ static const uint32_t ansi_colors[16] = {
     0x555555, 0xFF5555, 0x55FF55, 0xFFFF55, 0x5555FF, 0xFF55FF, 0x55FFFF, 0xFFFFFFFF
 };
 
-void dogeio_text_putchar_raw_glyph(char c, uint32_t x, uint32_t y) {
-    if (framebuffer_request.response == NULL || framebuffer_request.response->framebuffer_count < 1) {
-        return;
+
+extern const uint8_t font[];
+
+static const uint8_t* get_glyph_pointer(char c) {
+    if ((uint8_t)c >= 128) {
+        c = ' ';
     }
 
-    if ((uint8_t)c >= 128) {
-        c = ' '; 
+    uint32_t magic = *(const uint32_t*)font;
+
+    if ((magic & 0xFFFF) == 0x0436) {
+        uint8_t bytes_per_glyph = font[3]; 
+        return &font[4 + ((uint8_t)c * bytes_per_glyph)];
+    }
+    else if (magic == 0x864ab572) {
+        uint32_t header_size = *(const uint32_t*)&font[8];
+        uint32_t bytes_per_glyph = *(const uint32_t*)&font[20];
+        return &font[header_size + ((uint8_t)c * bytes_per_glyph)];
+    }
+
+    return font;
+}
+
+static void dogeio_render_glyph(char c, uint32_t x, uint32_t y, uint32_t fg_color, uint32_t bg_color) {
+    if (framebuffer_request.response == NULL || framebuffer_request.response->framebuffer_count < 1) {
+        return;
     }
 
     struct limine_framebuffer *framebuffer = framebuffer_request.response->framebuffers[0];
@@ -44,58 +63,24 @@ void dogeio_text_putchar_raw_glyph(char c, uint32_t x, uint32_t y) {
         return;
     }
 
-    const uint8_t* glyph = terminal_font[(uint8_t)c];
+    const uint8_t* glyph = get_glyph_pointer(c);
 
     for (uint32_t g_row = 0; g_row < 16; g_row++) {
         uint8_t bits = glyph[g_row];
         size_t row_offset = (pixel_y + g_row) * u64_pitch + pixel_x;
         
-        framebuffer_ptr[row_offset + 0] = ((bits >> 7) & 1) ? dogeio_text_color : dogeio_background_color;
-        framebuffer_ptr[row_offset + 1] = ((bits >> 6) & 1) ? dogeio_text_color : dogeio_background_color;
-        framebuffer_ptr[row_offset + 2] = ((bits >> 5) & 1) ? dogeio_text_color : dogeio_background_color;
-        framebuffer_ptr[row_offset + 3] = ((bits >> 4) & 1) ? dogeio_text_color : dogeio_background_color;
-        framebuffer_ptr[row_offset + 4] = ((bits >> 3) & 1) ? dogeio_text_color : dogeio_background_color;
-        framebuffer_ptr[row_offset + 5] = ((bits >> 2) & 1) ? dogeio_text_color : dogeio_background_color;
-        framebuffer_ptr[row_offset + 6] = ((bits >> 1) & 1) ? dogeio_text_color : dogeio_background_color;
-        framebuffer_ptr[row_offset + 7] = (bits & 1)        ? dogeio_text_color : dogeio_background_color;
+        for (int bit = 0; bit < 8; bit++) {
+            framebuffer_ptr[row_offset + (size_t)bit] = ((bits >> (7 - bit)) & 1) ? fg_color : bg_color;
+        }
     }
 }
 
+void dogeio_text_putchar_raw_glyph(char c, uint32_t x, uint32_t y) {
+    dogeio_render_glyph(c, x, y, dogeio_text_color, dogeio_background_color);
+}
+
 void dogeio_text_putchar_reverted_glyph(char c, uint32_t x, uint32_t y) {
-    if (framebuffer_request.response == NULL || framebuffer_request.response->framebuffer_count < 1) {
-        return;
-    }
-
-    if ((uint8_t)c >= 128) {
-        c = ' '; 
-    }
-
-    struct limine_framebuffer *framebuffer = framebuffer_request.response->framebuffers[0];
-    uint32_t* framebuffer_ptr = (uint32_t*)framebuffer->address;
-
-    uint32_t pixel_x = x * 8;
-    uint32_t pixel_y = y * 16;
-    uint64_t u64_pitch = framebuffer->pitch / 4;
-
-    if (pixel_x + 8 > framebuffer->width || pixel_y + 16 > framebuffer->height) {
-        return;
-    }
-
-    const uint8_t* glyph = terminal_font[(uint8_t)c];
-
-    for (uint32_t g_row = 0; g_row < 16; g_row++) {
-        uint8_t bits = glyph[g_row];
-        size_t row_offset = (pixel_y + g_row) * u64_pitch + pixel_x;
-        
-        framebuffer_ptr[row_offset + 0] = ((bits >> 7) & 1) ? dogeio_background_color : dogeio_text_color;
-        framebuffer_ptr[row_offset + 1] = ((bits >> 6) & 1) ? dogeio_background_color : dogeio_text_color;
-        framebuffer_ptr[row_offset + 2] = ((bits >> 5) & 1) ? dogeio_background_color : dogeio_text_color;
-        framebuffer_ptr[row_offset + 3] = ((bits >> 4) & 1) ? dogeio_background_color : dogeio_text_color;
-        framebuffer_ptr[row_offset + 4] = ((bits >> 3) & 1) ? dogeio_background_color : dogeio_text_color;
-        framebuffer_ptr[row_offset + 5] = ((bits >> 2) & 1) ? dogeio_background_color : dogeio_text_color;
-        framebuffer_ptr[row_offset + 6] = ((bits >> 1) & 1) ? dogeio_background_color : dogeio_text_color;
-        framebuffer_ptr[row_offset + 7] = (bits & 1)        ? dogeio_background_color : dogeio_text_color;
-    }
+    dogeio_render_glyph(c, x, y, dogeio_background_color, dogeio_text_color);
 }
 
 void dogeio_text_putchar(char c, uint32_t x, uint32_t y) {
