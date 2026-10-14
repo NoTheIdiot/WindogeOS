@@ -185,6 +185,55 @@ static void render_status_bar(void) {
     (void)background_color(COLOR_BLACK);
 }
 
+static bool status_bar_prompt(const char *prompt_label, char *buf, size_t buf_size) {
+    size_t len = 0;
+    buf[0] = '\0';
+
+    while (true) {
+        uint32_t status_y = TERMINAL_ROWS - 1;
+        char blank_line[TERMINAL_COLS + 1];
+        memset(blank_line, ' ', TERMINAL_COLS);
+        blank_line[TERMINAL_COLS] = '\0';
+
+        (void)background_color(COLOR_DARK_GRAY);
+        (void)print_at(blank_line, 0, status_y, COLOR_WHITE);
+
+        char display_buf[TERMINAL_COLS + 1];
+        int pos = 0;
+        for (int i = 0; prompt_label[i] != '\0' && pos < TERMINAL_COLS - 1; i++) {
+            display_buf[pos++] = prompt_label[i];
+        }
+        for (size_t i = 0; i < len && pos < TERMINAL_COLS - 1; i++) {
+            display_buf[pos++] = buf[i];
+        }
+        if (pos < TERMINAL_COLS - 1) {
+            display_buf[pos++] = '_';
+        }
+        display_buf[pos] = '\0';
+
+        (void)print_at(display_buf, 1, status_y, COLOR_WHITE);
+        (void)background_color(COLOR_BLACK);
+
+        uint16_t key = (uint16_t)get_key();
+        if (key == KEY_ENTER || key == 0x0A) {
+            buf[len] = '\0';
+            return true;
+        } else if (key == 0x1B) { // Escape
+            return false;
+        } else if (key == KEY_BACKSPACE || key == 0x08) {
+            if (len > 0) {
+                len--;
+                buf[len] = '\0';
+            }
+        } else if (key >= 32 && key <= 126) {
+            if (len + 1 < buf_size) {
+                buf[len++] = (char)key;
+                buf[len] = '\0';
+            }
+        }
+    }
+}
+
 static void render_editor(void) {
     if (cursor_row < scroll_row) {
         scroll_row = cursor_row;
@@ -205,7 +254,6 @@ static void render_editor(void) {
         uint32_t file_y = scroll_row + screen_y;
         uint32_t target_y = screen_y + TOP_MARGIN;
 
-        // Render line numbers within LEFT_MARGIN = 4
         if (file_y < total_lines) {
             char num_str[LEFT_MARGIN + 1];
             for (int i = 0; i < LEFT_MARGIN; i++) num_str[i] = ' ';
@@ -336,7 +384,7 @@ static void delete_char(void) {
 static void editor_goto_line(void) {
     char buf[16];
     memset(buf, 0, sizeof(buf));
-    if ((int64_t)input("Goto line: ", buf, sizeof(buf)) < 0 || buf[0] == '\0') {
+    if (!status_bar_prompt("Goto line: ", buf, sizeof(buf)) || buf[0] == '\0') {
         return;
     }
     uint32_t target = 0;
@@ -348,16 +396,13 @@ static void editor_goto_line(void) {
         if (cursor_col > line_lens[cursor_row]) {
             cursor_col = line_lens[cursor_row];
         }
-    } else {
-        println("Invalid line number.");
-        (void)get_key();
     }
 }
 
 static void editor_find(void) {
     char query[64];
     memset(query, 0, sizeof(query));
-    if ((int64_t)input("Find: ", query, sizeof(query)) < 0 || query[0] == '\0') {
+    if (!status_bar_prompt("Find: ", query, sizeof(query)) || query[0] == '\0') {
         return;
     }
 
@@ -392,8 +437,6 @@ static void editor_find(void) {
             }
         }
     }
-    println("String not found.");
-    (void)get_key();
 }
 
 static bool editor_confirm_changes(void) {
@@ -403,17 +446,11 @@ static bool editor_confirm_changes(void) {
 
     char answer[8];
     memset(answer, 0, sizeof(answer));
-    if ((int64_t)input("Save current changes before continuing? (y/n/c) ",
-                        answer, sizeof(answer)) < 0) {
+    if (!status_bar_prompt("Save changes? (y/n): ", answer, sizeof(answer)) || answer[0] == '\0') {
         return false;
     }
     if (answer[0] == 'y' || answer[0] == 'Y') {
-        if (save_file_to_disk()) {
-            return true;
-        }
-        println("Unable to save the current file; operation cancelled.");
-        (void)get_key();
-        return false;
+        return save_file_to_disk();
     }
     return answer[0] == 'n' || answer[0] == 'N';
 }
@@ -421,44 +458,31 @@ static bool editor_confirm_changes(void) {
 static void editor_open_file(void) {
     char filename[sizeof(current_filename)];
     memset(filename, 0, sizeof(filename));
-    if ((int64_t)input("Open file: ", filename, sizeof(filename)) < 0) {
-        return;
-    }
-    if (filename[0] == '\0') {
+    if (!status_bar_prompt("Open file: ", filename, sizeof(filename)) || filename[0] == '\0') {
         return;
     }
     if (file_exists(filename) != 1) {
-        println("File not found; current document was not changed.");
-        (void)get_key();
         return;
     }
     if (!editor_confirm_changes()) {
         return;
     }
-    if (!load_file_from_disk(filename)) {
-        println("Unable to read file; current document was not changed.");
-        (void)get_key();
-    }
+    (void)load_file_from_disk(filename);
 }
 
 static void editor_new_file(void) {
     char filename[sizeof(current_filename)];
     memset(filename, 0, sizeof(filename));
-    if ((int64_t)input("New file name: ", filename, sizeof(filename)) < 0) {
-        return;
-    }
-    if (filename[0] == '\0') {
+    if (!status_bar_prompt("New file name: ", filename, sizeof(filename)) || filename[0] == '\0') {
         return;
     }
     if (file_exists(filename) == 1) {
-        println("File already exists; use Ctrl+O to open it.");
-        (void)get_key();
         return;
     }
     if (!editor_confirm_changes()) {
         return;
     }
-    load_file_from_disk(filename);
+    (void)load_file_from_disk(filename);
 }
 
 void _start(int argc, char **argv) {
@@ -536,10 +560,7 @@ void _start(int argc, char **argv) {
                 break;
 
             case 0x13:
-                if (!save_file_to_disk()) {
-                    println("Unable to save the current file.");
-                    (void)get_key();
-                }
+                (void)save_file_to_disk();
                 break;
 
             case 0x18:
@@ -554,12 +575,12 @@ void _start(int argc, char **argv) {
                 editor_new_file();
                 break;
 
-            case 0x06: 
+            case 0x06: // ASCII Ctrl+F
             case KEY_CTRL_F:
                 editor_find();
                 break;
 
-            case 0x07: 
+            case 0x07: // ASCII Ctrl+G
             case KEY_CTRL_G:
                 editor_goto_line();
                 break;

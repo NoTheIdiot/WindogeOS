@@ -1144,7 +1144,7 @@ static int dogeshell_execute(int argc, char **argv) {
             return 0;
         }
         if (str_strcmp(argv[1], "--version") == 0) {
-            dogeio_text_println("Dogeedit v2.2");
+            dogeio_text_println("Dogeedit v2.3");
             return 0;
         }
         if (!dogeshell_authorize_path(argv[1], path, sizeof(path))) {
