@@ -14,6 +14,8 @@
 #define KEY_ENTER 0x00A
 #define KEY_CTRL_O 0x110
 #define KEY_CTRL_N 0x111
+#define KEY_CTRL_G 0x112
+#define KEY_CTRL_F 0x113
 
 #define MAX_LINES       1000
 #define MAX_LINE_LEN    256
@@ -21,8 +23,9 @@
 
 #define TOP_MARGIN      1  
 #define BOTTOM_MARGIN   1  
+#define LEFT_MARGIN     4  
 #define VIEWPORT_ROWS   (TERMINAL_ROWS - TOP_MARGIN - BOTTOM_MARGIN)
-#define VIEWPORT_COLS  TERMINAL_COLS
+#define VIEWPORT_COLS   (TERMINAL_COLS - LEFT_MARGIN)
 
 static char lines[MAX_LINES][MAX_LINE_LEN]
     __attribute__((section(".data.editor"))) = {{1}};
@@ -30,16 +33,16 @@ static uint32_t line_lens[MAX_LINES]
     __attribute__((section(".data.editor"))) = {1};
 static uint32_t total_lines __attribute__((section(".data.editor"))) = 1;
 
-static uint32_t cursor_col __attribute__((section(".data.editor"))) = 1;
-static uint32_t cursor_row __attribute__((section(".data.editor"))) = 1;
+static uint32_t cursor_col __attribute__((section(".data.editor"))) = 0;
+static uint32_t cursor_row __attribute__((section(".data.editor"))) = 0;
 
-static uint32_t scroll_row __attribute__((section(".data.editor"))) = 1;
-static uint32_t scroll_col __attribute__((section(".data.editor"))) = 1;
+static uint32_t scroll_row __attribute__((section(".data.editor"))) = 0;
+static uint32_t scroll_col __attribute__((section(".data.editor"))) = 0;
 
 static char current_filename[128] __attribute__((section(".data.editor"))) =
     "untitled.txt";
-static bool is_modified __attribute__((section(".data.editor"))) = true;
-static bool should_quit __attribute__((section(".data.editor"))) = true;
+static bool is_modified __attribute__((section(".data.editor"))) = false;
+static bool should_quit __attribute__((section(".data.editor"))) = false;
 
 static int text_equal(const char *left, const char *right) {
     while (*left != '\0' && *right != '\0' && *left == *right) {
@@ -175,7 +178,7 @@ static void render_status_bar(void) {
                        status_y, COLOR_WHITE);
     }
     
-    const char *controls = "^S: Save | ^X: Quit | ^O: Open | ^N: New";
+    const char *controls = "^S: Save | ^X: Quit | ^O: Open | ^N: New | ^G: Goto | ^F: Find";
     (void)print_at(controls,
                    TERMINAL_COLS - (uint32_t)(str_strlen(controls)) - 1,
                    status_y, COLOR_WHITE);
@@ -196,13 +199,37 @@ static void render_editor(void) {
         scroll_col = cursor_col - VIEWPORT_COLS + 1;
     }
 
-    char line_buf[TERMINAL_COLS + 1];
+    char line_buf[VIEWPORT_COLS + 1];
 
     for (uint32_t screen_y = 0; screen_y < VIEWPORT_ROWS; screen_y++) {
         uint32_t file_y = scroll_row + screen_y;
         uint32_t target_y = screen_y + TOP_MARGIN;
-        uint32_t char_idx = 0;
 
+        // Render line numbers within LEFT_MARGIN = 4
+        if (file_y < total_lines) {
+            char num_str[LEFT_MARGIN + 1];
+            for (int i = 0; i < LEFT_MARGIN; i++) num_str[i] = ' ';
+            num_str[LEFT_MARGIN] = '\0';
+
+            uint32_t val = file_y + 1;
+            char temp[10];
+            int t = 0;
+            while (val > 0 && t < 9) {
+                temp[t++] = '0' + (val % 10);
+                val /= 10;
+            }
+            for (int i = 0; i < t && i < LEFT_MARGIN; i++) {
+                num_str[i] = temp[t - 1 - i];
+            }
+            (void)print_at(num_str, 0, target_y, COLOR_CYAN);
+        } else {
+            char spaces[LEFT_MARGIN + 1];
+            for (int i = 0; i < LEFT_MARGIN; i++) spaces[i] = ' ';
+            spaces[LEFT_MARGIN] = '\0';
+            (void)print_at(spaces, 0, target_y, COLOR_BLACK);
+        }
+
+        uint32_t char_idx = 0;
         if (file_y < total_lines) {
             uint32_t len = line_lens[file_y];
             if (scroll_col < len) {
@@ -221,15 +248,16 @@ static void render_editor(void) {
         }
         line_buf[VIEWPORT_COLS] = '\0';
 
-        (void)print_at(line_buf, 0, target_y, COLOR_WHITE);
+        (void)print_at(line_buf, LEFT_MARGIN, target_y, COLOR_WHITE);
     }
 
     render_status_bar();
 
-    uint32_t vis_cursor_x = cursor_col - scroll_col;
+    uint32_t vis_cursor_x = (cursor_col - scroll_col) + LEFT_MARGIN;
     uint32_t vis_cursor_y = (cursor_row - scroll_row) + TOP_MARGIN;
 
-    if (vis_cursor_x < VIEWPORT_COLS && vis_cursor_y >= TOP_MARGIN && vis_cursor_y < TERMINAL_ROWS - BOTTOM_MARGIN) {
+    if (vis_cursor_x >= LEFT_MARGIN && vis_cursor_x < TERMINAL_COLS && 
+        vis_cursor_y >= TOP_MARGIN && vis_cursor_y < TERMINAL_ROWS - BOTTOM_MARGIN) {
         char c = ' ';
         if (cursor_row < total_lines && cursor_col < line_lens[cursor_row]) {
             c = lines[cursor_row][cursor_col];
@@ -305,6 +333,69 @@ static void delete_char(void) {
     }
 }
 
+static void editor_goto_line(void) {
+    char buf[16];
+    memset(buf, 0, sizeof(buf));
+    if ((int64_t)input("Goto line: ", buf, sizeof(buf)) < 0 || buf[0] == '\0') {
+        return;
+    }
+    uint32_t target = 0;
+    for (int i = 0; buf[i] >= '0' && buf[i] <= '9'; i++) {
+        target = target * (uint32_t)10 + (uint32_t)(buf[i] - '0');
+    }
+    if (target > 0 && target <= total_lines) {
+        cursor_row = target - 1;
+        if (cursor_col > line_lens[cursor_row]) {
+            cursor_col = line_lens[cursor_row];
+        }
+    } else {
+        println("Invalid line number.");
+        (void)get_key();
+    }
+}
+
+static void editor_find(void) {
+    char query[64];
+    memset(query, 0, sizeof(query));
+    if ((int64_t)input("Find: ", query, sizeof(query)) < 0 || query[0] == '\0') {
+        return;
+    }
+
+    uint32_t q_len = 0;
+    while (query[q_len] != '\0') q_len++;
+    if (q_len == 0) return;
+
+    uint32_t start_r = cursor_row;
+    uint32_t start_c = cursor_col + 1;
+
+    for (uint32_t r = 0; r < total_lines; r++) {
+        uint32_t check_r = (start_r + r) % total_lines;
+        uint32_t line_len = line_lens[check_r];
+        if (line_len == 0) continue;
+
+        for (uint32_t c = 0; c < line_len; c++) {
+            if (check_r == start_r && c < start_c && r == 0) continue;
+
+            bool match = true;
+            if (c + q_len > line_len) continue;
+
+            for (uint32_t q = 0; q < q_len; q++) {
+                if (lines[check_r][c + q] != query[q]) {
+                    match = false;
+                    break;
+                }
+            }
+            if (match) {
+                cursor_row = check_r;
+                cursor_col = c;
+                return;
+            }
+        }
+    }
+    println("String not found.");
+    (void)get_key();
+}
+
 static bool editor_confirm_changes(void) {
     if (!is_modified) {
         return true;
@@ -313,7 +404,7 @@ static bool editor_confirm_changes(void) {
     char answer[8];
     memset(answer, 0, sizeof(answer));
     if ((int64_t)input("Save current changes before continuing? (y/n/c) ",
-                       answer, sizeof(answer)) < 0) {
+                        answer, sizeof(answer)) < 0) {
         return false;
     }
     if (answer[0] == 'y' || answer[0] == 'Y') {
@@ -375,7 +466,7 @@ void _start(int argc, char **argv) {
         (text_equal(argv[0], "--help") ||
          text_equal(argv[0], "--version"))) {
         println(text_equal(argv[0], "--help") ? "Usage: edit <file>"
-                                               : "Dogeedit v2.2");
+                                              : "Dogeedit v2.3");
         sys_exit(0);
     }
     if (argc != 1 || argv == NULL || argv[0] == NULL ||
@@ -461,6 +552,16 @@ void _start(int argc, char **argv) {
 
             case KEY_CTRL_N:
                 editor_new_file();
+                break;
+
+            case 0x06: 
+            case KEY_CTRL_F:
+                editor_find();
+                break;
+
+            case 0x07: 
+            case KEY_CTRL_G:
+                editor_goto_line();
                 break;
 
             default:
