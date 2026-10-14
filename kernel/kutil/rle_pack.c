@@ -3,6 +3,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define RLE_BUF_SIZE 256
+
 void kernel_rle_decompress(char *src_path, uint64_t src_size, char *dst_path) {
     if (src_size < 4) {
         dogeio_text_println("[RLE] Error: RLE file too small.");
@@ -12,12 +14,18 @@ void kernel_rle_decompress(char *src_path, uint64_t src_size, char *dst_path) {
     uint32_t original_size = 0;
     fs_read_raw_at(src_path, (uint8_t *)&original_size, 0, 4);
 
+    if (original_size == 0) {
+        dogeio_text_println("[RLE] Error: Compressed header reads 0 bytes.");
+        return;
+    }
+
     fs_create(dst_path);
 
     uint64_t src_idx = 4;
     uint64_t dst_idx = 0;
     uint8_t control_buf = 0;
-    uint8_t value_buf = 0;
+    uint8_t local_buffer[RLE_BUF_SIZE];
+    uint32_t local_buf_idx = 0;
 
     while (src_idx < src_size && dst_idx < (uint64_t)original_size) {
         fs_read_raw_at(src_path, &control_buf, src_idx, 1);
@@ -26,24 +34,50 @@ void kernel_rle_decompress(char *src_path, uint64_t src_size, char *dst_path) {
 
         if (control >= 0) {
             uint64_t count = (uint64_t)control + 1;
-            for (uint64_t i = 0; i < count && src_idx < src_size && dst_idx < (uint64_t)original_size; i++) {
-                fs_read_raw_at(src_path, &value_buf, src_idx, 1);
+            
+            for (uint64_t i = 0; i < count; i++) {
+                if (src_idx >= src_size || dst_idx >= (uint64_t)original_size) {
+                    break;
+                }
+                
+                fs_read_raw_at(src_path, &local_buffer[local_buf_idx++], src_idx, 1);
                 src_idx++;
-                fs_append_data(dst_path, &value_buf, 1);
                 dst_idx++;
+
+                if (local_buf_idx >= RLE_BUF_SIZE) {
+                    fs_append_data(dst_path, local_buffer, local_buf_idx);
+                    local_buf_idx = 0;
+                }
             }
         } else {
             uint64_t count = (uint64_t)(-control) + 1;
+            uint8_t repeat_value = 0;
+
             if (src_idx < src_size) {
-                fs_read_raw_at(src_path, &value_buf, src_idx, 1);
+                fs_read_raw_at(src_path, &repeat_value, src_idx, 1);
                 src_idx++;
-                for (uint64_t i = 0; i < count && dst_idx < (uint64_t)original_size; i++) {
-                    fs_append_data(dst_path, &value_buf, 1);
+                
+                for (uint64_t i = 0; i < count; i++) {
+                    if (dst_idx >= (uint64_t)original_size) {
+                        break;
+                    }
+                    
+                    local_buffer[local_buf_idx++] = repeat_value;
                     dst_idx++;
+
+                    if (local_buf_idx >= RLE_BUF_SIZE) {
+                        fs_append_data(dst_path, local_buffer, local_buf_idx);
+                        local_buf_idx = 0;
+                    }
                 }
             }
         }
     }
+
+    if (local_buf_idx > 0) {
+        fs_append_data(dst_path, local_buffer, local_buf_idx);
+    }
+    
     dogeio_text_println("[RLE] Decompression completed successfully.");
 }
 
@@ -53,57 +87,45 @@ void kernel_rle_compress(char *src_path, uint64_t src_size, char *dst_path) {
     fs_append_data(dst_path, (const uint8_t *)&header_size, 4);
 
     uint64_t src_idx = 0;
-    uint64_t dst_idx = 4;
-    uint8_t current_val = 0;
-    uint8_t next_val = 0;
-    uint8_t out_ctrl = 0;
+    uint8_t lit_buffer[128];
 
     while (src_idx < src_size) {
-        fs_read_raw_at(src_path, &current_val, src_idx, 1);
         uint64_t run_len = 1;
+        uint8_t current_val = 0;
+        fs_read_raw_at(src_path, &current_val, src_idx, 1);
 
         while (src_idx + run_len < src_size && run_len < 128) {
+            uint8_t next_val = 0;
             fs_read_raw_at(src_path, &next_val, src_idx + run_len, 1);
-            if (next_val != current_val) {
-                break;
-            }
+            if (next_val != current_val) break;
             run_len++;
         }
 
-        if (run_len > 1) {
-            out_ctrl = (uint8_t)(-(int64_t)(run_len - 1));
-            fs_append_data(dst_path, &out_ctrl, 1);
+        if (run_len >= 2) {
+            int8_t ctrl = (int8_t)(-(int64_t)(run_len - 1));
+            fs_append_data(dst_path, (uint8_t *)&ctrl, 1);
             fs_append_data(dst_path, &current_val, 1);
-            dst_idx += 2;
             src_idx += run_len;
         } else {
             uint64_t lit_len = 0;
             while (src_idx + lit_len < src_size && lit_len < 128) {
                 if (src_idx + lit_len + 1 < src_size) {
-                    fs_read_raw_at(src_path, &current_val, src_idx + lit_len, 1);
-                    fs_read_raw_at(src_path, &next_val, src_idx + lit_len + 1, 1);
-                    if (current_val == next_val) {
-                        break;
-                    }
+                    uint8_t v1 = 0, v2 = 0;
+                    fs_read_raw_at(src_path, &v1, src_idx + lit_len, 1);
+                    fs_read_raw_at(src_path, &v2, src_idx + lit_len + 1, 1);
+                    if (v1 == v2) break; 
                 }
+                
+                fs_read_raw_at(src_path, &lit_buffer[lit_len], src_idx + lit_len, 1);
                 lit_len++;
             }
 
-            out_ctrl = (uint8_t)(lit_len - 1);
-            fs_append_data(dst_path, &out_ctrl, 1);
-            dst_idx++;
-
-            for (uint64_t i = 0; i < lit_len; i++) {
-                fs_read_raw_at(src_path, &current_val, src_idx++, 1);
-                fs_append_data(dst_path, &current_val, 1);
-                dst_idx++;
+            if (lit_len > 0) {
+                int8_t ctrl = (int8_t)(lit_len - 1);
+                fs_append_data(dst_path, (uint8_t *)&ctrl, 1);
+                fs_append_data(dst_path, lit_buffer, (uint32_t)lit_len);
+                src_idx += lit_len;
             }
-        }
-
-        if (dst_idx > src_size + 4) {
-            fs_delete(dst_path);
-            dogeio_text_println("[RLE] Notice: File cannot be compressed efficiently. Aborting.");
-            return;
         }
     }
     dogeio_text_println("[RLE] Compression completed successfully.");
