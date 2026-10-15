@@ -16,8 +16,8 @@ uint32_t bg_color_grid[TERMINAL_ROWS * TERMINAL_COLS];
 uint32_t cursor_x = 0;
 uint32_t cursor_y = 1;
 bool dogeio_cursor_visible = false;
-uint32_t dogeio_background_color = 0x000000;
-uint32_t dogeio_text_color = 0xFFCCCCCC;
+uint32_t dogeio_background_color = COLOR_BLACK;
+uint32_t dogeio_text_color = COLOR_GRAY;
 
 static const uint32_t ansi_colors[16] = {
     0x000000, 0xAA0000, 0x00AA00, 0xAA5500, 0x0000AA, 0xAA00AA, 0x00AAAA, 0xAAAAAA,

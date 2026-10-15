@@ -20,26 +20,44 @@ extern char text_grid[TERMINAL_COLS * TERMINAL_ROWS];
 extern uint32_t text_color_grid[TERMINAL_ROWS * TERMINAL_COLS];
 extern uint32_t bg_color_grid[TERMINAL_ROWS * TERMINAL_COLS];
 
-#define COLOR_BLACK          0x000000
-#define COLOR_RED            0xAA0000
-#define COLOR_GREEN          0x00AA00
-#define COLOR_YELLOW         0xFFFF00
-#define COLOR_BLUE           0x0000AA
-#define COLOR_MAGENTA        0xAA00AA
-#define COLOR_CYAN           0x00AAAA
-#define COLOR_WHITE          0xAAAAAA
-#define COLOR_DARK_GRAY      0x282828
-#define COLOR_ORANGE         0xFFA500
+#define COLOR_BACKGROUND            0x0C0C0C
+#define COLOR_DARK_GRAY             0x404040
+#define COLOR_GRAY                  0xCCCCCC
+#define COLOR_BRIGHT_GRAY           0xE0E0E0
+#define COLOR_CURSOR                0xFFFFFF
 
-#define COLOR_BRIGHT_BLACK   0x555555
-#define COLOR_BRIGHT_RED     0xFF5555
-#define COLOR_BRIGHT_GREEN   0x55FF55
-#define COLOR_BRIGHT_YELLOW  0xFFED29
-#define COLOR_BRIGHT_ORANGE  0xFFA500
-#define COLOR_BRIGHT_BLUE    0x5555FF
-#define COLOR_BRIGHT_MAGENTA 0xFF55FF
-#define COLOR_BRIGHT_CYAN    0x55FFFF
-#define COLOR_BRIGHT_WHITE   0xFFFFFF
+#define COLOR_DARK_BLACK            0x000000
+#define COLOR_DARK_BLUE             0x001F82
+#define COLOR_DARK_GREEN            0x0B5E08
+#define COLOR_DARK_CYAN             0x21547A
+#define COLOR_DARK_RED              0x6F0912
+#define COLOR_DARK_PURPLE           0x4D0D56
+#define COLOR_DARK_MAGENTA          0x4D0D56
+#define COLOR_DARK_ORANGE           0x803700
+#define COLOR_DARK_YELLOW           0x6E5900
+#define COLOR_DARK_WHITE            0x999999
+
+#define COLOR_BLACK                 0x0C0C0C
+#define COLOR_BLUE                  0x0037DA
+#define COLOR_GREEN                 0x13A10E
+#define COLOR_CYAN                  0x3A96DD
+#define COLOR_RED                   0xC50F1F
+#define COLOR_PURPLE                0x881798
+#define COLOR_MAGENTA               0x881798
+#define COLOR_ORANGE                0xD85D00
+#define COLOR_YELLOW                0xC19C00
+#define COLOR_WHITE                 0xF0F0F0
+
+#define COLOR_BRIGHT_BLACK          0x767676
+#define COLOR_BRIGHT_BLUE           0x3B78FF
+#define COLOR_BRIGHT_GREEN          0x16C60C
+#define COLOR_BRIGHT_CYAN           0x61D6D6
+#define COLOR_BRIGHT_RED            0xE74856
+#define COLOR_BRIGHT_PURPLE         0xB4009E
+#define COLOR_BRIGHT_MAGENTA        0xB4009E
+#define COLOR_BRIGHT_ORANGE         0xFF8C3A
+#define COLOR_BRIGHT_YELLOW         0xF9F1A5
+#define COLOR_BRIGHT_WHITE          0xFFFFFF
 
 void dogeio_text_putchar(char c, uint32_t x, uint32_t y);
 void dogeio_text_clear(void);

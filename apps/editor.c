@@ -211,7 +211,7 @@ static bool status_bar_prompt(const char *prompt_label, char *buf, size_t buf_si
         }
         display_buf[pos] = '\0';
 
-        (void)print_at(display_buf, 1, status_y, COLOR_WHITE);
+        (void)print_at(display_buf, 1, status_y, COLOR_GRAY);
         (void)background_color(COLOR_BLACK);
 
         uint16_t key = (uint16_t)get_key();
@@ -500,8 +500,8 @@ void _start(int argc, char **argv) {
         sys_exit(2);
     }
 
-    (void)background_color(COLOR_BLACK);
-    (void)text_color(COLOR_WHITE);
+    (void)background_color(COLOR_BACKGROUND);
+    (void)text_color(COLOR_GRAY);
 
     should_quit = false;
     if (!load_file_from_disk(current_filename)) {
