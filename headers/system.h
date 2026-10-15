@@ -232,64 +232,6 @@ void nvme_pci_callback(uint8_t b, uint8_t d, uint8_t f, uint16_t ven, uint16_t d
 
 #define SYS_EXIT     60
 
-static inline uint64_t syscall_0(uint64_t num) {
-    uint64_t ret;
-    __asm__ volatile (
-        "syscall"
-        : "=a"(ret)
-        : "0"(num)
-        : "rcx", "r11", "memory"
-    );
-    return ret;
-}
-
-static inline uint64_t syscall_1(uint64_t num, uint64_t arg1) {
-    uint64_t ret;
-    __asm__ volatile (
-        "syscall"
-        : "=a"(ret)
-        : "0"(num), "D"(arg1)
-        : "rcx", "r11", "memory"
-    );
-    return ret;
-}
-
-static inline uint64_t syscall_2(uint64_t num, uint64_t arg1, uint64_t arg2) {
-    uint64_t ret;
-    __asm__ volatile (
-        "syscall"
-        : "=a"(ret)
-        : "0"(num), "D"(arg1), "S"(arg2)
-        : "rcx", "r11", "memory"
-    );
-    return ret;
-}
-
-static inline uint64_t syscall_3(uint64_t num, uint64_t arg1, uint64_t arg2,
-                                 uint64_t arg3) {
-    uint64_t ret;
-    __asm__ volatile (
-        "syscall"
-        : "=a"(ret)
-        : "0"(num), "D"(arg1), "S"(arg2), "d"(arg3)
-        : "rcx", "r11", "memory"
-    );
-    return ret;
-}
-
-static inline uint64_t syscall_4(uint64_t num, uint64_t arg1, uint64_t arg2,
-                                 uint64_t arg3, uint64_t arg4) {
-    uint64_t ret;
-    register uint64_t syscall_arg4 __asm__("r10") = arg4;
-    __asm__ volatile (
-        "syscall"
-        : "=a"(ret)
-        : "0"(num), "D"(arg1), "S"(arg2), "d"(arg3), "r"(syscall_arg4)
-        : "rcx", "r11", "memory"
-    );
-    return ret;
-}
-
 // actual running
 int system_run_elf(char* filename, uint64_t size);
 void system_run_bin(char *filename, int program_size);

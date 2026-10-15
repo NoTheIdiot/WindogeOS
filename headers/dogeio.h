@@ -20,6 +20,12 @@ extern char text_grid[TERMINAL_COLS * TERMINAL_ROWS];
 extern uint32_t text_color_grid[TERMINAL_ROWS * TERMINAL_COLS];
 extern uint32_t bg_color_grid[TERMINAL_ROWS * TERMINAL_COLS];
 
+extern const uint8_t ubuntu_mono[];
+extern const uint8_t terminus[];
+extern const uint8_t tamzen[];
+extern const uint8_t vga_text[];
+extern const uint8_t spleen[];
+
 #define COLOR_BACKGROUND            0x0C0C0C
 #define COLOR_DARK_GRAY             0x404040
 #define COLOR_GRAY                  0xCCCCCC
@@ -71,6 +77,7 @@ void dogeio_text_color_change(uint32_t color);
 void dogeio_text_background_change(uint32_t color);
 void dogeio_text_clear_raw(void);
 void dogeio_print_hex8(uint8_t val);
+void dogeio_set_font(const uint8_t* font);
 void dogeio_text_cursor_show();
 void dogeio_text_cursor_hide();
 void dogeio_print_hex16(uint16_t val);

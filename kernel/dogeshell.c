@@ -19,6 +19,12 @@ typedef struct {
     uint32_t color;
 } settings_color_t;
 
+typedef struct {
+    const char *label;
+    const char *value;
+    const uint8_t *font_ptr;
+} settings_font_t;
+
 static const settings_color_t settings_colors[] = {
     {"Gray", "gray", 0xFFCCCCCC},
     {"White", "white", 0xFFFFFFFF},
@@ -30,15 +36,24 @@ static const settings_color_t settings_colors[] = {
     {"Cyan", "cyan", 0xFF55FFFF},
 };
 
+static const settings_font_t settings_fonts[] = {
+    {"Ubuntu Mono", "ubuntu_mono", ubuntu_mono},
+    {"Terminus",    "terminus",    terminus},
+    {"Tamzen",      "tamzen",      tamzen},
+    {"PC IBM",      "pc_ibm",      vga_text},
+    {"Spleen",      "spleen",      vga_text},
+};
+
 static char settings_path[] = "/.windoge";
 static size_t selected_color;
 static int default_shell_is_bash;
+static size_t selected_font_idx = 3;
 static char dogeshell_app_names[64][256];
 
 uint32_t saved_color = 0xFFCCCCCC;
 
 static void settings_draw_menu(const char *title, const char *const *items,
-                               size_t item_count, size_t selected) {
+                             size_t item_count, size_t selected) {
     dogeio_text_clear();
     dogeio_text_println(title);
     dogeio_text_println("");
@@ -86,7 +101,6 @@ void get_all_fucking_ram(void) {
     }
 }
 
-
 int dogeshell_list_pci(void) {
     dogeio_text_println("ADDRESS   IDENTITY DESCRIPTION & [VENDOR:DEVICE ID]");
     dogeio_text_println("---------------------------------------------------------");
@@ -132,6 +146,16 @@ static void settings_load_value(const char *value) {
     }
 }
 
+static void settings_load_font_value(const char *value) {
+    for (size_t i = 0; i < sizeof(settings_fonts) / sizeof(settings_fonts[0]); i++) {
+        if (str_strcmp(value, settings_fonts[i].value) == 0) {
+            selected_font_idx = i;
+            dogeio_set_font(settings_fonts[i].font_ptr);
+            return;
+        }
+    }
+}
+
 void system_load_settings(void) {
     char contents[128];
     int bytes_read;
@@ -139,6 +163,8 @@ void system_load_settings(void) {
     selected_color = 0;
     saved_color = settings_colors[0].color;
     default_shell_is_bash = 0;
+    selected_font_idx = 3;
+    dogeio_set_font(settings_fonts[selected_font_idx].font_ptr);
 
     if (!fs_exists(settings_path)) {
         return;
@@ -169,6 +195,8 @@ void system_load_settings(void) {
                 default_shell_is_bash = 1;
             } else if (str_strcmp(line_buffer, "shell=dogeshell") == 0) {
                 default_shell_is_bash = 0;
+            } else if (str_startswith(line_buffer, "font=")) {
+                settings_load_font_value(line_buffer + 5);
             }
         }
         line = line_end;
@@ -180,10 +208,13 @@ void system_load_settings(void) {
 }
 
 static int settings_save(void) {
-    char contents[64] = "text_color=";
+    char contents[128] = "text_color=";
     str_strcat(contents, settings_colors[selected_color].value);
     str_strcat(contents, "\nshell=");
     str_strcat(contents, default_shell_is_bash ? "bash\n" : "dogeshell\n");
+    str_strcat(contents, "font=");
+    str_strcat(contents, settings_fonts[selected_font_idx].value);
+    str_strcat(contents, "\n");
 
     if (!fs_exists(settings_path) &&
         fs_create(settings_path) != 0) {
@@ -283,6 +314,43 @@ static void settings_select_shell(void) {
     }
 }
 
+static void settings_select_font(void) {
+    size_t font_count = sizeof(settings_fonts) / sizeof(settings_fonts[0]);
+    size_t selected = selected_font_idx;
+    
+    const char *font_labels[5];
+    for (size_t i = 0; i < font_count; i++) {
+        font_labels[i] = settings_fonts[i].label;
+    }
+
+    while (true) {
+        settings_draw_menu("[ Default Font ]", font_labels, font_count, selected);
+        uint16_t key = settings_wait_key();
+
+        switch (key) {
+        case KEY_UP:
+            selected = selected == 0 ? font_count - 1 : selected - 1;
+            break;
+        case KEY_DOWN:
+            selected = (selected + 1) % font_count;
+            break;
+        case KEY_BACKSPACE:
+        case (uint16_t)'q':
+            return;
+        case KEY_ENTER:
+            selected_font_idx = selected;
+            dogeio_set_font(settings_fonts[selected_font_idx].font_ptr);
+            if (settings_save() != 0) {
+                dogeio_text_println("Unable to save settings to /.windoge.");
+            } else {
+                dogeio_text_println("Font settings saved.");
+            }
+            settings_wait_key();
+            return;
+        }
+    }
+}
+
 static void settings_run_test(void) {
     char* save = fs_dirname();
     fs_chdir("/");
@@ -297,6 +365,7 @@ void system_settings(void) {
         "Default Shell",
         "PCI/PCIE devices",
         "Test System",
+        "Default Font",
         "Exit",
     };
     const size_t menu_count = sizeof(menu_items) / sizeof(menu_items[0]);
@@ -336,6 +405,13 @@ void system_settings(void) {
             case 4:
                 settings_run_test();
                 break;
+            case 5:
+                settings_select_font();
+                break;
+            case 6:
+                dogeio_text_clear();
+                dogeio_text_color_change(saved_color);
+                return;
             default:
                 dogeio_text_clear();
                 dogeio_text_color_change(saved_color);

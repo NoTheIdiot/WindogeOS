@@ -160,7 +160,6 @@ void kernel_main(void) {
     log("[dogeing] initializing floating point");
     fpu_init();
     log("[dogeing] initializing nvme (if any available)");
-    // This should be moved to a helper in the future.
     for (uint16_t bus = 0; bus < 256; bus++) {
         for (uint8_t device = 0; device < 32; device++) {
             for (uint8_t function = 0; function < 8; function++) {
@@ -221,9 +220,6 @@ void kernel_main(void) {
             fs_chdir("/");
         }
 
-        log("[dogeing] creating boot file");
-        fs_create(".windoge");
-
         char username_new[64];
         char password_new[64];
         char root_new[64];
@@ -277,6 +273,56 @@ void kernel_main(void) {
         log("[dogeing] creating accounts");
         system_create_user(username_new, password_new, 1);
 
+        // Interactive Defaults Selection (Font, Shell, Color)
+        dogeio_text_println("\n--- Setup Preferences ---");
+        
+        // 1. Font Selection (Default: PC IBM)
+        dogeio_text_println("Select Default Font:");
+        dogeio_text_println("1. PC IBM (Default)");
+        dogeio_text_println("2. Ubuntu Mono");
+        dogeio_text_println("3. Terminus");
+        dogeio_text_println("4. Tamzen");
+        dogeio_text_println("5. Spleen");
+        char font_choice[8];
+        dogeio_text_input("Choice [1-5, default 1]: ", font_choice, sizeof(font_choice));
+        const char *font_val = "pc_ibm";
+        if (font_choice[0] == '2') font_val = "ubuntu_mono";
+        else if (font_choice[0] == '3') font_val = "terminus";
+        else if (font_choice[0] == '4') font_val = "tamzen";
+        else if (font_choice[0] == '5') font_val = "spleen";
+
+        dogeio_text_println("\nSelect Default Shell:");
+        dogeio_text_println("1. Dogeshell (Default)");
+        dogeio_text_println("2. Bash");
+        char shell_choice[8];
+        dogeio_text_input("Choice [1-2, default 1]: ", shell_choice, sizeof(shell_choice));
+        const char *shell_val = (shell_choice[0] == '2') ? "bash" : "dogeshell";
+
+        dogeio_text_println("\nSelect Default Text Color:");
+        dogeio_text_println("1. Gray (Default)");
+        dogeio_text_println("2. White");
+        dogeio_text_println("3. Green");
+        dogeio_text_println("4. Cyan");
+        char color_choice[8];
+        dogeio_text_input("Choice [1-4, default 1]: ", color_choice, sizeof(color_choice));
+        const char *color_val = "gray";
+        if (color_choice[0] == '2') color_val = "white";
+        else if (color_choice[0] == '3') color_val = "green";
+        else if (color_choice[0] == '4') color_val = "cyan";
+
+        log("[dogeing] creating boot configuration file (.windoge)");
+        if (fs_create(".windoge") == 0) {
+            char config_buf[128];
+            str_strcpy(config_buf, "text_color=");
+            str_strcat(config_buf, color_val);
+            str_strcat(config_buf, "\nshell=");
+            str_strcat(config_buf, shell_val);
+            str_strcat(config_buf, "\nfont=");
+            str_strcat(config_buf, font_val);
+            str_strcat(config_buf, "\n");
+            fs_write(".windoge", config_buf);
+        }
+
         log("[wow] setup complete");
         log("[dogeing] prompting for reboot");
 
@@ -292,10 +338,10 @@ void kernel_main(void) {
 
     char username[64];
     dogeio_text_color_change(0xE1B16C);
-        for (int i = 0; i < 22; i++) {
-            dogeio_text_println(doge_ascii[i]);
-        }
-        dogeio_text_color_change(0xFFCCCCCC);
+    for (int i = 0; i < 22; i++) {
+        dogeio_text_println(doge_ascii[i]);
+    }
+    dogeio_text_color_change(0xFFCCCCCC);
     while (true) {
         char password[64];
 
@@ -325,8 +371,8 @@ void kernel_main(void) {
     const char* starting[6] = {
         "================================================================================================================================================================",
         "=                                                                                                                                                              =",
-        "=                                                                     Welcome to WindogeOS!                                                                    =",
-        "=                                                       Type 'settings' to configure system preferences                                                        =",
+        "=                                                            Welcome to WindogeOS!                                                                             =",
+        "=                                               Type 'settings' to configure system preferences                                                                =",
         "=                                                                                                                                                              =",
         "================================================================================================================================================================"
     };
