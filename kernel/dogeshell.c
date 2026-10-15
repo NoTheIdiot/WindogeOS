@@ -1103,6 +1103,24 @@ static int dogeshell_execute(int argc, char **argv) {
                 return 1;
             }
 
+            if (str_strcmp(argv[i], "/system") == 0 || (str_strcmp(argv[i], "system") == 0 || str_strcmp(fs_dirname(), "/") == 0) || 
+                str_strcmp(argv[i], "/./system") == 0 || str_strcmp(argv[i], "./system") == 0) {
+                dogeio_text_println("[Error] no deleting system files");
+                return 1;
+            }
+
+            if (str_strcmp(argv[i], "/apps") == 0 || (str_strcmp(argv[i], "apps") == 0 && str_strcmp(fs_dirname(), "/") == 0) 
+            || str_strcmp(argv[i], "/./apps") == 0 || str_strcmp(argv[i], "./apps") == 0) {
+                dogeio_text_println("[Error] no deleting system files");
+                return 1;
+            }
+            
+            if (str_strcmp(argv[i], "/users") == 0 || (str_strcmp(argv[i], "users") == 0 && str_strcmp(fs_dirname(), "/") == 0) 
+            || str_strcmp(argv[i], "/./users") == 0 || str_strcmp(argv[i], "./users") == 0) {
+                dogeio_text_println("[Error] no deleting system files");
+                return 1;
+            }
+
             if (fs_delete(argv[i]) != 1) {
                 dogeio_text_print("bash: rm: cannot remove ");
                 dogeio_text_println(argv[i]);
@@ -1124,6 +1142,25 @@ static int dogeshell_execute(int argc, char **argv) {
                                       sizeof(destination_path))) {
             return 1;
         }
+
+        if (str_strcmp(argv[1], "/system") == 0 || (str_strcmp(argv[1], "system") == 0 || str_strcmp(fs_dirname(), "/") == 0) || 
+            str_strcmp(argv[1], "/./system") == 0 || str_strcmp(argv[1], "./system") == 0) {
+            dogeio_text_println("[Error] no deleting system files");
+            return 1;
+        }
+
+        if (str_strcmp(argv[1], "/apps") == 0 || (str_strcmp(argv[1], "apps") == 0 && str_strcmp(fs_dirname(), "/") == 0) 
+        || str_strcmp(argv[1], "/./apps") == 0 || str_strcmp(argv[1], "./apps") == 0) {
+            dogeio_text_println("[Error] no deleting system files");
+            return 1;
+        }
+            
+        if (str_strcmp(argv[1], "/users") == 0 || (str_strcmp(argv[1], "users") == 0 && str_strcmp(fs_dirname(), "/") == 0) 
+        || str_strcmp(argv[1], "/./users") == 0 || str_strcmp(argv[1], "./users") == 0) {
+            dogeio_text_println("[Error] no deleting system files");
+            return 1;
+        }
+
         int result;
         if (is_copy) {
             if (str_strcmp(source_path, destination_path) == 0) {
