@@ -288,21 +288,47 @@ void dogeio_text_cursor_hide() {
 }
 
 static size_t parse_ansi_escape(const char *str, size_t index) {
-    index += 2;
-    int param = 0;
+    index += 2; // skip '\033' and '['
 
-    while (str[index] != '\0' && str[index] >= '0' && str[index] <= '9') {
-        int digit = str[index] - '0';
-        if (param <= 107) {
-            param = param * 10 + digit;
-            if (param > 107) {
-                param = 108;
+    int params[4] = {0, 0, 0, 0};
+    int param_count = 0;
+    int current_param = 0;
+    bool has_param = false;
+
+    while (str[index] != '\0') {
+        char ch = str[index];
+        if (ch >= '0' && ch <= '9') {
+            current_param = current_param * 10 + (ch - '0');
+            has_param = true;
+            index++;
+        } else if (ch == ';') {
+            if (param_count < 4) {
+                params[param_count++] = has_param ? current_param : 0;
             }
+            current_param = 0;
+            has_param = false;
+            index++;
+        } else {
+            if (param_count < 4) {
+                params[param_count++] = has_param ? current_param : 0;
+            }
+            break;
         }
-        index++;
     }
 
-    if (str[index] == 'm') {
+    char cmd = str[index];
+
+    uint32_t old_cursor_x = cursor_x;
+    uint32_t old_cursor_y = cursor_y;
+    bool was_visible = dogeio_cursor_visible;
+
+    if (was_visible && old_cursor_x < TERMINAL_COLS && old_cursor_y < TERMINAL_ROWS) {
+        uint32_t idx = old_cursor_y * TERMINAL_COLS + old_cursor_x;
+        dogeio_text_putchar_raw_glyph(text_grid[idx], old_cursor_x, old_cursor_y);
+    }
+
+    if (cmd == 'm') {
+        int param = params[0];
         if (param == 0) {
             dogeio_text_color = 0xFFCCCCCC;       
             dogeio_background_color = 0x000000;   
@@ -315,8 +341,54 @@ static size_t parse_ansi_escape(const char *str, size_t index) {
         } else if (param >= 100 && param <= 107) {
             dogeio_background_color = ansi_colors[param - 100 + 8];
         }
-    } else if (str[index] == 'J' && param == 2) {
-        dogeio_text_clear();
+    } else if (cmd == 'J') {
+        int param = params[0];
+        if (param == 2) {
+            dogeio_text_clear();
+        }
+    } else if (cmd == 'A') { // Cursor Up
+        int n = (params[0] == 0) ? 1 : params[0];
+        if (cursor_y >= (uint32_t)n) {
+            cursor_y -= (uint32_t)n;
+        } else {
+            cursor_y = 0;
+        }
+    } else if (cmd == 'B') { // Cursor Down
+        int n = (params[0] == 0) ? 1 : params[0];
+        cursor_y += (uint32_t)n;
+        if (cursor_y >= TERMINAL_ROWS) {
+            cursor_y = TERMINAL_ROWS - 1;
+        }
+    } else if (cmd == 'C') { // Cursor Forward
+        int n = (params[0] == 0) ? 1 : params[0];
+        cursor_x += (uint32_t)n;
+        if (cursor_x >= TERMINAL_COLS) {
+            cursor_x = TERMINAL_COLS - 1;
+        }
+    } else if (cmd == 'D') { // Cursor Backward
+        int n = (params[0] == 0) ? 1 : params[0];
+        if (cursor_x >= (uint32_t)n) {
+            cursor_x -= (uint32_t)n;
+        } else {
+            cursor_x = 0;
+        }
+    } else if (cmd == 'H' || cmd == 'f') { 
+        int target_row = (params[0] == 0) ? 1 : params[0];
+        int target_col = (params[1] == 0) ? 1 : params[1];
+        
+        uint32_t new_y = (uint32_t)target_row - (uint32_t)1;
+        uint32_t new_x = (uint32_t)target_col - (uint32_t)1;
+
+        if (new_y < TERMINAL_ROWS) cursor_y = new_y;
+        else cursor_y = TERMINAL_ROWS - 1;
+
+        if (new_x < TERMINAL_COLS) cursor_x = new_x;
+        else cursor_x = TERMINAL_COLS - 1;
+    }
+
+    if (was_visible && cursor_x < TERMINAL_COLS && cursor_y < TERMINAL_ROWS) {
+        uint32_t idx = cursor_y * TERMINAL_COLS + cursor_x;
+        dogeio_text_putchar_reverted_glyph(text_grid[idx], cursor_x, cursor_y);
     }
 
     return str[index] == '\0' ? index - 1 : index;
