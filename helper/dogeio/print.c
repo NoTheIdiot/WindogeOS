@@ -28,6 +28,7 @@ extern const uint8_t ubuntu_mono[];
 extern const uint8_t terminus[];
 extern const uint8_t tamzen[];
 extern const uint8_t vga_text[];
+extern const uint8_t spleen[];
 
 static const uint8_t* current_font = vga_text;
 

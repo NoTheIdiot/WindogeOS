@@ -3,6 +3,7 @@ section .data
 global terminus
 global ubuntu_mono
 global vga_text
+global spleen
 global tamzen
 align 4
 terminus:
@@ -16,3 +17,6 @@ tamzen:
 
 vga_text:
     incbin "fonts/vga_text.psf"
+
+spleen:
+    incbin "fonts/spleen.psf"
