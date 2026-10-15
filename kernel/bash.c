@@ -782,13 +782,26 @@ static int execute_command(int argc, char **argv) {
             if (!authorize_path(argv[i])) {
                 return 1;
             }
+
+            if (str_strcmp(argv[i], "/") == 0 || str_strcmp(argv[i], "/.") == 0) {
+                dogeio_text_println("[Error] no deleting the entire drive.");
+                return 1;
+            }
+
+            if (str_strcmp(argv[i], "/.windoge") == 0 || 
+                str_strcmp(argv[i], ".windoge") == 0 || 
+                str_strcmp(argv[i], "/./.windoge") == 0 ||
+                str_strcmp(argv[i], "./.windoge") == 0) {
+                dogeio_text_println("[Error] no deleting boot file");
+                return 1;
+            }
+
             if (fs_delete(argv[i]) != 1) {
                 dogeio_text_print("bash: rm: cannot remove ");
                 dogeio_text_println(argv[i]);
                 return 1;
             }
         }
-        return 0;
     }
     if (str_strcmp(argv[0], "mv") == 0 ||
         str_strcmp(argv[0], "rename") == 0 ||

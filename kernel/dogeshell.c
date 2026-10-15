@@ -1082,20 +1082,33 @@ static int dogeshell_execute(int argc, char **argv) {
     }
     if (str_strcmp(argv[0], "del") == 0 || str_strcmp(argv[0], "rm") == 0) {
         if (argc < 2) {
-            dogeio_text_println("Usage: del <file> [file ...]");
+            dogeio_text_println("bash: rm: missing file operand");
             return 1;
         }
         for (int i = 1; i < argc; i++) {
-            if (!dogeshell_authorize_path(argv[i], path, sizeof(path))) {
+            if (!dogeshell_authorize_path(argv[1], path, sizeof(path))) {
                 return 1;
             }
-            if (fs_delete(path) != 1) {
-                dogeio_text_print("Error: unable to delete ");
+
+            if (str_strcmp(argv[i], "/") == 0 || str_strcmp(argv[i], "/.") == 0) {
+                dogeio_text_println("[Error] no deleting the entire drive.");
+                return 1;
+            }
+
+            if (str_strcmp(argv[i], "/.windoge") == 0 || 
+                str_strcmp(argv[i], ".windoge") == 0 || 
+                str_strcmp(argv[i], "/./.windoge") == 0 ||
+                str_strcmp(argv[i], "./.windoge") == 0) {
+                dogeio_text_println("[Error] no deleting boot file");
+                return 1;
+            }
+
+            if (fs_delete(argv[i]) != 1) {
+                dogeio_text_print("bash: rm: cannot remove ");
                 dogeio_text_println(argv[i]);
                 return 1;
             }
         }
-        return 0;
     }
     if (str_strcmp(argv[0], "rename") == 0 || str_strcmp(argv[0], "mv") == 0 ||
         str_strcmp(argv[0], "cp") == 0) {
