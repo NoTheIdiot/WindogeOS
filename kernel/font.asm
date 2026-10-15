@@ -2,6 +2,7 @@ bits 64
 section .data
 global terminus
 global ubuntu_mono
+global vga_text
 global tamzen
 align 4
 terminus:
@@ -12,3 +13,6 @@ ubuntu_mono:
 
 tamzen:
     incbin "fonts/Tamzen8x16.psf"
+
+vga_text:
+    incbin "fonts/vga_text.psf"

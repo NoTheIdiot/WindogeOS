@@ -27,8 +27,9 @@ static const uint32_t ansi_colors[16] = {
 extern const uint8_t ubuntu_mono[];
 extern const uint8_t terminus[];
 extern const uint8_t tamzen[];
+extern const uint8_t vga_text[];
 
-static const uint8_t* current_font = tamzen;
+static const uint8_t* current_font = vga_text;
 
 void dogeio_set_font(const uint8_t* font) {
     if (font != NULL) {
