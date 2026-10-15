@@ -333,7 +333,7 @@ void kernel_main(void) {
     }
 
     fs_set_auth_override(1);
-    dogeio_text_print("Welcome to WindogeOS ");
+    dogeio_text_print("Welcome to ");
     dogeio_text_println(windoge_version);
 
     char username[64];

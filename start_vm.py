@@ -1,4 +1,5 @@
 import subprocess
+import sys
 import os
 import platform
 import argparse
@@ -12,11 +13,11 @@ args = parser.parse_args()
 
 if not os.path.exists(img_file):
     print(f"Error: Disk image '{img_file}' not found. Please compile it first.")
-    exit(1)
+    sys.exit(1)
 
-print("-----------------------------------------------------------------------------")
-print("Starting WindogeOS in QEMU")
-print("-----------------------------------------------------------------------------")
+print("--------------------------- ")
+print("Starting WindogeOS in QEMU |")
+print("--------------------------- ")
 
 debug_flags = "-d int,cpu_reset -no-reboot -D qemu.log" if args.debug else ""
 
@@ -26,6 +27,6 @@ elif args.arch in ["arm64", "aarch64"]:
     qemu_cmd = f"qemu-system-aarch64 -rtc base=localtime -M virt -cpu cortex-a57 -m 4M -bios limine-binary/BOOTAA64.EFI -drive format=raw,file={img_file},if=none,id=drv0 -device virtio-blk-device,drive=drv0 -serial stdio {debug_flags}"
 else:
     print("Unknown architecture! Only x86_64 or arm64 (or aarch64) are supported.")
-    exit(1)
+    sys.exit(1)
 
-subprocess.run(qemu_cmd, shell=True)
+subprocess.run(qemu_cmd, shell = True)

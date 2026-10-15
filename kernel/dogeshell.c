@@ -102,7 +102,7 @@ void get_all_fucking_ram(void) {
 }
 
 int dogeshell_list_pci(void) {
-    dogeio_text_println("ADDRESS   IDENTITY DESCRIPTION & [VENDOR:DEVICE ID]");
+    dogeio_text_println("ADDRESS    IDENTITY DESCRIPTION & [VENDOR:DEVICE ID]");
     dogeio_text_println("---------------------------------------------------------");
     for (uint16_t bus = 0; bus < 256; bus++) {
         for (uint8_t slot = 0; slot < 32; slot++) {
@@ -226,12 +226,12 @@ static int settings_save(void) {
 static void settings_show_system_information(void) {
     char ram_buffer[32];
     dogeio_text_clear();
-    dogeio_text_println("[ System Information ]");
-    dogeio_text_print("[Version]> ");
+    dogeio_text_println("[ System Information ]\n");
+    dogeio_text_print("Version: ");
     dogeio_text_println(windoge_version);
-    dogeio_text_print("[CPU]> ");
+    dogeio_text_print("CPU: ");
     dogeio_text_println(cpuid());
-    dogeio_text_print("[RAM]> ");
+    dogeio_text_print("RAM: ");
     dogeio_text_print(uint64_to_str(get_ram() / 1024 / 1024, ram_buffer));
     dogeio_text_println(" MB");
     dogeio_text_println("");
