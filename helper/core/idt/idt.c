@@ -125,19 +125,35 @@ void isr_common_handler(interrupt_frame_t *frame) {
         dogeio_text_color_change(COLOR_BRIGHT_RED);
         
         switch (frame->vector) {
-            case 0:  dogeio_text_print("[Fault] Divide-by-Zero error in program."); break;
-            case 6:  dogeio_text_print("[Fault] Invalid opcode instruction executed."); break;
-            case 13: dogeio_text_print("[Fault] General Protection Violation."); break;
-            case 14: dogeio_text_print("[Fault] Segmentation / Page Fault violation."); break;
-            default: dogeio_text_print("[Fault] Application exception intercepted."); break;
+            case 0:  
+                dogeio_text_println("[Error] Divide-by-Zero error in program.");
+                dogeio_text_println("You may revert version of the application, contact the developer");
+                dogeio_text_println("or if you wrote the code, check ya loops. Much Error.");
+                break;
+            case 6:  
+                dogeio_text_println("[Error] Invalid opcode instruction executed."); 
+                dogeio_text_println("CPU has lower IQ than what the app expects.");
+                dogeio_text_println("If you wrote the code, maybe use less complex instructions.");
+                break;
+            case 13: 
+                dogeio_text_println("[Error] General Protection Violation."); 
+                dogeio_text_println("App tried to touch the kernel, but kernel is pure uranium rods.");
+                dogeio_text_println("Not Wow.");
+                break;
+            case 14: 
+                dogeio_text_println("[Error] Segmentation / Page Fault violation."); 
+                dogeio_text_println("App tried the touch memory that is NULL or not allocated.");
+                dogeio_text_println("If you wrote the code, check your pointers and also make");
+                dogeio_text_println("Conditions for NULL or memory access. Very Angy.");
+                break;
+            default: 
+                dogeio_text_println("[Error] Application exception intercepted.");
+                dogeio_text_println("I dont fucking know what happend, but is it broken.");
+                break;
         }
-        
-        dogeio_text_color_change(COLOR_WHITE);
-        dogeio_text_println(" Safely recovery back to prompt...");
 
         is_kernel_dead = false;
 
-        extern void system_dogeshell(void);
         system_dogeshell();
 
         while (1) {
