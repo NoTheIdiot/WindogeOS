@@ -571,6 +571,14 @@ static int execute_command(int argc, char **argv) {
     if (str_strcmp(argv[0], "false") == 0) {
         return 1;
     }
+    if (str_strcmp(argv[0], "dogestore") == 0) {
+        if (argc < 2) {
+            dogeio_text_println("Usage: dogestore <command> [args...]");
+            return 1;
+        }
+
+        return kernel_package(argc + 1, argv + 1);
+    }
     if (str_strcmp(argv[0], "exit") == 0) {
         int exit_status = shell_status;
         if (argc > 2) {
