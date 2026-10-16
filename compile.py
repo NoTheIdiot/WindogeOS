@@ -6,6 +6,40 @@ import subprocess
 import importlib.util
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
+def rle_compress_data(data: bytes) -> bytes:
+    original_size = len(data)
+    compressed = bytearray()
+    compressed.extend(original_size.to_bytes(4, byteorder='little'))
+    src_idx = 0
+    src_size = original_size
+    while src_idx < src_size:
+        run_len = 1
+        current_val = data[src_idx]
+        while src_idx + run_len < src_size and run_len < 128:
+            if data[src_idx + run_len] != current_val:
+                break
+            run_len += 1
+        if run_len >= 2:
+            ctrl = (-(run_len - 1)) & 0xFF
+            compressed.append(ctrl)
+            compressed.append(current_val)
+            src_idx += run_len
+        else:
+            lit_buf = bytearray()
+            lit_len = 0
+            while src_idx + lit_len < src_size and lit_len < 128:
+                if src_idx + lit_len + 1 < src_size:
+                    if data[src_idx + lit_len] == data[src_idx + lit_len + 1]:
+                        break
+                lit_buf.append(data[src_idx + lit_len])
+                lit_len += 1
+            if lit_len > 0:
+                ctrl = (lit_len - 1) & 0xFF
+                compressed.append(ctrl)
+                compressed.extend(lit_buf)
+                src_idx += lit_len
+    return bytes(compressed)
+
 def cmd(cmd_str, critical=True):
     res = subprocess.run(cmd_str, shell=True)
     if res.returncode != 0 and critical:
@@ -85,6 +119,8 @@ def main():
                             asm_source.append(source_path)
 
         app_sources = []
+        package_sources = []
+        
         app_library_paths = {
             os.path.abspath(os.path.normpath(src))
             for src in getattr(cfg, "app_library_sources", [])
@@ -92,6 +128,7 @@ def main():
         }
         app_source_arches = getattr(cfg, "app_source_arches", {})
         app_folders = getattr(cfg, "source_folders_apps", ["apps", "userland"])
+        
         for app_dir in app_folders:
             abs_app_dir = os.path.abspath(app_dir)
             if os.path.exists(abs_app_dir):
@@ -104,17 +141,26 @@ def main():
                         relative_path = os.path.normpath(os.path.relpath(file_path))
                         if arch not in app_source_arches.get(relative_path, [arch]):
                             continue
+                        
+                        is_package = "apps" + os.sep + "packages" in normalized_path or "userland" + os.sep + "packages" in normalized_path
+                        
                         if file.endswith(".c"):
-                            app_sources.append((file_path, "c"))
+                            if is_package:
+                                package_sources.append((file_path, "c"))
+                            else:
+                                app_sources.append((file_path, "c"))
                         elif file.endswith(".asm"):
-                            app_sources.append((file_path, "asm"))
+                            if is_package:
+                                package_sources.append((file_path, "asm"))
+                            else:
+                                app_sources.append((file_path, "asm"))
 
         if not c_source and not asm_source:
             print("[Not Wow] No kernel source files found.")
             sys.exit(1)
 
         print(f"[dogeing] Building {cfg.project_name} [{arch}]")
-        print(f"[dogeing] Found {len(c_source)} Kernel C files, {len(asm_source)} Kernel ASM files, {len(app_sources)} App files")
+        print(f"[dogeing] Found {len(c_source)} Kernel C files, {len(asm_source)} Kernel ASM files, {len(app_sources)} App files, {len(package_sources)} Package files")
 
         if not args.skip_analyze:
             print("[0/4] Running Static Analyzer (parallel)...")
@@ -125,7 +171,7 @@ def main():
                 for src in c_source
             ] + [
                 f"{analyzer_bin} {analyze_flag} {arch_cfg['app_flags']} {common_flags} {src}"
-                for src, ftype in app_sources if ftype == "c"
+                for src, ftype in app_sources + package_sources if ftype == "c"
             ]
             for lib_src in app_library_paths:
                 if lib_src.endswith(".c"):
@@ -159,9 +205,11 @@ def main():
         cmd(f"{tools['linker']} {arch_cfg['linker_flags']} -T {arch_cfg['kernel_linker_script']} {objects_str} -o kernel.elf")
 
         compiled_apps = []
+        compressed_packages = []
 
-        if app_sources:
-            print(f"[3/4] Compiling {len(app_sources)} Application(s) (parallel)...")
+        total_compile_items = app_sources + package_sources
+        if total_compile_items:
+            print(f"[3/4] Compiling {len(app_sources)} Application(s) and {len(package_sources)} Package(s) (parallel)...")
             app_library_objects = []
             library_compile_cmds = []
             for lib_src in app_library_paths:
@@ -198,6 +246,51 @@ def main():
                     f"-T {arch_cfg['app_linker_script']} {app_obj} {' '.join(app_library_objects)} -o {app_elf} && "
                     f"{tools['objcopy']} -O binary {app_elf} {app_bin} && "
                     f"rm -f {app_obj} {app_elf}"
+                )
+                app_cmds.append(chain_cmd)
+
+            for pkg_src, ftype in package_sources:
+                ext = ".c" if ftype == "c" else ".asm"
+                pkg_obj = pkg_src.replace(ext, ".o")
+                binary_name = os.path.splitext(os.path.basename(pkg_src))[0]
+                pkg_elf = os.path.join(os.path.dirname(pkg_src), binary_name + ".elf")
+                pkg_bin = os.path.join(os.path.dirname(pkg_src), binary_name + ".bin")
+                pkg_rle = os.path.join(os.path.dirname(pkg_src), binary_name + ".rle")
+                compressed_packages.append(pkg_rle)
+
+                if ftype == "c":
+                    compile_step = f"{tools['c_compiler']} {arch_cfg['app_flags']} {common_flags} -c {pkg_src} -o {pkg_obj}"
+                else:
+                    compile_step = f"{tools['assembler']} -f elf64 -g -F dwarf {pkg_src} -o {pkg_obj}"
+
+                rle_python_cmd = (
+                    f"python3 -c \"import os; " +
+                    f"data = open('{pkg_bin}', 'rb').read(); " +
+                    f"original_size = len(data); " +
+                    f"compressed = bytearray(original_size.to_bytes(4, byteorder='little')); " +
+                    f"src_idx = 0; " +
+                    f"while src_idx < original_size: " +
+                    f"    run_len = 1; current_val = data[src_idx]; " +
+                    f"    while src_idx + run_len < original_size and run_len < 128 and data[src_idx + run_len] == current_val: run_len += 1; " +
+                    f"    if run_len >= 2: " +
+                    f"        compressed.append((-(run_len - 1)) & 0xFF); compressed.append(current_val); src_idx += run_len; " +
+                    f"    else: " +
+                    f"        lit_buf = bytearray(); lit_len = 0; " +
+                    f"        while src_idx + lit_len < original_size and lit_len < 128: " +
+                    f"            if src_idx + lit_len + 1 < original_size and data[src_idx + lit_len] == data[src_idx + lit_len + 1]: break; " +
+                    f"            lit_buf.append(data[src_idx + lit_len]); lit_len += 1; " +
+                    f"        if lit_len > 0: " +
+                    f"            compressed.append((lit_len - 1) & 0xFF); compressed.extend(lit_buf); src_idx += lit_len; " +
+                    f"open('{pkg_rle}', 'wb').write(bytes(compressed))\""
+                )
+
+                chain_cmd = (
+                    f"{compile_step} && "
+                    f"{tools['linker']} {arch_cfg['linker_flags']} --no-relax --gc-sections "
+                    f"-T {arch_cfg['app_linker_script']} {pkg_obj} {' '.join(app_library_objects)} -o {pkg_elf} && "
+                    f"{tools['objcopy']} -O binary {pkg_elf} {pkg_bin} && "
+                    f"{rle_python_cmd} && "
+                    f"rm -f {pkg_obj} {pkg_elf} {pkg_bin}"
                 )
                 app_cmds.append(chain_cmd)
 
@@ -256,19 +349,26 @@ def main():
         
         cmd(f"mkfs.exfat -b 4K -L WINDOGEOS {part2_img}")
 
-
-        if compiled_apps:
+        if compiled_apps or compressed_packages:
             mnt_dir = "/tmp/windoge_p2_mnt"
             os.makedirs(mnt_dir, exist_ok=True)
             loop_dev = subprocess.check_output(f"sudo losetup -f --show {part2_img}", shell=True).decode().strip()
             cmd(f"sudo mount.exfat-fuse {loop_dev} {mnt_dir}")
             try:
                 cmd(f"sudo mkdir -p {mnt_dir}/apps")
+                cmd(f"sudo mkdir -p {mnt_dir}/apps/packages")
+                
                 for app_bin in compiled_apps:
                     if os.path.exists(app_bin):
                         app_name = os.path.basename(app_bin)
                         cmd(f"sudo cp {app_bin} {mnt_dir}/apps/{app_name}")
                         print(f"[dogeing] Injected binary to exFAT /apps: {app_name}")
+
+                for pkg_rle in compressed_packages:
+                    if os.path.exists(pkg_rle):
+                        pkg_name = os.path.basename(pkg_rle)
+                        cmd(f"sudo cp {pkg_rle} {mnt_dir}/apps/packages/{pkg_name}")
+                        print(f"[dogeing] Injected RLE package to exFAT /apps/packages: {pkg_name}")
             finally:
                 cmd(f"sudo umount {mnt_dir}")
                 cmd(f"sudo losetup -d {loop_dev}")
@@ -282,7 +382,6 @@ def main():
         print(f"\n[dogeing] Build success, doesn't mean it will work >:)")
         print(f"[dogeing] Output generated: {img_file}")
         print(f"[dogeing] Total build time: {elapsed:.2f} seconds ({elapsed / 60:.2f} mins)")
-
 
     finally:
         cleanup()

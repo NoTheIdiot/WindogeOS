@@ -15,11 +15,13 @@ Dogescript for advanced scripts also needs 8MB of RAM.
 ## Updates
 Nothing special read commits and releases
 
-## How to compile and run?
-### In your terminal:
+## Installation, how to much compile and run?
 *__Note__: these instructions are meant for Debian / Ubuntu.
-Building on Arch Linux and other distros is possible by changing a few packages 
-and a symlink or two.
+Building on Arch Linux and other distros is possible by changing a few packages and a symlink or two.
+*__Also__: these instructions for starting the OS in a VM, if you
+want to run this on real hardware, skip `python3 start_vm.py`
+
+### What's needed
 If you are on Windows, install WSL with* `wsl --install Ubuntu`.
 
 - Install the following:
@@ -32,7 +34,7 @@ If you are on Windows, install WSL with* `wsl --install Ubuntu`.
     `exfatprogs` 
     `exfat-fuse`
 
-- clone the repo via `git clone https://github.com/NoTheIdiot/WindogeOS`
+- clone the github repo via `git clone https://github.com/NoTheIdiot/WindogeOS`
 
 - then run:
   ```
@@ -43,6 +45,17 @@ If you are on Windows, install WSL with* `wsl --install Ubuntu`.
 
   that's it, you might have to type in your sudo password
   for compile.py
+
+### Installation (to real hardware very wow)
+To install on real hardware, you have to flash to a medium that can
+be saved and not a USB drive.
+
+If you are going to flash it to a hard drive:
+`sudo dd if=/path/to/WindogeOS/windoge_os.img of=/dev/sdX bs=4M status=progress conv=fsync`
+
+No other storage devices are currently supported, but
+ill work on that. Though you may use SD cards to IDE adapters,
+so in that case that might work.
 
 ## Contributing
 Thanks for contributing :)
