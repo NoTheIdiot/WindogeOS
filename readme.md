@@ -47,6 +47,8 @@ If you are on Windows, install WSL with* `wsl --install Ubuntu`.
   for compile.py
 
 ### Installation (to real hardware very wow)
+*__note__: do not install it on your main machine, only on a test 
+machines or an older spare machine 
 To install on real hardware, you have to flash to a medium that can
 be saved and not a USB drive.
 
