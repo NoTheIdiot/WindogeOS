@@ -13,7 +13,7 @@
 #define PAGE_ADDRESS_MASK 0x000FFFFFFFFFF000ULL
 #define MSR_IA32_EFER 0xC0000080
 #define EFER_NXE (1ULL << 11)
-
+#define DATA_AMOUNT 8192
 #define PAGE_USER_FLAGS (PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER)
 
 extern volatile struct limine_memmap_request memmap_request;
@@ -284,6 +284,7 @@ bool unmap_user_page(uint64_t virt_addr) {
 void setup_ring3_memory(uint64_t user_code_virt, uint64_t user_stack_virt, const uint8_t *user_code, size_t code_size) {
     uint64_t hhdm_offset = hhdm_request.response->offset;
 
+    // Map code pages
     for (size_t offset = 0; offset < code_size; offset += 4096) {
         uint64_t code_phys = pmm_alloc_zeroed_page();
         size_t bytes_to_copy = (code_size - offset > 4096) ? 4096 : (code_size - offset);
@@ -292,6 +293,13 @@ void setup_ring3_memory(uint64_t user_code_virt, uint64_t user_stack_virt, const
         map_user_page(user_code_virt + offset, code_phys);
     }
 
+    // Map stack page
     uint64_t stack_phys = pmm_alloc_zeroed_page();
     map_user_page(user_stack_virt, stack_phys);
+
+    uint64_t user_data_virt = user_stack_virt - 8192; 
+    for (int i = 0; i < 2; i++) {
+        uint64_t data_phys = pmm_alloc_zeroed_page();
+        map_user_page(user_data_virt + (uint64_t)(i * 4096), data_phys);
+    }
 }
