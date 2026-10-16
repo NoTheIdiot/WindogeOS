@@ -51,7 +51,7 @@ To install on real hardware, you have to flash to a medium that can
 be saved and not a USB drive.
 
 If you are going to flash it to a hard drive:
-`sudo dd if=/path/to/WindogeOS/windoge_os.img of=/dev/sdX bs=4M status=progress conv=fsync`
+`sudo dd if=/path/to/WindogeOS/windoge_os.img of=your_drive bs=4M status=progress conv=fsync`
 
 No other storage devices are currently supported, but
 ill work on that. Though you may use SD cards to IDE adapters,
