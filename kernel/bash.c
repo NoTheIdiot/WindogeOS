@@ -538,6 +538,7 @@ static int print_help(void) {
         "Built-ins: cd pwd ls echo cat touch mkdir rm mv cp clear history ver",
         "           export unset env date time whoami uname calc edit run",
         "           cpuinfo raminfo hexdump pci settings fetch true false exit",
+        "           dogestore",
         "Syntax: quotes and escapes, $NAME and ${NAME}, ;, &&, ||",
         "This shell does not implement processes, job control, pipes, or scripts."
     };

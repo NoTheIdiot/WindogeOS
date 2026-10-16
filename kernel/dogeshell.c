@@ -771,28 +771,28 @@ static int dogeshell_append_history(const char *command) {
 
 static void dogeshell_print_help(void) {
     static const char *const help[] = {
-        "================================================================================================================================================================",
+        "===============================================================================================================================================================",
         " BASIC FUNCTIONS                                                | FILE SYSTEM                                                                                  ",
-        "==================================================================+=============================================================================================",
-        " print/echo <text>        | print text                          | dir [path] [--hidden]      | list a directory                                                ",
-        " clear                    | clear the terminal                  | read <file>                | print file contents                                             ",
-        " ver                      | show shell version                  | write <file>               | replace a file with one line of text                            ",
-        " help                     | show this help                      | create <file>              | create an empty file                                            ",
-        " history                  | show command history                | mkdir <directory>          | create a directory                                              ",
-        " clear-history            | clear command history               | del <file>                 | delete a file                                                   ",
-        " time, date               | show current time or date           | rename <old> <new>         | rename a file                                                   ",
-        " shutdown, reboot         | power off or restart the system     | whereami                   | print the current directory                                     ",
-        "                                                                | cd [directory]             | change directory                                                ",
-        "==================================================================+=============================================================================================",
+        "==================================================================+============================================================================================",
+        " print/echo <text>        | print text                          | dir [path] [--hidden]      | list a directory                                               ",
+        " clear                    | clear the terminal                  | read <file>                | print file contents                                            ",
+        " ver                      | show shell version                  | write <file>               | replace a file with one line of text                           ",
+        " help                     | show this help                      | create <file>              | create an empty file                                           ",
+        " history                  | show command history                | mkdir <directory>          | create a directory                                             ",
+        " clear-history            | clear command history               | del <file>                 | delete a file                                                  ",
+        " time, date               | show current time or date           | rename <old> <new>         | rename a file                                                  ",
+        " shutdown, reboot         | power off or restart the system     | whereami                   | print the current directory                                    ",
+        "                                                                | cd [directory]             | change directory                                               ",
+        "==================================================================+============================================================================================",
         " SYSTEM AND UTILITIES                                           |                                                                                              ",
-        "==================================================================+=============================================================================================",
-        " whoami, cpuinfo, raminfo | user and system info                | apps                       | list installed apps in /apps                                    ",
-        " fetch, settings, tab     | system UI and terminal controls     | calc <expression>          | evaluate a calculator expression                                ",
-        " edit <file>              | open the text editor                | hexdump <file>             | display file bytes                                              ",
-        " pci                      | list PCI devices                    | run <file>                 | run a flat binary                                               ",
-        " bash                     | open Bash; exit returns here        | <app>[.bin] [args...]      | run an app from /apps                                           ",
-        " exit                     | leave Dogeshell                     |                            |                                                                 ",
-        "================================================================================================================================================================",
+        "==================================================================+============================================================================================",
+        " whoami, cpuinfo, raminfo | user and system info                | apps                       | list installed apps in /apps                                   ",
+        " fetch, settings, tab     | system UI and terminal controls     | calc <expression>          | evaluate a calculator expression                               ",
+        " edit <file>              | open the text editor                | hexdump <file>             | display file bytes                                             ",
+        " pci                      | list PCI devices                    | run <file>                 | run a flat binary                                              ",
+        " bash                     | open Bash; exit returns here        | <app>[.bin] [args...]      | run an app from /apps                                          ",
+        " exit                     | leave Dogeshell                     | dogestore                  | install and uninstall apps from dogestore                      ",
+        "===============================================================================================================================================================",
         " Use ; between commands. Quoted or escaped semicolons are literal. Paths may be quoted; use ~ for your home directory."
     };
     for (size_t i = 0; i < sizeof(help) / sizeof(help[0]); i++) {
@@ -1008,6 +1008,16 @@ static int dogeshell_execute(int argc, char **argv) {
         core_reboot();
         return 0;
     }
+
+    if (str_strcmp(argv[0], "dogestore") == 0) {
+        if (argc < 2) {
+            dogeio_text_println("Usage: dogestore <command> [args...]");
+            return 1;
+        }
+
+        return kernel_package(argc + 1, argv + 1);
+    }
+
     if (str_strcmp(argv[0], "dir") == 0 || str_strcmp(argv[0], "ls") == 0) {
         char *directory = NULL;
         int show_hidden = 0;

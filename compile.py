@@ -263,36 +263,37 @@ def main():
                 else:
                     compile_step = f"{tools['assembler']} -f elf64 -g -F dwarf {pkg_src} -o {pkg_obj}"
 
-                rle_python_cmd = (
-                    f"python3 -c \"import os; " +
-                    f"data = open('{pkg_bin}', 'rb').read(); " +
-                    f"original_size = len(data); " +
-                    f"compressed = bytearray(original_size.to_bytes(4, byteorder='little')); " +
-                    f"src_idx = 0; " +
-                    f"while src_idx < original_size: " +
-                    f"    run_len = 1; current_val = data[src_idx]; " +
-                    f"    while src_idx + run_len < original_size and run_len < 128 and data[src_idx + run_len] == current_val: run_len += 1; " +
-                    f"    if run_len >= 2: " +
-                    f"        compressed.append((-(run_len - 1)) & 0xFF); compressed.append(current_val); src_idx += run_len; " +
-                    f"    else: " +
-                    f"        lit_buf = bytearray(); lit_len = 0; " +
-                    f"        while src_idx + lit_len < original_size and lit_len < 128: " +
-                    f"            if src_idx + lit_len + 1 < original_size and data[src_idx + lit_len] == data[src_idx + lit_len + 1]: break; " +
-                    f"            lit_buf.append(data[src_idx + lit_len]); lit_len += 1; " +
-                    f"        if lit_len > 0: " +
-                    f"            compressed.append((lit_len - 1) & 0xFF); compressed.extend(lit_buf); src_idx += lit_len; " +
-                    f"open('{pkg_rle}', 'wb').write(bytes(compressed))\""
-                )
+                def compress_file_task(bin_path, rle_path):
+                    with open(bin_path, "rb") as f_in:
+                        compressed_data = rle_compress_data(f_in.read())
+                    with open(rle_path, "wb") as f_out:
+                        f_out.write(compressed_data)
 
-                chain_cmd = (
+                link_and_copy_cmd = (
                     f"{compile_step} && "
                     f"{tools['linker']} {arch_cfg['linker_flags']} --no-relax --gc-sections "
                     f"-T {arch_cfg['app_linker_script']} {pkg_obj} {' '.join(app_library_objects)} -o {pkg_elf} && "
-                    f"{tools['objcopy']} -O binary {pkg_elf} {pkg_bin} && "
-                    f"{rle_python_cmd} && "
-                    f"rm -f {pkg_obj} {pkg_elf} {pkg_bin}"
+                    f"{tools['objcopy']} -O binary {pkg_elf} {pkg_bin}"
                 )
-                app_cmds.append(chain_cmd)
+                
+                def build_package():
+                    success, _ = run_cmd(link_and_copy_cmd)
+                    if not success:
+                        return False, pkg_src
+                    try:
+                        compress_file_task(pkg_bin, pkg_rle)
+                        if os.path.exists(pkg_obj): os.remove(pkg_obj)
+                        if os.path.exists(pkg_elf): os.remove(pkg_elf)
+                        if os.path.exists(pkg_bin): os.remove(pkg_bin)
+                        return True, pkg_src
+                    except Exception as e:
+                        return False, pkg_src
+
+                # We can execute package builds synchronously or wrap them
+                success, failed_item = build_package()
+                if not success:
+                    print(f"\n[Not Wow] Build failed on package:\n  {failed_item}")
+                    sys.exit(1)
 
             run_parallel(app_cmds)
         else:

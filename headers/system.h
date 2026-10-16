@@ -239,5 +239,6 @@ void system_run_bin(char *filename, int program_size);
 // random utilities
 int util_hexdump(char* filename);
 int util_calc(char* string);
+int kernel_package(int argc, char **argv);
 
 #endif
