@@ -12,6 +12,7 @@
 #include <bool.h>
 
 extern volatile struct limine_memmap_request memmap_request;
+extern char current_user[64];
 
 typedef struct {
     const char *label;
@@ -358,6 +359,98 @@ static void settings_run_test(void) {
     fs_chdir(save);
 }
 
+static void clean_string(char* str) {
+    if (!str) return;
+    int len = 0;
+    while (str[len] != '\0') len++;
+    while (len > 0 && (str[len - 1] == '\r' || str[len - 1] == '\n' || str[len - 1] == ' ' || str[len - 1] == '\t')) {
+        str[--len] = '\0';
+    }
+}
+
+static void settings_user_accounts(void) {
+    static const char *user_menu[] = {
+        "Switch User / Login",
+        "Create New User",
+        "Back"
+    };
+    size_t selected = 0;
+
+    while (true) {
+        settings_draw_menu("[ User Accounts ]", user_menu, 3, selected);
+        uint16_t key = settings_wait_key();
+
+        switch (key) {
+        case KEY_UP:
+            selected = selected == 0 ? 2 : selected - 1;
+            break;
+        case KEY_DOWN:
+            selected = (selected + 1) % 3;
+            break;
+        case KEY_BACKSPACE:
+        case (uint16_t)'q':
+            return;
+        case KEY_ENTER:
+            if (selected == 0) {
+                char login_user[64];
+                char login_pass[64];
+                dogeio_text_clear();
+                dogeio_text_println("[ Switch User / Login ]\n");
+                dogeio_text_input("Username: ", login_user, sizeof(login_user));
+                clean_string(login_user);
+                if (login_user[0] == '\0') {
+                    dogeio_text_println("Username cannot be empty.");
+                    settings_wait_key();
+                    break;
+                }
+                dogeio_text_input("Password: ", login_pass, sizeof(login_pass));
+                clean_string(login_pass);
+
+                if (system_verify_user(login_user, login_pass)) {
+                    str_strcpy(current_user, login_user);
+                    char userpath[128];
+                    str_strcpy(userpath, "/users/");
+                    str_strcat(userpath, login_user);
+                    fs_chdir(userpath);
+                    dogeio_text_print("\nSuccessfully logged in as ");
+                    dogeio_text_println(login_user);
+                } else {
+                    dogeio_text_println("\nInvalid username or password.");
+                }
+                settings_wait_key();
+            } else if (selected == 1) {
+                char new_user[64];
+                char new_pass[64];
+                dogeio_text_clear();
+                dogeio_text_println("[ Create New User ]\n");
+                dogeio_text_input("Enter username: ", new_user, sizeof(new_user));
+                clean_string(new_user);
+                if (new_user[0] == '\0') {
+                    dogeio_text_println("Username cannot be empty.");
+                    settings_wait_key();
+                    break;
+                }
+                dogeio_text_input("Enter password: ", new_pass, sizeof(new_pass));
+                clean_string(new_pass);
+                if (new_pass[0] == '\0') {
+                    dogeio_text_println("Password cannot be empty.");
+                    settings_wait_key();
+                    break;
+                }
+                if (system_create_user(new_user, new_pass, 1)) {
+                    dogeio_text_println("\nUser created successfully!");
+                } else {
+                    dogeio_text_println("\nFailed to create user.");
+                }
+                settings_wait_key();
+            } else {
+                return;
+            }
+            break;
+        }
+    }
+}
+
 void system_settings(void) {
     static const char *menu_items[] = {
         "System Information",
@@ -366,6 +459,7 @@ void system_settings(void) {
         "PCI/PCIE devices",
         "Test System",
         "Default Font",
+        "User Accounts",
         "Exit",
     };
     const size_t menu_count = sizeof(menu_items) / sizeof(menu_items[0]);
@@ -409,6 +503,9 @@ void system_settings(void) {
                 settings_select_font();
                 break;
             case 6:
+                settings_user_accounts();
+                break;
+            case 7:
                 dogeio_text_clear();
                 dogeio_text_color_change(saved_color);
                 return;
