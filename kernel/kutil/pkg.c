@@ -94,7 +94,7 @@ int kernel_package(int argc, char **argv) {
             return -1;
         }
 
-        if (fs_delete(dst_path) == 0) {
+        if (fs_delete(dst_path)) {
             dogeio_text_println("[PKG] Deleted executable application from /apps.");
             dogeio_text_println("[PKG] Package uninstalled cleanly.");
         } else {
