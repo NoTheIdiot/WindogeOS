@@ -3,8 +3,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define CHUNK_SIZE 32
-#define RLE_BUF_SIZE 512
+#define CHUNK_SIZE 64
+#define RLE_BUF_SIZE 64
 
 void kernel_rle_decompress(char *src_path, uint64_t src_size, char *dst_path) {
     if (src_size < 4) {
