@@ -357,14 +357,10 @@ void _start(void) {
             }
         }
         else if (key == 'e' || key == 'E') {
-            clear();
-            text_color(COLOR_BRIGHT_ORANGE);
-            print("  === Dogesheet v1.0 - Edit Cell ===\n");
-            text_color(COLOR_DARK_GRAY);
-            print("  ---------------------------------------------------------\n\n");
+            print("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
             
             text_color(COLOR_WHITE);
-            print("  Editing Cell [");
+            print("  Edit [");
             text_color(COLOR_BRIGHT_YELLOW);
             print(cur_c == 0 ? "A" : cur_c == 1 ? "B" : cur_c == 2 ? "C" : cur_c == 3 ? "D" : "E");
             
@@ -380,7 +376,8 @@ void _start(void) {
             }
             print(r_str);
             text_color(COLOR_WHITE);
-            print("]\n\n  Enter new value (max 11 chars): ");
+            print("]: ");
+            
             text_color(COLOR_BRIGHT_CYAN);
             input("", sheet[cur_r][cur_c].text, CELL_LEN - 1);
             trim_newline(sheet[cur_r][cur_c].text);

@@ -298,8 +298,8 @@ void _start(void) {
             clear();
             
             print_at("[Doge Databaser v1.0 - File: ", 2, 1, COLOR_BRIGHT_ORANGE);
-            print_at(db_file, 29, 1, COLOR_BRIGHT_CYAN);
-            print_at("]", 29 + (uint32_t)str_strlen(db_file), 1, COLOR_BRIGHT_ORANGE);
+            print_at(db_file, 31, 1, COLOR_BRIGHT_CYAN);
+            print_at("]", 31 + (uint32_t)str_strlen(db_file), 1, COLOR_BRIGHT_ORANGE);
             print_at("====================================================================", 2, 2, COLOR_DARK_GRAY);
             
             char formatted_headers[128];
