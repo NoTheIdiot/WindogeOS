@@ -50,6 +50,19 @@ typedef struct {
 #define COLOR_BRIGHT_YELLOW         0xF9F1A5
 #define COLOR_BRIGHT_WHITE          0xFFFFFF
 
+#define KEY_UP        0x101
+#define KEY_DOWN      0x102
+#define KEY_LEFT      0x103
+#define KEY_RIGHT     0x104
+#define KEY_BACKSPACE 0x008
+#define KEY_ENTER     0x00A
+#define KEY_TAB       0x009
+#define KEY_UNKNOWN   0x000
+#define KEY_F1        0x105
+#define KEY_F2        0x106
+#define KEY_CTRL_O    0x110
+#define KEY_CTRL_N    0x111
+
 
 static inline uint64_t read_file(const char *path, void *buffer, uint64_t size) {
     return syscall_3(READ_FILE, (uint64_t)path, (uint64_t)buffer, size);

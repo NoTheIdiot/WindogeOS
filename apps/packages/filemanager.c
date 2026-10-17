@@ -8,24 +8,49 @@
 #define PATH_CAPACITY 512
 #define MAX_VISIBLE_ROWS 15
 
-static int safe_change_dir(const char* path) {
-    if (!path) return -1;
-
-    char resolved_path[PATH_CAPACITY];
+static int get_resolved_path(const char* path, char* resolved_out) {
+    if (!path || !resolved_out) return -1;
     char cwd_buf[PATH_CAPACITY];
     memset(cwd_buf, 0, PATH_CAPACITY);
     get_cwd(cwd_buf, PATH_CAPACITY);
 
     if (path[0] == '/') {
-        str_strcpy(resolved_path, path);
+        str_strcpy(resolved_out, path);
     } else {
-        str_strcpy(resolved_path, cwd_buf);
-        size_t len = str_strlen(resolved_path);
-        if (len > 0 && resolved_path[len - 1] != '/') {
-            str_strcat(resolved_path, "/");
+        str_strcpy(resolved_out, cwd_buf);
+        size_t len = str_strlen(resolved_out);
+        if (len > 0 && resolved_out[len - 1] != '/') {
+            str_strcat(resolved_out, "/");
         }
-        str_strcat(resolved_path, path);
+        str_strcat(resolved_out, path);
     }
+    return 0;
+}
+
+static int is_protected_path(const char* target_path) {
+    if (!target_path) return 1;
+
+    char resolved[PATH_CAPACITY];
+    get_resolved_path(target_path, resolved);
+
+    const char* p = resolved;
+    while (*p == '/') p++;
+
+    if (*p == '\0') return 1; // Root directory '/'
+
+    if (str_strncmp(p, "system", 6) == 0 && (p[6] == '/' || p[6] == '\0')) return 1;
+    if (str_strncmp(p, ".windoge", 8) == 0 && (p[8] == '/' || p[8] == '\0')) return 1;
+    if (str_strncmp(p, "users", 5) == 0 && (p[5] == '/' || p[5] == '\0')) return 1;
+    if (str_strncmp(p, "apps", 4) == 0 && (p[4] == '/' || p[4] == '\0')) return 1;
+
+    return 0;
+}
+
+static int safe_change_dir(const char* path) {
+    if (!path) return -1;
+
+    char resolved_path[PATH_CAPACITY];
+    get_resolved_path(path, resolved_path);
 
     const char* p = resolved_path;
     while (*p == '/') p++;
@@ -61,7 +86,7 @@ void _start(void) {
         }
 
         clear();
-        print_at("=== DOGE TUI FILE MANAGER ===", 2, 1, COLOR_BRIGHT_ORANGE);
+        print_at("=== FILE MANAGER ===", 2, 1, COLOR_BRIGHT_ORANGE);
         print_at("CWD: ", 2, 2, COLOR_GRAY);
         print_at(cwd, 7, 2, COLOR_BRIGHT_CYAN);
         print_at("-------------------------------------------", 2, 3, COLOR_DARK_GRAY);
@@ -117,19 +142,39 @@ void _start(void) {
         if (footer_y > 23) footer_y = 23;
 
         print_at("-------------------------------------------", 2, footer_y, COLOR_DARK_GRAY);
-        print_at("[W/S] Nav | [Enter] Open/View | [Backspace] Up | [Q] Exit", 2, footer_y + 1, COLOR_BRIGHT_GREEN);
+        print_at("[W/S/Up/Down] Nav | [Enter] Open | [N] New | [D] Del | [Q] Exit", 2, footer_y + 1, COLOR_BRIGHT_GREEN);
 
         uint64_t key = get_key();
 
-        if (key == 'w' || key == 'W') {
+        if (key == 'w' || key == 'W' || key == KEY_UP) {
             if (selected > 0) selected--;
         } 
-        else if (key == 's' || key == 'S') {
+        else if (key == 's' || key == 'S' || key == KEY_DOWN) {
             if (selected < (int)count - 1) selected++;
         } 
         else if (key == 8 || key == 127) {
             safe_change_dir("..");
             selected = 0;
+        }
+        else if (key == 'n' || key == 'N') {
+            char new_name[128];
+            memset(new_name, 0, sizeof(new_name));
+            input("Enter new file name: ", new_name, sizeof(new_name) - 1);
+            if (new_name[0] != '\0') {
+                char resolved_new[PATH_CAPACITY];
+                get_resolved_path(new_name, resolved_new);
+                if (!is_protected_path(resolved_new)) {
+                    create_file(new_name);
+                }
+            }
+        }
+        else if (key == 'd' || key == 'D') {
+            if (count > 0) {
+                if (!is_protected_path(file_names[selected])) {
+                    delete_file(file_names[selected]);
+                    selected = 0;
+                }
+            }
         }
         else if (key == '\n' || key == '\r' || key == 13) {
             if (count > 0) {
