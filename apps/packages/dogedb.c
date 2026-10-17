@@ -148,14 +148,14 @@ void _start(void) {
     text_color(COLOR_WHITE);
     clear();
 
-    print_at("=== Dogestore DB v1.0 ===", 2, 1, COLOR_BRIGHT_ORANGE);
+    print_at("=== Doge Databaser v1.0 ===", 2, 1, COLOR_BRIGHT_ORANGE);
     print_at("---------------------------------------------------------", 2, 2, COLOR_DARK_GRAY);
     
     input("\n\n  Enter database file path (.csv required): ", db_file, sizeof(db_file) - 1);
 
     if (!ends_with_csv(db_file) || !file_exists(db_file)) {
         clear();
-        print_at("=== Dogestore DB v1.0 ===", 2, 1, COLOR_BRIGHT_ORANGE);
+        print_at("=== Doge Databaser v1.0 ===", 2, 1, COLOR_BRIGHT_ORANGE);
         print_at("---------------------------------------------------------", 2, 2, COLOR_DARK_GRAY);
         
         if (!ends_with_csv(db_file)) {
@@ -174,7 +174,7 @@ void _start(void) {
                 sys_exit(0);
             } else if (key == 'n' || key == 'N') {
                 clear();
-                print_at("=== Dogestore DB v1.0 - Schema Setup ===", 2, 1, COLOR_BRIGHT_ORANGE);
+                print_at("=== Doge Databaser v1.0 - Schema Setup ===", 2, 1, COLOR_BRIGHT_ORANGE);
                 print_at("---------------------------------------------------------", 2, 2, COLOR_DARK_GRAY);
                 
                 char new_path[PATH_CAPACITY];
@@ -297,7 +297,7 @@ void _start(void) {
         if (needs_redraw) {
             clear();
             
-            print_at("[Dogestore DB v1.0 - File: ", 2, 1, COLOR_BRIGHT_ORANGE);
+            print_at("[Doge Databaser v1.0 - File: ", 2, 1, COLOR_BRIGHT_ORANGE);
             print_at(db_file, 29, 1, COLOR_BRIGHT_CYAN);
             print_at("]", 29 + (uint32_t)str_strlen(db_file), 1, COLOR_BRIGHT_ORANGE);
             print_at("====================================================================", 2, 2, COLOR_DARK_GRAY);
