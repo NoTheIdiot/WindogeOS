@@ -881,6 +881,30 @@ uint64_t syscall_handler(syscall_registers_t *regs) {
             break;
         }
 
+        case GET_USER: {
+            char *user_dst = (char *)regs->rdi;
+            uint64_t max_len = regs->rsi;
+
+            if (user_dst == NULL || max_len == 0 ||
+                !user_range_accessible(regs->rdi, max_len, true)) {
+                return (uint64_t)-1;
+            }
+
+            size_t username_length = 0;
+            while (username_length < sizeof(current_user) &&
+                   current_user[username_length] != '\0') {
+                username_length++;
+            }
+
+            if (username_length >= max_len) {
+                return (uint64_t)-1;
+            }
+
+            memcpy(user_dst, current_user, username_length + 1);
+            ret_val = (uint64_t)username_length;
+            break;
+        }
+
         case SPECIAL:
             dogeio_text_println("TESTING");
             log("TESTING");

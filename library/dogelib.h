@@ -42,4 +42,8 @@ static inline uint64_t doge_get_egid(void) {
     return syscall_0(GET_EGID);
 }
 
+static inline uint64_t get_user(void) {
+    return syscall_0(GET_USER);
+}
+
 #endif

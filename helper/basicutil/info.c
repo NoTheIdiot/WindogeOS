@@ -76,6 +76,9 @@ uint64_t get_ram(void) {
     return (type_counts[0] + type_counts[7]) / 1024;
 }
 
+char* get_user(void) {
+    return current_user;
+}
 
 uint64_t get_ram_end_address(void) {
     if (memmap_request.response == NULL) {

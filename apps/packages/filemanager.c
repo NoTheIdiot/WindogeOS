@@ -8,6 +8,35 @@
 #define PATH_CAPACITY 512
 #define MAX_VISIBLE_ROWS 15
 
+static int safe_change_dir(const char* path) {
+    if (!path) return -1;
+
+    char resolved_path[PATH_CAPACITY];
+    char cwd_buf[PATH_CAPACITY];
+    memset(cwd_buf, 0, PATH_CAPACITY);
+    get_cwd(cwd_buf, PATH_CAPACITY);
+
+    if (path[0] == '/') {
+        str_strcpy(resolved_path, path);
+    } else {
+        str_strcpy(resolved_path, cwd_buf);
+        size_t len = str_strlen(resolved_path);
+        if (len > 0 && resolved_path[len - 1] != '/') {
+            str_strcat(resolved_path, "/");
+        }
+        str_strcat(resolved_path, path);
+    }
+
+    const char* p = resolved_path;
+    while (*p == '/') p++;
+
+    if (str_strncmp(p, "system", 6) == 0 && (p[6] == '/' || p[6] == '\0')) {
+        return -1;
+    }
+
+    return (int)change_dir(path);
+}
+
 void _start(void) {
     int selected = 0;
     uint64_t count = 0;
@@ -88,7 +117,7 @@ void _start(void) {
         if (footer_y > 23) footer_y = 23;
 
         print_at("-------------------------------------------", 2, footer_y, COLOR_DARK_GRAY);
-        print_at("[W/S] Navigate | [Enter] Open Dir | [Q] Exit", 2, footer_y + 1, COLOR_BRIGHT_GREEN);
+        print_at("[W/S] Nav | [Enter] Open/View | [Backspace] Up | [Q] Exit", 2, footer_y + 1, COLOR_BRIGHT_GREEN);
 
         uint64_t key = get_key();
 
@@ -98,6 +127,10 @@ void _start(void) {
         else if (key == 's' || key == 'S') {
             if (selected < (int)count - 1) selected++;
         } 
+        else if (key == 8 || key == 127) {
+            safe_change_dir("..");
+            selected = 0;
+        }
         else if (key == '\n' || key == '\r' || key == 13) {
             if (count > 0) {
                 dogec_stat_t target_stat;
@@ -105,8 +138,31 @@ void _start(void) {
                 stat(file_names[selected], &target_stat);
 
                 if (target_stat.is_dir) {
-                    change_dir(file_names[selected]);
+                    safe_change_dir(file_names[selected]);
                     selected = 0;
+                } else {
+                    clear();
+                    print_at("=== FILE VIEWER ===", 2, 1, COLOR_BRIGHT_ORANGE);
+                    print_at("File: ", 2, 2, COLOR_GRAY);
+                    print_at(file_names[selected], 8, 2, COLOR_BRIGHT_CYAN);
+                    print_at("-------------------------------------------", 2, 3, COLOR_DARK_GRAY);
+
+                    char file_buf[4096];
+                    memset(file_buf, 0, sizeof(file_buf));
+                    
+                    int bytes_read = (int)read_file(file_names[selected], file_buf, sizeof(file_buf) - 1);
+                    if (bytes_read > 0) {
+                        file_buf[bytes_read] = '\0';
+                        print_at(file_buf, 2, 5, COLOR_WHITE);
+                    } else {
+                        print_at("[ Empty or Unreadable File ]", 2, 5, COLOR_BRIGHT_BLACK);
+                    }
+
+                    print_at("-------------------------------------------", 2, 22, COLOR_DARK_GRAY);
+                    print_at("Press any key to return...", 2, 23, COLOR_BRIGHT_GREEN);
+                    
+                    while (get_key() == 0) {
+                    }
                 }
             }
         } 

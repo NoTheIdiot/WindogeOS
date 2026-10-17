@@ -47,6 +47,7 @@
 #define EXEC_ELF           40
 #define LIST_DIR           41
 #define WRITE_FILE_RAW     42
+#define GET_USER           43
 
 #define SPECIAL 90
 
