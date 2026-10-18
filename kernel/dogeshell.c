@@ -1375,10 +1375,8 @@ static int dogeshell_execute(int argc, char **argv) {
             return 127;
         }
         char *editor_args[] = {path};
-        dogeio_text_clear();
         system_run_bin_args(editor_path, MAX_FLAT_BINARY_SIZE, 1,
                             editor_args);
-        dogeio_text_clear();
         return 0;
     }
     if (str_strcmp(argv[0], "settings") == 0) {

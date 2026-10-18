@@ -17,9 +17,9 @@
 #define KEY_CTRL_G 0x112
 #define KEY_CTRL_F 0x113
 
-#define MAX_LINES       1000
+#define MAX_LINES       4096
 #define MAX_LINE_LEN    256
-#define MAX_FILE_SIZE   8192
+#define MAX_FILE_SIZE   32768
 
 #define TOP_MARGIN      1  
 #define BOTTOM_MARGIN   1  
@@ -502,6 +502,7 @@ void _start(int argc, char **argv) {
 
     (void)background_color(COLOR_BACKGROUND);
     (void)text_color(COLOR_GRAY);
+    clear();
 
     should_quit = false;
     if (!load_file_from_disk(current_filename)) {
@@ -593,5 +594,6 @@ void _start(int argc, char **argv) {
         }
     }
 
+    clear();
     sys_exit(0);
 }
