@@ -8,7 +8,15 @@
 extern volatile struct limine_memmap_request memmap_request;
 
 char current_user[64];
-const char* dogeshell_version = "Dogeshell v2.1";
+const char* dogeshell_version = "Dogeshell v2.3";
+
+#if defined(__x86_64__) || defined(_M_X64) 
+    const char* windoge_arch = "x86_64 (Intel/AMD)";
+#elif defined(__aarch64__) || defined (_M_ARM64)
+    const char* windoge_arch = "ARM64/Aarch64";
+#else
+    const char* windoge_arch = "Unknown";
+#endif
 
 const char* doge_ascii[22] = {
     "                 ;i.",
@@ -137,22 +145,26 @@ void system_fetch() {
                 dogeio_text_println("-----------------------------");
                 break;
             case 3:
-                dogeio_text_print("Such User: ");
-                dogeio_text_println(current_user);
-                break;
-            case 4:
                 dogeio_text_print("Version: ");
                 dogeio_text_println(windoge_version);
                 break;
+            case 4:
+                dogeio_text_print("Arch: ");
+                dogeio_text_println(windoge_arch);
+                break;
             case 5:
+                dogeio_text_print("Such User: ");
+                dogeio_text_println(current_user);
+                break;
+            case 6:
                 dogeio_text_print("Shell: ");
                 dogeio_text_println(dogeshell_version);
                 break;
-            case 6:
+            case 7:
                 dogeio_text_print("CPU: ");
                 dogeio_text_println(cpuid());
                 break;
-            case 7:
+            case 8:
                 dogeio_text_print("RAM: ");
                 
                 uint64_t ram_used_mib = get_used_ram() / 1024 / 1024;
@@ -173,8 +185,8 @@ void system_fetch() {
                 }
                 break;
 
-            case 8:
-                dogeio_text_print("Storage: ");
+            case 9:
+                dogeio_text_print("  Storage: ");
                 if (metrics_status == 0 && total_clusters > 0) {
                     uint32_t used_clusters = total_clusters - free_clusters;
                     str_itoa((int)used_clusters, storage_buf);
@@ -184,10 +196,10 @@ void system_fetch() {
                     dogeio_text_print(storage_buf);
                     dogeio_text_println(" Clusters");
                 } else {
-                    dogeio_text_println("Error reading exFAT");
+                    dogeio_text_println(" Error reading exFAT");
                 }
                 break;
-            case 9:
+            case 10:
                 if (metrics_status == 0 && total_clusters > 0) {
                     uint32_t used_clusters = total_clusters - free_clusters;
                     uint32_t percentage = (used_clusters * 100U) / total_clusters;
@@ -210,7 +222,8 @@ void system_fetch() {
                     dogeio_text_println("");
                 }
                 break;
-            case 10:
+            case 11:
+                dogeio_text_print(" ");
                 dogeio_text_background_change(COLOR_RED);
                 dogeio_text_print("   ");
                 dogeio_text_background_change(COLOR_ORANGE);
@@ -228,8 +241,8 @@ void system_fetch() {
                 dogeio_text_background_change(COLOR_BLACK);
                 dogeio_text_println("");
                 break;
-            case 11:
-                dogeio_text_print(" ");
+            case 12:
+                dogeio_text_print("  ");
                 dogeio_text_background_change(COLOR_BRIGHT_RED);
                 dogeio_text_print("   ");
                 dogeio_text_background_change(COLOR_BRIGHT_ORANGE);
