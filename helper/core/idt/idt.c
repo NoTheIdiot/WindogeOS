@@ -88,12 +88,60 @@ static void uint64_to_hex_forward(uint64_t value, char* buf) {
 
 void idt_set_gate(uint8_t vector, uint64_t handler, uint8_t ist, uint8_t flags) {
     idt[vector].offset_low      = (uint16_t)(handler & 0xFFFF);
-    idt[vector].selector        = 0x08;               
+    idt[vector].selector        = 0x08;              
     idt[vector].ist             = ist & 0x07;          
     idt[vector].type_attributes = flags;
     idt[vector].offset_middle   = (uint16_t)((handler >> 16) & 0xFFFF);
     idt[vector].offset_high     = (uint32_t)((handler >> 32) & 0xFFFFFFFF);
     idt[vector].reserved        = 0;
+}
+
+static void dump_stack_frames(uint64_t start_rip, uint64_t start_rbp, bool to_screen) {
+    char buf[64];
+    uint64_t rip = start_rip;
+    uint64_t rbp = start_rbp;
+
+    if (to_screen) {
+        dogeio_text_println("--- Call Stack Trace ---");
+    } else {
+        log("--- Call Stack Trace ---");
+    }
+
+    for (int i = 0; i < 6; i++) {
+        if (rip == 0 || rbp == 0) break;
+
+        uint64_to_hex_forward(rip, buf);
+        char line[128];
+        str_strcpy(line, "  #");
+        char num_buf[4];
+        num_buf[0] = '0' + (char)i;
+        num_buf[1] = '\0';
+        str_strcat(line, num_buf);
+        str_strcat(line, " RIP: ");
+        str_strcat(line, buf);
+
+        if (to_screen) {
+            dogeio_text_println(line);
+        } else {
+            log(line);
+        }
+
+        if (rbp < 0xFFFF800000000000ULL || (rbp & 7) != 0) {
+            break;
+        }
+
+        uint64_t *frame_ptr = (uint64_t *)rbp;
+        uint64_t next_rbp = frame_ptr[0];
+        uint64_t next_rip = frame_ptr[1];
+
+        // Stacks grow down, so caller's rbp must be strictly greater than current rbp
+        if (next_rbp <= rbp) {
+            break;
+        }
+
+        rbp = next_rbp;
+        rip = next_rip;
+    }
 }
 
 void isr_common_handler(interrupt_frame_t *frame) {
@@ -153,7 +201,6 @@ void isr_common_handler(interrupt_frame_t *frame) {
         }
 
         is_kernel_dead = false;
-
         system_dogeshell();
 
         while (1) {
@@ -186,6 +233,8 @@ void isr_common_handler(interrupt_frame_t *frame) {
         log(log_buf);
     }
 
+    dump_stack_frames(frame->rip, frame->rbp, false);
+
     while (true) {
         dogeio_text_clear();
         dogeio_text_color_change(COLOR_WHITE);
@@ -193,11 +242,11 @@ void isr_common_handler(interrupt_frame_t *frame) {
         dogeio_text_clear();
 
         const char* error_panic[9] = {
-            "     ##",
+            "    ##",
             "##  #",
             "   #",
             "##  #",
-            "     ##",
+            "    ##",
             "",
             "Your Computer has ran into a problem and needs to such restart :(",
             "Much crash, please select an option and press Enter.",
@@ -236,6 +285,9 @@ void isr_common_handler(interrupt_frame_t *frame) {
             dogeio_text_println(log_buf);
         }
 
+        dogeio_text_println("");
+        dump_stack_frames(frame->rip, frame->rbp, true);
+
         while (true) {
             uint16_t key = dogeio_get_key();
 
@@ -253,7 +305,6 @@ void isr_common_handler(interrupt_frame_t *frame) {
         }
     }
 }
-
 
 void init_idt(void) {
     for (int i = 0; i < 256; i++) {
