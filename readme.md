@@ -22,7 +22,7 @@ Building on Arch Linux and other distros is possible by changing a few packages 
 want to run this on real hardware, skip `python3 start_vm.py`
 
 ### What's needed
-If you are on Windows, install WSL with* `wsl --install Ubuntu`.
+If you are on Windows, install WSL with `wsl --install Ubuntu`.
 
 - Install the following:
     `git` 
@@ -47,17 +47,16 @@ If you are on Windows, install WSL with* `wsl --install Ubuntu`.
   for compile.py
 
 ### Installation (to real hardware very wow)
-*__note__: do not install it on your main machine, only on a test 
-machines or an older spare machine 
-To install on real hardware, you have to flash to a medium that can
-be saved and not a USB drive.
+*__note__: It's probably not a good idea to install this on your main machine. A test 
+machines or an older spare machine is a better idea.
+To install on real hardware, you have to flash to a medium that WindogeOS can write to.
+USB drives are not supported storage mediums right now, only IDE devices.
 
 If you are going to flash it to a hard drive:
 `sudo dd if=/path/to/WindogeOS/windoge_os.img of=your_drive bs=4M status=progress conv=fsync`
 
-No other storage devices are currently supported, but
-ill work on that. Though you may use SD cards to IDE adapters,
-so in that case that might work.
+You may use SD card to IDE adapters,
+so in that case that might somehow work.
 
 ## Contributing
 Thanks for contributing :)
