@@ -416,74 +416,83 @@ void _start(void) {
     char latest_query[INPUT_BUF_LEN] = "";
     char latest_result[32] = "0.000000";
 
+    int needs_redraw = 1;
+
     while (1) {
-        clear();
-        print_at("=== AvCalc (Bad Advanced Calculator) ===", 2, 1, COLOR_BRIGHT_CYAN);
-        print_at("---------------------------------------------------------", 2, 2, COLOR_DARK_GRAY);
+        if (needs_redraw) {
+            clear();
+            print_at("=== AvCalc (Bad Advanced Calculator) ===", 2, 1, COLOR_BRIGHT_CYAN);
+            print_at("---------------------------------------------------------", 2, 2, COLOR_DARK_GRAY);
 
-        if (show_help) {
-            print_at("HELP & COMMAND REFERENCE:", 4, 4, COLOR_YELLOW);
-            print_at(" - Operators: + , - , * , / , ^ (power) , ! (factorial)", 4, 6, COLOR_WHITE);
-            print_at(" - Functions: sin(x), cos(x), tan(x), sqrt(x), log(x), ln(x), abs(x)", 4, 8, COLOR_WHITE);
-            print_at(" - Constants: pi, e, ans (last result)", 4, 10, COLOR_WHITE);
-            print_at(" - Special Commands in input:", 4, 12, COLOR_YELLOW);
-            print_at("   * 'clear' or 'cls' to reset history", 6, 13, COLOR_WHITE);
-            print_at("   * 'mr' / 'mc' for Memory Register", 6, 14, COLOR_WHITE);
-            print_at("CONTROLS: [CTRL+O] Toggle Help | [CTRL+N] Clear | [ENTER] Calculate", 2, 21, COLOR_BRIGHT_GREEN);
-        } else {
-            print_at("LATEST CALCULATION:", 4, 3, COLOR_BRIGHT_GREEN);
-            char latest_box[200];
-            str_strcpy(latest_box, "> ");
-            str_strcat(latest_box, latest_query[0] ? latest_query : "(none)");
-            str_strcat(latest_box, " = ");
-            str_strcat(latest_box, latest_result);
-            print_at(latest_box, 4, 4, COLOR_BRIGHT_WHITE);
-            print_at("---------------------------------------------------------", 2, 5, COLOR_DARK_GRAY);
+            if (show_help) {
+                print_at("HELP & COMMAND REFERENCE:", 4, 4, COLOR_YELLOW);
+                print_at(" - Operators: + , - , * , / , ^ (power) , ! (factorial)", 4, 6, COLOR_WHITE);
+                print_at(" - Functions: sin(x), cos(x), tan(x), sqrt(x), log(x), ln(x), abs(x)", 4, 8, COLOR_WHITE);
+                print_at(" - Constants: pi, e, ans (last result)", 4, 10, COLOR_WHITE);
+                print_at(" - Special Commands in input:", 4, 12, COLOR_YELLOW);
+                print_at("   * 'clear' or 'cls' to reset history", 6, 13, COLOR_WHITE);
+                print_at("   * 'mr' / 'mc' for Memory Register", 6, 14, COLOR_WHITE);
+                print_at("CONTROLS: [CTRL+O] Toggle Help | [CTRL+N] Clear | [ENTER] Calculate", 2, 21, COLOR_BRIGHT_GREEN);
+            } else {
+                print_at("LATEST CALCULATION:", 4, 3, COLOR_BRIGHT_GREEN);
+                char latest_box[200];
+                str_strcpy(latest_box, "> ");
+                str_strcat(latest_box, latest_query[0] ? latest_query : "(none)");
+                str_strcat(latest_box, " = ");
+                str_strcat(latest_box, latest_result);
+                print_at(latest_box, 4, 4, COLOR_BRIGHT_WHITE);
+                print_at("---------------------------------------------------------", 2, 5, COLOR_DARK_GRAY);
 
-            print_at("HISTORY:", 4, 6, COLOR_BRIGHT_YELLOW);
-            int start_y = 7;
-            for (int i = 0; i < history_count && i < MAX_HISTORY; i++) {
-                char line_buf[200];
-                str_strcpy(line_buf, "  > ");
-                str_strcat(line_buf, history[i].query);
-                str_strcat(line_buf, " = ");
-                str_strcat(line_buf, history[i].result);
-                print_at(line_buf, 4, (uint32_t)(start_y + i), COLOR_GRAY);
+                print_at("HISTORY:", 4, 6, COLOR_BRIGHT_YELLOW);
+                int start_y = 7;
+                for (int i = 0; i < history_count && i < MAX_HISTORY; i++) {
+                    char line_buf[200];
+                    str_strcpy(line_buf, "  > ");
+                    str_strcat(line_buf, history[i].query);
+                    str_strcat(line_buf, " = ");
+                    str_strcat(line_buf, history[i].result);
+                    print_at(line_buf, 4, (uint32_t)(start_y + i), COLOR_GRAY);
+                }
+                if (history_count == 0) {
+                    print_at("  (No previous history)", 4, 7, COLOR_DARK_WHITE);
+                }
+
+                char mem_str[64];
+                str_strcpy(mem_str, "Memory [M]: ");
+                char mem_val_str[32];
+                fixed_to_str(memory_reg.int_part, memory_reg.frac_part, mem_val_str, 32);
+                str_strcat(mem_str, mem_val_str);
+                print_at(mem_str, 4, 18, COLOR_CYAN);
+                print_at("CONTROLS: [CTRL+O] Help | [CTRL+N] Clear History | [ENTER] Calculate", 2, 21, COLOR_BRIGHT_GREEN);
             }
-            if (history_count == 0) {
-                print_at("  (No previous history)", 4, 7, COLOR_DARK_WHITE);
-            }
 
-            char mem_str[64];
-            str_strcpy(mem_str, "Memory [M]: ");
-            char mem_val_str[32];
-            fixed_to_str(memory_reg.int_part, memory_reg.frac_part, mem_val_str, 32);
-            str_strcat(mem_str, mem_val_str);
-            print_at(mem_str, 4, 18, COLOR_CYAN);
-            print_at("CONTROLS: [CTRL+O] Help | [CTRL+N] Clear History | [ENTER] Calculate", 2, 21, COLOR_BRIGHT_GREEN);
+            print_at("---------------------------------------------------------", 2, 19, COLOR_DARK_GRAY);
+            print_at("Expr > ", 2, 20, COLOR_BRIGHT_WHITE);
+            char render_buf[INPUT_BUF_LEN + 16];
+            str_strcpy(render_buf, input_buf);
+            str_strcat(render_buf, "_   ");
+            print_at(render_buf, 9, 20, COLOR_WHITE);
+
+            needs_redraw = 0;
         }
-
-        print_at("---------------------------------------------------------", 2, 19, COLOR_DARK_GRAY);
-        print_at("Expr > ", 2, 20, COLOR_BRIGHT_WHITE);
-        char render_buf[INPUT_BUF_LEN + 16];
-        str_strcpy(render_buf, input_buf);
-        str_strcat(render_buf, "_   ");
-        print_at(render_buf, 9, 20, COLOR_WHITE);
 
         uint64_t key = get_key();
 
         if (key == KEY_CTRL_O) {
             show_help = !show_help;
+            needs_redraw = 1;
         } else if (key == KEY_CTRL_N) {
             history_count = 0;
             latest_query[0] = '\0';
             str_strcpy(latest_result, "0.000000");
             input_len = 0;
             input_buf[0] = '\0';
+            needs_redraw = 1;
         } else if (key == KEY_BACKSPACE) {
             if (input_len > 0) {
                 input_len--;
                 input_buf[input_len] = '\0';
+                needs_redraw = 1;
             }
         } else if (key == KEY_ENTER || key == 0x0A || key == 0x0D) {
             if (input_len == 0) continue;
@@ -497,6 +506,7 @@ void _start(void) {
                 str_strcpy(latest_result, "0.000000");
                 input_len = 0;
                 input_buf[0] = '\0';
+                needs_redraw = 1;
                 continue;
             }
             if (str_strcmp(input_buf, "mc") == 0) {
@@ -504,12 +514,14 @@ void _start(void) {
                 memory_reg.frac_part = 0;
                 input_len = 0;
                 input_buf[0] = '\0';
+                needs_redraw = 1;
                 continue;
             }
             if (str_strcmp(input_buf, "mr") == 0) {
                 last_answer = memory_reg;
                 input_len = 0;
                 input_buf[0] = '\0';
+                needs_redraw = 1;
                 continue;
             }
 
@@ -544,10 +556,12 @@ void _start(void) {
 
             input_len = 0;
             input_buf[0] = '\0';
+            needs_redraw = 1;
         } else if (key >= 32 && key < 127) {
             if (input_len < INPUT_BUF_LEN - 1) {
                 input_buf[input_len++] = (char)key;
                 input_buf[input_len] = '\0';
+                needs_redraw = 1;
             }
         }
     }
