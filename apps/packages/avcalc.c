@@ -5,6 +5,26 @@
 #include "../library/string.h"
 #include "../library/math.h"
 
+#ifndef KEY_CTRL_O
+#define KEY_CTRL_O 0x0F
+#endif
+
+#ifndef KEY_CTRL_N
+#define KEY_CTRL_N 0x0E
+#endif
+
+#ifndef KEY_CTRL_Q
+#define KEY_CTRL_Q 0x11
+#endif
+
+#ifndef KEY_BACKSPACE
+#define KEY_BACKSPACE 0x08
+#endif
+
+#ifndef KEY_ENTER
+#define KEY_ENTER 0x0A
+#endif
+
 static void int_to_str(int64_t val, char *buf, int max_len) {
     if (val == 0) {
         if (max_len > 1) {
@@ -432,7 +452,7 @@ void _start(void) {
                 print_at(" - Special Commands in input:", 4, 12, COLOR_YELLOW);
                 print_at("   * 'clear' or 'cls' to reset history", 6, 13, COLOR_WHITE);
                 print_at("   * 'mr' / 'mc' for Memory Register", 6, 14, COLOR_WHITE);
-                print_at("CONTROLS: [CTRL+O] Toggle Help | [CTRL+N] Clear | [ENTER] Calculate", 2, 21, COLOR_BRIGHT_GREEN);
+                print_at("CONTROLS: [CTRL+O] Help | [CTRL+N] Clear | [CTRL+Q] Quit | [ENTER] Calc", 2, 21, COLOR_BRIGHT_GREEN);
             } else {
                 print_at("LATEST CALCULATION:", 4, 3, COLOR_BRIGHT_GREEN);
                 char latest_box[200];
@@ -463,7 +483,7 @@ void _start(void) {
                 fixed_to_str(memory_reg.int_part, memory_reg.frac_part, mem_val_str, 32);
                 str_strcat(mem_str, mem_val_str);
                 print_at(mem_str, 4, 18, COLOR_CYAN);
-                print_at("CONTROLS: [CTRL+O] Help | [CTRL+N] Clear History | [ENTER] Calculate", 2, 21, COLOR_BRIGHT_GREEN);
+                print_at("CONTROLS: [CTRL+O] Help | [CTRL+N] Clear | [CTRL+Q] Quit | [ENTER] Calc", 2, 21, COLOR_BRIGHT_GREEN);
             }
 
             print_at("---------------------------------------------------------", 2, 19, COLOR_DARK_GRAY);
@@ -488,7 +508,10 @@ void _start(void) {
             input_len = 0;
             input_buf[0] = '\0';
             needs_redraw = 1;
-        } else if (key == KEY_BACKSPACE) {
+        } else if (key == KEY_CTRL_Q || key == 0x11) {
+            clear();
+            sys_exit(0);
+        } else if (key == KEY_BACKSPACE || key == 0x08 || key == 127) {
             if (input_len > 0) {
                 input_len--;
                 input_buf[input_len] = '\0';
@@ -566,5 +589,6 @@ void _start(void) {
         }
     }
 
+    clear();
     sys_exit(0);
 }
