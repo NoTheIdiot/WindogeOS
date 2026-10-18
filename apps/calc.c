@@ -6,16 +6,23 @@ void _start(int argc, char** argv) {
     if (argc < 1 || argv == (void*)0 || argv[0] == (void*)0) {
         print("Usage: calc <expression>\n");
         sys_exit(1);
+        return;
     } 
     
-    if (argv[0] != NULL && str_strcmp(argv[0], "--help") == 0) {
+    if (str_strcmp(argv[0], "--help") == 0) {
         print("Calculator\n");
         print("Usage: calc <expression>\n");
         print("Example: calc \"2 + 3 * 4\"\n");
         sys_exit(0);
+        return;
     }
 
     char* string = argv[0];
+    if (string == (void*)0) {
+        sys_exit(1);
+        return;
+    }
+
     int total_result = 0; 
     int current_term = 0; 
     int current_num = 0;
@@ -33,7 +40,7 @@ void _start(int argc, char** argv) {
             current_num = (current_num * 10) + (c - '0'); 
             has_num = 1;
         } 
-          
+         
         if (c == '+' || c == '-' || c == '*' || c == '/' || c == '^' || string[i+1] == '\0') {
             if (has_num) {
                 if (last_op == '+') {
@@ -73,6 +80,7 @@ void _start(int argc, char** argv) {
     } else if (total_result == 0) {
         print("0\n");
         sys_exit(0);
+        return;
     }
 
     char inline_buf[32];
