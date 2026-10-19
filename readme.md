@@ -4,9 +4,9 @@ Also supposed to be a free and lightweight operating system.
 Also being easy to use on the command line.
 
 ## Minimum requirements
-Any x86_64 CPU will work, and also you will ned at least
-4MB of RAM and 4MB of disk, and it will run pretty well.
-Dogescript full functionality requires about 6MB of RAM.
+Pretty much any x86_64 will work, intel atoms, core 2 duos (if specified 
+x86_64), anything would work. You will also need 4MB of RAM and 5MB of 
+disk.
 
 ## Recommended Specs
 Any CPU, 6MB of RAM and 8MB of disk for the best experience.
