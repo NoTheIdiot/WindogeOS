@@ -6,6 +6,8 @@ import subprocess
 import importlib.util
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
+DISK_IMAGE_SIZE_MB = 4
+
 def rle_compress_data(data: bytes) -> bytes:
     original_size = len(data)
     compressed = bytearray()
@@ -289,7 +291,6 @@ def main():
                     except Exception as e:
                         return False, pkg_src
 
-                # We can execute package builds synchronously or wrap them
                 success, failed_item = build_package()
                 if not success:
                     print(f"\n[Not Wow] Build failed on package:\n  {failed_item}")
@@ -305,12 +306,13 @@ def main():
         if os.path.exists(img_file):
             os.remove(img_file)
 
-        cmd(f"dd if=/dev/zero bs=1M count=0 seek=4 of={img_file} 2>/dev/null")
+        cmd(f"dd if=/dev/zero bs=1M count={DISK_IMAGE_SIZE_MB} of={img_file} 2>/dev/null")
 
         partition_type_p1 = "8300" if arch == "x86_64" else "ef00"
         
         p2_start = 4096
-        p2_end = 8158 
+        total_sectors = (DISK_IMAGE_SIZE_MB * 1024 * 1024) // 512
+        p2_end = total_sectors - 2048
         
         cmd(
             f"PATH=$PATH:/usr/sbin:/sbin sgdisk {img_file} "

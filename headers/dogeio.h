@@ -138,6 +138,7 @@ int   fs_rename(char* filename, char* newname);
 int   fs_copy(char* source, char* dest);
 int   fs_move(char* source, char* dest);
 int   fs_chdir(char* folder);
+int   fs_isdir(char* filename);
 char* fs_dirname(void);
 int   fs_mount(void);
 int   fs_list_files(const char *directory, char (*names)[256], size_t capacity);

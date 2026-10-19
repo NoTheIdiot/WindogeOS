@@ -10,6 +10,8 @@ struct datetime {
     int day;
 };
 
+#define CALENDAR_FILE "/.calendar"
+
 static int get_start_day_of_month(int year, int month) {
     if (month < 3) {
         month += 12;
@@ -107,6 +109,138 @@ static void get_current_date(struct datetime *dt) {
     dt->day = (int)(days + 1);
 }
 
+static void format_date_key(int year, int month, int day, char *out_buf) {
+    int y = year;
+    out_buf[0] = (char)('0' + (y / 1000));
+    y %= 1000;
+    out_buf[1] = (char)('0' + (y / 100));
+    y %= 100;
+    out_buf[2] = (char)('0' + (y / 10));
+    out_buf[3] = (char)('0' + (y % 10));
+    out_buf[4] = '-';
+    out_buf[5] = (char)('0' + (month / 10));
+    out_buf[6] = (char)('0' + (month % 10));
+    out_buf[7] = '-';
+    out_buf[8] = (char)('0' + (day / 10));
+    out_buf[9] = (char)('0' + (day % 10));
+    out_buf[10] = '\0';
+}
+
+static void get_reminder_for_date(int year, int month, int day, char *out_msg, size_t max_len) {
+    out_msg[0] = '\0';
+    if (!file_exists(CALENDAR_FILE)) return;
+
+    dogec_stat_t st = {0};
+    if (stat(CALENDAR_FILE, &st) != 0 || st.size == 0 || st.is_dir) return;
+
+    char file_buf[256];
+    for (int i = 0; i < 256; i++) file_buf[i] = 0;
+
+    uint64_t bytes_to_read = st.size < 255 ? st.size : 255;
+    int64_t bytes_read = (int64_t)read_file(CALENDAR_FILE, file_buf, bytes_to_read);
+    if (bytes_read <= 0 || bytes_read >= 256) return;
+    file_buf[bytes_read] = '\0';
+
+    char target_key[16];
+    format_date_key(year, month, day, target_key);
+
+    char *line = file_buf;
+    while (*line) {
+        char *nl = line;
+        while (*nl && *nl != '\n' && *nl != '\r') nl++;
+        char saved_char = *nl;
+        *nl = '\0';
+
+        if (str_strlen(line) > 11 && str_strncmp(line, target_key, 10) == 0 && line[10] == ':') {
+            char *msg_ptr = line + 11;
+            while (*msg_ptr == ' ') msg_ptr++;
+            str_strncpy(out_msg, msg_ptr, max_len - 1);
+            out_msg[max_len - 1] = '\0';
+            break;
+        }
+
+        *nl = saved_char;
+        line = nl;
+        while (*line == '\n' || *line == '\r') line++;
+    }
+}
+
+static void save_reminder_for_date(int year, int month, int day, const char *new_msg) {
+    char target_key[16];
+    format_date_key(year, month, day, target_key);
+
+    char file_buf[256];
+    for (int i = 0; i < 256; i++) file_buf[i] = 0;
+
+    uint64_t fsize = 0;
+    if (file_exists(CALENDAR_FILE)) {
+        dogec_stat_t st = {0};
+        if (stat(CALENDAR_FILE, &st) == 0 && st.size > 0 && !st.is_dir) {
+            uint64_t bytes_to_read = st.size < 255 ? st.size : 255;
+            int64_t br = (int64_t)read_file(CALENDAR_FILE, file_buf, bytes_to_read);
+            if (br > 0 && br < 256) {
+                file_buf[br] = '\0';
+                fsize = (uint64_t)br;
+            }
+        }
+    }
+
+    char new_buf[256];
+    for (int i = 0; i < 256; i++) new_buf[i] = 0;
+    size_t new_buf_len = 0;
+
+    bool updated = false;
+    if (fsize > 0) {
+        char *line = file_buf;
+        while (*line && new_buf_len < 200) {
+            char *nl = line;
+            while (*nl && *nl != '\n' && *nl != '\r') nl++;
+            char saved_char = *nl;
+            *nl = '\0';
+
+            if (str_strlen(line) > 11 && str_strncmp(line, target_key, 10) == 0 && line[10] == ':') {
+                if (new_msg && new_msg[0] != '\0') {
+                    size_t needed = 11 + str_strlen(new_msg) + 2;
+                    if (new_buf_len + needed < 240) {
+                        str_strcat(new_buf, target_key);
+                        str_strcat(new_buf, ": ");
+                        str_strcat(new_buf, new_msg);
+                        str_strcat(new_buf, "\n");
+                        new_buf_len = str_strlen(new_buf);
+                    }
+                    updated = true;
+                }
+            } else if (line[0] != '\0') {
+                size_t l_len = str_strlen(line);
+                if (new_buf_len + l_len + 2 < 240) {
+                    str_strcat(new_buf, line);
+                    str_strcat(new_buf, "\n");
+                    new_buf_len = str_strlen(new_buf);
+                }
+            }
+
+            *nl = saved_char;
+            line = nl;
+            while (*line == '\n' || *line == '\r') line++;
+        }
+    }
+
+    if (!updated && new_msg && new_msg[0] != '\0') {
+        size_t needed = 11 + str_strlen(new_msg) + 2;
+        if (new_buf_len + needed < 240) {
+            str_strcat(new_buf, target_key);
+            str_strcat(new_buf, ": ");
+            str_strcat(new_buf, new_msg);
+            str_strcat(new_buf, "\n");
+        }
+    }
+
+    if (!file_exists(CALENDAR_FILE)) {
+        create_file(CALENDAR_FILE);
+    }
+    write_file(CALENDAR_FILE, new_buf);
+}
+
 static void render_calendar(int year, int month, int selected_day) {
     clear();
     println("====================");
@@ -162,9 +296,23 @@ static void render_calendar(int year, int month, int selected_day) {
     }
 
     println("====================");
+    
+    char reminder_buf[128];
+    get_reminder_for_date(year, month, selected_day, reminder_buf, sizeof(reminder_buf));
+    if (reminder_buf[0] != '\0') {
+        print("Reminder: ");
+        text_color(COLOR_BRIGHT_YELLOW);
+        println(reminder_buf);
+        text_color(COLOR_WHITE);
+    } else {
+        println("Reminder: (None)");
+    }
+
+    println("====================");
     println("Left/Right: Day     ");
     println("Up/Down:    Month   ");
     println("+/-:        Year    ");
+    println("ENTER:      Edit Rem");
     println("R:          Reset   ");
     println("ESC/Q:      Quit    ");
 }
@@ -230,6 +378,40 @@ void _start(int argc, char **argv) {
             year--;
             int new_max = get_days_in_month(year, month);
             if (day > new_max) day = new_max;
+        } else if (key == KEY_ENTER || key == '\n' || key == 13) {
+            clear();
+            println("=== Edit Reminder ===");
+            print("Date: ");
+            char dkey[16];
+            format_date_key(year, month, day, dkey);
+            println(dkey);
+            println("Type reminder text and press Enter.");
+            println("(Leave blank and press Enter to clear)");
+            print("> ");
+
+            char input_rem[64];
+            for (int i = 0; i < 64; i++) input_rem[i] = 0;
+            int input_idx = 0;
+
+            while (true) {
+                uint64_t rkey = get_key();
+                if (rkey == KEY_ENTER || rkey == '\n' || rkey == 13) {
+                    break;
+                } else if (rkey == KEY_BACKSPACE || rkey == 8 || rkey == 127) {
+                    if (input_idx > 0) {
+                        input_idx--;
+                        input_rem[input_idx] = '\0';
+                        print("\b \b");
+                    }
+                } else if (rkey >= 32 && rkey < 127 && input_idx < 60) {
+                    input_rem[input_idx++] = (char)rkey;
+                    input_rem[input_idx] = '\0';
+                    char tmp[2] = {(char)rkey, '\0'};
+                    print(tmp);
+                }
+            }
+
+            save_reminder_for_date(year, month, day, input_rem);
         } else if (key == 'r' || key == 'R') {
             get_current_date(&current_dt);
             year = current_dt.year;

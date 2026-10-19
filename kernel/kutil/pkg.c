@@ -15,11 +15,11 @@ int kernel_package(int argc, char **argv) {
         dogeio_text_println("Usage: dogestore <command> [arguments]");
         dogeio_text_println("");
         dogeio_text_println("Commands:");
-        dogeio_text_println("  install <pkg>    Decompress and install an .rle package from /apps/packages/");
-        dogeio_text_println("  uninstall <pkg>  Remove an installed package executable from /apps/");
-        dogeio_text_println("  list             Show uninstalled packages available for installation");
-        dogeio_text_println("  search <query>   Search for installable packages in the repository");
-        dogeio_text_println("  help             Display this help menu screen");
+        dogeio_text_println("  install <pkg>     Decompress and install an .rle package or folder ending with .rle from /apps/packages/");
+        dogeio_text_println("  uninstall <pkg>   Remove an installed package executable from /apps/");
+        dogeio_text_println("  list              Show uninstalled packages available for installation");
+        dogeio_text_println("  search <query>    Search for installable packages in the repository");
+        dogeio_text_println("  help              Display this help menu screen");
         return 0;
     }
 
@@ -37,6 +37,73 @@ int kernel_package(int argc, char **argv) {
             return -1;
         }
 
+        char pkg_path[MAX_PATH_LEN];
+        str_strcpy(pkg_path, REPO_DIR);
+        str_strcat(pkg_path, pkg_name);
+
+        if (fs_isdir(pkg_path)) {
+            size_t pkg_len = str_strlen(pkg_name);
+            if (pkg_len <= 4 || str_strcmp(&pkg_name[pkg_len - 4], ".rle") != 0) {
+                dogeio_text_println("[PKG] Error: Folder name in repository must end with .rle.");
+                return -1;
+            }
+
+            char original_dir[MAX_PATH_LEN];
+            char *curr = fs_dirname();
+            if (curr) {
+                str_strcpy(original_dir, curr);
+            } else {
+                str_strcpy(original_dir, "/");
+            }
+
+            if (fs_chdir(pkg_path) != 0) {
+                dogeio_text_println("[PKG] Error: Failed to enter package directory.");
+                return -1;
+            }
+
+            char entries[MAX_NAMES][256];
+            int count = fs_list_entries(".", entries, MAX_NAMES);
+            if (count < 0) count = 0;
+
+            int installed_any = 0;
+            for (int i = 0; i < count; i++) {
+                size_t entry_len = str_strlen(entries[i]);
+                if (entry_len > 4 && str_strcmp(&entries[i][entry_len - 4], ".rle") == 0) {
+                    char file_clean_name[MAX_PATH_LEN];
+                    memset(file_clean_name, 0, sizeof(file_clean_name));
+                    for (size_t j = 0; j < entry_len - 4 && j < MAX_PATH_LEN - 1; j++) {
+                        file_clean_name[j] = entries[i][j];
+                    }
+
+                    char sub_src_path[MAX_PATH_LEN];
+                    str_strcpy(sub_src_path, entries[i]);
+
+                    char sub_dst_path[MAX_PATH_LEN];
+                    str_strcpy(sub_dst_path, APPS_DIR);
+                    str_strcat(sub_dst_path, file_clean_name);
+                    str_strcat(sub_dst_path, ".bin");
+
+                    uint64_t sub_size = 0;
+                    bool sub_is_dir = false;
+                    if (fs_get_info(sub_src_path, &sub_size, &sub_is_dir) == 0 && !sub_is_dir && sub_size > 0) {
+                        dogeio_text_print("[PKG] Installing sub-package payload: ");
+                        dogeio_text_println(file_clean_name);
+                        kernel_rle_decompress(sub_src_path, sub_size, sub_dst_path);
+                        installed_any = 1;
+                    }
+                }
+            }
+
+            fs_chdir(original_dir);
+
+            if (!installed_any) {
+                dogeio_text_println("[PKG] Warning: No valid .rle files found inside the package folder.");
+            } else {
+                dogeio_text_println("[PKG] Folder package installed successfully.");
+            }
+            return 0;
+        }
+
         char src_path[MAX_PATH_LEN];
         str_strcpy(src_path, REPO_DIR);
         str_strcat(src_path, pkg_name);
@@ -49,7 +116,8 @@ int kernel_package(int argc, char **argv) {
 
         uint64_t src_size = 0;
         bool is_dir = false;
-        if (fs_get_info(src_path, &src_size, &is_dir) != 0 || src_size == 0) {
+        
+        if (fs_get_info(src_path, &src_size, &is_dir) != 0 || src_size == 0 || is_dir) {
             dogeio_text_println("[PKG] Error: Package source file (.rle) does not exist in /apps/packages/.");
             return -1;
         }

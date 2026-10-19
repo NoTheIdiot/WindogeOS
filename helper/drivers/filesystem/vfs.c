@@ -8,6 +8,20 @@
 
 extern int exfat_resolve_entry(const char *target_name, void *out);
 extern int exfat_get_info(const char *name, uint64_t *size, bool *is_dir);
+extern int exfat_wipe_and_format(void);
+extern int exfat_create_node(const char *name, bool is_dir);
+extern int exfat_delete_node(const char *name);
+extern int exfat_truncate_last_line(const char *name);
+extern int64_t exfat_read_file(const char *name, uint8_t *buffer, uint64_t max_size);
+extern int64_t exfat_read_file_at(const char *name, uint8_t *buffer, uint64_t offset, uint64_t max_size);
+extern int exfat_write_file(const char *name, const uint8_t *buffer, uint64_t size);
+extern int exfat_append_file(const char *name, const uint8_t *data, uint64_t size);
+extern int exfat_print_directory(int hidden);
+extern int exfat_list_entries(char (*names)[256], size_t capacity);
+extern int exfat_list_files(char (*names)[256], size_t capacity);
+extern int exfat_change_directory(const char *path);
+extern const char* exfat_get_working_dir(void);
+extern int exfat_mount(void);
 
 static void fs_sanitize_path(const char *in, char *out, size_t out_size) {
     if (!in || !out || out_size == 0) return;
@@ -29,7 +43,7 @@ static void fs_sanitize_path(const char *in, char *out, size_t out_size) {
 }
 
 static int fs_split_path(const char *path, char *out_parent, size_t parent_size, 
-                          char *out_filename, size_t filename_size) {
+                         char *out_filename, size_t filename_size) {
     if (!path || path[0] == '\0') return -1;
 
     char clean[256];
@@ -89,7 +103,7 @@ static int fs_enter_path(const char *path, char *leaf, size_t leaf_size, char *s
     }
 
     if (parent_dir[0] != '\0') {
-        char *current = (char*)exfat_get_working_dir();
+        const char *current = exfat_get_working_dir();
         if (current) {
             str_strcpy(saved_cwd, current);
             *walked = 1;
@@ -191,6 +205,16 @@ int fs_get_info(char *filename, uint64_t *size, bool *is_dir) {
     int rc = exfat_get_info(leaf, size, is_dir);
     fs_leave_path(saved_cwd, walked);
     return rc;
+}
+
+int fs_isdir(char *filename) {
+    uint64_t size = 0;
+    bool is_dir = false;
+
+    if (fs_get_info(filename, &size, &is_dir) != 0) {
+        return 0;
+    }
+    return is_dir ? 1 : 0;
 }
 
 int fs_delete(char* filename) {
@@ -452,7 +476,7 @@ int fs_list(const char* directory, int show_hidden) {
     }
 
     char saved_cwd[256];
-    char *current = (char*)exfat_get_working_dir();
+    const char *current = exfat_get_working_dir();
     int walked = 0;
 
     if (current) {

@@ -25,6 +25,28 @@
 #define KEY_ENTER 0x0A
 #endif
 
+#define MAX_VARS 16
+#define MAX_HISTORY 10
+#define INPUT_BUF_LEN 128
+
+typedef struct {
+    int64_t int_part;
+    int64_t frac_part;
+} fixed_t;
+
+typedef struct {
+    char name[32];
+    fixed_t val;
+} Variable;
+
+typedef struct {
+    const char *p;
+    fixed_t memory;
+    Variable *vars;
+    int var_count;
+    int error;
+} Parser;
+
 static void int_to_str(int64_t val, char *buf, int max_len) {
     if (val == 0) {
         if (max_len > 1) {
@@ -69,11 +91,6 @@ static void fixed_to_str(int64_t int_part, int64_t frac_part, char *buf, int max
     }
     str_strcat(buf, frac_buf);
 }
-
-typedef struct {
-    int64_t int_part;
-    int64_t frac_part;
-} fixed_t;
 
 static fixed_t fixed_add(fixed_t a, fixed_t b) {
     fixed_t res;
@@ -236,12 +253,6 @@ static fixed_t fixed_factorial(fixed_t x) {
     return long_to_fixed(acc);
 }
 
-typedef struct {
-    const char *p;
-    fixed_t memory;
-    int error;
-} Parser;
-
 static fixed_t parse_expr(Parser *ps);
 
 static void skip_spaces(Parser *ps) {
@@ -298,6 +309,36 @@ static fixed_t parse_factor(Parser *ps) {
     if (str_startswith(ps->p, "pi")) { ps->p += 2; fixed_t pi = {3, 141592}; return pi; }
     if (str_startswith(ps->p, "e")) { ps->p++; fixed_t e = {2, 718281}; return e; }
     if (str_startswith(ps->p, "ans")) { ps->p += 3; return ps->memory; }
+
+    if ((*ps->p >= 'a' && *ps->p <= 'z') || (*ps->p >= 'A' && *ps->p <= 'Z') || *ps->p == '_') {
+        char id_buf[32];
+        int id_len = 0;
+        while (ps->p && ((*ps->p >= 'a' && *ps->p <= 'z') || (*ps->p >= 'A' && *ps->p <= 'Z') || (*ps->p >= '0' && *ps->p <= '9') || *ps->p == '_')) {
+            if (id_len < 31) id_buf[id_len++] = *ps->p;
+            ps->p++;
+        }
+        id_buf[id_len] = '\0';
+
+        int found = 0;
+        fixed_t var_val = {0, 0};
+        for (int i = 0; i < ps->var_count; i++) {
+            if (str_strcmp(ps->vars[i].name, id_buf) == 0) {
+                var_val = ps->vars[i].val;
+                found = 1;
+                break;
+            }
+        }
+        if (!found) {
+            ps->error = 1;
+            return (fixed_t){0, 0};
+        }
+        skip_spaces(ps);
+        if (ps->p && *ps->p == '!') {
+            ps->p++;
+            var_val = fixed_factorial(var_val);
+        }
+        return var_val;
+    }
 
     int64_t int_val = 0;
     int64_t frac_val = 0;
@@ -402,15 +443,12 @@ static fixed_t parse_expr(Parser *ps) {
     return val;
 }
 
-static fixed_t evaluate(const char *expr, fixed_t last_ans, int *error_code) {
-    Parser ps = { .p = expr, .memory = last_ans, .error = 0 };
+static fixed_t evaluate(const char *expr, fixed_t last_ans, Variable *vars, int var_count, int *error_code) {
+    Parser ps = { .p = expr, .memory = last_ans, .vars = vars, .var_count = var_count, .error = 0 };
     fixed_t res = parse_expr(&ps);
     *error_code = ps.error;
     return res;
 }
-
-#define MAX_HISTORY 10
-#define INPUT_BUF_LEN 128
 
 typedef struct {
     char query[INPUT_BUF_LEN];
@@ -431,6 +469,8 @@ void _start(void) {
 
     fixed_t last_answer = {0, 0};
     fixed_t memory_reg = {0, 0};
+    Variable vars[MAX_VARS];
+    int var_count = 0;
     int show_help = 0;
 
     char latest_query[INPUT_BUF_LEN] = "";
@@ -441,17 +481,15 @@ void _start(void) {
     while (1) {
         if (needs_redraw) {
             clear();
-            print_at("=== AvCalc (Bad Advanced Calculator) ===", 2, 1, COLOR_BRIGHT_CYAN);
+            print_at("=== avcalc - Bad Advanced Calculator ===", 2, 1, COLOR_BRIGHT_CYAN);
             print_at("---------------------------------------------------------", 2, 2, COLOR_DARK_GRAY);
 
             if (show_help) {
                 print_at("HELP & COMMAND REFERENCE:", 4, 4, COLOR_YELLOW);
                 print_at(" - Operators: + , - , * , / , ^ (power) , ! (factorial)", 4, 6, COLOR_WHITE);
                 print_at(" - Functions: sin(x), cos(x), tan(x), sqrt(x), log(x), ln(x), abs(x)", 4, 8, COLOR_WHITE);
-                print_at(" - Constants: pi, e, ans (last result)", 4, 10, COLOR_WHITE);
-                print_at(" - Special Commands in input:", 4, 12, COLOR_YELLOW);
-                print_at("   * 'clear' or 'cls' to reset history", 6, 13, COLOR_WHITE);
-                print_at("   * 'mr' / 'mc' for Memory Register", 6, 14, COLOR_WHITE);
+                print_at(" - Constants & Vars: pi, e, ans, custom vars (e.g. x = 5)", 4, 10, COLOR_WHITE);
+                print_at(" - Commands: clear / cls, mc, mr", 4, 12, COLOR_WHITE);
                 print_at("CONTROLS: [CTRL+O] Help | [CTRL+N] Clear | [CTRL+Q] Quit | [ENTER] Calc", 2, 21, COLOR_BRIGHT_GREEN);
             } else {
                 print_at("LATEST CALCULATION:", 4, 3, COLOR_BRIGHT_GREEN);
@@ -548,17 +586,85 @@ void _start(void) {
                 continue;
             }
 
-            int err = 0;
-            fixed_t res = evaluate(input_buf, last_answer, &err);
+            char *eq_pos = NULL;
+            int p_depth = 0;
+            for (int i = 0; input_buf[i] != '\0'; i++) {
+                if (input_buf[i] == '(') p_depth++;
+                else if (input_buf[i] == ')') p_depth--;
+                else if (input_buf[i] == '=' && p_depth == 0) {
+                    eq_pos = &input_buf[i];
+                    break;
+                }
+            }
 
             char res_str[32];
-            if (err == 1) {
-                str_strcpy(res_str, "Syntax Error");
-            } else if (err == 2) {
-                str_strcpy(res_str, "Division by Zero");
+            if (eq_pos) {
+                char var_name[32];
+                int name_len = 0;
+                char *p_name = input_buf;
+                while (p_name < eq_pos && *p_name == ' ') p_name++;
+                while (p_name < eq_pos && *p_name != ' ' && name_len < 31) {
+                    var_name[name_len++] = *p_name++;
+                }
+                var_name[name_len] = '\0';
+
+                int valid_name = (name_len > 0);
+                if (!((var_name[0] >= 'a' && var_name[0] <= 'z') || (var_name[0] >= 'A' && var_name[0] <= 'Z') || var_name[0] == '_')) {
+                    valid_name = 0;
+                }
+                for (int i = 1; i < name_len; i++) {
+                    char c = var_name[i];
+                    if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_')) {
+                        valid_name = 0;
+                        break;
+                    }
+                }
+                if (str_strcmp(var_name, "pi") == 0 || str_strcmp(var_name, "e") == 0 || str_strcmp(var_name, "ans") == 0) {
+                    valid_name = 0;
+                }
+
+                if (!valid_name) {
+                    str_strcpy(res_str, "Syntax Error");
+                } else {
+                    char *p_expr = eq_pos + 1;
+                    while (*p_expr == ' ') p_expr++;
+
+                    int err = 0;
+                    fixed_t res = evaluate(p_expr, last_answer, vars, var_count, &err);
+                    if (err != 0) {
+                        if (err == 1) str_strcpy(res_str, "Syntax Error");
+                        else if (err == 2) str_strcpy(res_str, "Division by Zero");
+                    } else {
+                        last_answer = res;
+                        fixed_to_str(res.int_part, res.frac_part, res_str, 32);
+
+                        int found_var = -1;
+                        for (int v = 0; v < var_count; v++) {
+                            if (str_strcmp(vars[v].name, var_name) == 0) {
+                                found_var = v;
+                                break;
+                            }
+                        }
+                        if (found_var != -1) {
+                            vars[found_var].val = res;
+                        } else if (var_count < MAX_VARS) {
+                            str_strcpy(vars[var_count].name, var_name);
+                            vars[var_count].val = res;
+                            var_count++;
+                        }
+                    }
+                }
             } else {
-                last_answer = res;
-                fixed_to_str(res.int_part, res.frac_part, res_str, 32);
+                int err = 0;
+                fixed_t res = evaluate(input_buf, last_answer, vars, var_count, &err);
+                if (err == 1) {
+                    str_strcpy(res_str, "Syntax Error");
+                } else if (err == 2) {
+                    str_strcpy(res_str, "Division by Zero");
+                } else {
+                    last_answer = res;
+                    fixed_to_str(res.int_part, res.frac_part, res_str, 32);
+                }
             }
 
             str_strcpy(latest_query, input_buf);
@@ -589,6 +695,5 @@ void _start(void) {
         }
     }
 
-    clear();
     sys_exit(0);
 }
