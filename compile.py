@@ -6,7 +6,7 @@ import subprocess
 import importlib.util
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-DISK_IMAGE_SIZE_MB = 4
+DISK_IMAGE_SIZE_MB = 5
 
 def rle_compress_data(data: bytes) -> bytes:
     original_size = len(data)
