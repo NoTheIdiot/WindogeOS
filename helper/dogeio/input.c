@@ -46,6 +46,8 @@ uint16_t dogeio_get_key(void) {
                 }
             }
             menubar_draw();
+            // SAVE POWER YE MORON
+            __asm__ volatile ("pause");
         }
 
         uint8_t code = ports_inb(0x60);
@@ -122,6 +124,7 @@ uint16_t dogeio_get_key(void) {
     }
     return KEY_UNKNOWN;
 }
+
 
 void dogeio_text_input(const char *prompt, char *buffer, size_t max_size) {
     if (prompt != NULL) {

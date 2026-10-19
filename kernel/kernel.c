@@ -190,6 +190,9 @@ void kernel_main(void) {
     log("WindogeOS has successfully booted. Start celebrating broski.");
     menubar_draw();
 
+    // enable itterupts
+    sti();
+
     if (!fs_exists(".windoge")) {
         fs_mount();
         fs_set_auth_override(1);
