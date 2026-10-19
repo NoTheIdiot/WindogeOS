@@ -1170,7 +1170,7 @@ static int dogeshell_execute(int argc, char **argv) {
     }
     if (str_strcmp(argv[0], "del") == 0 || str_strcmp(argv[0], "rm") == 0) {
         if (argc < 2) {
-            dogeio_text_println("bash: rm: missing file operand");
+            dogeio_text_println("del: missing file operand");
             return 1;
         }
         for (int i = 1; i < argc; i++) {
@@ -1215,6 +1215,7 @@ static int dogeshell_execute(int argc, char **argv) {
                 return 1;
             }
         }
+        return 0 ;
     }
     if (str_strcmp(argv[0], "rename") == 0 || str_strcmp(argv[0], "mv") == 0 ||
         str_strcmp(argv[0], "cp") == 0) {
