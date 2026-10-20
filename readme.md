@@ -1,7 +1,8 @@
 # About WindogeOS
-* Doge filled OS that fits in (3) floppies
+* Doge filled OS that fits in (4) floppies
 * Free and lightweight operating system
 * Easy to use on the command line
+* Doesn't make your RAM want to commit sudoku
 
 ## Minimum requirements
 Most x86_64 CPUs will work. Intel Atoms, early Pentiums (2000-2010), and Core 2 Duos have been tested
