@@ -19,7 +19,7 @@ const char* dogeshell_version = "Dogeshell v2.3";
 #endif
 
 const char* doge_ascii[22] = {
-    "                 ;i.",
+    "                 ;i.                                   ",
     "                  M$L                    .;i.          ",
     "                  M$Y;                .;iii;;.         ",
     "                 ;$YY$i._           .iiii;;;;;         ",
@@ -28,14 +28,14 @@ const char* doge_ascii[22] = {
     "           .YYYY$$$$YYYYYYYYYYYYYYYYiii;; ;;;;         ",
     "         .YYY$$$$$$YYYYYY$$$$iiiY$$$$$$$ii;;;;         ",
     "        :YYYF`,  TYYYYY$$$$$YYYYYYYi$$$$$iiiii;        ",
-    "       Y$MM: \\\\  :YYYY$$P\"````\"T$YYMMMMMMMMiiYY.     ",
-    "     `.;\\\\[M\\\\]b.,dYY\\\\[Yi; .( .YYMMM\\\\]\\\\$MMMMYY      ",
-    "    .._MMMMM!YYYYYYYYYi;.`\\\\\"  .;iiMMM$MMMMMMMYY      ",
-    "    ._$MMMP` ```\"\"4$$$$$iiiiiiii$MMMMMMMMMMMMMY;     ",
+    "       Y$MM: \\\\  :YYYY$$P\"````\"T$YYMMMMMMMMiiYY.       ",
+    "     `.;\\\\[M\\\\]b.,dYY\\\\[Yi; .( .YYMMMMM$MMMMMMYY       ",
+    "    .._MMMMM!YYYYYYYYYi;.`\\\\\"  .;iiMM$$MMMMMMMYY       ",
+    "    ._$MMMP` ```\"\"4$$$$$iiiiiiii$MMMM$MMMMMMMMY;       ",
     "     MMMM$:       :$$$$$$$MMMMMMMMMMM$$MMMMMMMYYL      ",
     "    :MMMM$$.    .;PPb$$$$MMMMMMMMMM$$$$MMMMMMiYYU:     ",
     "     iMM$$;;: ;;;;i$$$$$$$MMMMM$$$$MMMMMMMMMMYYYYY     ",
-    "     `$$$$i .. ``:iiii!*\"``.$$$$$$$$$MMMMMMM$YiYYY    ",
+    "     `$$$$i .. ``:iiii!*\"``.$$$$$$$$$MMMMMMM$YiYYY     ",
     "      :Y$$iii;;;.. ` ..;;i$$$$$$$$$MMMMMM$$YYYYiYY:    ",
     "       :$$$$$iiiiiii$$$$$$$$$$$MMMMMMMMMMYYYYiiYYYY.   ",
     "        `$$$$$$$$$$$$$$$$$$$$MMMMMMMM$YYYYYiiiYYYYYY   ",
@@ -184,9 +184,8 @@ void system_fetch() {
                     dogeio_text_println(" KB");
                 }
                 break;
-
             case 9:
-                dogeio_text_print("  Storage: ");
+                dogeio_text_print("Storage: ");
                 if (metrics_status == 0 && total_clusters > 0) {
                     uint32_t used_clusters = total_clusters - free_clusters;
                     str_itoa((int)used_clusters, storage_buf);
@@ -194,9 +193,9 @@ void system_fetch() {
                     dogeio_text_print(" / ");
                     str_itoa((int)total_clusters, storage_buf);
                     dogeio_text_print(storage_buf);
-                    dogeio_text_println(" Clusters");
+                    dogeio_text_println("Clusters");
                 } else {
-                    dogeio_text_println(" Error reading exFAT");
+                    dogeio_text_println("Error reading exFAT");
                 }
                 break;
             case 10:
@@ -223,7 +222,6 @@ void system_fetch() {
                 }
                 break;
             case 11:
-                dogeio_text_print(" ");
                 dogeio_text_background_change(COLOR_RED);
                 dogeio_text_print("   ");
                 dogeio_text_background_change(COLOR_ORANGE);
@@ -242,7 +240,6 @@ void system_fetch() {
                 dogeio_text_println("");
                 break;
             case 12:
-                dogeio_text_print("  ");
                 dogeio_text_background_change(COLOR_BRIGHT_RED);
                 dogeio_text_print("   ");
                 dogeio_text_background_change(COLOR_BRIGHT_ORANGE);
@@ -260,7 +257,6 @@ void system_fetch() {
                 dogeio_text_background_change(COLOR_BLACK);
                 dogeio_text_println("");
                 break;
-                
             default:
                 dogeio_text_println("");
         }
