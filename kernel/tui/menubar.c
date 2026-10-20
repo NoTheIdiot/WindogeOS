@@ -5,6 +5,8 @@
 #include <time.h>
 #include <string.h>
 
+extern bool is_setup;
+
 void menubar_draw(void) {
     uint32_t old_text_color = dogeio_text_color;
     uint32_t old_bg_color = dogeio_background_color;
@@ -13,16 +15,35 @@ void menubar_draw(void) {
     bool old_cursor_visible = dogeio_cursor_visible;
     dogeio_cursor_visible = false;
     
-    const char* ver;
+    char* ver;
+    char ver_buffer[64];
     
-    if (is_kernel_dead == true) {
+    if (is_kernel_dead) {
         dogeio_text_color_change(COLOR_BRIGHT_RED);
         dogeio_text_background_change(0x282828);
         ver = "[KERNEL PANIC]";
     } else {
         dogeio_text_color_change(0xFFFFFF);
         dogeio_text_background_change(0x282828);
-        ver = windoge_version;
+        
+        if (is_setup) {
+            int i = 0;
+            if (windoge_version) {
+                while (windoge_version[i] != '\0' && i < 45) {
+                    ver_buffer[i] = windoge_version[i];
+                    i++;
+                }
+            }
+            char* suffix = " SETUP";
+            int j = 0;
+            while (suffix[j] != '\0' && i < 63) {
+                ver_buffer[i++] = suffix[j++];
+            }
+            ver_buffer[i] = '\0';
+            ver = ver_buffer;
+        } else {
+            ver = windoge_version;
+        }
     }
     
     cursor_x = 0;

@@ -53,74 +53,74 @@ uint16_t dogeio_get_key(void) {
         uint8_t code = ports_inb(0x60);
 
         switch (code) {
-        case 0xE0:
-            escaped = true;
-            continue;
+            case 0xE0:
+                escaped = true;
+                continue;
+                
+            case 0x2A:
+            case 0x36:
+                global_shift_pressed = true;
+                escaped = false;
+                continue;
             
-        case 0x2A:
-        case 0x36:
-            global_shift_pressed = true;
-            escaped = false;
-            continue;
+            case 0xAA:
+            case 0xB6:
+                global_shift_pressed = false;
+                escaped = false;
+                continue;
+            
+            case 0x1D:
+                global_ctrl_pressed = true;
+                escaped = false;
+                continue;
         
-        case 0xAA:
-        case 0xB6:
-            global_shift_pressed = false;
-            escaped = false;
-            continue;
-        
-        case 0x1D:
-            global_ctrl_pressed = true;
-            escaped = false;
-            continue;
-       
-        case 0x9D:
-            global_ctrl_pressed = false;
-            escaped = false;
-            continue;
-        }
-        
-        if (code & 0x80) {
-            escaped = false;
-            continue;
-        }
-
-        if (escaped) {
-            escaped = false;
-            switch (code) {
-            case 0x48: return KEY_UP;
-            case 0x50: return KEY_DOWN;
-            case 0x4B: return KEY_LEFT;
-            case 0x4D: return KEY_RIGHT;
+            case 0x9D:
+                global_ctrl_pressed = false;
+                escaped = false;
+                continue;
             }
-            continue;
-        }
+            
+            if (code & 0x80) {
+                escaped = false;
+                continue;
+            }
 
-        switch (code) {
-        case 0x1C: return KEY_ENTER;
-        case 0x0E: return KEY_BACKSPACE;
-
-        case 0x48: return KEY_UP;
-        case 0x50: return KEY_DOWN;
-        case 0x4B: return KEY_LEFT;
-        case 0x4D: return KEY_RIGHT;
-        }
-
-        if (code < 58) {
-            char c = global_shift_pressed ? map_upper[code] : map_lower[code];
-            if (c != 0) {
-                if (global_ctrl_pressed) {
-                    if (c == 'o') return KEY_CTRL_O;
-                    if (c == 'n') return KEY_CTRL_N;
-                    if (c >= 'a' && c <= 'z') {
-                        return (uint16_t)(c - 'a' + 1);
-                    } else if (c >= 'A' && c <= 'Z') {
-                        return (uint16_t)(c - 'A' + 1);
-                    }
+            if (escaped) {
+                escaped = false;
+                switch (code) {
+                case 0x48: return KEY_UP;
+                case 0x50: return KEY_DOWN;
+                case 0x4B: return KEY_LEFT;
+                case 0x4D: return KEY_RIGHT;
                 }
-                return (uint16_t)c;
+                continue;
             }
-        }
+
+            switch (code) {
+                case 0x1C: return KEY_ENTER;
+                case 0x0E: return KEY_BACKSPACE;
+
+                case 0x48: return KEY_UP;
+                case 0x50: return KEY_DOWN;
+                case 0x4B: return KEY_LEFT;
+                case 0x4D: return KEY_RIGHT;
+            }
+
+            if (code < 58) {
+                char c = global_shift_pressed ? map_upper[code] : map_lower[code];
+                if (c != 0) {
+                    if (global_ctrl_pressed) {
+                        if (c == 'o') return KEY_CTRL_O;
+                        if (c == 'n') return KEY_CTRL_N;
+                        if (c >= 'a' && c <= 'z') {
+                            return (uint16_t)(c - 'a' + 1);
+                        } else if (c >= 'A' && c <= 'Z') {
+                            return (uint16_t)(c - 'A' + 1);
+                        }
+                    }
+                    return (uint16_t)c;
+                }
+            }
     }
     return KEY_UNKNOWN;
 }

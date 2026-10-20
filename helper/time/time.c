@@ -11,7 +11,7 @@ struct {
     uint32_t year;
 } time;
 
-uint8_t time_read_rtc(uint8_t reg) {
+static inline uint8_t time_read_rtc(uint8_t reg) {
     ports_outb(0x70, reg);
     return ports_inb(0x71);
 }

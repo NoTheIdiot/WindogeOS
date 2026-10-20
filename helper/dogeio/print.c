@@ -110,14 +110,12 @@ void dogeio_text_putchar(char c, uint32_t x, uint32_t y) {
 }
 
 static void dogeio_text_clear_cells(void) {
-    log("[clear] resetting terminal grid");
     for (uint32_t i = 0; i < (TERMINAL_ROWS * TERMINAL_COLS); i++) {
         text_grid[i] = ' ';
         text_color_grid[i] = dogeio_text_color;
         bg_color_grid[i] = dogeio_background_color;
     }
 
-    log("[clear] redrawing framebuffer cells");
     if (framebuffer_request.response == NULL ||
         framebuffer_request.response->framebuffer_count < 1) {
         log("[clear] framebuffer unavailable");
@@ -129,16 +127,28 @@ static void dogeio_text_clear_cells(void) {
             dogeio_text_putchar_raw_glyph(' ', x, y);
         }
     }
-    log("[clear] framebuffer redraw complete");
 }
 
 void dogeio_text_clear() {
-    dogeio_text_clear_cells();
-    cursor_x = 0;
+    for (uint32_t i = 0; i < (TERMINAL_ROWS * TERMINAL_COLS); i++) {
+        text_grid[i] = ' ';
+        text_color_grid[i] = dogeio_text_color;
+        bg_color_grid[i] = dogeio_background_color;
+    }
+
+    if (framebuffer_request.response == NULL ||
+        framebuffer_request.response->framebuffer_count < 1) {
+        log("[clear] framebuffer unavailable");
+        return;
+    }
+
+    for (uint32_t y = 1; y < TERMINAL_ROWS; y++) {
+        for (uint32_t x = 0; x < TERMINAL_COLS; x++) {
+            dogeio_text_putchar_raw_glyph(' ', x, y);
+        }
+    }
     cursor_y = 1;
-    log("[clear] drawing menu bar");
-    menubar_draw();
-    log("[clear] menu bar complete");
+    cursor_x = 0;
 }
 
 void dogeio_text_clear_raw() {

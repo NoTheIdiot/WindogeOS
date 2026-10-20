@@ -37,7 +37,14 @@ volatile struct limine_memmap_request memmap_request = {
 __attribute__((used, section(".limine_requests_end")))
 volatile uint64_t limine_requests_end_marker[] = LIMINE_REQUESTS_END_MARKER;
 
+/* random things that are probably too messy for the headers */
+extern void system_load_settings(void);
+/* end */
+
+/* random flag variables */
 char computer_name[64];
+bool is_setup = false;
+/* end */
 
 static void install_root_apps(void) {
     static char root_files[48][256];
@@ -187,7 +194,7 @@ void kernel_main(void) {
     }
     log("[wow] all basic drivers done");
 
-    log("WindogeOS has successfully booted. Start celebrating broski.");
+    log("WindogeOS fully booted very wow.");
     menubar_draw();
 
     // enable itterupts
@@ -228,6 +235,10 @@ void kernel_main(void) {
         char root_new[64];
 
         while (true) {
+            dogeio_text_clear();
+            for (int i = 0; i < 22; i++) {
+                dogeio_text_println(doge_ascii[i]);
+            }
             dogeio_text_println("\nSet the admin password.");
             dogeio_text_input("admin password: ", root_new, 64);
             clean_input_string(root_new);
@@ -241,6 +252,10 @@ void kernel_main(void) {
         system_create_user("admin", root_new, 0);
 
         while (true) {
+            dogeio_text_clear();
+            for (int i = 0; i < 22; i++) {
+                dogeio_text_println(doge_ascii[i]);
+            }
             dogeio_text_println("\nCreate system username and password.");
             dogeio_text_input("username: ", username_new, 64);
             clean_input_string(username_new);
@@ -275,11 +290,8 @@ void kernel_main(void) {
 
         log("[dogeing] creating accounts");
         system_create_user(username_new, password_new, 1);
-
-        // Interactive Defaults Selection (Font, Shell, Color)
         dogeio_text_println("\n--- Setup Preferences ---");
-        
-        // 1. Font Selection (Default: PC IBM)
+    
         dogeio_text_println("Select Default Font:");
         dogeio_text_println("1. PC IBM (Default)");
         dogeio_text_println("2. Ubuntu Mono");
@@ -335,6 +347,8 @@ void kernel_main(void) {
         core_reboot();
     }
 
+    // load settings
+    system_load_settings();
     fs_set_auth_override(1);
     dogeio_text_print("Welcome to ");
     dogeio_text_println(windoge_version);

@@ -40,30 +40,9 @@ static bool shell_exit_requested;
 
 extern uint32_t saved_color;
 
-static size_t text_length(const char *text) {
-    size_t length = 0;
-    if (text != NULL) {
-        while (text[length] != '\0') {
-            length++;
-        }
-    }
-    return length;
-}
-
-static int text_copy(char *destination, size_t capacity, const char *source) {
-    size_t length = text_length(source);
-    if (destination == NULL || capacity == 0 || length >= capacity) {
-        return -1;
-    }
-    for (size_t i = 0; i <= length; i++) {
-        destination[i] = source[i];
-    }
-    return 0;
-}
-
 static int append_text(char *destination, size_t capacity, size_t *length,
                        const char *text) {
-    size_t append_length = text_length(text);
+    size_t append_length = str_strlen(text);
     if (*length > capacity || append_length >= capacity - *length) {
         return -1;
     }
@@ -93,7 +72,7 @@ static const char *get_variable(const char *name, size_t name_length) {
         return status_text;
     }
     for (size_t i = 0; i < variable_count; i++) {
-        if (text_length(variables[i].name) == name_length &&
+        if (str_strlen(variables[i].name) == name_length &&
             str_strncmp(variables[i].name, name, name_length) == 0) {
             return variables[i].value;
         }
@@ -139,14 +118,14 @@ static int valid_variable_name(const char *name, size_t length) {
 static int set_variable(const char *name, size_t name_length, const char *value) {
     initialize_variables();
     if (!valid_variable_name(name, name_length) ||
-        text_length(value) >= BASH_VARIABLE_VALUE_SIZE) {
+        str_strlen(value) >= BASH_VARIABLE_VALUE_SIZE) {
         return -1;
     }
 
     for (size_t i = 0; i < variable_count; i++) {
-        if (text_length(variables[i].name) == name_length &&
+        if (str_strlen(variables[i].name) == name_length &&
             str_strncmp(variables[i].name, name, name_length) == 0) {
-            if (text_copy(variables[i].value, sizeof(variables[i].value), value) != 0) {
+            if (str_strncpy(variables[i].value, value, sizeof(variables[i].value)) != 0) {
                 return -1;
             }
             return 0;
@@ -160,8 +139,8 @@ static int set_variable(const char *name, size_t name_length, const char *value)
         variables[variable_count].name[i] = name[i];
     }
     variables[variable_count].name[name_length] = '\0';
-    if (text_copy(variables[variable_count].value,
-                  sizeof(variables[variable_count].value), value) != 0) {
+    if (str_strncpy(variables[variable_count].value, value,
+                  sizeof(variables[variable_count].value)) != 0) {
         return -1;
     }
     variable_count++;
@@ -381,7 +360,7 @@ static int canonicalize_path(const char *path, char *output, size_t capacity) {
             append_text(combined, sizeof(combined), &combined_length, path) != 0) {
             return -1;
         }
-    } else if (text_copy(combined, sizeof(combined), path) != 0) {
+    } else if (str_strncpy(combined, path, sizeof(combined)) != 0) {
         return -1;
     }
 
@@ -445,7 +424,7 @@ static int authorize_path(const char *path) {
 }
 
 static int build_home_path(char *path, size_t capacity) {
-    return text_copy(path, capacity, get_variable("HOME", 4));
+    return str_strncpy(path, get_variable("HOME", 4), capacity);
 }
 
 static int build_history_path(char *path, size_t capacity) {
@@ -462,7 +441,7 @@ static int build_history_path(char *path, size_t capacity) {
 static int append_history(const char *command) {
     char history_path[160];
     char line[BASH_LINE_SIZE + 1];
-    size_t length = text_length(command);
+    size_t length = str_strlen(command);
     if (length == 0) {
         return 0;
     }
@@ -554,7 +533,7 @@ static int execute_command(int argc, char **argv) {
         return 0;
     }
 
-    size_t name_length = text_length(argv[0]);
+    size_t name_length = str_strlen(argv[0]);
     for (size_t i = 0; i < name_length; i++) {
         if (argv[0][i] == '=') {
             if (set_variable(argv[0], i, argv[0] + i + 1) != 0) {
@@ -644,7 +623,7 @@ static int execute_command(int argc, char **argv) {
             }
             target = path;
         } else if (str_strcmp(argv[1], "-") == 0) {
-            if (text_copy(path, sizeof(path), get_variable("OLDPWD", 6)) != 0) {
+            if (str_strncpy(path, get_variable("OLDPWD", 6), sizeof(path)) != 0) {
                 dogeio_text_println("bash: cd: OLDPWD not set");
                 return 1;
             }
@@ -658,8 +637,8 @@ static int execute_command(int argc, char **argv) {
         }
         const char *current_directory = fs_dirname();
         if (current_directory == NULL ||
-            text_copy(previous_directory, sizeof(previous_directory),
-                      current_directory) != 0) {
+            str_strncpy(previous_directory,
+                      current_directory, sizeof(previous_directory)) != 0) {
             dogeio_text_println("bash: cd: unable to determine current directory");
             return 1;
         }
@@ -1022,7 +1001,7 @@ static int execute_command(int argc, char **argv) {
             return 0;
         }
         for (int i = 1; i < argc; i++) {
-            size_t length = text_length(argv[i]);
+            size_t length = str_strlen(argv[i]);
             size_t equals = 0;
             while (equals < length && argv[i][equals] != '=') {
                 equals++;
@@ -1095,7 +1074,7 @@ static int execute_command(int argc, char **argv) {
         }
         char editor_path[32] = "/apps/editor.bin";
         if (!fs_exists(editor_path)) {
-            text_copy(editor_path, sizeof(editor_path), "/editor.bin");
+            str_strncpy(editor_path, "/editor.bin", sizeof(editor_path));
         }
         if (!fs_exists(editor_path)) {
             dogeio_text_println("bash: edit: editor app is not installed");
@@ -1177,7 +1156,7 @@ static int execute_command(int argc, char **argv) {
 
     if (argc > 0 && str_strcmp(argv[0], ".") != 0 &&
         str_strcmp(argv[0], "..") != 0) {
-        size_t command_length = text_length(argv[0]);
+        size_t command_length = str_strlen(argv[0]);
         int explicit_path = 0;
         for (size_t i = 0; argv[0][i] != '\0'; i++) {
             if (argv[0][i] == '/' || argv[0][i] == '\\') {
@@ -1220,11 +1199,11 @@ static int execute_command(int argc, char **argv) {
                             (extension[3] == 'n' || extension[3] == 'N');
         }
         if (has_extension) {
-            if (text_copy(app_name, sizeof(app_name), argv[0]) != 0) {
+            if (str_strncpy(app_name, argv[0], sizeof(app_name)) != 0) {
                 return 127;
             }
         } else {
-            if (text_copy(app_name, sizeof(app_name), argv[0]) != 0 ||
+            if (str_strncpy(app_name, argv[0], sizeof(app_name)) != 0 ||
                 append_text(app_name, sizeof(app_name), &app_name_length,
                             ".bin") != 0) {
                 return 127;
@@ -1236,7 +1215,7 @@ static int execute_command(int argc, char **argv) {
                 return 126;
             }
         }
-        if (text_copy(path, sizeof(path), "/apps/") != 0) {
+        if (str_strncpy(path, "/apps/", sizeof(path)) != 0) {
             return 1;
         }
         size_t path_length = 6;
@@ -1335,7 +1314,7 @@ int system_bash_ex(char *command) {
         return shell_status;
     }
     shell_exit_requested = false;
-    if (text_copy(source, sizeof(source), command) != 0) {
+    if (str_strncpy(source, command, sizeof(source)) != 0) {
         dogeio_text_println("bash: syntax error or command line too long");
         shell_status = 2;
         return shell_status;
@@ -1343,7 +1322,7 @@ int system_bash_ex(char *command) {
     if (append_history(source) != 0) {
         dogeio_text_println("bash: unable to save command history");
     }
-    source_length = text_length(source);
+    source_length = str_strlen(source);
 
     while (source_index < source_length && !shell_exit_requested) {
         size_t segment_start = source_index;
@@ -1454,7 +1433,7 @@ static void print_prompt(void) {
     dogeio_text_print(":");
 
     if (build_home_path(home, sizeof(home)) == 0) {
-        home_length = text_length(home);
+        home_length = str_strlen(home);
         if (str_strncmp(display_directory, home, home_length) == 0 &&
             (display_directory[home_length] == '\0' ||
              display_directory[home_length] == '/')) {

@@ -275,19 +275,18 @@ uint8_t str_to_u8(char *str) {
     return (uint8_t)res;
 }
 
-char* str_strncpy(char* dest, const char* src, size_t n) {
-    if (n == 0) return dest;
-    
-    size_t i;
-    for (i = 0; i < n - 1 && src[i] != '\0'; i++) {
-        dest[i] = src[i];
+int str_strncpy(char *destination, const char *source, size_t capacity) {
+    if (destination == NULL || source == NULL || capacity == 0) {
+        return -1;
     }
-    
-    for (; i < n; i++) {
-        dest[i] = '\0';
+    size_t length = str_strlen(source);
+    if (length >= capacity) {
+        return -1;
     }
-
-    return dest;
+    for (size_t i = 0; i <= length; i++) {
+        destination[i] = source[i];
+    }
+    return 0;
 }
 
 char* str_strcat(char* dest, const char* src) {  

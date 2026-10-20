@@ -8,7 +8,6 @@
 #include <core.h>
 #include <basicutil.h>
 #include <boot/limine.h>
-#include <image.h>
 #include <bool.h>
 
 extern volatile struct limine_memmap_request memmap_request;
@@ -102,7 +101,7 @@ void get_all_fucking_ram(void) {
     }
 }
 
-int dogeshell_list_pci(void) {
+static inline int dogeshell_list_pci(void) {
     dogeio_text_println("ADDRESS    IDENTITY DESCRIPTION & [VENDOR:DEVICE ID]");
     dogeio_text_println("---------------------------------------------------------");
     for (uint16_t bus = 0; bus < 256; bus++) {
@@ -137,7 +136,7 @@ int dogeshell_list_pci(void) {
     return 0;
 }
 
-static void settings_load_value(const char *value) {
+static inline void settings_load_value(const char *value) {
     for (size_t i = 0; i < sizeof(settings_colors) / sizeof(settings_colors[0]); i++) {
         if (str_strcmp(value, settings_colors[i].value) == 0) {
             selected_color = i;
@@ -147,7 +146,7 @@ static void settings_load_value(const char *value) {
     }
 }
 
-static void settings_load_font_value(const char *value) {
+static inline void settings_load_font_value(const char *value) {
     for (size_t i = 0; i < sizeof(settings_fonts) / sizeof(settings_fonts[0]); i++) {
         if (str_strcmp(value, settings_fonts[i].value) == 0) {
             selected_font_idx = i;
@@ -208,7 +207,7 @@ void system_load_settings(void) {
     dogeio_text_color_change(saved_color);
 }
 
-static int settings_save(void) {
+static inline int settings_save(void) {
     char contents[128] = "text_color=";
     str_strcat(contents, settings_colors[selected_color].value);
     str_strcat(contents, "\nshell=");

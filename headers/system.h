@@ -20,7 +20,7 @@ static inline int system(char* command) {
 }
 
 void system_fetch();
-extern const char *windoge_version;
+extern char *windoge_version;
 extern char current_user[64];
 extern uint32_t old;
 extern const char* dogeshell_version;
