@@ -25,7 +25,8 @@ static int get_start_day_of_month(int year, int month) {
 
 static int get_days_in_month(int year, int month) {
     switch (month) {
-        case 1: case 3: case 5: case 7: case 8: case 10: case 12:
+        case 1: case 3: case 5: case 7:
+        case 8: case 10: case 12:
             return 31;
         case 4: case 6: case 9: case 11:
             return 30;
@@ -41,19 +42,19 @@ static int get_days_in_month(int year, int month) {
 
 static void print_month_title(int month, int year) {
     switch (month) {
-        case 1: print("January "); break;
-        case 2: print("February "); break;
-        case 3: print("March "); break;
-        case 4: print("April "); break;
-        case 5: print("May "); break;
-        case 6: print("June "); break;
-        case 7: print("July "); break;
-        case 8: print("August "); break;
-        case 9: print("September "); break;
-        case 10: print("October "); break;
-        case 11: print("November "); break;
-        case 12: print("December "); break;
-        default: break;
+        case 1:  print("January ");   break;
+        case 2:  print("February ");  break;
+        case 3:  print("March ");     break;
+        case 4:  print("April ");     break;
+        case 5:  print("May ");       break;
+        case 6:  print("June ");      break;
+        case 7:  print("July ");      break;
+        case 8:  print("August ");    break;
+        case 9:  print("September "); break;
+        case 10: print("October ");   break;
+        case 11: print("November ");  break;
+        case 12: print("December ");  break;
+        default:                      break;
     }
     char y_buf[16];
     int y = year;
