@@ -21,35 +21,6 @@ extern volatile struct limine_hhdm_request   hhdm_request;
 
 static uint64_t free_page_head;
 
-size_t pmm_get_free_page_count(void) {
-    if (!memmap_request.response) {
-        return 0;
-    }
-
-    struct limine_memmap_response *memmap = memmap_request.response;
-    size_t free_pages = 0;
-
-    uint64_t current_free = free_page_head;
-    uint64_t hhdm_offset = hhdm_request.response ? hhdm_request.response->offset : 0;
-    while (current_free != 0) {
-        free_pages++;
-        if (hhdm_offset != 0) {
-            current_free = *(uint64_t *)(current_free + hhdm_offset);
-        } else {
-            break;
-        }
-    }
-
-    for (size_t i = 0; i < memmap->entry_count; i++) {
-        struct limine_memmap_entry *entry = memmap->entries[i];
-        if (entry->type == LIMINE_MEMMAP_USABLE) {
-            free_pages += entry->length / 4096;
-        }
-    }
-
-    return free_pages;
-}
-
 uint64_t pmm_alloc_zeroed_page(void) {
     static uint64_t alloc_index = 0;
     static uint64_t alloc_offset = 0;
@@ -93,6 +64,35 @@ uint64_t pmm_alloc_zeroed_page(void) {
     cli();
     halt();
     return 0;
+}
+
+size_t pmm_get_free_page_count(void) {
+    if (!memmap_request.response) {
+        return 0;
+    }
+
+    struct limine_memmap_response *memmap = memmap_request.response;
+    size_t free_pages = 0;
+
+    uint64_t current_free = free_page_head;
+    uint64_t hhdm_offset = hhdm_request.response ? hhdm_request.response->offset : 0;
+    while (current_free != 0) {
+        free_pages++;
+        if (hhdm_offset != 0) {
+            current_free = *(uint64_t *)(current_free + hhdm_offset);
+        } else {
+            break;
+        }
+    }
+
+    for (size_t i = 0; i < memmap->entry_count; i++) {
+        struct limine_memmap_entry *entry = memmap->entries[i];
+        if (entry->type == LIMINE_MEMMAP_USABLE) {
+            free_pages += entry->length / 4096;
+        }
+    }
+
+    return free_pages;
 }
 
 static void pmm_free_page(uint64_t phys_addr, uint64_t hhdm_offset) {
@@ -152,6 +152,33 @@ void cleanup_user_pages(void) {
         if (user_tables[i] != 0) {
             free_user_table(user_tables[i], 3, hhdm_offset);
         }
+    }
+}
+
+uint64_t create_user_pml4(void) {
+    if (hhdm_request.response == NULL) {
+        return 0;
+    }
+
+    uint64_t hhdm_offset = hhdm_request.response->offset;
+    uint64_t new_pml4_phys = pmm_alloc_zeroed_page();
+    if (new_pml4_phys == 0) {
+        return 0;
+    }
+
+    uint64_t *new_pml4 = (uint64_t *)(new_pml4_phys + hhdm_offset);
+    uint64_t *current_pml4 = (uint64_t *)((read_cr3() & ~0xFFFULL) + hhdm_offset);
+
+    for (size_t i = 256; i < 512; i++) {
+        new_pml4[i] = current_pml4[i];
+    }
+
+    return new_pml4_phys;
+}
+
+void switch_user_pml4(uint64_t pml4_phys) {
+    if (pml4_phys != 0) {
+        write_cr3(pml4_phys & ~0xFFFULL);
     }
 }
 
@@ -313,7 +340,6 @@ bool unmap_user_page(uint64_t virt_addr) {
 void setup_ring3_memory(uint64_t user_code_virt, uint64_t user_stack_virt, const uint8_t *user_code, size_t code_size) {
     uint64_t hhdm_offset = hhdm_request.response->offset;
 
-    // Map code pages
     for (size_t offset = 0; offset < code_size; offset += 4096) {
         uint64_t code_phys = pmm_alloc_zeroed_page();
         size_t bytes_to_copy = (code_size - offset > 4096) ? 4096 : (code_size - offset);
@@ -322,7 +348,6 @@ void setup_ring3_memory(uint64_t user_code_virt, uint64_t user_stack_virt, const
         map_user_page(user_code_virt + offset, code_phys);
     }
 
-    // Map stack page
     uint64_t stack_phys = pmm_alloc_zeroed_page();
     map_user_page(user_stack_virt, stack_phys);
 

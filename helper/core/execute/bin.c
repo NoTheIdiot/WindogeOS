@@ -8,14 +8,15 @@
 
 extern volatile struct limine_hhdm_request hhdm_request;
 extern size_t pmm_get_free_page_count(void);
+extern void to_userland_ring3_args(uint64_t rip, uint64_t rsp, uint64_t argc, uint64_t argv);
 
-#define USER_CODE_BASE  0x0000000000400000ULL
-#define USER_STACK_BASE 0x00007FFFF0000000ULL
-#define PAGE_SIZE       4096
-#define USER_STACK_PAGE_COUNT 8
-#define USER_STACK_SIZE (PAGE_SIZE * USER_STACK_PAGE_COUNT)
+#define USER_CODE_BASE          0x0000000000400000ULL
+#define USER_STACK_BASE         0x00007FFFF0000000ULL
+#define PAGE_SIZE               4096
+#define USER_STACK_PAGE_COUNT   8
+#define USER_STACK_SIZE         (PAGE_SIZE * USER_STACK_PAGE_COUNT)
 #define USER_ARGUMENT_AREA_SIZE (USER_STACK_SIZE / 2)
-#define DATA_SECTION_SIZE (8 * 1024)
+#define DATA_SECTION_SIZE       (8 * 1024)
 
 static size_t bin_argument_length(const char *argument) {
     size_t length = 0;
@@ -72,13 +73,13 @@ static int prepare_user_arguments(uint8_t *stack_memory, int argc, char **argv,
 }
 
 void system_run_bin_args_impl(char *filename, int program_size, int argc, char **argv) {
-    if (!filename || program_size <= 0 || program_size > MAX_FLAT_BINARY_SIZE) {
-        dogeio_text_println("[Error] Invalid binary filename or size.");
+    if (!filename || program_size <= 0 || (size_t)program_size > MAX_FLAT_BINARY_SIZE) {
+        dogeio_text_println("[Error] Invalid binary filename or size exceeds MAX_FLAT_BINARY_SIZE.");
         return;
     }
 
-    if ((size_t)program_size + DATA_SECTION_SIZE > MAX_FLAT_BINARY_SIZE) {
-        dogeio_text_println("[Error] Binary file and 8KB data section exceed maximum allowed size.");
+    if ((size_t)program_size + DATA_SECTION_SIZE > (USER_STACK_BASE - USER_CODE_BASE)) {
+        dogeio_text_println("[Error] Binary file and data section exceed memory address window.");
         return;
     }
 
@@ -90,9 +91,19 @@ void system_run_bin_args_impl(char *filename, int program_size, int argc, char *
     size_t required_code_pages = ((size_t)program_size + PAGE_SIZE - 1) / PAGE_SIZE;
     size_t total_pages_needed = required_code_pages + USER_STACK_PAGE_COUNT;
 
-    if (pmm_get_free_page_count() < total_pages_needed) {
-        dogeio_text_println("[Error] Insufficient physical RAM to load binary and stack.");
-        log("[Error] Out of physical RAM: requested pages exceed available free pages.");
+    size_t free_pages = pmm_get_free_page_count();
+    if (free_pages < total_pages_needed) {
+        dogeio_text_println("[Error] Out of physical RAM: requested pages exceed available free pages.");
+        
+        char needed_buf[32];
+        char free_buf[32];
+        
+        serial_print("[Debug] Needed pages: ");
+        serial_print(uint64_to_str(total_pages_needed, needed_buf));
+        serial_print(" | Free pages: ");
+        serial_print(uint64_to_str(free_pages, free_buf));
+        serial_print("\n");
+        
         return;
     }
 
@@ -111,12 +122,6 @@ void system_run_bin_args_impl(char *filename, int program_size, int argc, char *
             cleanup_user_pages();
             return;
         }
-
-        char code_phys_str[32];
-        uint64_to_str(code_phys, code_phys_str);
-        char* actual_string_ptr = uint64_to_str(code_phys, code_phys_str);
-        serial_print("[dogeing] mapped page ");
-        log(actual_string_ptr);
 
         size_t bytes_to_read = (size_t)program_size - offset;
         if (bytes_to_read > PAGE_SIZE) {
@@ -150,7 +155,7 @@ void system_run_bin_args_impl(char *filename, int program_size, int argc, char *
         return;
     }
 
-    serial_print("[dogeing] mapping user stack pages");
+    serial_print("[dogeing] mapping user stack pages\n");
     for (size_t i = 0; i < USER_STACK_PAGE_COUNT; i++) {
         uint64_t stack_phys = pmm_alloc_zeroed_page();
         if (!stack_phys) {
@@ -161,7 +166,7 @@ void system_run_bin_args_impl(char *filename, int program_size, int argc, char *
         map_user_page(USER_STACK_BASE + i * PAGE_SIZE, stack_phys);
     }
 
-    uint64_t user_argv;
+    uint64_t user_argv = 0;
     if (prepare_user_arguments((uint8_t *)USER_STACK_BASE,
                                argc, argv, &user_argv) != 0) {
         dogeio_text_println("[Error] Application arguments exceed the user stack.");
