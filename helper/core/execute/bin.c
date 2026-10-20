@@ -7,12 +7,15 @@
 #include <boot/limine.h>
 
 extern volatile struct limine_hhdm_request hhdm_request;
+extern size_t pmm_get_free_page_count(void);
+
 #define USER_CODE_BASE  0x0000000000400000ULL
 #define USER_STACK_BASE 0x00007FFFF0000000ULL
 #define PAGE_SIZE       4096
 #define USER_STACK_PAGE_COUNT 8
 #define USER_STACK_SIZE (PAGE_SIZE * USER_STACK_PAGE_COUNT)
 #define USER_ARGUMENT_AREA_SIZE (USER_STACK_SIZE / 2)
+#define DATA_SECTION_SIZE (8 * 1024)
 
 static size_t bin_argument_length(const char *argument) {
     size_t length = 0;
@@ -27,7 +30,7 @@ void system_run_bin_impl(char *filename, int program_size) {
 }
 
 static int prepare_user_arguments(uint8_t *stack_memory, int argc, char **argv,
-                                  uint64_t *user_argv) {
+                                uint64_t *user_argv) {
     uint64_t argument_addresses[32];
     size_t cursor = 0;
 
@@ -74,8 +77,22 @@ void system_run_bin_args_impl(char *filename, int program_size, int argc, char *
         return;
     }
 
+    if ((size_t)program_size + DATA_SECTION_SIZE > MAX_FLAT_BINARY_SIZE) {
+        dogeio_text_println("[Error] Binary file and 8KB data section exceed maximum allowed size.");
+        return;
+    }
+
     if (hhdm_request.response == NULL) {
         dogeio_text_println("[Error] HHDM response is NULL.");
+        return;
+    }
+
+    size_t required_code_pages = ((size_t)program_size + PAGE_SIZE - 1) / PAGE_SIZE;
+    size_t total_pages_needed = required_code_pages + USER_STACK_PAGE_COUNT;
+
+    if (pmm_get_free_page_count() < total_pages_needed) {
+        dogeio_text_println("[Error] Insufficient physical RAM to load binary and stack.");
+        log("[Error] Out of physical RAM: requested pages exceed available free pages.");
         return;
     }
 
@@ -83,23 +100,23 @@ void system_run_bin_args_impl(char *filename, int program_size, int argc, char *
     log("[dogeing] cleaned user pages");
 
     uint64_t hhdm_offset = hhdm_request.response->offset;
-
-    size_t required_pages = ((size_t)program_size + PAGE_SIZE - 1) / PAGE_SIZE;
     size_t loaded_bytes = 0;
 
-    for (size_t i = 0; i < required_pages; i++) {
+    for (size_t i = 0; i < required_code_pages; i++) {
         uint64_t offset = i * PAGE_SIZE;
 
         uint64_t code_phys = pmm_alloc_zeroed_page();
+        if (!code_phys) {
+            log("[Error] Out of physical memory loading binary.");
+            cleanup_user_pages();
+            return;
+        }
+
         char code_phys_str[32];
         uint64_to_str(code_phys, code_phys_str);
         char* actual_string_ptr = uint64_to_str(code_phys, code_phys_str);
         serial_print("[dogeing] mapped page ");
         log(actual_string_ptr);
-        if (!code_phys) {
-            log("[Error] Out of physical memory loading binary.");
-            return;
-        }
 
         size_t bytes_to_read = (size_t)program_size - offset;
         if (bytes_to_read > PAGE_SIZE) {
@@ -144,7 +161,6 @@ void system_run_bin_args_impl(char *filename, int program_size, int argc, char *
         map_user_page(USER_STACK_BASE + i * PAGE_SIZE, stack_phys);
     }
 
-    /* Keep argv in the lower half, away from the downward-growing stack. */
     uint64_t user_argv;
     if (prepare_user_arguments((uint8_t *)USER_STACK_BASE,
                                argc, argv, &user_argv) != 0) {

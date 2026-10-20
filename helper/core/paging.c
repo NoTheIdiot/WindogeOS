@@ -21,6 +21,35 @@ extern volatile struct limine_hhdm_request   hhdm_request;
 
 static uint64_t free_page_head;
 
+size_t pmm_get_free_page_count(void) {
+    if (!memmap_request.response) {
+        return 0;
+    }
+
+    struct limine_memmap_response *memmap = memmap_request.response;
+    size_t free_pages = 0;
+
+    uint64_t current_free = free_page_head;
+    uint64_t hhdm_offset = hhdm_request.response ? hhdm_request.response->offset : 0;
+    while (current_free != 0) {
+        free_pages++;
+        if (hhdm_offset != 0) {
+            current_free = *(uint64_t *)(current_free + hhdm_offset);
+        } else {
+            break;
+        }
+    }
+
+    for (size_t i = 0; i < memmap->entry_count; i++) {
+        struct limine_memmap_entry *entry = memmap->entries[i];
+        if (entry->type == LIMINE_MEMMAP_USABLE) {
+            free_pages += entry->length / 4096;
+        }
+    }
+
+    return free_pages;
+}
+
 uint64_t pmm_alloc_zeroed_page(void) {
     static uint64_t alloc_index = 0;
     static uint64_t alloc_offset = 0;
