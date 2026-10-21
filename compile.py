@@ -360,18 +360,40 @@ def main():
             try:
                 cmd(f"sudo mkdir -p {mnt_dir}/apps")
                 cmd(f"sudo mkdir -p {mnt_dir}/apps/packages")
-                
+                cmd(f"sudo mkdir -p {mnt_dir}/apps/text")
+
                 for app_bin in compiled_apps:
                     if os.path.exists(app_bin):
                         app_name = os.path.basename(app_bin)
-                        cmd(f"sudo cp {app_bin} {mnt_dir}/apps/{app_name}")
+                        cmd(f"sudo cp '{app_bin}' '{mnt_dir}/apps/{app_name}'")
                         print(f"[dogeing] Injected binary to exFAT /apps: {app_name}")
 
                 for pkg_rle in compressed_packages:
                     if os.path.exists(pkg_rle):
                         pkg_name = os.path.basename(pkg_rle)
-                        cmd(f"sudo cp {pkg_rle} {mnt_dir}/apps/packages/{pkg_name}")
+                        cmd(f"sudo cp '{pkg_rle}' '{mnt_dir}/apps/packages/{pkg_name}'")
                         print(f"[dogeing] Injected RLE package to exFAT /apps/packages: {pkg_name}")
+
+                text_source_dir = os.path.join("apps", "text")
+
+                if os.path.isdir(text_source_dir):
+                    for root, _, files in os.walk(text_source_dir):
+                        for file in files:
+                            if not file.lower().endswith(".txt"):
+                                continue
+
+                src_file = os.path.join(root, file)
+
+                rel_dir = os.path.relpath(root, text_source_dir)
+                dst_dir = os.path.join(mnt_dir, "apps", "text", rel_dir)
+
+                cmd(f"sudo mkdir -p '{dst_dir}'")
+                cmd(f"sudo cp '{src_file}' '{dst_dir}/{file}'")
+
+                print(
+                    f"[dogeing] Injected text file to exFAT "
+                    f"/apps/text/{os.path.join(rel_dir, file)}"
+                )
             finally:
                 cmd(f"sudo umount {mnt_dir}")
                 cmd(f"sudo losetup -d {loop_dev}")

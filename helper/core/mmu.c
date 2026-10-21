@@ -60,9 +60,8 @@ uint64_t pmm_alloc_zeroed_page(void) {
         alloc_offset = 0;
     }
 
-    dogeio_text_println("[error] out of dang ram");
-    cli();
-    halt();
+    dogeio_text_println("[error] out of dang ram, bullshit");
+    cleanup_user_pages();
     return 0;
 }
 
@@ -349,6 +348,11 @@ void setup_ring3_memory(uint64_t user_code_virt, uint64_t user_stack_virt, const
     }
 
     uint64_t stack_phys = pmm_alloc_zeroed_page();
+    if (!stack_phys) {
+        log("[Error] Out of freaking RAM, going back.");
+        dogeio_text_println("[Error] Out of freaking RAM, going back.");
+        return;
+    }
     map_user_page(user_stack_virt, stack_phys);
 
     uint64_t user_data_virt = user_stack_virt - 8192; 
