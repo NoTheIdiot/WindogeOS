@@ -15,9 +15,13 @@ uint32_t bg_color_grid[TERMINAL_ROWS * TERMINAL_COLS];
 
 uint32_t cursor_x = 0;
 uint32_t cursor_y = 1;
-bool dogeio_cursor_visible = false;
+bool     dogeio_cursor_visible = false;
 uint32_t dogeio_background_color = COLOR_BLACK;
 uint32_t dogeio_text_color = COLOR_GRAY;
+bool     dogeio_video_mode = false;
+
+uint32_t video_cursor_x = 0;
+uint32_t video_cursor_y = 0;
 
 static const uint32_t ansi_colors[16] = {
     0x000000, 0xAA0000, 0x00AA00, 0xAA5500, 0x0000AA, 0xAA00AA, 0x00AAAA, 0xAAAAAA,
@@ -29,6 +33,48 @@ static const uint8_t* current_font = vga_text;
 void dogeio_set_font(const uint8_t* font) {
     if (font != NULL) {
         current_font = font;
+    }
+}
+
+void dogeio_set_video_mode(bool enabled) {
+    dogeio_video_mode = enabled;
+}
+
+void dogeio_draw_pixel(uint32_t x, uint32_t y, uint32_t color) {
+    if (framebuffer_request.response == NULL || framebuffer_request.response->framebuffer_count < 1) {
+        return;
+    }
+
+    struct limine_framebuffer *framebuffer = framebuffer_request.response->framebuffers[0];
+    if (x >= framebuffer->width || y >= framebuffer->height) {
+        return;
+    }
+
+    uint32_t* framebuffer_ptr = (uint32_t*)framebuffer->address;
+    uint64_t u64_pitch = framebuffer->pitch / 4;
+    framebuffer_ptr[y * u64_pitch + x] = color;
+}
+
+void dogeio_draw_rect(uint32_t x, uint32_t y, uint32_t width, uint32_t height, uint32_t color) {
+    if (framebuffer_request.response == NULL || framebuffer_request.response->framebuffer_count < 1) {
+        return;
+    }
+
+    struct limine_framebuffer *framebuffer = framebuffer_request.response->framebuffers[0];
+    uint32_t max_x = x + width;
+    uint32_t max_y = y + height;
+
+    if (max_x > framebuffer->width) max_x = (uint32_t)framebuffer->width;
+    if (max_y > framebuffer->height) max_y = (uint32_t)framebuffer->height;
+
+    uint32_t* framebuffer_ptr = (uint32_t*)framebuffer->address;
+    uint64_t u64_pitch = framebuffer->pitch / 4;
+
+    for (uint32_t py = y; py < max_y; py++) {
+        uint64_t row_offset = py * u64_pitch;
+        for (uint32_t px = x; px < max_x; px++) {
+            framebuffer_ptr[row_offset + px] = color;
+        }
     }
 }
 
@@ -80,6 +126,31 @@ static void dogeio_render_glyph(char c, uint32_t x, uint32_t y, uint32_t fg_colo
     }
 }
 
+static void dogeio_render_pixel_glyph(char c, uint32_t pixel_x, uint32_t pixel_y, uint32_t fg_color, uint32_t bg_color) {
+    if (framebuffer_request.response == NULL || framebuffer_request.response->framebuffer_count < 1) {
+        return;
+    }
+
+    struct limine_framebuffer *framebuffer = framebuffer_request.response->framebuffers[0];
+    uint32_t* framebuffer_ptr = (uint32_t*)framebuffer->address;
+    uint64_t u64_pitch = framebuffer->pitch / 4;
+
+    if (pixel_x + 8 > framebuffer->width || pixel_y + 16 > framebuffer->height) {
+        return;
+    }
+
+    const uint8_t* glyph = get_glyph_pointer(c);
+
+    for (uint32_t g_row = 0; g_row < 16; g_row++) {
+        uint8_t bits = glyph[g_row];
+        size_t row_offset = (pixel_y + g_row) * u64_pitch + pixel_x;
+        
+        for (int bit = 0; bit < 8; bit++) {
+            framebuffer_ptr[row_offset + (size_t)bit] = ((bits >> (7 - bit)) & 1) ? fg_color : bg_color;
+        }
+    }
+}
+
 void dogeio_text_putchar_raw_glyph(char c, uint32_t x, uint32_t y) {
     dogeio_render_glyph(c, x, y, dogeio_text_color, dogeio_background_color);
 }
@@ -90,6 +161,11 @@ void dogeio_text_putchar_reverted_glyph(char c, uint32_t x, uint32_t y) {
 
 void dogeio_text_putchar(char c, uint32_t x, uint32_t y) {
     if (framebuffer_request.response == NULL || framebuffer_request.response->framebuffer_count < 1) {
+        return;
+    }
+
+    if (dogeio_video_mode) {
+        dogeio_render_pixel_glyph(c, x, y, dogeio_text_color, dogeio_background_color);
         return;
     }
 
@@ -130,6 +206,16 @@ static void dogeio_text_clear_cells(void) {
 }
 
 void dogeio_text_clear() {
+    if (dogeio_video_mode) {
+        if (framebuffer_request.response != NULL && framebuffer_request.response->framebuffer_count >= 1) {
+            struct limine_framebuffer *framebuffer = framebuffer_request.response->framebuffers[0];
+            dogeio_draw_rect(0, 0, (uint32_t)framebuffer->width, (uint32_t)framebuffer->height, dogeio_background_color);
+        }
+        video_cursor_x = 0;
+        video_cursor_y = 0;
+        return;
+    }
+
     for (uint32_t i = 0; i < (TERMINAL_ROWS * TERMINAL_COLS); i++) {
         text_grid[i] = ' ';
         text_color_grid[i] = dogeio_text_color;
@@ -152,12 +238,22 @@ void dogeio_text_clear() {
 }
 
 void dogeio_text_clear_raw() {
+    if (dogeio_video_mode) {
+        dogeio_text_clear();
+        return;
+    }
     dogeio_text_clear_cells();
     cursor_x = 0;
     cursor_y = 0;
 }
 
 static void dogeio_text_scroll() {
+    if (dogeio_video_mode) {
+        video_cursor_x = 0;
+        video_cursor_y += 16;
+        return;
+    }
+
     for (uint32_t row = 2; row < TERMINAL_ROWS; row++) {
         for (uint32_t col = 0; col < TERMINAL_COLS; col++) {
             uint32_t dst = ((row - 1) * TERMINAL_COLS) + col;
@@ -200,6 +296,33 @@ static void dogeio_text_scroll() {
 }
 
 void dogeio_text_printchar(char c) {
+    if (dogeio_video_mode) {
+        if (framebuffer_request.response == NULL || framebuffer_request.response->framebuffer_count < 1) {
+            return;
+        }
+        struct limine_framebuffer *framebuffer = framebuffer_request.response->framebuffers[0];
+
+        if (c == '\n') {
+            video_cursor_x = 0;
+            video_cursor_y += 16;
+        } else if (c == '\r') {
+            video_cursor_x = 0;
+        } else if (c == '\t') {
+            video_cursor_x += 32; 
+        } else {
+            if (video_cursor_x + 8 > framebuffer->width) {
+                video_cursor_x = 0;
+                video_cursor_y += 16;
+            }
+            if (video_cursor_y + 16 > framebuffer->height) {
+                video_cursor_y = 0; 
+            }
+            dogeio_render_pixel_glyph(c, video_cursor_x, video_cursor_y, dogeio_text_color, dogeio_background_color);
+            video_cursor_x += 8;
+        }
+        return;
+    }
+
     if (dogeio_cursor_visible && cursor_x < TERMINAL_COLS && cursor_y < TERMINAL_ROWS) {
         uint32_t current_idx = cursor_y * TERMINAL_COLS + cursor_x;
         dogeio_text_putchar_raw_glyph(text_grid[current_idx], cursor_x, cursor_y);
@@ -276,24 +399,32 @@ void dogeio_text_printchar(char c) {
     }
 }
 
-void dogeio_text_cursor_show() {
+void dogeio_text_cursor_show(void) {
     dogeio_cursor_visible = true;
-    if (cursor_x < TERMINAL_COLS && cursor_y < TERMINAL_ROWS) {
+    if (!dogeio_video_mode && cursor_x < TERMINAL_COLS && cursor_y < TERMINAL_ROWS) {
         uint32_t idx = cursor_y * TERMINAL_COLS + cursor_x;
         dogeio_text_putchar_reverted_glyph(text_grid[idx], cursor_x, cursor_y);
     }
 }
 
-void dogeio_text_cursor_hide() {
-    if (dogeio_cursor_visible && cursor_x < TERMINAL_COLS && cursor_y < TERMINAL_ROWS) {
+void dogeio_text_cursor_hide(void) {
+    if (dogeio_cursor_visible && !dogeio_video_mode && cursor_x < TERMINAL_COLS && cursor_y < TERMINAL_ROWS) {
         uint32_t idx = cursor_y * TERMINAL_COLS + cursor_x;
         dogeio_text_putchar_raw_glyph(text_grid[idx], cursor_x, cursor_y);
     }
     dogeio_cursor_visible = false;
 }
 
+void dogeio_video(void) {
+    dogeio_video_mode = true;
+}
+
+void dogeio_text(void) {
+    dogeio_video_mode = false;
+}
+
 static size_t parse_ansi_escape(const char *str, size_t index) {
-    index += 2; // skip '\033' and '['
+    index += 2; 
 
     int params[4] = {0, 0, 0, 0};
     int param_count = 0;
@@ -323,6 +454,30 @@ static size_t parse_ansi_escape(const char *str, size_t index) {
 
     char cmd = str[index];
 
+    if (dogeio_video_mode) {
+        if (cmd == 'm') {
+            int param = params[0];
+            if (param == 0) {
+                dogeio_text_color = 0xFFCCCCCC;       
+                dogeio_background_color = 0x000000;   
+            } else if (param >= 30 && param <= 37) {
+                dogeio_text_color = ansi_colors[param - 30];
+            } else if (param >= 90 && param <= 97) {
+                dogeio_text_color = ansi_colors[param - 90 + 8];
+            } else if (param >= 40 && param <= 47) {
+                dogeio_background_color = ansi_colors[param - 40];
+            } else if (param >= 100 && param <= 107) {
+                dogeio_background_color = ansi_colors[param - 100 + 8];
+            }
+        } else if (cmd == 'H' || cmd == 'f') {
+            int target_row = (params[0] == 0) ? 1 : params[0];
+            int target_col = (params[1] == 0) ? 1 : params[1];
+            video_cursor_x = (uint32_t)(target_col - 1) * 8;
+            video_cursor_y = (uint32_t)(target_row - 1) * 16;
+        }
+        return str[index] == '\0' ? index - 1 : index;
+    }
+
     uint32_t old_cursor_x = cursor_x;
     uint32_t old_cursor_y = cursor_y;
     bool was_visible = dogeio_cursor_visible;
@@ -351,26 +506,26 @@ static size_t parse_ansi_escape(const char *str, size_t index) {
         if (param == 2) {
             dogeio_text_clear();
         }
-    } else if (cmd == 'A') { // Cursor Up
+    } else if (cmd == 'A') { 
         int n = (params[0] == 0) ? 1 : params[0];
         if (cursor_y >= (uint32_t)n) {
             cursor_y -= (uint32_t)n;
         } else {
             cursor_y = 0;
         }
-    } else if (cmd == 'B') { // Cursor Down
+    } else if (cmd == 'B') { 
         int n = (params[0] == 0) ? 1 : params[0];
         cursor_y += (uint32_t)n;
         if (cursor_y >= TERMINAL_ROWS) {
             cursor_y = TERMINAL_ROWS - 1;
         }
-    } else if (cmd == 'C') { // Cursor Forward
+    } else if (cmd == 'C') { 
         int n = (params[0] == 0) ? 1 : params[0];
         cursor_x += (uint32_t)n;
         if (cursor_x >= TERMINAL_COLS) {
             cursor_x = TERMINAL_COLS - 1;
         }
-    } else if (cmd == 'D') { // Cursor Backward
+    } else if (cmd == 'D') { 
         int n = (params[0] == 0) ? 1 : params[0];
         if (cursor_x >= (uint32_t)n) {
             cursor_x -= (uint32_t)n;
@@ -424,6 +579,24 @@ void dogeio_text_println(const char *str) {
 
 void dogeio_text_print_at(const char *str, uint32_t x_pos, uint32_t y_pos, uint32_t text_color) {
     if (framebuffer_request.response == NULL || framebuffer_request.response->framebuffer_count < 1) {
+        return;
+    }
+
+    if (dogeio_video_mode) {
+        uint32_t original_color = dogeio_text_color;
+        dogeio_text_color = text_color;
+        
+        uint32_t saved_x = video_cursor_x;
+        uint32_t saved_y = video_cursor_y;
+        
+        video_cursor_x = x_pos; 
+        video_cursor_y = y_pos;
+        
+        dogeio_text_print(str);
+        
+        video_cursor_x = saved_x;
+        video_cursor_y = saved_y;
+        dogeio_text_color = original_color;
         return;
     }
 

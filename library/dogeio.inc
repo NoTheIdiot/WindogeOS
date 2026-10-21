@@ -167,6 +167,34 @@
     io_println %1
 %endmacro
 
+%macro set_text_mode
+    mov rax, SET_TEXT_MODE
+    syscall
+%endmacro
+
+%macro set_video_mode
+    mov rax, SET_VIDEO_MODE
+    syscall
+%endmacro
+
+%macro draw_rec 5
+    mov rax, DRAW_REC
+    mov rdi, %1
+    mov rsi, %2
+    mov rdx, %3
+    mov rcx, %4
+    mov r8, %5
+    syscall
+%endmacro
+
+%macro draw_pixel 3
+    mov rax, DRAW_PIXEL
+    mov rdi, %1
+    mov rsi, %2
+    mov rdx, %3
+    syscall
+%endmacro
+
 %macro sys_exit 1
     process_exit %1
 %endmacro

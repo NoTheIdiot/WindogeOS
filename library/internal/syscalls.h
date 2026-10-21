@@ -48,6 +48,10 @@
 #define LIST_DIR           41
 #define WRITE_FILE_RAW     42
 #define GET_USER           43
+#define SET_VIDEO_MODE     44
+#define SET_TEXT_MODE      45
+#define DRAW_PIXEL         46
+#define DRAW_REC           47
 
 #define SPECIAL 90
 
@@ -55,11 +59,6 @@
 #define USER_MEMORY_WRITE   0x2
 #define USER_MEMORY_EXEC    0x4
 #define USER_MEMORY_MAX_SIZE (16 * 1024 * 1024)
-
-/* User memory calls use page-aligned addresses; map/protect also take permission flags. */
-/* Native process IDs are currently single-process: PID is 1 and UID/GID are 0. */
-/* RANDOM_BYTES takes (buffer, length, 0); it requires CPU RDRAND support. */
-/* EXEC_ARGS takes (path, argc, argv); EXEC_ELF takes a path to an ELF file. */
 
 #define SYS_EXIT           60
 
@@ -116,6 +115,20 @@ static inline uint64_t syscall_4(uint64_t num, uint64_t arg1, uint64_t arg2,
         "syscall"
         : "=a"(ret)
         : "0"(num), "D"(arg1), "S"(arg2), "d"(arg3), "r"(syscall_arg4)
+        : "rcx", "r11", "memory"
+    );
+    return ret;
+}
+
+static inline uint64_t syscall_5(uint64_t num, uint64_t arg1, uint64_t arg2,
+                               uint64_t arg3, uint64_t arg4, uint64_t arg5) {
+    uint64_t ret;
+    register uint64_t syscall_arg4 __asm__("r10") = arg4;
+    register uint64_t syscall_arg5 __asm__("r8") = arg5;
+    __asm__ volatile (
+        "syscall"
+        : "=a"(ret)
+        : "0"(num), "D"(arg1), "S"(arg2), "d"(arg3), "r"(syscall_arg4), "r"(syscall_arg5)
         : "rcx", "r11", "memory"
     );
     return ret;

@@ -224,6 +224,12 @@ void nvme_pci_callback(uint8_t b, uint8_t d, uint8_t f, uint16_t ven, uint16_t d
 #define WRITE_FILE_RAW     42
 #define GET_USER           43
 
+// video
+#define SET_VIDEO_MODE 44
+#define SET_TEXT_MODE  45
+#define DRAW_PIXEL     46
+#define DRAW_REC       47
+
 #define SPECIAL 90
 
 #define USER_MEMORY_READ    0x1ULL

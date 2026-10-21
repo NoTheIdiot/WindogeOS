@@ -29,6 +29,10 @@
 %define MOVE_FILE 27
 %define WRITE_FILE_RAW 42
 %define GET_USER 43
+%define SET_VIDEO_MODE 44
+%define SET_TEXT_MODE 45
+%define DRAW_PIXEL 46
+%define DRAW_REC 47
 
 %define SPECIAL 90
 

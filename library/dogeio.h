@@ -63,12 +63,10 @@ typedef struct {
 #define KEY_CTRL_O    0x110
 #define KEY_CTRL_N    0x111
 
-
 static inline uint64_t read_file(const char *path, void *buffer, uint64_t size) {
     return syscall_3(READ_FILE, (uint64_t)path, (uint64_t)buffer, size);
 }
 
-/* Raw reads return bytes without adding a string terminator. */
 static inline uint64_t read_file_raw(const char *path, uint8_t *buffer,
                                      uint64_t size) {
     return syscall_3(READ_FILE, (uint64_t)path, (uint64_t)buffer, size);
@@ -201,6 +199,22 @@ static inline uint64_t text_color(uint32_t color) {
 
 static inline uint64_t background_color(uint32_t color) {
     return syscall_1(BACKGROUND_COLOR, color);
+}
+
+static inline uint64_t set_video_mode(void) {
+    return syscall_0(SET_VIDEO_MODE);
+}
+
+static inline uint64_t set_text_mode(void) {
+    return syscall_0(SET_TEXT_MODE);
+}
+
+static inline uint64_t draw_pixel(uint32_t x, uint32_t y, uint32_t color) {
+    return syscall_3(DRAW_PIXEL, x, y, color);
+}
+
+static inline uint64_t draw_rec(uint32_t x, uint32_t y, uint32_t width, uint32_t height, uint32_t color) {
+    return syscall_5(DRAW_REC, x, y, height, width, color);
 }
 
 static inline uint64_t sys_exit(uint64_t status) {

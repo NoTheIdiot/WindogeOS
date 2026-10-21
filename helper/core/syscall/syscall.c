@@ -905,6 +905,38 @@ uint64_t syscall_handler(syscall_registers_t *regs) {
             break;
         }
 
+        case SET_VIDEO_MODE: {
+            dogeio_video();
+            ret_val = 1;
+            break;
+        }
+
+        case SET_TEXT_MODE: {
+            dogeio_text();
+            ret_val = 1;
+            break;
+        }
+
+        case DRAW_PIXEL: {
+            uint32_t x = (uint32_t)regs->rdi;
+            uint32_t y = (uint32_t)regs->rsi;
+            uint32_t color = (uint32_t)regs->rdx;
+            dogeio_draw_pixel(x, y, color);
+            ret_val = 1;
+            break; 
+        }
+
+        case DRAW_REC: {
+            uint32_t x = (uint32_t)regs->rdi;
+            uint32_t y = (uint32_t)regs->rsi;
+            uint32_t width = (uint32_t)regs->rdx;
+            uint32_t height = (uint32_t)regs->rcx;
+            uint32_t color = (uint32_t)regs->r8;
+            dogeio_draw_rect(x, y, width, height, color);
+            ret_val = 1;
+            break;
+        }
+
         case SPECIAL:
             dogeio_text_println("TESTING");
             log("TESTING");

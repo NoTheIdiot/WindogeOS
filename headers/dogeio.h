@@ -19,6 +19,7 @@ extern bool dogeio_cursor_visible;
 extern char text_grid[TERMINAL_COLS * TERMINAL_ROWS];
 extern uint32_t text_color_grid[TERMINAL_ROWS * TERMINAL_COLS];
 extern uint32_t bg_color_grid[TERMINAL_ROWS * TERMINAL_COLS];
+extern bool dogeio_video_mode;
 
 extern const uint8_t ubuntu_mono[];
 extern const uint8_t terminus[];
@@ -78,9 +79,13 @@ void dogeio_text_background_change(uint32_t color);
 void dogeio_text_clear_raw(void);
 void dogeio_print_hex8(uint8_t val);
 void dogeio_set_font(const uint8_t* font);
-void dogeio_text_cursor_show();
-void dogeio_text_cursor_hide();
+void dogeio_text_cursor_show(void);
+void dogeio_text_cursor_hide(void);
 void dogeio_print_hex16(uint16_t val);
+void dogeio_video(void);
+void dogeio_text(void);
+void dogeio_draw_pixel(uint32_t x, uint32_t y, uint32_t color);
+void dogeio_draw_rect(uint32_t x, uint32_t y, uint32_t width, uint32_t height, uint32_t color);
 
 #define KEY_UP        0x101
 #define KEY_DOWN      0x102
