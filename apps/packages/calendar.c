@@ -24,38 +24,27 @@ static int get_start_day_of_month(int year, int month) {
 }
 
 static int get_days_in_month(int year, int month) {
-    switch (month) {
-        case 1: case 3: case 5: case 7:
-        case 8: case 10: case 12:
-            return 31;
-        case 4: case 6: case 9: case 11:
-            return 30;
-        case 2:
-            if ((year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)) {
-                return 29;
-            }
-            return 28;
-        default:
-            return 30;
+    static const int days_per_month[] = { 0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+
+    if (month < 1 || month > 12) {
+        return 30; // When will this ever be true lol
     }
+    // Is it a leap year February?
+    if ((month == 2 && (year % 4 == 0 && year % 100 != 0)) || (year % 400 == 0)) {
+        return 29;
+    }
+
+    return days_per_month[month];
 }
 
 static void print_month_title(int month, int year) {
-    switch (month) {
-        case 1:  print("January ");   break;
-        case 2:  print("February ");  break;
-        case 3:  print("March ");     break;
-        case 4:  print("April ");     break;
-        case 5:  print("May ");       break;
-        case 6:  print("June ");      break;
-        case 7:  print("July ");      break;
-        case 8:  print("August ");    break;
-        case 9:  print("September "); break;
-        case 10: print("October ");   break;
-        case 11: print("November ");  break;
-        case 12: print("December ");  break;
-        default:                      break;
-    }
+
+    static const char* const month_names[] = {
+        "", "January ", "February ", "March ", "April ", "May ", "June ",
+            "July ", "August ", "September ", "October ", "November ", "December "
+    };
+    print(month_names[month]);
+    
     char y_buf[16];
     int y = year;
     int idx = 0;
@@ -124,7 +113,7 @@ static void format_date_key(int year, int month, int day, char *out_buf) {
     out_buf[7] = '-';
     out_buf[8] = (char)('0' + (day / 10));
     out_buf[9] = (char)('0' + (day % 10));
-    out_buf[10] = '\0';
+    out_buf[10]= '\0';
 }
 
 static void get_reminder_for_date(int year, int month, int day, char *out_msg, size_t max_len) {
