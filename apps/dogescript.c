@@ -1172,25 +1172,6 @@ void _start(int argc, char **argv) {
         println("Flow:     if else endif while endwhile repeat endrepeat");
         println("          break continue. Other commands run in Dogeshell.");
         println("Variables: $name, ${name}, $0 (script), $1..$N, $argc");
-        println("");
-        println("Examples:");
-        println("1. I/O & VARIABLES              2. MATH & ARITHMETIC");
-        println("   input name \"Name?\"              math res 10 + 5");
-        println("   set count 5                     dec res");
-        println("   inc count                       inc res");
-        println("   unset count                     echo $res");
-        println("");
-        println("3. FILE OPERATIONS              4. PATH CHECKS");
-        println("   write file.txt \"Hello\"        exists file.txt -> chk");
-        println("   append file.txt \" World\"      isdir file.txt -> dirchk");
-        println("   read data file.txt              if $chk == 1");
-        println("");
-        println("5. CONTROL FLOW & LOOPS         6. ASSERTS, FAIL & EXIT");
-        println("   if $res > 5                     assert 5 > 2");
-        println("       println \"Big\"             fail \"Custom error\"");
-        println("   else                            exit 0");
-        println("       println \"Small\"           break");
-        println("   endif                           continue");
         sys_exit(0);
         return;
     }

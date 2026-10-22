@@ -437,18 +437,9 @@ void kernel_main(void) {
 
     dogeio_text_clear();
     
-    const char* starting[6] = {
-        "================================================================================================================================================================",
-        "=                                                                                                                                                              =",
-        "=                                                            Welcome to WindogeOS!                                                                             =",
-        "=                                               Type 'settings' to configure system preferences                                                                =",
-        "=                                                                                                                                                              =",
-        "================================================================================================================================================================"
-    };
-
-    for (int i = 0; i < 6; i++) {
-        dogeio_text_print(starting[i]);
-    }
+    char buffer[1024];
+    fs_read("/apps/text/boot.txt", buffer, 1024);
+    dogeio_text_print(buffer);
 
     log("Starting the default shell");
     system_start_default_shell();

@@ -1,0 +1,32 @@
+= About Dogescript = 
+Just a simple scripting language that probably sucks.
+
+= Keywords
+===================================================================
+echo/print/println                  | prints text.
+set                                 | set variable
+unset                               | unset variable
+inc                                 | increase var by one
+dec                                 | decrease var by one
+input                               | ask for keyboard input
+read [variable] [filename]          | read a file
+write [filename] [text]             | write a file
+append [filename] [text]            | add a line of text to a file
+exists [filename] -> [variable]     | check if smomething exists
+isdir [filename] -> [variable]      | check if it's a dir
+assert [something]                  | something
+fail [text]                         | for custom error
+break                               | break loop
+exit [code]                         | exit
+continue                            | skip a loop
+====================================================================
+
+= Condition loops:          = File checks
+  if [condition]              exists file.txt -> chk
+      [action]                if $chk == 1
+  else                      
+      [action]              = Set variable
+  endif                       set count = 5
+
+= Comments
+  # this is a comment

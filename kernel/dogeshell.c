@@ -953,9 +953,20 @@ static int dogeshell_execute(int argc, char **argv) {
         return dogeshell_last_status;
     }
     if (str_strcmp(argv[0], "help") == 0) {
-        dogeshell_print_help();
+        if (argv[1] == NULL) {
+            dogeshell_print_help();
+        } else {
+            if (str_strcmp(argv[1], "dogescript") == 0) {
+                system_dogeshell_ex("pages /apps/text/help/dogescript_help");
+            } else {
+                dogeio_text_println("Help for that doesn't exists :(");
+                return 1;
+            }
+        }
+        
         return 0;
     }
+
     if (str_strcmp(argv[0], "print") == 0 || str_strcmp(argv[0], "echo") == 0) {
         char output[DOGESHELL_LINE_SIZE];
         if (dogeshell_join_arguments(argc, argv, 1, output, sizeof(output)) != 0) {
