@@ -37,14 +37,14 @@ volatile struct limine_memmap_request memmap_request = {
 __attribute__((used, section(".limine_requests_end")))
 volatile uint64_t limine_requests_end_marker[] = LIMINE_REQUESTS_END_MARKER;
 
-/* random things that are probably too messy for the headers */
+// random things that are probably too messy for the headers
 extern void system_load_settings(void);
-/* end */
+// end
 
-/* random flag variables */
+// random flag variables
 char computer_name[64];
 bool is_setup = false;
-/* end */
+// end
 
 static void install_root_apps(void) {
     static char root_files[48][256];
@@ -54,7 +54,7 @@ static void install_root_apps(void) {
         return;
     }
 
-    int file_count = fs_list_files("/", root_files,
+    int file_count = fs_list_files("/", root_files, 
                                    sizeof(root_files) / sizeof(root_files[0]));
     if (file_count < 0) {
         log("[setup] unable to list root files");
@@ -176,9 +176,8 @@ void kernel_main(void) {
                 uint16_t device_id = (uint16_t)(id_reg >> 16);
 
                 if (vendor_id == 0xFFFF) {
-                    if (function == 0) {
-                        break; 
-                    }
+                    if (function == 0) break;
+                    // else...
                     continue;
                 }
 
@@ -194,11 +193,11 @@ void kernel_main(void) {
     }
     log("[wow] all basic drivers done");
 
-    log("WindogeOS fully booted very wow. (clear screen and draw status bar)");
+    log("WindogeOS fully booted. very wow. (clear screen and draw status bar)");
     dogeio_text_clear();
     menubar_draw();
 
-    // enable itterupts
+    // enable interrupts
     sti();
 
     if (!fs_exists(".windoge")) {
@@ -271,21 +270,24 @@ void kernel_main(void) {
             clean_input_string(username_new);
 
             if (username_new[0] == '\0') {
-                dogeio_text_println("username cannot be empty.");
-                continue;
+                dogeio_text_println("Username cannot be empty.");
+                dogeio_text_println(" Press Enter to continue...");
                 dogeio_get_key();
+                continue;
             }
 
             if (str_strcmp(username_new, "admin") == 0) {
-                dogeio_text_println(" username cannot be 'admin'.");
-                continue;
+                dogeio_text_println(" Username cannot be 'admin'.");
+                dogeio_text_println(" Press Enter to continue...");
                 dogeio_get_key();
+                continue;
             }
             
             dogeio_text_input(" [password]> ", password_new, 64);
             clean_input_string(password_new);
             if (password_new[0] == '\0') {
-                dogeio_text_println("password cannot be empty.");
+                dogeio_text_println(" Password cannot be empty.");
+                dogeio_text_println(" Press Enter to continue...");
                 dogeio_get_key();
                 continue;
             }
@@ -303,7 +305,8 @@ void kernel_main(void) {
             dogeio_text_println(" Name your computer (old or new)");
             dogeio_text_input("\n [name]> ", computer_name, 64);
             if (computer_name[0] == '\0') {
-                dogeio_text_println(" computer name cannot be empty.");
+                dogeio_text_println(" Computer name cannot be empty.");
+                dogeio_text_println(" Press Enter to continue...");
                 dogeio_get_key();
                 continue;
             }
@@ -330,7 +333,7 @@ void kernel_main(void) {
         char font_choice[8];
         dogeio_text_input(" Choice [1-5, default 1]: ", font_choice, sizeof(font_choice));
         const char *font_val = "pc_ibm";
-        if (font_choice[0] == '2') font_val = "ubuntu_mono";
+        if      (font_choice[0] == '2') font_val = "ubuntu_mono";
         else if (font_choice[0] == '3') font_val = "terminus";
         else if (font_choice[0] == '4') font_val = "tamzen";
         else if (font_choice[0] == '5') font_val = "spleen";
@@ -364,7 +367,7 @@ void kernel_main(void) {
         char color_choice[8];
         dogeio_text_input(" Choice [1-4, default 1]: ", color_choice, sizeof(color_choice));
         const char *color_val = "gray";
-        if (color_choice[0] == '2') color_val = "white";
+        if      (color_choice[0] == '2') color_val = "white";
         else if (color_choice[0] == '3') color_val = "green";
         else if (color_choice[0] == '4') color_val = "cyan";
 
@@ -406,7 +409,6 @@ void kernel_main(void) {
         dogeio_text_println(doge_ascii[i]);
     }
     dogeio_text_color_change(COLOR_GRAY);
-    dogeio_text_println(" WindogeOS v0.2.1");
     dogeio_text_println(" Welcome back!");
     while (true) {
         char password[64];
