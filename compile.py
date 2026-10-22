@@ -138,19 +138,32 @@ def main():
                     for file in files:
                         file_path = os.path.join(root, file)
                         normalized_path = os.path.abspath(os.path.normpath(file_path))
+
+                        if normalized_path.startswith(
+                            os.path.abspath(os.path.join("apps", "text")) + os.sep
+                        ):
+                            continue
+
                         if normalized_path in app_library_paths:
                             continue
+
                         relative_path = os.path.normpath(os.path.relpath(file_path))
+
                         if arch not in app_source_arches.get(relative_path, [arch]):
                             continue
-                        
-                        is_package = "apps" + os.sep + "packages" in normalized_path or "userland" + os.sep + "packages" in normalized_path
-                        
+
+                        is_package = (
+                            "apps" + os.sep + "packages" in normalized_path
+                            or
+                            "userland" + os.sep + "packages" in normalized_path
+                        )
+
                         if file.endswith(".c"):
                             if is_package:
                                 package_sources.append((file_path, "c"))
                             else:
                                 app_sources.append((file_path, "c"))
+
                         elif file.endswith(".asm"):
                             if is_package:
                                 package_sources.append((file_path, "asm"))
@@ -374,26 +387,32 @@ def main():
                         cmd(f"sudo cp '{pkg_rle}' '{mnt_dir}/apps/packages/{pkg_name}'")
                         print(f"[dogeing] Injected RLE package to exFAT /apps/packages: {pkg_name}")
 
-                text_source_dir = os.path.join("apps", "text")
+                assets_source_dir = os.path.join("apps", "text")
 
-                if os.path.isdir(text_source_dir):
-                    for root, _, files in os.walk(text_source_dir):
+                if os.path.isdir(assets_source_dir):
+                    for root, _, files in os.walk(assets_source_dir):
+
+                        rel_dir = os.path.relpath(root, assets_source_dir)
+
+                        if rel_dir == ".":
+                            dst_dir = os.path.join(mnt_dir, "apps", "text")
+                        else:
+                            dst_dir = os.path.join(mnt_dir, "apps", "text", rel_dir)
+
+                        cmd(f"sudo mkdir -p '{dst_dir}'")
+
                         for file in files:
-                            if not file.lower().endswith(".txt"):
-                                continue
+                            src_file = os.path.join(root, file)
+                            dst_file = os.path.join(dst_dir, file)
 
-                src_file = os.path.join(root, file)
+                            cmd(f"sudo cp '{src_file}' '{dst_file}'")
 
-                rel_dir = os.path.relpath(root, text_source_dir)
-                dst_dir = os.path.join(mnt_dir, "apps", "text", rel_dir)
+                            rel_path = os.path.relpath(src_file, assets_source_dir)
 
-                cmd(f"sudo mkdir -p '{dst_dir}'")
-                cmd(f"sudo cp '{src_file}' '{dst_dir}/{file}'")
-
-                print(
-                    f"[dogeing] Injected text file to exFAT "
-                    f"/apps/text/{os.path.join(rel_dir, file)}"
-                )
+                            print(
+                                f"[dogeing] Injected asset to exFAT "
+                                f"/apps/text/{rel_path}"
+                            )
             finally:
                 cmd(f"sudo umount {mnt_dir}")
                 cmd(f"sudo losetup -d {loop_dev}")
