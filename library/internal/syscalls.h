@@ -52,6 +52,10 @@
 #define SET_TEXT_MODE      45
 #define DRAW_PIXEL         46
 #define DRAW_REC           47
+#define GET_KEY_DELAY      48
+#define ENABLE_STATUS_BAR 49
+#define DISABLE_STATUS_BAR 50
+#define IS_BAR_ON 51
 
 #define SPECIAL 90
 

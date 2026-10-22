@@ -1,0 +1,33 @@
+================================================================================================================
+                 ;i.                                    
+                  M$L                    .;i.           
+                  M$Y;                .;iii;;.          
+                 ;$YY$i._           .iiii;;;;;          
+                .iiiYYYYYYiiiii;;;;i;iii;; ;;;          
+              .;iYYYYYYiiiiiiYYYiiiiiii;;  ;;;          
+           .YYYY$$$$YYYYYYYYYYYYYYYYiii;; ;;;;        #     # ### #     # ######  #######  #####  #######
+         .YYY$$$$$$YYYYYY$$$$iiiY$$$$$$$ii;;;;        #  #  #  #  ##    # #     # #     # #     # #      
+        :YYYF`,  TYYYYY$$$$$YYYYYYYi$$$$$iiiii;       #  #  #  #  # #   # #     # #     # #       #       
+        Y$MM: \  :YYYY$$P"````"T$YYMMMMMMMMiiYY.      #  #  #  #  #  #  # #     # #     # #  #### #####   
+     `.;$$M$$b.,dYY$$Yi; .(     .YYMMM$$$MMMMYY       #  #  #  #  #   # # #     # #     # #     # #      
+   .._$MMMMM$!YYYYYYYYYi;.`"  .;iiMMM$MMMMMMMYY       #  #  #  #  #    ## #     # #     # #     # #       
+    ._$MMMP` ```""4$$$$$iiiiiiii$MMMMMMMMMMMMMY;       ## ##  ### #     # ######  #######  #####  #######
+     MMMM$:       :$$$$$$$MMMMMMMMMMM$$MMMMMMMYYL     ================  
+    :MMMM$$.    .;PPb$$$$MMMMMMMMMM$$$$MMMMMMiYYU:    v0.2.1
+     iMM$$;;: ;;;;i$$$$$$$MMMMM$$$$MMMMMMMMMMYYYYY      
+     `$$$$i .. ``:iiii!*"``.$$$$$$$$$MMMMMMM$YiYYY      
+      :Y$$iii;;;.. ` ..;;i$$$$$$$$$MMMMMM$$YYYYiYY:     
+       :$$$$$iiiiiii$$$$$$$$$$$MMMMMMMMMMYYYYiiYYYY.    
+        `$$$$$$$$$$$$$$$$$$$$MMMMMMMM$YYYYYiiiYYYYYY    
+         YY$$$$$$$$$$$$$$$$MMMMMMM$$YYYiiiiiiYYYYYYY    
+        :YYYYYY$$$$$$$$$$$$$$$$$$YYYYYYYiiiiYYYYYYi'    
+================================================================================================================
+Welcome to WindogeOS v0.2.1!
+
+= To install applications
+  - To install applications, type this: `dogestore install [insert your desired app]`
+  - To list installable applications, type: `dogestore list`
+  - Uninstalling is: `dogestore uninstall [insert your desired app]`
+
+= Others
+  - the `settings` command is to change settings.

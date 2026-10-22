@@ -3,6 +3,7 @@
 
 #include "stdint.h"
 #include "internal/syscalls.h"
+#include "bool.h"
 #include <boot/syscall.h>
 
 typedef struct {
@@ -215,6 +216,22 @@ static inline uint64_t draw_pixel(uint32_t x, uint32_t y, uint32_t color) {
 
 static inline uint64_t draw_rec(uint32_t x, uint32_t y, uint32_t width, uint32_t height, uint32_t color) {
     return syscall_5(DRAW_REC, x, y, height, width, color);
+}
+
+static inline uint64_t get_key_delay(uint64_t loops) {
+    return syscall_1(GET_KEY_DELAY, loops);
+}
+
+static inline uint64_t enable_bar(void) {
+    return syscall_0(ENABLE_STATUS_BAR);
+}
+
+static inline uint64_t disable_bar(void) {
+    return syscall_0(DISABLE_STATUS_BAR);
+}
+
+static inline bool is_bar_on(void) {
+    return (bool)syscall_0(IS_BAR_ON);
 }
 
 static inline uint64_t sys_exit(uint64_t status) {

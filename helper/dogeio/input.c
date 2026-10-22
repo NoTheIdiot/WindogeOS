@@ -26,103 +26,132 @@ extern char text_grid[TERMINAL_ROWS * TERMINAL_COLS];
 static bool global_shift_pressed = false;
 static bool global_ctrl_pressed  = false;
 
-uint16_t dogeio_get_key(void) {
-    char last_seen_time[16] = {0};
-    bool escaped = false;
+static bool status_bar_enabled = true;
 
-    while (true) {
-        while ((ports_inb(0x64) & 1) == 0) {
-            if (is_kernel_dead == false) {
-                char* current_time = time_get();
-                if (str_strcmp(current_time, last_seen_time) != 0) {
-                    menubar_draw();
-                    for (int i = 0; i < 15; i++) {
-                        last_seen_time[i] = current_time[i];
-                        if (current_time[i] == '\0') {
-                            break;
-                        }
-                    }
-                    last_seen_time[15] = '\0';
-                }
-            }
-            menubar_draw();
-            // SAVE POWER YE MORON
-            __asm__ volatile ("pause");
-        }
+static uint16_t dogeio_decode_key(uint8_t code)
+{
+    static bool escaped = false;
 
-        uint8_t code = ports_inb(0x60);
+    switch (code) {
+        case 0xE0:
+            escaped = true;
+            return KEY_UNKNOWN;
+
+        case 0x2A:
+        case 0x36:
+            global_shift_pressed = true;
+            return KEY_UNKNOWN;
+
+        case 0xAA:
+        case 0xB6:
+            global_shift_pressed = false;
+            return KEY_UNKNOWN;
+
+        case 0x1D:
+            global_ctrl_pressed = true;
+            return KEY_UNKNOWN;
+
+        case 0x9D:
+            global_ctrl_pressed = false;
+            return KEY_UNKNOWN;
+    }
+
+    if (code & 0x80) {
+        escaped = false;
+        return KEY_UNKNOWN;
+    }
+
+    if (escaped) {
+        escaped = false;
 
         switch (code) {
-            case 0xE0:
-                escaped = true;
-                continue;
-                
-            case 0x2A:
-            case 0x36:
-                global_shift_pressed = true;
-                escaped = false;
-                continue;
-            
-            case 0xAA:
-            case 0xB6:
-                global_shift_pressed = false;
-                escaped = false;
-                continue;
-            
-            case 0x1D:
-                global_ctrl_pressed = true;
-                escaped = false;
-                continue;
-        
-            case 0x9D:
-                global_ctrl_pressed = false;
-                escaped = false;
-                continue;
-            }
-            
-            if (code & 0x80) {
-                escaped = false;
-                continue;
-            }
+            case 0x48: return KEY_UP;
+            case 0x50: return KEY_DOWN;
+            case 0x4B: return KEY_LEFT;
+            case 0x4D: return KEY_RIGHT;
+        }
 
-            if (escaped) {
-                escaped = false;
-                switch (code) {
-                case 0x48: return KEY_UP;
-                case 0x50: return KEY_DOWN;
-                case 0x4B: return KEY_LEFT;
-                case 0x4D: return KEY_RIGHT;
-                }
-                continue;
-            }
-
-            switch (code) {
-                case 0x1C: return KEY_ENTER;
-                case 0x0E: return KEY_BACKSPACE;
-
-                case 0x48: return KEY_UP;
-                case 0x50: return KEY_DOWN;
-                case 0x4B: return KEY_LEFT;
-                case 0x4D: return KEY_RIGHT;
-            }
-
-            if (code < 58) {
-                char c = global_shift_pressed ? map_upper[code] : map_lower[code];
-                if (c != 0) {
-                    if (global_ctrl_pressed) {
-                        if (c == 'o') return KEY_CTRL_O;
-                        if (c == 'n') return KEY_CTRL_N;
-                        if (c >= 'a' && c <= 'z') {
-                            return (uint16_t)(c - 'a' + 1);
-                        } else if (c >= 'A' && c <= 'Z') {
-                            return (uint16_t)(c - 'A' + 1);
-                        }
-                    }
-                    return (uint16_t)c;
-                }
-            }
+        return KEY_UNKNOWN;
     }
+
+    switch (code) {
+        case 0x1C: return KEY_ENTER;
+        case 0x0E: return KEY_BACKSPACE;
+
+        case 0x48: return KEY_UP;
+        case 0x50: return KEY_DOWN;
+        case 0x4B: return KEY_LEFT;
+        case 0x4D: return KEY_RIGHT;
+    }
+
+    if (code < 58) {
+        char c = global_shift_pressed ? map_upper[code] : map_lower[code];
+
+        if (c != 0) {
+            if (global_ctrl_pressed) {
+                if (c == 'o') return KEY_CTRL_O;
+                if (c == 'n') return KEY_CTRL_N;
+
+                if (c >= 'a' && c <= 'z')
+                    return (uint16_t)(c - 'a' + 1);
+
+                if (c >= 'A' && c <= 'Z')
+                    return (uint16_t)(c - 'A' + 1);
+            }
+
+            return (uint16_t)c;
+        }
+    }
+
     return KEY_UNKNOWN;
+}
+
+uint16_t dogeio_get_key_delay(uint64_t loops) {
+    while (loops--) {
+
+        if ((ports_inb(0x64) & 1) != 0) {
+            uint8_t code = ports_inb(0x60);
+
+            return dogeio_decode_key(code);
+        }
+
+        __asm__ volatile ("pause");
+    }
+
+    return KEY_UNKNOWN;
+}
+
+uint16_t dogeio_get_key(void) {
+    char last_seen_time[16] = {0};
+
+    while (true) {
+
+        uint16_t key = dogeio_get_key_delay(1);
+
+        if (key != KEY_UNKNOWN) {
+            return key;
+        }
+
+       if (status_bar_enabled && !is_kernel_dead) {
+            char *current_time = time_get();
+
+            if (str_strcmp(current_time, last_seen_time) != 0) {
+                menubar_draw();
+
+                for (int i = 0; i < 15; i++) {
+                    last_seen_time[i] = current_time[i];
+
+                    if (current_time[i] == '\0') {
+                        break;
+                    }
+                }
+
+                last_seen_time[15] = '\0';
+            }
+        }
+
+        __asm__ volatile ("pause");
+    }
 }
 
 
@@ -303,4 +332,19 @@ void dogeio_text_input(const char *prompt, char *buffer, size_t max_size) {
 
     dogeio_text_cursor_hide();
     buffer[len] = '\0';
+}
+
+void dogeio_enable_status_bar(void)
+{
+    status_bar_enabled = true;
+}
+
+void dogeio_disable_status_bar(void)
+{
+    status_bar_enabled = false;
+}
+
+bool dogeio_status_bar_enabled(void)
+{
+    return status_bar_enabled;
 }

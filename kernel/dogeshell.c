@@ -953,12 +953,16 @@ static int dogeshell_execute(int argc, char **argv) {
         return dogeshell_last_status;
     }
     if (str_strcmp(argv[0], "help") == 0) {
-        if (argv[1] == NULL) {
+        if (argc == 1) {
             dogeshell_print_help();
         } else {
-            if (str_strcmp(argv[1], "dogescript") == 0) {
+            if (str_strncmp(argv[1], "dogescript", 10) == 0) {
                 system_dogeshell_ex("pages /apps/text/help/dogescript_help");
-            } else {
+            } else if (str_strncmp(argv[1], "general", 7) == 0) {
+                system_dogeshell_ex("pages /apps/text/help/general_help");
+            }
+            
+            else {
                 dogeio_text_println("Help for that doesn't exists :(");
                 return 1;
             }
@@ -1579,5 +1583,6 @@ void system_dogeshell(void) {
         if (input[0] != '\0') {
             system_dogeshell_ex(input);
         }
+        input[0] = '\0';
     }
 }

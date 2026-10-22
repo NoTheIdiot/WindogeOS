@@ -937,6 +937,29 @@ uint64_t syscall_handler(syscall_registers_t *regs) {
             break;
         }
 
+        case GET_KEY_DELAY: {
+            uint64_t loops = regs->rdi;
+            ret_val = (uint64_t)dogeio_get_key_delay(loops);
+            break;
+        }
+        
+        case ENABLE_STATUS_BAR: {
+            dogeio_enable_status_bar();
+            ret_val = 1;
+            break;
+        }
+
+        case DISABLE_STATUS_BAR: {
+            dogeio_disable_status_bar();
+            ret_val = 1;
+            break;
+        }
+
+        case IS_BAR_ON: {
+            ret_val = dogeio_status_bar_enabled();
+            break;
+        }
+
         case SPECIAL:
             dogeio_text_println("TESTING");
             log("TESTING");

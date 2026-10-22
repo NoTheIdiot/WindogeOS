@@ -84,8 +84,12 @@ void dogeio_text_cursor_hide(void);
 void dogeio_print_hex16(uint16_t val);
 void dogeio_video(void);
 void dogeio_text(void);
+uint16_t dogeio_get_key_delay(uint64_t loops);
 void dogeio_draw_pixel(uint32_t x, uint32_t y, uint32_t color);
 void dogeio_draw_rect(uint32_t x, uint32_t y, uint32_t width, uint32_t height, uint32_t color);
+void dogeio_enable_status_bar(void);
+void dogeio_disable_status_bar(void);
+bool dogeio_status_bar_enabled(void);
 
 #define KEY_UP        0x101
 #define KEY_DOWN      0x102
