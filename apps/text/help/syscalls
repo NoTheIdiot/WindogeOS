@@ -1,0 +1,45 @@
+===== Syscalls (System Call) =====
+You can use system calls to call a function to the WindogeOS kernel
+to run a function like printing a string, writing a file or getting 
+more memory. There are a total of 55 system calls available to use.
+
+=== basic operations ==
+[1] READ_FILE                                       | [11] PRINT
+    Read a file into a buffer.                      |      Print a string.
+    RDI = Filename, RSI = Text, RDX = Size          |      RDI = Text
+                                                    | 
+[2] WRITE_FILE                                      | [12] PRINTLN
+    Write a piece of text to a buffer.              |      Print a string with a newline.
+    RDI = Filename, RSI = Text, RDX = Size          |      RDI = Text
+                                                    | 
+[3] CREATE_FILE                                     | [13] CLEAR
+    Create a file.                                  |      Clear the console / terminal.
+    RDI = Filename                                  |      No args.
+                                                    | 
+[4] DELETE_FILE                                     | [14] INPUT
+    Delete a file.                                  |      Get a keyboard input.
+    RDI = Filename                                  |      RDI = Prompt (Text), RSI = Text Buffer, 
+                                                    |      RDX = Buffer Size
+[5] CREATE_DIR                                      | 
+    Create a folder.                                | [15] GET_KEY
+    RDI = Folder name                               |      Waits until a key is pressed. 
+                                                    |      No args.
+[6] RENAME_FILE                                     | 
+    Rename a file (not folders)                     | [16] PRINT_AT
+    RDI = File, RSI = New name                      |      Prints at a specific location, doesn't 
+                                                    |      change cursor.
+[7] FILE_EXISTS                                     |      RDI = Text, RSI = X, RDX = Y, R10 = Color
+    Check if a file exists                          | 
+    RDI = Filename                                  | [17] TEXT_COLOR
+                                                    |      Change the current text color.
+[8] CHANGE_DIR                                      |      RDI = Color Hex
+    Change the current working folder               | 
+    RDI = Location                                  | [18] BACKGROUND_COLOR
+                                                    |      Change background color.
+[9] DELETE_LAST_LINE                                |      RDI = Color Hex
+    Delete the last line of a file                  | 
+    RDI = Filename                                  | 
+                                                    | 
+[10] COPY_FILE                                      | 
+    Copy a file to another location                 | 
+    RDI = File, RSI = Location                      | 

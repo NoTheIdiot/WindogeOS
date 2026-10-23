@@ -960,10 +960,12 @@ static int dogeshell_execute(int argc, char **argv) {
                 system_dogeshell_ex("pages /apps/text/help/dogescript_help");
             } else if (str_strncmp(argv[1], "general", 7) == 0) {
                 system_dogeshell_ex("pages /apps/text/help/general_help");
-            } else if (str_strncmp(argv[1], "dogeedit", 7) == 0) {
+            } else if (str_strncmp(argv[1], "dogeedit", 8) == 0) {
                 system_dogeshell_ex("pages /apps/text/help/dogeedit_help");
-            } else if (str_strncmp(argv[1], "bash", 7) == 0) {
+            } else if (str_strncmp(argv[1], "bash", 4) == 0) {
                 system_dogeshell_ex("pages /apps/text/help/bash_help");
+            } else if (str_strncmp(argv[1], "syscalls", 8) == 0) {
+                system_dogeshell_ex("pages /apps/text/help/syscalls");
             }
             
             else {
