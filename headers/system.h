@@ -235,6 +235,7 @@ void nvme_pci_callback(uint8_t b, uint8_t d, uint8_t f, uint16_t ven, uint16_t d
 #define DISABLE_STATUS_BAR 50
 #define IS_BAR_ON 51
 #define CLEAR_RAW 52
+#define EXPAND_USER_PAGES 53
 
 #define SPECIAL 90
 

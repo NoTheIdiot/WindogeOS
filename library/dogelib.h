@@ -47,6 +47,10 @@ static inline uint64_t get_user(void) {
     return syscall_0(GET_USER);
 }
 
+static inline uint64_t expand_pages(void) {
+    return syscall_0(EXPAND_USER_PAGES);
+}
+
 #define HEAP_MAGIC 0x444F474554485058ULL
 
 typedef struct block_header {

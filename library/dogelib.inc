@@ -45,3 +45,8 @@
     mov rsi, %2
     syscall
 %endmacro
+
+%macro expand_pages
+    mov rax, EXPAND_USER_PAGES
+    syscall
+%endmacro

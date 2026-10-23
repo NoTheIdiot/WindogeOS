@@ -607,6 +607,14 @@ uint64_t syscall_handler(syscall_registers_t *regs) {
         case UNMAP_USER_MEMORY:
             return native_user_memory_unmap(regs->rdi, regs->rsi);
 
+        case EXPAND_USER_PAGES: {
+            uint64_t phys = pmm_alloc_zeroed_page();
+            if (!phys) {
+                dogeio_text_println("[Error] Out of RAM!");
+            }
+            return 1;
+        }
+
         case GET_PID:
             return 1;
 
