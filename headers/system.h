@@ -254,5 +254,6 @@ int util_hexdump(char* filename);
 int util_calc(char* string);
 int kernel_package(int argc, char **argv);
 char* get_user(void);
+void sleep_ms(uint64_t miliseconds);
 
 #endif
