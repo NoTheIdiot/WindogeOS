@@ -37,6 +37,7 @@
 %define ENABLE_STATUS_BAR 49
 %define DISABLE_STATUS_BAR 50
 %define IS_BAR_ON 51
+%define CLEAR_RAW 52
 
 %define SPECIAL 90
 

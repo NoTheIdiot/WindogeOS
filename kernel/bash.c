@@ -853,6 +853,12 @@ static int execute_command(int argc, char **argv) {
         }
         return 0;
     }
+    if (str_strcmp(argv[0], "sleep") == 0) {
+        fs_set_auth_override(1);
+        system_run_bin("/system/sleep.bin", 512);
+        fs_set_auth_override(0);
+        return 0;
+    }
     if (str_strcmp(argv[0], "write") == 0 ||
         str_strcmp(argv[0], "sed") == 0) {
         char text[BASH_LINE_SIZE];

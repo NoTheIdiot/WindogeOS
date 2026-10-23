@@ -234,6 +234,10 @@ static inline bool is_bar_on(void) {
     return (bool)syscall_0(IS_BAR_ON);
 }
 
+static inline uint64_t clear_raw(void) {
+    return syscall_0(CLEAR_RAW);
+}
+
 static inline uint64_t sys_exit(uint64_t status) {
     return syscall_1(SYS_EXIT, status);
 }

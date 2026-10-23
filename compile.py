@@ -79,6 +79,13 @@ def main():
     start_time = time.perf_counter()
 
     try:
+        app_sources = []
+        package_sources = []
+
+        compiled_apps = []
+        compiled_system_apps = []
+        compressed_packages = []
+
         config_path = "compile_config.py"
         if not os.path.exists(config_path):
             print(f"[Not Wow] Could not find configuration file '{config_path}'")
@@ -119,9 +126,6 @@ def main():
                             c_source.append(source_path)
                         elif file.endswith(".asm"):
                             asm_source.append(source_path)
-
-        app_sources = []
-        package_sources = []
         
         app_library_paths = {
             os.path.abspath(os.path.normpath(src))
@@ -219,9 +223,6 @@ def main():
         print("[2/4] Linking Kernel ELF...")
         cmd(f"{tools['linker']} {arch_cfg['linker_flags']} -T {arch_cfg['kernel_linker_script']} {objects_str} -o kernel.elf")
 
-        compiled_apps = []
-        compressed_packages = []
-
         total_compile_items = app_sources + package_sources
         if total_compile_items:
             print(f"[3/4] Compiling {len(app_sources)} Application(s) and {len(package_sources)} Package(s) (parallel)...")
@@ -248,7 +249,19 @@ def main():
                 )
                 app_elf = os.path.join(os.path.dirname(app_src), binary_name + ".elf")
                 app_bin = os.path.join(os.path.dirname(app_src), binary_name + ".bin")
-                compiled_apps.append(app_bin)
+
+                system_apps_dir = os.path.abspath(
+                    os.path.join("apps", "system")
+                )
+
+                normalized_app_path = os.path.abspath(
+                    os.path.normpath(app_src)
+                )
+
+                if normalized_app_path.startswith(system_apps_dir + os.sep):
+                    compiled_system_apps.append(app_bin)
+                else:
+                    compiled_apps.append(app_bin)
 
                 if ftype == "c":
                     compile_step = f"{tools['c_compiler']} {arch_cfg['app_flags']} {common_flags} -c {app_src} -o {app_obj}"
@@ -365,39 +378,91 @@ def main():
         
         cmd(f"mkfs.exfat -b 4K -L WINDOGEOS {part2_img}")
 
-        if compiled_apps or compressed_packages:
+        if compiled_apps or compiled_system_apps or compressed_packages:
             mnt_dir = "/tmp/windoge_p2_mnt"
             os.makedirs(mnt_dir, exist_ok=True)
-            loop_dev = subprocess.check_output(f"sudo losetup -f --show {part2_img}", shell=True).decode().strip()
+
+            loop_dev = subprocess.check_output(
+                f"sudo losetup -f --show {part2_img}",
+                shell=True
+            ).decode().strip()
+
             cmd(f"sudo mount.exfat-fuse {loop_dev} {mnt_dir}")
+
             try:
                 cmd(f"sudo mkdir -p {mnt_dir}/apps")
                 cmd(f"sudo mkdir -p {mnt_dir}/apps/packages")
                 cmd(f"sudo mkdir -p {mnt_dir}/apps/text")
+                cmd(f"sudo mkdir -p {mnt_dir}/system")
 
                 for app_bin in compiled_apps:
                     if os.path.exists(app_bin):
                         app_name = os.path.basename(app_bin)
-                        cmd(f"sudo cp '{app_bin}' '{mnt_dir}/apps/{app_name}'")
-                        print(f"[dogeing] Injected binary to exFAT /apps: {app_name}")
+
+                        cmd(
+                            f"sudo cp '{app_bin}' "
+                            f"'{mnt_dir}/apps/{app_name}'"
+                        )
+
+                        print(
+                            f"[dogeing] Injected application "
+                            f"to exFAT /apps: {app_name}"
+                        )
+
+                for app_bin in compiled_system_apps:
+                    if os.path.exists(app_bin):
+                        app_name = os.path.basename(app_bin)
+
+                        cmd(
+                            f"sudo cp '{app_bin}' "
+                            f"'{mnt_dir}/system/{app_name}'"
+                        )
+
+                        print(
+                            f"[dogeing] Injected system application "
+                            f"to exFAT /system: {app_name}"
+                        )
 
                 for pkg_rle in compressed_packages:
                     if os.path.exists(pkg_rle):
                         pkg_name = os.path.basename(pkg_rle)
-                        cmd(f"sudo cp '{pkg_rle}' '{mnt_dir}/apps/packages/{pkg_name}'")
-                        print(f"[dogeing] Injected RLE package to exFAT /apps/packages: {pkg_name}")
 
+                        cmd(
+                            f"sudo cp '{pkg_rle}' "
+                            f"'{mnt_dir}/apps/packages/{pkg_name}'"
+                        )
+
+                        print(
+                            f"[dogeing] Injected package "
+                            f"to exFAT /apps/packages: {pkg_name}"
+                        )
+
+                #
+                # Assets -> /apps/text
+                #
                 assets_source_dir = os.path.join("apps", "text")
 
                 if os.path.isdir(assets_source_dir):
                     for root, _, files in os.walk(assets_source_dir):
 
-                        rel_dir = os.path.relpath(root, assets_source_dir)
+                        rel_dir = os.path.relpath(
+                            root,
+                            assets_source_dir
+                        )
 
                         if rel_dir == ".":
-                            dst_dir = os.path.join(mnt_dir, "apps", "text")
+                            dst_dir = os.path.join(
+                                mnt_dir,
+                                "apps",
+                                "text"
+                            )
                         else:
-                            dst_dir = os.path.join(mnt_dir, "apps", "text", rel_dir)
+                            dst_dir = os.path.join(
+                                mnt_dir,
+                                "apps",
+                                "text",
+                                rel_dir
+                            )
 
                         cmd(f"sudo mkdir -p '{dst_dir}'")
 
@@ -405,17 +470,25 @@ def main():
                             src_file = os.path.join(root, file)
                             dst_file = os.path.join(dst_dir, file)
 
-                            cmd(f"sudo cp '{src_file}' '{dst_file}'")
+                            cmd(
+                                f"sudo cp '{src_file}' "
+                                f"'{dst_file}'"
+                            )
 
-                            rel_path = os.path.relpath(src_file, assets_source_dir)
+                            rel_path = os.path.relpath(
+                                src_file,
+                                assets_source_dir
+                            )
 
                             print(
-                                f"[dogeing] Injected asset to exFAT "
-                                f"/apps/text/{rel_path}"
+                                f"[dogeing] Injected asset "
+                                f"to exFAT /apps/text/{rel_path}"
                             )
+
             finally:
                 cmd(f"sudo umount {mnt_dir}")
                 cmd(f"sudo losetup -d {loop_dev}")
+
                 if os.path.exists(mnt_dir):
                     os.rmdir(mnt_dir)
 

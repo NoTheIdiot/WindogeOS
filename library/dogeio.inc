@@ -195,6 +195,32 @@
     syscall
 %endmacro
 
+%macro get_key_delay 1
+    mov rax, GET_KEY_DELAY
+    mov rdi, %1
+    syscall
+%endmacro
+
+%macro enable_status_bar 
+    mov rax, ENABLE_STATUS_BAR
+    syscall
+%endmacro 
+
+%macro disable_status_bar
+    mov rax, DISABLE_STATUS_BAR
+    syscall
+%endmacro
+
+%macro isbar_on
+    mov rax, IS_BAR_ON
+    syscall
+%endmacro
+
+%macro clear_raw
+    mov rax, CLEAR_RAW
+    syscall
+%endmacro
+
 %macro sys_exit 1
     process_exit %1
 %endmacro

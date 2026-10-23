@@ -955,6 +955,12 @@ uint64_t syscall_handler(syscall_registers_t *regs) {
             break;
         }
 
+        case CLEAR_RAW: {
+            dogeio_text_clear_raw();
+            ret_val = 1;
+            break;
+        }
+
         case IS_BAR_ON: {
             ret_val = dogeio_status_bar_enabled();
             break;

@@ -1,0 +1,15 @@
+====== DogeEdit ======
+DogeEdit is a random text editor that is just like micro text editor.
+
+= Exiting
+  To exit from the editor, hit Ctrl-X.
+
+= Going somewhere
+  Ctrl-G for going to anyline (use the side bar if you want to refer)
+  Ctrl-F for finding any piece of text
+
+= File operations
+  Ctrl-S for saving your file (opening any name auto creates if doesn't
+      exist)
+  Ctrl-O for opening an existing file,
+  Ctrl-N for creating a new file

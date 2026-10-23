@@ -960,6 +960,10 @@ static int dogeshell_execute(int argc, char **argv) {
                 system_dogeshell_ex("pages /apps/text/help/dogescript_help");
             } else if (str_strncmp(argv[1], "general", 7) == 0) {
                 system_dogeshell_ex("pages /apps/text/help/general_help");
+            } else if (str_strncmp(argv[1], "dogeedit", 7) == 0) {
+                system_dogeshell_ex("pages /apps/text/help/dogeedit_help");
+            } else if (str_strncmp(argv[1], "bash", 7) == 0) {
+                system_dogeshell_ex("pages /apps/text/help/bash_help");
             }
             
             else {
@@ -1438,6 +1442,12 @@ static int dogeshell_execute(int argc, char **argv) {
     }
     if (str_strcmp(argv[0], "hostname") == 0) {
         dogeio_text_println(computer_name[0] != '\0' ? computer_name : "windoge");
+        return 0;
+    }
+    if (str_strcmp(argv[0], "sleep") == 0) {
+        fs_set_auth_override(1);
+        system_run_bin("/system/sleep.bin", 512);
+        fs_set_auth_override(0);
         return 0;
     }
 
