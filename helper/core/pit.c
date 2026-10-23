@@ -1,0 +1,31 @@
+#include <stdint.h>
+#include <string.h>
+#include <stddef.h>
+#include <system.h>
+#include <basicutil.h>
+#include <boot/kernel.h>
+
+#define PIT_CHANNEL_0   0x40
+#define PIT_MODE_CMD    0x43
+#define PIT_BASE_FREQ   1193182
+
+volatile uint64_t system_ticks = 0;
+
+void init_pit(uint32_t target_frequency) {
+    uint32_t divisor = PIT_BASE_FREQ / target_frequency;
+    ports_outb(PIT_MODE_CMD, 0x36);
+    ports_outb(PIT_CHANNEL_0, (uint8_t)(divisor & 0xFF));
+    ports_outb(PIT_CHANNEL_0, (uint8_t)((divisor >> 8) & 0xFF));
+}
+
+void pit_handler(void) {
+    system_ticks++;
+    ports_outb(0x20, 0x20);
+}
+
+void sleep_ms(uint64_t milliseconds) {
+    uint64_t target_ticks = system_ticks + milliseconds;
+    while (system_ticks < target_ticks) {
+        asm volatile ("sti; hlt"); 
+    }
+}
