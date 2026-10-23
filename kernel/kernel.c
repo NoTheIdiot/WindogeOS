@@ -158,6 +158,8 @@ void kernel_main(void) {
     init_gdt_tss();
     log("[dogeing] initializing idt");
     init_idt();
+    log("[dogeing] initializing PIT");
+    init_pit(1000);
     log("[dogeing] initializing syscalls");
     init_syscalls();
     log("[dogeing] initializing pcie");

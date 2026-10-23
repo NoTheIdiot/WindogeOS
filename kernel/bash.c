@@ -1101,7 +1101,7 @@ static int execute_command(int argc, char **argv) {
             dogeio_text_println("bash: run: file does not exist");
             return 1;
         }
-        system_run_bin(argv[1], MAX_FLAT_BINARY_SIZE);
+        system_exec(argv[1]);
         return 0;
     }
     if (str_strcmp(argv[0], "pack") == 0) {

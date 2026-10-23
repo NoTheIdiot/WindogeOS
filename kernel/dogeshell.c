@@ -1433,7 +1433,7 @@ static int dogeshell_execute(int argc, char **argv) {
             dogeio_text_println("Error: program doesn't exist.");
             return 1;
         }
-        system_run_bin(path, MAX_FLAT_BINARY_SIZE);
+        system_exec(path);
         return 0;
     }
     if (str_strcmp(argv[0], "uname") == 0) {
