@@ -18,7 +18,7 @@ void sys_init_terminals(void);
 // though i equally suck at all of these ta
 void init_gdt_tss(void);
 void init_idt(void);
-void init_pit(void);
+void init_pit(uint32_t target_frequency);
 void pit_handler(void);
 
 extern bool is_kernel_dead;
