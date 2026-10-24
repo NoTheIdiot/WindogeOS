@@ -779,7 +779,7 @@ int exfat_print_directory(int hidden) {
     uint8_t sector[512];
     uint64_t base_lba = exfat_cluster_lba(g_current_cluster);
 
-    dogeio_text_println("-------- In Current Folder --------");
+    dogeio_println("-------- In Current Folder --------");
     for (uint32_t s = 0; s < 8; s++) {
         if (exfat_sector_read(base_lba + s, sector) != 0) return -1;
 
@@ -810,19 +810,19 @@ int exfat_print_directory(int hidden) {
                 }
 
                 if (file->file_attributes & 0x10) {
-                    dogeio_text_print("DIR  ");
-                    dogeio_text_println(name_buf);
+                    dogeio_print("DIR  ");
+                    dogeio_println(name_buf);
                 } else {
                     char size_str[32];
                     exfat_num_to_str(stream->data_length, size_str);
                     char name_str[32];
                     str_pad(name_str, name_buf, 16, ' ');
 
-                    dogeio_text_print("FILE ");
-                    dogeio_text_print(name_str);
-                    dogeio_text_print(" | ");
-                    dogeio_text_print(size_str);
-                    dogeio_text_println(" bytes");
+                    dogeio_print("FILE ");
+                    dogeio_print(name_str);
+                    dogeio_print(" | ");
+                    dogeio_print(size_str);
+                    dogeio_println(" bytes");
                 }
 
                 i += file->secondary_count * 32;

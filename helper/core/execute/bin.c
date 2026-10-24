@@ -72,12 +72,12 @@ static int prepare_user_arguments(uint8_t *stack_memory, int argc, char **argv,
 
 void system_run_bin_args_impl(char *filename, int program_size, int argc, char **argv) {
     if (!filename || program_size <= 0) {
-        dogeio_text_println("[Error] Invalid binary filename or size.");
+        dogeio_println("[Error] Invalid binary filename or size.");
         return;
     }
 
     if (hhdm_request.response == NULL) {
-        dogeio_text_println("[Error] HHDM response is NULL.");
+        dogeio_println("[Error] HHDM response is NULL.");
         return;
     }
 
@@ -94,11 +94,11 @@ void system_run_bin_args_impl(char *filename, int program_size, int argc, char *
 
         uint64_t code_phys = pmm_alloc_zeroed_page();
         if (!code_phys) {
-            uint32_t saved = dogeio_text_color;
-            dogeio_text_color_change(COLOR_RED);
-            dogeio_text_println("[Error] Out of physical RAM while loading binary.");
+            uint32_t saved = dogeio_color;
+            dogeio_color_change(COLOR_RED);
+            dogeio_println("[Error] Out of physical RAM while loading binary.");
             cleanup_user_pages();
-            dogeio_text_color_change(saved);
+            dogeio_color_change(saved);
             return;
         }
 
@@ -112,11 +112,11 @@ void system_run_bin_args_impl(char *filename, int program_size, int argc, char *
 
         int read_bytes = fs_read_raw_at(filename, page_dst, offset, bytes_to_read);
         if (read_bytes < 0 || (size_t)read_bytes > bytes_to_read) {
-            dogeio_text_color_change(COLOR_RED);
-            uint32_t saved = dogeio_text_color;
-            dogeio_text_println("[Error] Failed to read binary from exFAT filesystem.");
+            dogeio_color_change(COLOR_RED);
+            uint32_t saved = dogeio_color;
+            dogeio_println("[Error] Failed to read binary from exFAT filesystem.");
             cleanup_user_pages();
-            dogeio_text_color_change(saved);
+            dogeio_color_change(saved);
             return;
         }
 
@@ -132,7 +132,7 @@ void system_run_bin_args_impl(char *filename, int program_size, int argc, char *
     }
 
     if (loaded_bytes == 0) {
-        dogeio_text_println("[Error] Binary file is empty or could not be read.");
+        dogeio_println("[Error] Binary file is empty or could not be read.");
         cleanup_user_pages();
         return;
     }
@@ -141,11 +141,11 @@ void system_run_bin_args_impl(char *filename, int program_size, int argc, char *
     for (size_t i = 0; i < USER_STACK_PAGE_COUNT; i++) {
         uint64_t stack_phys = pmm_alloc_zeroed_page();
         if (!stack_phys) {
-            uint32_t saved = dogeio_text_color;
-            dogeio_text_color_change(COLOR_RED);
-            dogeio_text_println("[Error] Out of physical RAM for user stack.");
+            uint32_t saved = dogeio_color;
+            dogeio_color_change(COLOR_RED);
+            dogeio_println("[Error] Out of physical RAM for user stack.");
             cleanup_user_pages();
-            dogeio_text_color_change(saved);
+            dogeio_color_change(saved);
             return;
         }
         map_user_page(USER_STACK_BASE + i * PAGE_SIZE, stack_phys);
@@ -154,7 +154,7 @@ void system_run_bin_args_impl(char *filename, int program_size, int argc, char *
     uint64_t user_argv = 0;
     if (prepare_user_arguments((uint8_t *)USER_STACK_BASE,
                                argc, argv, &user_argv) != 0) {
-        dogeio_text_println("[Error] Application arguments exceed the user stack.");
+        dogeio_println("[Error] Application arguments exceed the user stack.");
         cleanup_user_pages();
         return;
     }

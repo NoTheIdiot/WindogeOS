@@ -102,7 +102,7 @@ static void dump_stack_frames(uint64_t start_rip, uint64_t start_rbp, bool to_sc
     uint64_t rbp = start_rbp;
 
     if (to_screen) {
-        dogeio_text_println("--- Call Stack Trace ---");
+        dogeio_println("--- Call Stack Trace ---");
     } else {
         log("--- Call Stack Trace ---");
     }
@@ -121,7 +121,7 @@ static void dump_stack_frames(uint64_t start_rip, uint64_t start_rbp, bool to_sc
         str_strcat(line, buf);
 
         if (to_screen) {
-            dogeio_text_println(line);
+            dogeio_println(line);
         } else {
             log(line);
         }
@@ -169,34 +169,34 @@ void isr_common_handler(interrupt_frame_t *frame) {
             log(log_buf);
         }
 
-        dogeio_text_println("");
-        dogeio_text_color_change(COLOR_BRIGHT_RED);
+        dogeio_println("");
+        dogeio_color_change(COLOR_BRIGHT_RED);
         
         switch (frame->vector) {
             case 0:  
-                dogeio_text_println("[Error] Divide-by-Zero error in program.");
-                dogeio_text_println("You may revert version of the application, contact the developer");
-                dogeio_text_println("or if you wrote the code, check ya loops. Much Error.");
+                dogeio_println("[Error] Divide-by-Zero error in program.");
+                dogeio_println("You may revert version of the application, contact the developer");
+                dogeio_println("or if you wrote the code, check ya loops. Much Error.");
                 break;
             case 6:  
-                dogeio_text_println("[Error] Invalid opcode instruction executed."); 
-                dogeio_text_println("CPU has lower IQ than what the app expects.");
-                dogeio_text_println("If you wrote the code, maybe use less complex instructions.");
+                dogeio_println("[Error] Invalid opcode instruction executed."); 
+                dogeio_println("CPU has lower IQ than what the app expects.");
+                dogeio_println("If you wrote the code, maybe use less complex instructions.");
                 break;
             case 13: 
-                dogeio_text_println("[Error] General Protection Violation."); 
-                dogeio_text_println("App tried to touch the kernel, but kernel is pure uranium rods.");
-                dogeio_text_println("Not Wow.");
+                dogeio_println("[Error] General Protection Violation."); 
+                dogeio_println("App tried to touch the kernel, but kernel is pure uranium rods.");
+                dogeio_println("Not Wow.");
                 break;
             case 14: 
-                dogeio_text_println("[Error] Segmentation / Page Fault violation."); 
-                dogeio_text_println("App tried the touch memory that is NULL or not allocated.");
-                dogeio_text_println("If you wrote the code, check your pointers and also make");
-                dogeio_text_println("Conditions for NULL or memory access. Very Angy.");
+                dogeio_println("[Error] Segmentation / Page Fault violation."); 
+                dogeio_println("App tried the touch memory that is NULL or not allocated.");
+                dogeio_println("If you wrote the code, check your pointers and also make");
+                dogeio_println("Conditions for NULL or memory access. Very Angy.");
                 break;
             default: 
-                dogeio_text_println("[Error] Application exception intercepted.");
-                dogeio_text_println("I dont fucking know what happend, but is it broken.");
+                dogeio_println("[Error] Application exception intercepted.");
+                dogeio_println("I dont fucking know what happend, but is it broken.");
                 break;
         }
 
@@ -236,10 +236,10 @@ void isr_common_handler(interrupt_frame_t *frame) {
     dump_stack_frames(frame->rip, frame->rbp, false);
 
     while (true) {
-        dogeio_text_clear();
-        dogeio_text_color_change(COLOR_WHITE);
-        dogeio_text_background_change(COLOR_BLUE);
-        dogeio_text_clear();
+        dogeio_clear();
+        dogeio_color_change(COLOR_WHITE);
+        dogeio_background_change(COLOR_BLUE);
+        dogeio_clear();
 
         const char* error_panic[9] = {
             "    ##",
@@ -254,27 +254,27 @@ void isr_common_handler(interrupt_frame_t *frame) {
         };
 
         for (int i = 0; i < 9; i++) {
-            dogeio_text_println(error_panic[i]);
+            dogeio_println(error_panic[i]);
         }
         
-        dogeio_text_println(selected_option == 0 ? "-> [ Reboot Computer ]"   : "   [ Reboot Computer ]");
-        dogeio_text_println(selected_option == 1 ? "-> [ Shutdown Computer ]" : "   [ Shutdown Computer ]");
-        dogeio_text_println("");
+        dogeio_println(selected_option == 0 ? "-> [ Reboot Computer ]"   : "   [ Reboot Computer ]");
+        dogeio_println(selected_option == 1 ? "-> [ Shutdown Computer ]" : "   [ Shutdown Computer ]");
+        dogeio_println("");
 
         uint64_to_dec_forward(frame->vector, str_buf);
         str_strcpy(log_buf, "VECTOR: ");
         str_strcat(log_buf, str_buf);
-        dogeio_text_println(log_buf);
+        dogeio_println(log_buf);
 
         uint64_to_hex_forward(frame->rip, str_buf);
         str_strcpy(log_buf, "RIP: ");
         str_strcat(log_buf, str_buf);
-        dogeio_text_println(log_buf);
+        dogeio_println(log_buf);
 
         uint64_to_hex_forward(frame->error_code, str_buf);
         str_strcpy(log_buf, "ERR: ");
         str_strcat(log_buf, str_buf);
-        dogeio_text_println(log_buf);
+        dogeio_println(log_buf);
 
         if (frame->vector == 14) {
             uint64_t cr2;
@@ -282,10 +282,10 @@ void isr_common_handler(interrupt_frame_t *frame) {
             uint64_to_hex_forward(cr2, str_buf);
             str_strcpy(log_buf, "CR2: ");
             str_strcat(log_buf, str_buf);
-            dogeio_text_println(log_buf);
+            dogeio_println(log_buf);
         }
 
-        dogeio_text_println("");
+        dogeio_println("");
         dump_stack_frames(frame->rip, frame->rbp, true);
 
         while (true) {

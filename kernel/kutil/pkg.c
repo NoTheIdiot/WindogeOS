@@ -11,29 +11,29 @@
 
 int kernel_package(int argc, char **argv) {
     if (argc < 1 || str_strcmp(argv[0], "help") == 0 || str_strcmp(argv[0], "-h") == 0 || str_strcmp(argv[0], "--help") == 0) {
-        dogeio_text_println("--- Dogestore Package Manager Help ---");
-        dogeio_text_println("Usage: dogestore <command> [arguments]");
-        dogeio_text_println("");
-        dogeio_text_println("Commands:");
-        dogeio_text_println("  install <pkg>     Decompress and install an .rle package or folder ending with .rle from /apps/packages/");
-        dogeio_text_println("  uninstall <pkg>   Remove an installed package executable from /apps/");
-        dogeio_text_println("  list              Show uninstalled packages available for installation");
-        dogeio_text_println("  search <query>    Search for installable packages in the repository");
-        dogeio_text_println("  help              Display this help menu screen");
+        dogeio_println("--- Dogestore Package Manager Help ---");
+        dogeio_println("Usage: dogestore <command> [arguments]");
+        dogeio_println("");
+        dogeio_println("Commands:");
+        dogeio_println("  install <pkg>     Decompress and install an .rle package or folder ending with .rle from /apps/packages/");
+        dogeio_println("  uninstall <pkg>   Remove an installed package executable from /apps/");
+        dogeio_println("  list              Show uninstalled packages available for installation");
+        dogeio_println("  search <query>    Search for installable packages in the repository");
+        dogeio_println("  help              Display this help menu screen");
         return 0;
     }
 
     if (str_strcmp(argv[0], "install") == 0) {
         if (argc < 2) {
-            dogeio_text_println("[PKG] Error: Missing package name.");
-            dogeio_text_println("Usage: dogestore install <package_name>");
+            dogeio_println("[PKG] Error: Missing package name.");
+            dogeio_println("Usage: dogestore install <package_name>");
             return -1;
         }
         char *pkg_name = argv[1];
 
         if ((str_strlen(REPO_DIR) + str_strlen(pkg_name) + 5) >= MAX_PATH_LEN ||
             (str_strlen(APPS_DIR) + str_strlen(pkg_name) + 4) >= MAX_PATH_LEN) {
-            dogeio_text_println("[PKG] Error: Package name is too long.");
+            dogeio_println("[PKG] Error: Package name is too long.");
             return -1;
         }
 
@@ -44,7 +44,7 @@ int kernel_package(int argc, char **argv) {
         if (fs_isdir(pkg_path)) {
             size_t pkg_len = str_strlen(pkg_name);
             if (pkg_len <= 4 || str_strcmp(&pkg_name[pkg_len - 4], ".rle") != 0) {
-                dogeio_text_println("[PKG] Error: Folder name in repository must end with .rle.");
+                dogeio_println("[PKG] Error: Folder name in repository must end with .rle.");
                 return -1;
             }
 
@@ -57,7 +57,7 @@ int kernel_package(int argc, char **argv) {
             }
 
             if (fs_chdir(pkg_path) != 0) {
-                dogeio_text_println("[PKG] Error: Failed to enter package directory.");
+                dogeio_println("[PKG] Error: Failed to enter package directory.");
                 return -1;
             }
 
@@ -86,8 +86,8 @@ int kernel_package(int argc, char **argv) {
                     uint64_t sub_size = 0;
                     bool sub_is_dir = false;
                     if (fs_get_info(sub_src_path, &sub_size, &sub_is_dir) == 0 && !sub_is_dir && sub_size > 0) {
-                        dogeio_text_print("[PKG] Installing sub-package payload: ");
-                        dogeio_text_println(file_clean_name);
+                        dogeio_print("[PKG] Installing sub-package payload: ");
+                        dogeio_println(file_clean_name);
                         kernel_rle_decompress(sub_src_path, sub_size, sub_dst_path);
                         installed_any = 1;
                     }
@@ -97,9 +97,9 @@ int kernel_package(int argc, char **argv) {
             fs_chdir(original_dir);
 
             if (!installed_any) {
-                dogeio_text_println("[PKG] Warning: No valid .rle files found inside the package folder.");
+                dogeio_println("[PKG] Warning: No valid .rle files found inside the package folder.");
             } else {
-                dogeio_text_println("[PKG] Folder package installed successfully.");
+                dogeio_println("[PKG] Folder package installed successfully.");
             }
             return 0;
         }
@@ -118,25 +118,25 @@ int kernel_package(int argc, char **argv) {
         bool is_dir = false;
         
         if (fs_get_info(src_path, &src_size, &is_dir) != 0 || src_size == 0 || is_dir) {
-            dogeio_text_println("[PKG] Error: Package source file (.rle) does not exist in /apps/packages/.");
+            dogeio_println("[PKG] Error: Package source file (.rle) does not exist in /apps/packages/.");
             return -1;
         }
 
-        dogeio_text_println("[PKG] Decompressing package payload to /apps...");
+        dogeio_println("[PKG] Decompressing package payload to /apps...");
         kernel_rle_decompress(src_path, src_size, dst_path);
-        dogeio_text_println("[PKG] Package installed successfully.");
+        dogeio_println("[PKG] Package installed successfully.");
     } 
     else if (str_strcmp(argv[0], "uninstall") == 0) {
         if (argc < 2) {
-            dogeio_text_println("[PKG] Error: Missing package name.");
-            dogeio_text_println("Usage: dogestore uninstall <package_name>");
+            dogeio_println("[PKG] Error: Missing package name.");
+            dogeio_println("Usage: dogestore uninstall <package_name>");
             return -1;
         }
         char *pkg_name = argv[1];
 
         if ((str_strlen(REPO_DIR) + str_strlen(pkg_name) + 5) >= MAX_PATH_LEN ||
             (str_strlen(APPS_DIR) + str_strlen(pkg_name) + 4) >= MAX_PATH_LEN) {
-            dogeio_text_println("[PKG] Error: Package name is too long.");
+            dogeio_println("[PKG] Error: Package name is too long.");
             return -1;
         }
 
@@ -153,20 +153,20 @@ int kernel_package(int argc, char **argv) {
         uint64_t src_size = 0;
         bool is_dir = false;
         if (fs_get_info(src_path, &src_size, &is_dir) != 0 || src_size == 0) {
-            dogeio_text_println("[PKG] Error: Cannot uninstall. Matching source file (.rle) missing from /apps/packages/.");
+            dogeio_println("[PKG] Error: Cannot uninstall. Matching source file (.rle) missing from /apps/packages/.");
             return -1;
         }
 
         if (!fs_exists(dst_path)) {
-            dogeio_text_println("[PKG] Error: Package is not installed in /apps.");
+            dogeio_println("[PKG] Error: Package is not installed in /apps.");
             return -1;
         }
 
         if (fs_delete(dst_path)) {
-            dogeio_text_println("[PKG] Deleted executable application from /apps.");
-            dogeio_text_println("[PKG] Package uninstalled cleanly.");
+            dogeio_println("[PKG] Deleted executable application from /apps.");
+            dogeio_println("[PKG] Package uninstalled cleanly.");
         } else {
-            dogeio_text_println("[PKG] Error: Could not delete application file.");
+            dogeio_println("[PKG] Error: Could not delete application file.");
             return -1;
         }
     } 
@@ -176,9 +176,9 @@ int kernel_package(int argc, char **argv) {
 
         int rle_count = fs_list_files(REPO_DIR, rle_files, MAX_NAMES);
 
-        dogeio_text_println("--- Available Packages (Uninstalled) ---");
+        dogeio_println("--- Available Packages (Uninstalled) ---");
         if (rle_count <= 0) {
-            dogeio_text_println("No source packages found in /apps/packages/.");
+            dogeio_println("No source packages found in /apps/packages/.");
             return 0;
         }
 
@@ -201,20 +201,20 @@ int kernel_package(int argc, char **argv) {
                 str_strcat(check_bin, ".bin");
 
                 if (!fs_exists(check_bin)) {
-                    dogeio_text_print("-> ");
-                    dogeio_text_println(clean_name);
+                    dogeio_print("-> ");
+                    dogeio_println(clean_name);
                     shown_count++;
                 }
             }
         }
         if (shown_count == 0) {
-            dogeio_text_println("All repository packages are currently installed.");
+            dogeio_println("All repository packages are currently installed.");
         }
     }
     else if (str_strcmp(argv[0], "search") == 0) {
         if (argc < 2) {
-            dogeio_text_println("[PKG] Error: Missing search term.");
-            dogeio_text_println("Usage: dogestore search <query>");
+            dogeio_println("[PKG] Error: Missing search term.");
+            dogeio_println("Usage: dogestore search <query>");
             return -1;
         }
         char *search_term = argv[1];
@@ -225,12 +225,12 @@ int kernel_package(int argc, char **argv) {
 
         int rle_count = fs_list_files(REPO_DIR, rle_files, MAX_NAMES);
 
-        dogeio_text_print("--- Search Results for '");
-        dogeio_text_print(search_term);
-        dogeio_text_println("' ---");
+        dogeio_print("--- Search Results for '");
+        dogeio_print(search_term);
+        dogeio_println("' ---");
 
         if (rle_count <= 0) {
-            dogeio_text_println("No packages found in repository.");
+            dogeio_println("No packages found in repository.");
             return 0;
         }
 
@@ -272,25 +272,25 @@ int kernel_package(int argc, char **argv) {
                     str_strcat(check_bin, clean_name);
                     str_strcat(check_bin, ".bin");
 
-                    dogeio_text_print("-> ");
-                    dogeio_text_print(clean_name);
+                    dogeio_print("-> ");
+                    dogeio_print(clean_name);
                     if (fs_exists(check_bin)) {
-                        dogeio_text_println(" [Installed]");
+                        dogeio_println(" [Installed]");
                     } else {
-                        dogeio_text_println(" [Available]");
+                        dogeio_println(" [Available]");
                     }
                     found_count++;
                 }
             }
         }
         if (found_count == 0) {
-            dogeio_text_println("No matching packages found.");
+            dogeio_println("No matching packages found.");
         }
     }
     else {
-        dogeio_text_print("[PKG] Error: Unknown command '");
-        dogeio_text_print(argv[0]);
-        dogeio_text_println("'. Type 'dogestore help' for instructions.");
+        dogeio_print("[PKG] Error: Unknown command '");
+        dogeio_print(argv[0]);
+        dogeio_println("'. Type 'dogestore help' for instructions.");
         return -1;
     }
     return 0;

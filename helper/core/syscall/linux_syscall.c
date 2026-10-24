@@ -310,7 +310,7 @@ static uint64_t linux_read_fd(linux_file_descriptor_t *fd, uint64_t buffer,
             count = 256;
         }
         char input[257];
-        dogeio_text_input("", input, (size_t)count + 1);
+        dogeio_input("", input, (size_t)count + 1);
         size_t read_count;
         size_t input_capacity = (size_t)count + 1;
         size_t index = 0;
@@ -352,7 +352,7 @@ static uint64_t linux_write_fd(linux_file_descriptor_t *fd, uint64_t buffer,
     if (fd->is_terminal &&
         (fd == &file_descriptors[1] || fd == &file_descriptors[2])) {
         for (uint64_t i = 0; i < count; i++) {
-            dogeio_text_printchar(((const char *)buffer)[i]);
+            dogeio_printchar(((const char *)buffer)[i]);
         }
         return count;
     }

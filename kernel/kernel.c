@@ -133,7 +133,7 @@ void kernel_main(void) {
     if (memmap_request.response == NULL) {
         log("[Not Wow] Holy shit RAM does not exist.... How?");
         log("          memmap_request.response == NULL");
-        dogeio_text_println("[Not Wow] Memmap request does not respond. Not Wow.");
+        dogeio_println("[Not Wow] Memmap request does not respond. Not Wow.");
         cli();
         halt();
     }
@@ -196,7 +196,7 @@ void kernel_main(void) {
     log("[wow] all basic drivers done");
 
     log("WindogeOS fully booted. very wow. (clear screen and draw status bar)");
-    dogeio_text_clear();
+    dogeio_clear();
     menubar_draw();
 
     // enable interrupts
@@ -207,13 +207,13 @@ void kernel_main(void) {
         fs_set_auth_override(1);
 
         char proceed[1];
-        dogeio_text_color_change(0xE1B16C);
+        dogeio_color_change(0xE1B16C);
         for (int i = 0; i < 22; i++) {
-            dogeio_text_println(doge_ascii[i]);
+            dogeio_println(doge_ascii[i]);
         }
-        dogeio_text_color_change(COLOR_GRAY);
-        dogeio_text_println(" Welcome to WindogeOS setup! Such doge, very OS.");
-        dogeio_text_input(" Press enter to start setup.", proceed, 1);
+        dogeio_color_change(COLOR_GRAY);
+        dogeio_println(" Welcome to WindogeOS setup! Such doge, very OS.");
+        dogeio_input(" Press enter to start setup.", proceed, 1);
 
         log("\n[dogeing] creating folders");
         if (!fs_exists("/system")) {
@@ -237,19 +237,19 @@ void kernel_main(void) {
         char root_new[64];
 
         while (true) {
-            dogeio_text_clear();
-            dogeio_text_color_change(0xE1B16C);
+            dogeio_clear();
+            dogeio_color_change(0xE1B16C);
             for (int i = 0; i < 22; i++) {
-                dogeio_text_println(doge_ascii[i]);
+                dogeio_println(doge_ascii[i]);
             }
             
-            dogeio_text_color_change(COLOR_GRAY);
-            dogeio_text_println(" ===== ACCOUNT CREATION ===== ");
-            dogeio_text_println("\n Set the admin password. ");
-            dogeio_text_input(" [admin]> ", root_new, 64);
+            dogeio_color_change(COLOR_GRAY);
+            dogeio_println(" ===== ACCOUNT CREATION ===== ");
+            dogeio_println("\n Set the admin password. ");
+            dogeio_input(" [admin]> ", root_new, 64);
             clean_input_string(root_new);
             if (root_new[0] == '\0') {
-                dogeio_text_println(" Password cannot be empty.");
+                dogeio_println(" Password cannot be empty.");
                 dogeio_get_key();
                 continue;
             }
@@ -259,37 +259,37 @@ void kernel_main(void) {
         system_create_user("admin", root_new, 0);
 
         while (true) {
-            dogeio_text_clear();
-            dogeio_text_color_change(0xE1B16C);
+            dogeio_clear();
+            dogeio_color_change(0xE1B16C);
             for (int i = 0; i < 22; i++) {
-                dogeio_text_println(doge_ascii[i]);
+                dogeio_println(doge_ascii[i]);
             }
             
-            dogeio_text_color_change(COLOR_GRAY);
-            dogeio_text_println("\n ===== ACCOUNT CREATION ===== ");
-            dogeio_text_println("\n Create system username and password.");
-            dogeio_text_input(" [username]> ", username_new, 64);
+            dogeio_color_change(COLOR_GRAY);
+            dogeio_println("\n ===== ACCOUNT CREATION ===== ");
+            dogeio_println("\n Create system username and password.");
+            dogeio_input(" [username]> ", username_new, 64);
             clean_input_string(username_new);
 
             if (username_new[0] == '\0') {
-                dogeio_text_println("Username cannot be empty.");
-                dogeio_text_println(" Press Enter to continue...");
+                dogeio_println("Username cannot be empty.");
+                dogeio_println(" Press Enter to continue...");
                 dogeio_get_key();
                 continue;
             }
 
             if (str_strcmp(username_new, "admin") == 0) {
-                dogeio_text_println(" Username cannot be 'admin'.");
-                dogeio_text_println(" Press Enter to continue...");
+                dogeio_println(" Username cannot be 'admin'.");
+                dogeio_println(" Press Enter to continue...");
                 dogeio_get_key();
                 continue;
             }
             
-            dogeio_text_input(" [password]> ", password_new, 64);
+            dogeio_input(" [password]> ", password_new, 64);
             clean_input_string(password_new);
             if (password_new[0] == '\0') {
-                dogeio_text_println(" Password cannot be empty.");
-                dogeio_text_println(" Press Enter to continue...");
+                dogeio_println(" Password cannot be empty.");
+                dogeio_println(" Press Enter to continue...");
                 dogeio_get_key();
                 continue;
             }
@@ -297,18 +297,18 @@ void kernel_main(void) {
         }
 
         while (true) {
-            dogeio_text_clear();
-            dogeio_text_color_change(0xE1B16C);
+            dogeio_clear();
+            dogeio_color_change(0xE1B16C);
             for (int i = 0; i < 22; i++) {
-                dogeio_text_println(doge_ascii[i]);
+                dogeio_println(doge_ascii[i]);
             }
-            dogeio_text_color_change(COLOR_GRAY);
-            dogeio_text_println("\n ===== ACCOUNT CREATION ===== ");
-            dogeio_text_println(" Name your computer (old or new)");
-            dogeio_text_input("\n [name]> ", computer_name, 64);
+            dogeio_color_change(COLOR_GRAY);
+            dogeio_println("\n ===== ACCOUNT CREATION ===== ");
+            dogeio_println(" Name your computer (old or new)");
+            dogeio_input("\n [name]> ", computer_name, 64);
             if (computer_name[0] == '\0') {
-                dogeio_text_println(" Computer name cannot be empty.");
-                dogeio_text_println(" Press Enter to continue...");
+                dogeio_println(" Computer name cannot be empty.");
+                dogeio_println(" Press Enter to continue...");
                 dogeio_get_key();
                 continue;
             }
@@ -318,56 +318,56 @@ void kernel_main(void) {
         log("[dogeing] creating accounts");
         system_create_user(username_new, password_new, 1);
         
-        dogeio_text_clear();
-        dogeio_text_color_change(0xE1B16C);
+        dogeio_clear();
+        dogeio_color_change(0xE1B16C);
         for (int i = 0; i < 22; i++) {
-            dogeio_text_println(doge_ascii[i]);
+            dogeio_println(doge_ascii[i]);
         }
-        dogeio_text_color_change(COLOR_GRAY);
-        dogeio_text_println("\n ===== USER PREFERENCES =====");
+        dogeio_color_change(COLOR_GRAY);
+        dogeio_println("\n ===== USER PREFERENCES =====");
 
-        dogeio_text_println(" Select Default Font:");
-        dogeio_text_println(" 1. PC IBM (Default)");
-        dogeio_text_println(" 2. Ubuntu Mono");
-        dogeio_text_println(" 3. Terminus");
-        dogeio_text_println(" 4. Tamzen");
-        dogeio_text_println(" 5. Spleen");
+        dogeio_println(" Select Default Font:");
+        dogeio_println(" 1. PC IBM (Default)");
+        dogeio_println(" 2. Ubuntu Mono");
+        dogeio_println(" 3. Terminus");
+        dogeio_println(" 4. Tamzen");
+        dogeio_println(" 5. Spleen");
         char font_choice[8];
-        dogeio_text_input(" Choice [1-5, default 1]: ", font_choice, sizeof(font_choice));
+        dogeio_input(" Choice [1-5, default 1]: ", font_choice, sizeof(font_choice));
         const char *font_val = "pc_ibm";
         if      (font_choice[0] == '2') font_val = "ubuntu_mono";
         else if (font_choice[0] == '3') font_val = "terminus";
         else if (font_choice[0] == '4') font_val = "tamzen";
         else if (font_choice[0] == '5') font_val = "spleen";
 
-        dogeio_text_clear();
-        dogeio_text_color_change(0xE1B16C);
+        dogeio_clear();
+        dogeio_color_change(0xE1B16C);
         for (int i = 0; i < 22; i++) {
-            dogeio_text_println(doge_ascii[i]);
+            dogeio_println(doge_ascii[i]);
         }
-        dogeio_text_color_change(COLOR_GRAY);
-        dogeio_text_println("\n ===== USER PREFERENCES ===== ");
-        dogeio_text_println("\n Select Default Shell:");
-        dogeio_text_println(" 1. Dogeshell (Default)");
-        dogeio_text_println(" 2. Bash");
+        dogeio_color_change(COLOR_GRAY);
+        dogeio_println("\n ===== USER PREFERENCES ===== ");
+        dogeio_println("\n Select Default Shell:");
+        dogeio_println(" 1. Dogeshell (Default)");
+        dogeio_println(" 2. Bash");
         char shell_choice[8];
-        dogeio_text_input(" Choice [1-2, default 1]: ", shell_choice, sizeof(shell_choice));
+        dogeio_input(" Choice [1-2, default 1]: ", shell_choice, sizeof(shell_choice));
         const char *shell_val = (shell_choice[0] == '2') ? "bash" : "dogeshell";
 
-        dogeio_text_clear();
-        dogeio_text_color_change(0xE1B16C);
+        dogeio_clear();
+        dogeio_color_change(0xE1B16C);
         for (int i = 0; i < 22; i++) {
-            dogeio_text_println(doge_ascii[i]);
+            dogeio_println(doge_ascii[i]);
         }
-        dogeio_text_color_change(COLOR_GRAY);
-        dogeio_text_println("\n ===== USER PREFERENCES ===== ");
-        dogeio_text_println("\n Select Default Text Color:");
-        dogeio_text_println(" 1. Gray (Default)");
-        dogeio_text_println(" 2. White");
-        dogeio_text_println(" 3. Green");
-        dogeio_text_println(" 4. Cyan");
+        dogeio_color_change(COLOR_GRAY);
+        dogeio_println("\n ===== USER PREFERENCES ===== ");
+        dogeio_println("\n Select Default Text Color:");
+        dogeio_println(" 1. Gray (Default)");
+        dogeio_println(" 2. White");
+        dogeio_println(" 3. Green");
+        dogeio_println(" 4. Cyan");
         char color_choice[8];
-        dogeio_text_input(" Choice [1-4, default 1]: ", color_choice, sizeof(color_choice));
+        dogeio_input(" Choice [1-4, default 1]: ", color_choice, sizeof(color_choice));
         const char *color_val = "gray";
         if      (color_choice[0] == '2') color_val = "white";
         else if (color_choice[0] == '3') color_val = "green";
@@ -389,14 +389,14 @@ void kernel_main(void) {
         log("[wow] setup complete");
         log("[dogeing] prompting for reboot");
 
-        dogeio_text_clear();
-        dogeio_text_color_change(0xE1B16C);
+        dogeio_clear();
+        dogeio_color_change(0xE1B16C);
         for (int i = 0; i < 22; i++) {
-            dogeio_text_println(doge_ascii[i]);
+            dogeio_println(doge_ascii[i]);
         }
-        dogeio_text_color_change(COLOR_GRAY);
+        dogeio_color_change(COLOR_GRAY);
         char nothing[1];
-        dogeio_text_input("\n Press enter to reboot... ", nothing, 1);
+        dogeio_input("\n Press enter to reboot... ", nothing, 1);
         fs_set_auth_override(0);
         core_reboot();
     }
@@ -406,18 +406,18 @@ void kernel_main(void) {
     fs_set_auth_override(1);
 
     char username[64];
-    dogeio_text_color_change(0xE1B16C);
+    dogeio_color_change(0xE1B16C);
     for (int i = 0; i < 22; i++) {
-        dogeio_text_println(doge_ascii[i]);
+        dogeio_println(doge_ascii[i]);
     }
-    dogeio_text_color_change(COLOR_GRAY);
-    dogeio_text_println(" Welcome back!");
+    dogeio_color_change(COLOR_GRAY);
+    dogeio_println(" Welcome back!");
     while (true) {
         char password[64];
 
         // looks nicer...
-        dogeio_text_input(" [username]> ", username, 64);
-        dogeio_text_input(" [password]> ", password, 64);
+        dogeio_input(" [username]> ", username, 64);
+        dogeio_input(" [password]> ", password, 64);
 
         clean_input_string(username);
         clean_input_string(password);
@@ -427,7 +427,7 @@ void kernel_main(void) {
             fs_set_auth_override(0);
             break;
         }
-        dogeio_text_println("wrong username or password :(");
+        dogeio_println("wrong username or password :(");
     }
 
     system_load_settings();
@@ -437,11 +437,11 @@ void kernel_main(void) {
     str_strcat(userpath, username);
     fs_chdir(userpath);
 
-    dogeio_text_clear();
+    dogeio_clear();
     
     char buffer[1024];
     fs_read("/apps/text/boot.txt", buffer, 1024);
-    dogeio_text_print(buffer);
+    dogeio_print(buffer);
 
     log("Starting the default shell");
     system_start_default_shell();

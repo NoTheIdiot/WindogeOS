@@ -610,7 +610,7 @@ uint64_t syscall_handler(syscall_registers_t *regs) {
         case EXPAND_USER_PAGES: {
             uint64_t phys = pmm_alloc_zeroed_page();
             if (!phys) {
-                dogeio_text_println("[Error] Out of RAM!");
+                dogeio_println("[Error] Out of RAM!");
             }
             return 1;
         }
@@ -711,7 +711,7 @@ uint64_t syscall_handler(syscall_registers_t *regs) {
                 return (uint64_t)-1;
             }
             
-            dogeio_text_print(text);
+            dogeio_print(text);
             ret_val = 1;
             break;
         }
@@ -723,14 +723,14 @@ uint64_t syscall_handler(syscall_registers_t *regs) {
                 return (uint64_t)-1;
             }
             
-            dogeio_text_println(text);
+            dogeio_println(text);
             ret_val = 1;
             break;
         }
 
         case CLEAR: {
             log("[syscall] CLEAR entered");
-            dogeio_text_clear();
+            dogeio_clear();
             log("[syscall] CLEAR returned");
             ret_val = 1;
             break;
@@ -745,7 +745,7 @@ uint64_t syscall_handler(syscall_registers_t *regs) {
                 return (uint64_t)-1;
             }
 
-            dogeio_text_input(prompt, (char *)regs->rsi, (size_t)capacity);
+            dogeio_input(prompt, (char *)regs->rsi, (size_t)capacity);
             size_t input_length;
             if (!user_string_length(regs->rsi, capacity, &input_length)) {
                 return (uint64_t)-1;
@@ -768,18 +768,18 @@ uint64_t syscall_handler(syscall_registers_t *regs) {
                 return (uint64_t)-1;
             }
 
-            dogeio_text_print_at(text, x, y, color);
+            dogeio_print_at(text, x, y, color);
             ret_val = 1;
             break;
         }
 
         case TEXT_COLOR:
-            dogeio_text_color_change((uint32_t)regs->rdi);
+            dogeio_color_change((uint32_t)regs->rdi);
             ret_val = 1;
             break;
 
         case BACKGROUND_COLOR:
-            dogeio_text_background_change((uint32_t)regs->rdi);
+            dogeio_background_change((uint32_t)regs->rdi);
             ret_val = 1;
             break;
 
@@ -964,7 +964,7 @@ uint64_t syscall_handler(syscall_registers_t *regs) {
         }
 
         case CLEAR_RAW: {
-            dogeio_text_clear_raw();
+            dogeio_clear_raw();
             ret_val = 1;
             break;
         }
@@ -975,7 +975,7 @@ uint64_t syscall_handler(syscall_registers_t *regs) {
         }
 
         case SPECIAL:
-            dogeio_text_println("TESTING");
+            dogeio_println("TESTING");
             log("TESTING");
             ret_val = 1;
             break;

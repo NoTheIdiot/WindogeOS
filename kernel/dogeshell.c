@@ -54,15 +54,15 @@ uint32_t saved_color = 0xFFCCCCCC;
 
 static void settings_draw_menu(const char *title, const char *const *items,
                              size_t item_count, size_t selected) {
-    dogeio_text_clear();
-    dogeio_text_println(title);
-    dogeio_text_println("");
+    dogeio_clear();
+    dogeio_println(title);
+    dogeio_println("");
     for (size_t i = 0; i < item_count; i++) {
-        dogeio_text_print(i == selected ? "  > " : "    ");
-        dogeio_text_println(items[i]);
+        dogeio_print(i == selected ? "  > " : "    ");
+        dogeio_println(items[i]);
     }
-    dogeio_text_println("");
-    dogeio_text_println("Use Up/Down and Enter. Backspace returns.");
+    dogeio_println("");
+    dogeio_println("Use Up/Down and Enter. Backspace returns.");
 }
 
 static uint16_t settings_wait_key(void) {
@@ -89,21 +89,21 @@ void get_all_fucking_ram(void) {
     }
 
     char debug_buf[32];
-    dogeio_text_println("\n--- Memory Map Breakdown ---");
+    dogeio_println("\n--- Memory Map Breakdown ---");
     for (int t = 0; t < 8; t++) {
-        dogeio_text_print("Type ");
+        dogeio_print("Type ");
         str_kutoa((uint64_t)t, debug_buf); 
-        dogeio_text_print(debug_buf);
-        dogeio_text_print(": ");
+        dogeio_print(debug_buf);
+        dogeio_print(": ");
         str_kutoa(type_counts[t] / 1024, debug_buf); 
-        dogeio_text_print(debug_buf);
-        dogeio_text_println(" KB");
+        dogeio_print(debug_buf);
+        dogeio_println(" KB");
     }
 }
 
 static inline int dogeshell_list_pci(void) {
-    dogeio_text_println("ADDRESS    IDENTITY DESCRIPTION & [VENDOR:DEVICE ID]");
-    dogeio_text_println("---------------------------------------------------------");
+    dogeio_println("ADDRESS    IDENTITY DESCRIPTION & [VENDOR:DEVICE ID]");
+    dogeio_println("---------------------------------------------------------");
     for (uint16_t bus = 0; bus < 256; bus++) {
         for (uint8_t slot = 0; slot < 32; slot++) {
             for (uint8_t function = 0; function < 8; function++) {
@@ -118,21 +118,21 @@ static inline int dogeshell_list_pci(void) {
                 uint8_t class_code = pci_read_8((uint8_t)bus, slot, function, 0x0B);
                 char function_text[2] = {(char)('0' + function), '\0'};
                 dogeio_print_hex8((uint8_t)bus);
-                dogeio_text_print(":");
+                dogeio_print(":");
                 dogeio_print_hex8(slot);
-                dogeio_text_print(".");
-                dogeio_text_print(function_text);
-                dogeio_text_print("    ");
-                dogeio_text_print(pci_class_to_name(class_code));
-                dogeio_text_print(" [");
+                dogeio_print(".");
+                dogeio_print(function_text);
+                dogeio_print("    ");
+                dogeio_print(pci_class_to_name(class_code));
+                dogeio_print(" [");
                 dogeio_print_hex16(vendor);
-                dogeio_text_print(":");
+                dogeio_print(":");
                 dogeio_print_hex16(device);
-                dogeio_text_println("]");
+                dogeio_println("]");
             }
         }
     }
-    dogeio_text_println("\nPress any key to return...");
+    dogeio_println("\nPress any key to return...");
     return 0;
 }
 
@@ -172,8 +172,8 @@ void system_load_settings(void) {
 
     bytes_read = fs_read(settings_path, contents, sizeof(contents) - 1);
     if (bytes_read < 0) {
-        dogeio_text_println("Settings error: unable to read /.windoge.");
-        dogeio_text_color_change(saved_color);
+        dogeio_println("Settings error: unable to read /.windoge.");
+        dogeio_color_change(saved_color);
         return;
     }
     contents[bytes_read] = '\0';
@@ -204,7 +204,7 @@ void system_load_settings(void) {
             line++;
         }
     }
-    dogeio_text_color_change(saved_color);
+    dogeio_color_change(saved_color);
 }
 
 static inline int settings_save(void) {
@@ -225,31 +225,31 @@ static inline int settings_save(void) {
 
 static void settings_show_system_information(void) {
     char ram_buffer[32];
-    dogeio_text_clear();
-    dogeio_text_println("[ System Information ]\n");
-    dogeio_text_print("Version: ");
-    dogeio_text_println(windoge_version);
-    dogeio_text_print("CPU: ");
-    dogeio_text_println(cpuid());
-    dogeio_text_print("RAM: ");
-    dogeio_text_print(uint64_to_str(get_ram() / 1024 / 1024, ram_buffer));
-    dogeio_text_println(" MB");
-    dogeio_text_println("");
-    dogeio_text_println("Press any key to return...");
+    dogeio_clear();
+    dogeio_println("[ System Information ]\n");
+    dogeio_print("Version: ");
+    dogeio_println(windoge_version);
+    dogeio_print("CPU: ");
+    dogeio_println(cpuid());
+    dogeio_print("RAM: ");
+    dogeio_print(uint64_to_str(get_ram() / 1024 / 1024, ram_buffer));
+    dogeio_println(" MB");
+    dogeio_println("");
+    dogeio_println("Press any key to return...");
     settings_wait_key();
 }
 
 static void settings_draw_color_menu(size_t selected) {
     size_t color_count = sizeof(settings_colors) / sizeof(settings_colors[0]);
-    dogeio_text_clear();
-    dogeio_text_println("[ Default Text Color ]");
-    dogeio_text_println("");
+    dogeio_clear();
+    dogeio_println("[ Default Text Color ]");
+    dogeio_println("");
     for (size_t i = 0; i < color_count; i++) {
-        dogeio_text_print(i == selected ? "  > " : "    ");
-        dogeio_text_println(settings_colors[i].label);
+        dogeio_print(i == selected ? "  > " : "    ");
+        dogeio_println(settings_colors[i].label);
     }
-    dogeio_text_println("");
-    dogeio_text_println("Use Up/Down and Enter. Backspace returns.");
+    dogeio_println("");
+    dogeio_println("Use Up/Down and Enter. Backspace returns.");
 }
 
 static void settings_select_color(void) {
@@ -272,11 +272,11 @@ static void settings_select_color(void) {
         case KEY_ENTER:
             selected_color = selected;
             saved_color = settings_colors[selected_color].color;
-            dogeio_text_color_change(saved_color);
+            dogeio_color_change(saved_color);
             if (settings_save() != 0) {
-                dogeio_text_println("Unable to save settings to /.windoge.");
+                dogeio_println("Unable to save settings to /.windoge.");
             } else {
-                dogeio_text_println("Default text color saved.");
+                dogeio_println("Default text color saved.");
             }
             settings_wait_key();
             return;
@@ -304,9 +304,9 @@ static void settings_select_shell(void) {
         case KEY_ENTER:
             default_shell_is_bash = selected == 1;
             if (settings_save() != 0) {
-                dogeio_text_println("Unable to save settings to /.windoge.");
+                dogeio_println("Unable to save settings to /.windoge.");
             } else {
-                dogeio_text_println("Default shell saved. It will be used after reboot.");
+                dogeio_println("Default shell saved. It will be used after reboot.");
             }
             settings_wait_key();
             return;
@@ -341,9 +341,9 @@ static void settings_select_font(void) {
             selected_font_idx = selected;
             dogeio_set_font(settings_fonts[selected_font_idx].font_ptr);
             if (settings_save() != 0) {
-                dogeio_text_println("Unable to save settings to /.windoge.");
+                dogeio_println("Unable to save settings to /.windoge.");
             } else {
-                dogeio_text_println("Font settings saved.");
+                dogeio_println("Font settings saved.");
             }
             settings_wait_key();
             return;
@@ -393,16 +393,16 @@ static void settings_user_accounts(void) {
             if (selected == 0) {
                 char login_user[64];
                 char login_pass[64];
-                dogeio_text_clear();
-                dogeio_text_println("[ Switch User / Login ]\n");
-                dogeio_text_input("Username: ", login_user, sizeof(login_user));
+                dogeio_clear();
+                dogeio_println("[ Switch User / Login ]\n");
+                dogeio_input("Username: ", login_user, sizeof(login_user));
                 clean_string(login_user);
                 if (login_user[0] == '\0') {
-                    dogeio_text_println("Username cannot be empty.");
+                    dogeio_println("Username cannot be empty.");
                     settings_wait_key();
                     break;
                 }
-                dogeio_text_input("Password: ", login_pass, sizeof(login_pass));
+                dogeio_input("Password: ", login_pass, sizeof(login_pass));
                 clean_string(login_pass);
 
                 if (system_verify_user(login_user, login_pass)) {
@@ -411,35 +411,35 @@ static void settings_user_accounts(void) {
                     str_strcpy(userpath, "/users/");
                     str_strcat(userpath, login_user);
                     fs_chdir(userpath);
-                    dogeio_text_print("\nSuccessfully logged in as ");
-                    dogeio_text_println(login_user);
+                    dogeio_print("\nSuccessfully logged in as ");
+                    dogeio_println(login_user);
                 } else {
-                    dogeio_text_println("\nInvalid username or password.");
+                    dogeio_println("\nInvalid username or password.");
                 }
                 settings_wait_key();
             } else if (selected == 1) {
                 char new_user[64];
                 char new_pass[64];
-                dogeio_text_clear();
-                dogeio_text_println("[ Create New User ]\n");
-                dogeio_text_input("Enter username: ", new_user, sizeof(new_user));
+                dogeio_clear();
+                dogeio_println("[ Create New User ]\n");
+                dogeio_input("Enter username: ", new_user, sizeof(new_user));
                 clean_string(new_user);
                 if (new_user[0] == '\0') {
-                    dogeio_text_println("Username cannot be empty.");
+                    dogeio_println("Username cannot be empty.");
                     settings_wait_key();
                     break;
                 }
-                dogeio_text_input("Enter password: ", new_pass, sizeof(new_pass));
+                dogeio_input("Enter password: ", new_pass, sizeof(new_pass));
                 clean_string(new_pass);
                 if (new_pass[0] == '\0') {
-                    dogeio_text_println("Password cannot be empty.");
+                    dogeio_println("Password cannot be empty.");
                     settings_wait_key();
                     break;
                 }
                 if (system_create_user(new_user, new_pass, 1)) {
-                    dogeio_text_println("\nUser created successfully!");
+                    dogeio_println("\nUser created successfully!");
                 } else {
-                    dogeio_text_println("\nFailed to create user.");
+                    dogeio_println("\nFailed to create user.");
                 }
                 settings_wait_key();
             } else {
@@ -476,8 +476,8 @@ void system_settings(void) {
             break;
         case KEY_BACKSPACE:
         case (uint16_t)'q':
-            dogeio_text_clear();
-            dogeio_text_color_change(saved_color);
+            dogeio_clear();
+            dogeio_color_change(saved_color);
             return;
         case KEY_ENTER:
             switch (selected) {
@@ -491,7 +491,7 @@ void system_settings(void) {
                 settings_select_shell();
                 break;
             case 3:
-                dogeio_text_clear();
+                dogeio_clear();
                 dogeshell_list_pci(); 
                 settings_wait_key();
                 break;
@@ -505,12 +505,12 @@ void system_settings(void) {
                 settings_user_accounts();
                 break;
             case 7:
-                dogeio_text_clear();
-                dogeio_text_color_change(saved_color);
+                dogeio_clear();
+                dogeio_color_change(saved_color);
                 return;
             default:
-                dogeio_text_clear();
-                dogeio_text_color_change(saved_color);
+                dogeio_clear();
+                dogeio_color_change(saved_color);
                 return;
             }
         }
@@ -723,11 +723,11 @@ static int dogeshell_resolve_path(const char *input, char *output,
 static int dogeshell_authorize_path(const char *path, char *resolved,
                                     size_t resolved_size) {
     if (dogeshell_resolve_path(path, resolved, resolved_size) != 0) {
-        dogeio_text_println("Error: invalid or overlong path.");
+        dogeio_println("Error: invalid or overlong path.");
         return 0;
     }
     if (!system_can_access_path(current_user, resolved)) {
-        dogeio_text_println("Error: permission denied.");
+        dogeio_println("Error: permission denied.");
         return 0;
     }
     return 1;
@@ -795,7 +795,7 @@ static void dogeshell_print_help(void) {
         " Use ; between commands. Quoted or escaped semicolons are literal. Paths may be quoted; use ~ for your home directory."
     };
     for (size_t i = 0; i < sizeof(help) / sizeof(help[0]); i++) {
-        dogeio_text_println(help[i]);
+        dogeio_println(help[i]);
     }
 }
 
@@ -805,26 +805,26 @@ static int dogeshell_show_history(void) {
     int bytes_read;
 
     if (dogeshell_history_path(path, sizeof(path)) != 0) {
-        dogeio_text_println("History error: path is too long.");
+        dogeio_println("History error: path is too long.");
         return 1;
     }
     bytes_read = fs_read(path, contents, sizeof(contents) - 1);
     if (bytes_read < 0) {
-        dogeio_text_println("No history available.");
+        dogeio_println("No history available.");
         return 1;
     }
     if (bytes_read == 0) {
-        dogeio_text_println("No history available.");
+        dogeio_println("No history available.");
         return 0;
     }
     if (bytes_read >= (int)sizeof(contents)) {
-        dogeio_text_println("History error: invalid file size.");
+        dogeio_println("History error: invalid file size.");
         return 1;
     }
     contents[bytes_read] = '\0';
-    dogeio_text_print(contents);
+    dogeio_print(contents);
     if (contents[bytes_read - 1] != '\n') {
-        dogeio_text_println("");
+        dogeio_println("");
     }
     return 0;
 }
@@ -833,13 +833,13 @@ static int dogeshell_print_file(const char *path) {
     static char contents[8192];
     int bytes_read = fs_read((char *)path, contents, sizeof(contents) - 1);
     if (bytes_read < 0 || bytes_read >= (int)sizeof(contents)) {
-        dogeio_text_println("Unable to read file.");
+        dogeio_println("Unable to read file.");
         return 1;
     }
     contents[bytes_read] = '\0';
-    dogeio_text_print(contents);
+    dogeio_print(contents);
     if (bytes_read == 0 || contents[bytes_read - 1] != '\n') {
-        dogeio_text_println("");
+        dogeio_println("");
     }
     return 0;
 }
@@ -912,7 +912,7 @@ static int dogeshell_list_apps(void) {
         "/apps", dogeshell_app_names,
         sizeof(dogeshell_app_names) / sizeof(dogeshell_app_names[0]));
     if (app_count < 0) {
-        dogeio_text_println("Error: unable to list /apps.");
+        dogeio_println("Error: unable to list /apps.");
         return 1;
     }
 
@@ -931,13 +931,13 @@ static int dogeshell_list_apps(void) {
             continue;
         }
 
-        dogeio_text_print("  ");
-        dogeio_text_println(dogeshell_app_names[i]);
+        dogeio_print("  ");
+        dogeio_println(dogeshell_app_names[i]);
         printed_count++;
     }
 
     if (printed_count == 0) {
-        dogeio_text_println("No apps are installed in /apps.");
+        dogeio_println("No apps are installed in /apps.");
     }
     return 0;
 }
@@ -969,7 +969,7 @@ static int dogeshell_execute(int argc, char **argv) {
             }
             
             else {
-                dogeio_text_println("Help for that doesn't exists :(");
+                dogeio_println("Help for that doesn't exists :(");
                 return 1;
             }
         }
@@ -980,18 +980,18 @@ static int dogeshell_execute(int argc, char **argv) {
     if (str_strcmp(argv[0], "print") == 0 || str_strcmp(argv[0], "echo") == 0) {
         char output[DOGESHELL_LINE_SIZE];
         if (dogeshell_join_arguments(argc, argv, 1, output, sizeof(output)) != 0) {
-            dogeio_text_println("Error: text is too long.");
+            dogeio_println("Error: text is too long.");
             return 1;
         }
-        dogeio_text_println(output);
+        dogeio_println(output);
         return 0;
     }
     if (str_strcmp(argv[0], "clear") == 0) {
-        dogeio_text_clear();
+        dogeio_clear();
         return 0;
     }
     if (str_strcmp(argv[0], "ver") == 0) {
-        dogeio_text_println(dogeshell_version);
+        dogeio_println(dogeshell_version);
         return 0;
     }
     if (str_strcmp(argv[0], "history") == 0) {
@@ -1000,38 +1000,38 @@ static int dogeshell_execute(int argc, char **argv) {
     if (str_strcmp(argv[0], "clear-history") == 0) {
         char history_path[160];
         if (dogeshell_history_path(history_path, sizeof(history_path)) != 0) {
-            dogeio_text_println("History error: path is too long.");
+            dogeio_println("History error: path is too long.");
             return 1;
         }
         if (fs_exists(history_path) && fs_delete(history_path) != 1) {
-            dogeio_text_println("History error: unable to delete history.");
+            dogeio_println("History error: unable to delete history.");
             return 1;
         }
         if (fs_create(history_path) != 0) {
-            dogeio_text_println("History error: unable to create history.");
+            dogeio_println("History error: unable to create history.");
             return 1;
         }
-        dogeio_text_println("History cleared.");
+        dogeio_println("History cleared.");
         return 0;
     }
     if (str_strcmp(argv[0], "shutdown") == 0 ||
         str_strcmp(argv[0], "poweroff") == 0) {
-        dogeio_text_clear_raw();
-        dogeio_text_println("Such shutdown, very goodbye.");
+        dogeio_clear_raw();
+        dogeio_println("Such shutdown, very goodbye.");
         core_shutdown();
         return 0;
     }
     if (str_strcmp(argv[0], "reboot") == 0 ||
         str_strcmp(argv[0], "restart") == 0) {
-        dogeio_text_clear_raw();
-        dogeio_text_println("Very reboot, much restart.");
+        dogeio_clear_raw();
+        dogeio_println("Very reboot, much restart.");
         core_reboot();
         return 0;
     }
 
     if (str_strcmp(argv[0], "dogestore") == 0) {
         if (argc < 2) {
-            dogeio_text_println("Usage: dogestore <command> [args...]");
+            dogeio_println("Usage: dogestore <command> [args...]");
             return 1;
         }
 
@@ -1050,7 +1050,7 @@ static int dogeshell_execute(int argc, char **argv) {
             } else if (directory == NULL) {
                 directory = argv[i];
             } else {
-                dogeio_text_println("Usage: dir [location] [--hidden]");
+                dogeio_println("Usage: dir [location] [--hidden]");
                 return 1;
             }
         }
@@ -1066,14 +1066,14 @@ static int dogeshell_execute(int argc, char **argv) {
     if (str_strcmp(argv[0], "pack") == 0) {
         if (argc == 2) {
             if (str_strcmp(argv[1], "--help") == 0) {
-                dogeio_text_println("RLEPACK (Kernel Package Utility)");
-                dogeio_text_println("Usage: pack [file]");
+                dogeio_println("RLEPACK (Kernel Package Utility)");
+                dogeio_println("Usage: pack [file]");
                 return 1;
             }
         }
 
         if (argc != 2 || argv[1] == NULL || argv[1][0] == '\0') {
-            dogeio_text_println("Usage: pack [file]");
+            dogeio_println("Usage: pack [file]");
             return 2;
         }
 
@@ -1082,12 +1082,12 @@ static int dogeshell_execute(int argc, char **argv) {
         bool is_dir = false;
 
         if (fs_get_info(target_filename, &file_size, &is_dir) != 0) {
-            dogeio_text_println("Error: Target file does not exist.");
+            dogeio_println("Error: Target file does not exist.");
             return -1;
         }
 
         if (is_dir) {
-            dogeio_text_println("Error: Cannot pack a directory.");
+            dogeio_println("Error: Cannot pack a directory.");
             return -1;
         }
 
@@ -1096,12 +1096,12 @@ static int dogeshell_execute(int argc, char **argv) {
         for (int i = 0; i < 256; i++) out_name[i] = '\0';
 
         if (len >= 250) {
-            dogeio_text_println("Error: Filename too long.");
+            dogeio_println("Error: Filename too long.");
             return -1;
         }
 
         if (len > 4 && str_strcmp(target_filename + len - 4, ".rle") == 0) {
-            dogeio_text_println("Action: Decompressing archive stream...");
+            dogeio_println("Action: Decompressing archive stream...");
             
             str_strcpy(out_name, target_filename);
             out_name[len - 4] = '\0';
@@ -1109,7 +1109,7 @@ static int dogeshell_execute(int argc, char **argv) {
             kernel_rle_decompress(target_filename, file_size, out_name);
         } 
         else {
-            dogeio_text_println("Action: Compressing raw binary target...");
+            dogeio_println("Action: Compressing raw binary target...");
 
             str_strcpy(out_name, target_filename);
             str_strcat(out_name, ".rle");
@@ -1121,39 +1121,39 @@ static int dogeshell_execute(int argc, char **argv) {
 
     if (str_strcmp(argv[0], "create") == 0 || str_strcmp(argv[0], "touch") == 0) {
         if (argc != 2) {
-            dogeio_text_println("Usage: create <file>");
+            dogeio_println("Usage: create <file>");
             return 1;
         }
         if (!dogeshell_authorize_path(argv[1], path, sizeof(path))) {
             return 1;
         }
         if (fs_exists(path)) {
-            dogeio_text_println("Error: file exists already.");
+            dogeio_println("Error: file exists already.");
             return 1;
         }
         if (fs_create(path) != 0) {
-            dogeio_text_println("Error: unable to create file.");
+            dogeio_println("Error: unable to create file.");
             return 1;
         }
         return 0;
     }
     if (str_strcmp(argv[0], "mkdir") == 0) {
         if (argc != 2) {
-            dogeio_text_println("Usage: mkdir <directory>");
+            dogeio_println("Usage: mkdir <directory>");
             return 1;
         }
         if (!dogeshell_authorize_path(argv[1], path, sizeof(path))) {
             return 1;
         }
         if (fs_mkdir(path) != 0) {
-            dogeio_text_println("Error: unable to create directory.");
+            dogeio_println("Error: unable to create directory.");
             return 1;
         }
         return 0;
     }
     if (str_strcmp(argv[0], "read") == 0 || str_strcmp(argv[0], "cat") == 0) {
         if (argc < 2) {
-            dogeio_text_println("Usage: read <file> [file ...]");
+            dogeio_println("Usage: read <file> [file ...]");
             return 1;
         }
         for (int i = 1; i < argc; i++) {
@@ -1161,8 +1161,8 @@ static int dogeshell_execute(int argc, char **argv) {
                 return 1;
             }
             if (!fs_exists(path) || dogeshell_print_file(path) != 0) {
-                dogeio_text_print("Error: unable to read ");
-                dogeio_text_println(argv[i]);
+                dogeio_print("Error: unable to read ");
+                dogeio_println(argv[i]);
                 return 1;
             }
         }
@@ -1171,26 +1171,26 @@ static int dogeshell_execute(int argc, char **argv) {
     if (str_strcmp(argv[0], "write") == 0) {
         char text[DOGESHELL_LINE_SIZE];
         if (argc != 2) {
-            dogeio_text_println("Usage: write <file>");
+            dogeio_println("Usage: write <file>");
             return 1;
         }
         if (!dogeshell_authorize_path(argv[1], path, sizeof(path))) {
             return 1;
         }
         if (!fs_exists(path)) {
-            dogeio_text_println("Error: file doesn't exist.");
+            dogeio_println("Error: file doesn't exist.");
             return 1;
         }
-        dogeio_text_input("> ", text, sizeof(text));
+        dogeio_input("> ", text, sizeof(text));
         if (fs_write(path, text) != 0) {
-            dogeio_text_println("Error: unable to write file.");
+            dogeio_println("Error: unable to write file.");
             return 1;
         }
         return 0;
     }
     if (str_strcmp(argv[0], "del") == 0 || str_strcmp(argv[0], "rm") == 0) {
         if (argc < 2) {
-            dogeio_text_println("del: missing file operand");
+            dogeio_println("del: missing file operand");
             return 1;
         }
         for (int i = 1; i < argc; i++) {
@@ -1199,7 +1199,7 @@ static int dogeshell_execute(int argc, char **argv) {
             }
 
             if (str_strcmp(argv[i], "/") == 0 || str_strcmp(argv[i], "/.") == 0) {
-                dogeio_text_println("[Error] no deleting the entire drive.");
+                dogeio_println("[Error] no deleting the entire drive.");
                 return 1;
             }
 
@@ -1207,31 +1207,31 @@ static int dogeshell_execute(int argc, char **argv) {
                 str_strcmp(argv[i], ".windoge") == 0 || 
                 str_strcmp(argv[i], "/./.windoge") == 0 ||
                 str_strcmp(argv[i], "./.windoge") == 0) {
-                dogeio_text_println("[Error] no deleting boot file");
+                dogeio_println("[Error] no deleting boot file");
                 return 1;
             }
 
             if (str_strcmp(argv[i], "/system") == 0 || (str_strcmp(argv[i], "system") == 0 || str_strcmp(fs_dirname(), "/") == 0) || 
                 str_strcmp(argv[i], "/./system") == 0 || str_strcmp(argv[i], "./system") == 0) {
-                dogeio_text_println("[Error] no deleting system files");
+                dogeio_println("[Error] no deleting system files");
                 return 1;
             }
 
             if (str_strcmp(argv[i], "/apps") == 0 || (str_strcmp(argv[i], "apps") == 0 && str_strcmp(fs_dirname(), "/") == 0) 
             || str_strcmp(argv[i], "/./apps") == 0 || str_strcmp(argv[i], "./apps") == 0) {
-                dogeio_text_println("[Error] no deleting system files");
+                dogeio_println("[Error] no deleting system files");
                 return 1;
             }
             
             if (str_strcmp(argv[i], "/users") == 0 || (str_strcmp(argv[i], "users") == 0 && str_strcmp(fs_dirname(), "/") == 0) 
             || str_strcmp(argv[i], "/./users") == 0 || str_strcmp(argv[i], "./users") == 0) {
-                dogeio_text_println("[Error] no deleting system files");
+                dogeio_println("[Error] no deleting system files");
                 return 1;
             }
 
             if (fs_delete(argv[i]) != 1) {
-                dogeio_text_print("bash: rm: cannot remove ");
-                dogeio_text_println(argv[i]);
+                dogeio_print("bash: rm: cannot remove ");
+                dogeio_println(argv[i]);
                 return 1;
             }
         }
@@ -1243,7 +1243,7 @@ static int dogeshell_execute(int argc, char **argv) {
         char destination_path[256];
         int is_copy = str_strcmp(argv[0], "cp") == 0;
         if (argc != 3) {
-            dogeio_text_println("Usage: rename <old> <new>");
+            dogeio_println("Usage: rename <old> <new>");
             return 1;
         }
         if (!dogeshell_authorize_path(argv[1], source_path, sizeof(source_path)) ||
@@ -1254,26 +1254,26 @@ static int dogeshell_execute(int argc, char **argv) {
 
         if (str_strcmp(argv[1], "/system") == 0 || (str_strcmp(argv[1], "system") == 0 || str_strcmp(fs_dirname(), "/") == 0) || 
             str_strcmp(argv[1], "/./system") == 0 || str_strcmp(argv[1], "./system") == 0) {
-            dogeio_text_println("[Error] no deleting system files");
+            dogeio_println("[Error] no deleting system files");
             return 1;
         }
 
         if (str_strcmp(argv[1], "/apps") == 0 || (str_strcmp(argv[1], "apps") == 0 && str_strcmp(fs_dirname(), "/") == 0) 
         || str_strcmp(argv[1], "/./apps") == 0 || str_strcmp(argv[1], "./apps") == 0) {
-            dogeio_text_println("[Error] no deleting system files");
+            dogeio_println("[Error] no deleting system files");
             return 1;
         }
             
         if (str_strcmp(argv[1], "/users") == 0 || (str_strcmp(argv[1], "users") == 0 && str_strcmp(fs_dirname(), "/") == 0) 
         || str_strcmp(argv[1], "/./users") == 0 || str_strcmp(argv[1], "./users") == 0) {
-            dogeio_text_println("[Error] no deleting system files");
+            dogeio_println("[Error] no deleting system files");
             return 1;
         }
 
         int result;
         if (is_copy) {
             if (str_strcmp(source_path, destination_path) == 0) {
-                dogeio_text_println("Error: source and destination are the same.");
+                dogeio_println("Error: source and destination are the same.");
                 return 1;
             }
             result = fs_copy(source_path, destination_path);
@@ -1284,7 +1284,7 @@ static int dogeshell_execute(int argc, char **argv) {
             return result == 1 ? 0 : 1;
         }
         if (result != 0) {
-            dogeio_text_println("Error: rename/copy operation failed.");
+            dogeio_println("Error: rename/copy operation failed.");
             return 1;
         }
         return 0;
@@ -1294,18 +1294,18 @@ static int dogeshell_execute(int argc, char **argv) {
         const char *target;
         int print_directory = 0;
         if (argc > 2) {
-            dogeio_text_println("Usage: cd [directory]");
+            dogeio_println("Usage: cd [directory]");
             return 1;
         }
         if (argc == 1 || str_strcmp(argv[1], "~") == 0) {
             if (dogeshell_build_home(home, sizeof(home)) != 0) {
-                dogeio_text_println("Error: invalid home directory.");
+                dogeio_println("Error: invalid home directory.");
                 return 1;
             }
             target = home;
         } else if (str_strcmp(argv[1], "-") == 0) {
             if (dogeshell_old_directory[0] == '\0') {
-                dogeio_text_println("Error: previous directory is not set.");
+                dogeio_println("Error: previous directory is not set.");
                 return 1;
             }
             target = dogeshell_old_directory;
@@ -1321,33 +1321,33 @@ static int dogeshell_execute(int argc, char **argv) {
             dogeshell_copy(dogeshell_old_directory,
                            sizeof(dogeshell_old_directory),
                            current_directory) != 0) {
-            dogeio_text_println("Error: unable to determine current directory.");
+            dogeio_println("Error: unable to determine current directory.");
             return 1;
         }
         if (fs_chdir(path) != 0) {
-            dogeio_text_println("Error: directory doesn't exist.");
+            dogeio_println("Error: directory doesn't exist.");
             return 1;
         }
         if (print_directory) {
-            dogeio_text_println(fs_dirname());
+            dogeio_println(fs_dirname());
         }
         return 0;
     }
     if (str_strcmp(argv[0], "whereami") == 0 || str_strcmp(argv[0], "pwd") == 0) {
         const char *directory = fs_dirname();
         if (directory == NULL) {
-            dogeio_text_println("Error: unable to get current directory.");
+            dogeio_println("Error: unable to get current directory.");
             return 1;
         }
-        dogeio_text_println(directory);
+        dogeio_println(directory);
         return 0;
     }
     if (str_strcmp(argv[0], "whoami") == 0) {
-        dogeio_text_println(current_user);
+        dogeio_println(current_user);
         return 0;
     }
     if (str_strcmp(argv[0], "cpuinfo") == 0) {
-        dogeio_text_println(cpuid());
+        dogeio_println(cpuid());
         return 0;
     }
     if (str_strcmp(argv[0], "raminfo") == 0) {
@@ -1359,40 +1359,40 @@ static int dogeshell_execute(int argc, char **argv) {
         return 0;
     }
     if (str_strcmp(argv[0], "date") == 0) {
-        dogeio_text_print(date_get());
-        dogeio_text_print(" ");
-        dogeio_text_println(time_get());
+        dogeio_print(date_get());
+        dogeio_print(" ");
+        dogeio_println(time_get());
         return 0;
     }
     if (str_strcmp(argv[0], "time") == 0) {
-        dogeio_text_println(time_get());
+        dogeio_println(time_get());
         return 0;
     }
     if (str_strcmp(argv[0], "edit") == 0) {
         if (argc != 2) {
-            dogeio_text_println("Usage: edit <file>");
+            dogeio_println("Usage: edit <file>");
             return 1;
         }
         if (str_strcmp(argv[1], "--help") == 0) {
-            dogeio_text_println("Dogeedit v2.2");
-            dogeio_text_println("edit <file>");
+            dogeio_println("Dogeedit v2.2");
+            dogeio_println("edit <file>");
             return 0;
         }
         if (str_strcmp(argv[1], "--version") == 0) {
-            dogeio_text_println("Dogeedit v2.3");
+            dogeio_println("Dogeedit v2.3");
             return 0;
         }
         if (!dogeshell_authorize_path(argv[1], path, sizeof(path))) {
             return 1;
         }
         if (!fs_exists(path) && fs_create(path) != 0) {
-            dogeio_text_println("Error: unable to create file.");
+            dogeio_println("Error: unable to create file.");
             return 1;
         }
         char editor_path[160];
         if (dogeshell_find_app("editor", editor_path,
                                sizeof(editor_path)) != 0) {
-            dogeio_text_println("Error: editor app is not installed.");
+            dogeio_println("Error: editor app is not installed.");
             return 127;
         }
         char *editor_args[] = {path};
@@ -1413,7 +1413,7 @@ static int dogeshell_execute(int argc, char **argv) {
     }
     if (str_strcmp(argv[0], "apps") == 0) {
         if (argc != 1) {
-            dogeio_text_println("Usage: apps");
+            dogeio_println("Usage: apps");
             return 1;
         }
         return dogeshell_list_apps();
@@ -1425,25 +1425,25 @@ static int dogeshell_execute(int argc, char **argv) {
     }
     if (str_strcmp(argv[0], "run") == 0) {
         if (argc != 2) {
-            dogeio_text_println("Usage: run <file>");
+            dogeio_println("Usage: run <file>");
             return 1;
         }
         if (!dogeshell_authorize_path(argv[1], path, sizeof(path))) {
             return 1;
         }
         if (!fs_exists(path)) {
-            dogeio_text_println("Error: program doesn't exist.");
+            dogeio_println("Error: program doesn't exist.");
             return 1;
         }
         system_exec(path);
         return 0;
     }
     if (str_strcmp(argv[0], "uname") == 0) {
-        dogeio_text_println("WindogeOS");
+        dogeio_println("WindogeOS");
         return 0;
     }
     if (str_strcmp(argv[0], "hostname") == 0) {
-        dogeio_text_println(computer_name[0] != '\0' ? computer_name : "windoge");
+        dogeio_println(computer_name[0] != '\0' ? computer_name : "windoge");
         return 0;
     }
     if (str_strcmp(argv[0], "sleep") == 0) {
@@ -1468,8 +1468,8 @@ static int dogeshell_execute(int argc, char **argv) {
         }
     }
 
-    dogeio_text_print(argv[0]);
-    dogeio_text_println(": command not found :(");
+    dogeio_print(argv[0]);
+    dogeio_println(": command not found :(");
     return 127;
 }
 
@@ -1486,12 +1486,12 @@ int system_dogeshell_ex(char *command) {
         return 0;
     }
     if (dogeshell_copy(input, sizeof(input), command) != 0) {
-        dogeio_text_println("Error: command is too long.");
+        dogeio_println("Error: command is too long.");
         dogeshell_last_status = 2;
         return dogeshell_last_status;
     }
     if (dogeshell_append_history(input) != 0) {
-        dogeio_text_println("Warning: unable to save command history.");
+        dogeio_println("Warning: unable to save command history.");
     }
 
     input_length = dogeshell_strlen(input);
@@ -1499,7 +1499,7 @@ int system_dogeshell_ex(char *command) {
         char character = input[i];
         if (character == '\\' && quote != '\'') {
             if (i + 1 == input_length) {
-                dogeio_text_println("Syntax error: trailing escape.");
+                dogeio_println("Syntax error: trailing escape.");
                 dogeshell_last_status = 2;
                 return dogeshell_last_status;
             }
@@ -1519,7 +1519,7 @@ int system_dogeshell_ex(char *command) {
         }
     }
     if (quote != '\0') {
-        dogeio_text_println("Syntax error: unmatched quote.");
+        dogeio_println("Syntax error: unmatched quote.");
         dogeshell_last_status = 2;
         return dogeshell_last_status;
     }
@@ -1539,7 +1539,7 @@ int system_dogeshell_ex(char *command) {
                                             sizeof(storage), arguments,
                                             DOGESHELL_ARGUMENT_COUNT);
         if (argument_count < 0) {
-            dogeio_text_println("Syntax error: too many arguments.");
+            dogeio_println("Syntax error: too many arguments.");
             dogeshell_last_status = 2;
             return dogeshell_last_status;
         }
@@ -1563,35 +1563,35 @@ void system_dogeshell(void) {
     dogeshell_old_directory[0] = '\0';
     if (dogeshell_build_home(home_path, sizeof(home_path)) != 0 ||
         fs_chdir(home_path) != 0) {
-        dogeio_text_println("Dogeshell: unable to enter the user home directory.");
+        dogeio_println("Dogeshell: unable to enter the user home directory.");
     }
 
     while (!dogeshell_exit_requested) {
         const char *current_directory = fs_dirname();
-        dogeio_text_color_change(0xFF00FF00);
-        dogeio_text_print(current_user);
-        dogeio_text_color_change(saved_color);
-        dogeio_text_print(" (");
+        dogeio_color_change(0xFF00FF00);
+        dogeio_print(current_user);
+        dogeio_color_change(saved_color);
+        dogeio_print(" (");
         if (current_directory == NULL) {
-            dogeio_text_print("/");
+            dogeio_print("/");
         } else if (str_strcmp(current_directory, home_path) == 0) {
-            dogeio_text_print("~");
+            dogeio_print("~");
         } else {
-            dogeio_text_print(current_directory);
+            dogeio_print(current_directory);
         }
-        dogeio_text_print(") ");
+        dogeio_print(") ");
 
         if (dogeshell_last_status != 0) {
             char status_text[16];
             str_itoa(dogeshell_last_status, status_text);
-            dogeio_text_color_change(0xFFFF0000);
-            dogeio_text_print("[");
-            dogeio_text_print(status_text);
-            dogeio_text_print("] ");
-            dogeio_text_color_change(saved_color);
+            dogeio_color_change(0xFFFF0000);
+            dogeio_print("[");
+            dogeio_print(status_text);
+            dogeio_print("] ");
+            dogeio_color_change(saved_color);
         }
 
-        dogeio_text_input("> ", input, sizeof(input));
+        dogeio_input("> ", input, sizeof(input));
         if (input[0] != '\0') {
             system_dogeshell_ex(input);
         }

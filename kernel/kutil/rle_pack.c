@@ -8,7 +8,7 @@
 
 void kernel_rle_decompress(char *src_path, uint64_t src_size, char *dst_path) {
     if (src_size < 4) {
-        dogeio_text_println("[RLE] Error: RLE file too small.");
+        dogeio_println("[RLE] Error: RLE file too small.");
         return;
     }
 
@@ -16,7 +16,7 @@ void kernel_rle_decompress(char *src_path, uint64_t src_size, char *dst_path) {
     fs_read_raw_at(src_path, (uint8_t *)&original_size, 0, 4);
 
     if (original_size == 0) {
-        dogeio_text_println("[RLE] Error: Compressed header reads 0 bytes.");
+        dogeio_println("[RLE] Error: Compressed header reads 0 bytes.");
         return;
     }
 
@@ -88,7 +88,7 @@ void kernel_rle_decompress(char *src_path, uint64_t src_size, char *dst_path) {
         fs_append_data(dst_path, local_buffer, local_buf_idx);
     }
     
-    dogeio_text_println("[RLE] Decompression completed successfully.");
+    dogeio_println("[RLE] Decompression completed successfully.");
 }
 
 void kernel_rle_compress(char *src_path, uint64_t src_size, char *dst_path) {
@@ -143,5 +143,5 @@ void kernel_rle_compress(char *src_path, uint64_t src_size, char *dst_path) {
             }
         }
     }
-    dogeio_text_println("[RLE] Compression completed successfully.");
+    dogeio_println("[RLE] Compression completed successfully.");
 }

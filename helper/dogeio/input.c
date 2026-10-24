@@ -155,28 +155,28 @@ uint16_t dogeio_get_key(void) {
 }
 
 
-void dogeio_text_input(const char *prompt, char *buffer, size_t max_size) {
+void dogeio_input(const char *prompt, char *buffer, size_t max_size) {
     if (prompt != NULL) {
-        dogeio_text_print(prompt);
+        dogeio_print(prompt);
     }
 
     size_t len = 0;
     size_t pos = 0;
     buffer[0] = '\0';
 
-    dogeio_text_cursor_show();
+    dogeio_cursor_show();
 
     while (true) {
         uint16_t key = dogeio_get_key();
 
         if (key == KEY_ENTER) {
-            dogeio_text_print("\n");
+            dogeio_print("\n");
             break;
         }
 
         if (key == KEY_LEFT) {
             if (pos > 0) {
-                dogeio_text_cursor_hide();
+                dogeio_cursor_hide();
                 pos--;
                 if (cursor_x > 0) {
                     cursor_x--;
@@ -184,14 +184,14 @@ void dogeio_text_input(const char *prompt, char *buffer, size_t max_size) {
                     cursor_y--;
                     cursor_x = TERMINAL_COLS - 1;
                 }
-                dogeio_text_cursor_show();
+                dogeio_cursor_show();
             }
             continue;
         }
 
         if (key == KEY_TAB || key == 9 || key == 0x000F || key == 0x000D) {
             if (len + 8 < max_size) {
-                dogeio_text_cursor_hide();
+                dogeio_cursor_hide();
                 
                 for (size_t i = len + 8; i > pos + 7; i--) {
                     buffer[i] = buffer[i - 8];
@@ -211,7 +211,7 @@ void dogeio_text_input(const char *prompt, char *buffer, size_t max_size) {
                 for (size_t i = pos; i < len; i++) {
                     char ch = buffer[i];
                     text_grid[cursor_y * TERMINAL_COLS + cursor_x] = ch;
-                    dogeio_text_putchar(ch, cursor_x, cursor_y);
+                    dogeio_putchar(ch, cursor_x, cursor_y);
                     cursor_x++;
                     if (cursor_x >= TERMINAL_COLS) {
                         cursor_x = 0;
@@ -230,28 +230,28 @@ void dogeio_text_input(const char *prompt, char *buffer, size_t max_size) {
                 }
                 pos += 8;
 
-                dogeio_text_cursor_show();
+                dogeio_cursor_show();
             }
             continue;
         }
 
         if (key == KEY_RIGHT) {
             if (pos < len) {
-                dogeio_text_cursor_hide();
+                dogeio_cursor_hide();
                 pos++;
                 cursor_x++;
                 if (cursor_x >= TERMINAL_COLS) {
                     cursor_x = 0;
                     cursor_y++;
                 }
-                dogeio_text_cursor_show();
+                dogeio_cursor_show();
             }
             continue;
         }
 
         if (key == KEY_BACKSPACE) {
             if (pos > 0) {
-                dogeio_text_cursor_hide();
+                dogeio_cursor_hide();
                 
                 for (size_t i = pos - 1; i < len; i++) {
                     buffer[i] = buffer[i + 1];
@@ -273,7 +273,7 @@ void dogeio_text_input(const char *prompt, char *buffer, size_t max_size) {
                 for (size_t i = pos; i <= len; i++) {
                     char c = (i < len) ? buffer[i] : ' ';
                     text_grid[cursor_y * TERMINAL_COLS + cursor_x] = c;
-                    dogeio_text_putchar(c, cursor_x, cursor_y);
+                    dogeio_putchar(c, cursor_x, cursor_y);
                     cursor_x++;
                     if (cursor_x >= TERMINAL_COLS) {
                         cursor_x = 0;
@@ -283,7 +283,7 @@ void dogeio_text_input(const char *prompt, char *buffer, size_t max_size) {
 
                 cursor_x = saved_x;
                 cursor_y = saved_y;
-                dogeio_text_cursor_show();
+                dogeio_cursor_show();
             }
             continue;
         }
@@ -291,7 +291,7 @@ void dogeio_text_input(const char *prompt, char *buffer, size_t max_size) {
         if (key >= 32 && key < 127) {
             char c = (char)key;
             if (len + 1 < max_size) {
-                dogeio_text_cursor_hide();
+                dogeio_cursor_hide();
 
                 for (size_t i = len + 1; i > pos; i--) {
                     buffer[i] = buffer[i - 1];
@@ -307,7 +307,7 @@ void dogeio_text_input(const char *prompt, char *buffer, size_t max_size) {
                 for (size_t i = pos - 1; i < len; i++) {
                     char ch = buffer[i];
                     text_grid[cursor_y * TERMINAL_COLS + cursor_x] = ch;
-                    dogeio_text_putchar(ch, cursor_x, cursor_y);
+                    dogeio_putchar(ch, cursor_x, cursor_y);
                     cursor_x++;
                     if (cursor_x >= TERMINAL_COLS) {
                         cursor_x = 0;
@@ -324,13 +324,13 @@ void dogeio_text_input(const char *prompt, char *buffer, size_t max_size) {
                     cursor_y++;
                 }
 
-                dogeio_text_cursor_show();
+                dogeio_cursor_show();
             }
             continue;
         }
     }
 
-    dogeio_text_cursor_hide();
+    dogeio_cursor_hide();
     buffer[len] = '\0';
 }
 
