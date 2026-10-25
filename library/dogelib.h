@@ -166,4 +166,31 @@ static inline void free(void* ptr) {
     }
 }
 
+static inline void* salloc(size_t size) {
+    if (size == 0) return (void*)0;
+
+    // keep cpu happy
+    size_t aligned_size = (size + 15) & (size_t)(~15);
+
+    void* raw_mem = malloc(aligned_size);
+    if (!raw_mem) return (void*)0;
+
+    char* clear_ptr = (char*)raw_mem;
+    for (size_t i = 0; i < aligned_size; i++) {
+        clear_ptr[i] = 0;
+    }
+
+    return (void*)(clear_ptr + aligned_size);
+}
+
+static inline void sfree(void* stack_ptr, size_t size) {
+    if (!stack_ptr) return;
+
+    size_t aligned_size = (size + 15) & (size_t)(~15);
+
+    void* original_malloc_ptr = (void*)((char*)stack_ptr - aligned_size);
+
+    free(original_malloc_ptr);
+}
+
 #endif
