@@ -6,6 +6,7 @@
 #include <system.h>
 #include <bool.h>
 #include <basicutil.h>
+#include <start.h>
 
 typedef struct __attribute__((packed)) {
     uint16_t offset_low;      

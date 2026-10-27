@@ -19,6 +19,18 @@ static inline int system(char* command) {
     return system_dogeshell_ex(command);
 }
 
+typedef struct {
+    const char *label;
+    const char *value;
+    uint32_t color;
+} settings_color_t;
+
+typedef struct {
+    const char *label;
+    const char *value;
+    const uint8_t *font_ptr;
+} settings_font_t;
+
 void system_fetch();
 extern char *windoge_version;
 extern char current_user[64];

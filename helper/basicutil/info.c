@@ -9,6 +9,7 @@ extern volatile struct limine_memmap_request memmap_request;
 
 char current_user[64];
 const char* dogeshell_version = "Dogeshell v2.3";
+char* windoge_version = "WindogeOS v0.3-Beta1";
 
 #if defined(__x86_64__) || defined(_M_X64) 
     const char* windoge_arch = "x86_64 (Intel/AMD)";
@@ -41,6 +42,33 @@ const char* doge_ascii[22] = {
     "        `$$$$$$$$$$$$$$$$$$$$MMMMMMMM$YYYYYiiiYYYYYY   ",
     "         YY$$$$$$$$$$$$$$$$MMMMMMM$$YYYiiiiiiYYYYYYY   ",
     "        :YYYYYY$$$$$$$$$$$$$$$$$$YYYYYYYiiiiYYYYYYi'   "
+};
+
+const char* doge_ascii_full[24] = {
+    "================================================================================================================",
+"                 ;i.                                    ",
+"                  M$L                    .;i.           ",
+"                  M$Y;                .;iii;;.          ",
+"                 ;$YY$i._           .iiii;;;;;          ",
+"                .iiiYYYYYYiiiii;;;;i;iii;; ;;;          ",
+"              .;iYYYYYYiiiiiiYYYiiiiiii;;  ;;;          ",
+"           .YYYY$$$$YYYYYYYYYYYYYYYYiii;; ;;;;        #     # ### #     # ######  #######  #####  #######",
+"         .YYY$$$$$$YYYYYY$$$$iiiY$$$$$$$ii;;;;        #  #  #  #  ##    # #     # #     # #     # #      ",
+"        :YYYF`,  TYYYYY$$$$$YYYYYYYi$$$$$iiiii;       #  #  #  #  # #   # #     # #     # #       #       ",
+"        Y$MM: \\  :YYYY$$P\"````\"T$YYMMMMMMMMiiYY.      #  #  #  #  #  #  # #     # #     # #  #### #####   ",
+"     `.;$$M$$b.,dYY$$Yi; .(     .YYMMM$$$MMMMYY       #  #  #  #  #   # # #     # #     # #     # #      ",
+"   .._$MMMMM$!YYYYYYYYYi;.`\"  .;iiMMM$MMMMMMMYY       #  #  #  #  #    ## #     # #     # #     # #       ",
+"    ._$MMMP` ```\"\"4$$$$$iiiiiiii$MMMMMMMMMMMMMY;       ## ##  ### #     # ######  #######  #####  #######",
+"     MMMM$:       :$$$$$$$MMMMMMMMMMM$$MMMMMMMYYL     ================  ",
+"    :MMMM$$.    .;PPb$$$$MMMMMMMMMM$$$$MMMMMMiYYU:    v0.2.1",
+"     iMM$$;;: ;;;;i$$$$$$$MMMMM$$$$MMMMMMMMMMYYYYY      ",
+"     `$$$$i .. ``:iiii!*\"``.$$$$$$$$$MMMMMMM$YiYYY      ",
+"      :Y$$iii;;;.. ` ..;;i$$$$$$$$$MMMMMM$$YYYYiYY:     ",
+"       :$$$$$iiiiiii$$$$$$$$$$$MMMMMMMMMMYYYYiiYYYY.    ",
+"        `$$$$$$$$$$$$$$$$$$$$MMMMMMMM$YYYYYiiiYYYYYY    ",
+"         YY$$$$$$$$$$$$$$$$MMMMMMM$$YYYiiiiiiYYYYYYY    ",
+"        :YYYYYY$$$$$$$$$$$$$$$$$$YYYYYYYiiiiYYYYYYi'    ",
+"================================================================================================================"
 };
 
 char* cpuid(void) {
