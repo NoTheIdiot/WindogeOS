@@ -134,7 +134,6 @@ static inline int settings_save(void) {
 }
 
 static void settings_show_system_information(void) {
-    char ram_buffer[32];
     dogeio_clear();
     dogeio_println("[ System Information ]\n");
     dogeio_print("Version: ");
@@ -142,10 +141,25 @@ static void settings_show_system_information(void) {
     dogeio_print("CPU: ");
     dogeio_println(cpuid());
     dogeio_print("RAM: ");
-    dogeio_print(uint64_to_str(get_ram() / 1024 / 1024, ram_buffer));
+    char ram_used_str[32];
+                
+    uint64_t ram_total_mb = get_ram();
+
+    str_kutoa(ram_total_mb, ram_used_str);
+    dogeio_print(ram_used_str);
     dogeio_println(" MB");
-    dogeio_println("");
-    dogeio_println("Press any key to return...");
+    char width[32];
+    char height[32];
+
+    dogeio_print("Display: ");
+
+    str_itoa(dogeio_screen_width(), width);
+    str_itoa(dogeio_screen_height(), height);
+
+    dogeio_print(width);
+    dogeio_print("x");
+    dogeio_println(height);
+    dogeio_println("\nPress any key to return...");
     dogeio_get_key();
 }
 
