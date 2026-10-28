@@ -122,10 +122,10 @@ void dogeio_clear_cells(void) {
 }
 
 /* bullshit information stuff, also setting stuff. */
-uint64_t dogeio_screen_width(void) {
-    return framebuffer_request.response->framebuffers[0]->width;
+int dogeio_screen_width(void) {
+    return (int)framebuffer_request.response->framebuffers[0]->width;
 }
 
-uint64_t dogeio_screen_height(void) {
-    return framebuffer_request.response->framebuffers[0]->height;
+int dogeio_screen_height(void) {
+    return (int)framebuffer_request.response->framebuffers[0]->height;
 }

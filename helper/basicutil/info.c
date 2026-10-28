@@ -60,7 +60,7 @@ const char* doge_ascii_full[24] = {
 "   .._$MMMMM$!YYYYYYYYYi;.`\"  .;iiMMM$MMMMMMMYY       #  #  #  #  #    ## #     # #     # #     # #       ",
 "    ._$MMMP` ```\"\"4$$$$$iiiiiiii$MMMMMMMMMMMMMY;       ## ##  ### #     # ######  #######  #####  #######",
 "     MMMM$:       :$$$$$$$MMMMMMMMMMM$$MMMMMMMYYL     ================  ",
-"    :MMMM$$.    .;PPb$$$$MMMMMMMMMM$$$$MMMMMMiYYU:    v0.2.1",
+"    :MMMM$$.    .;PPb$$$$MMMMMMMMMM$$$$MMMMMMiYYU:    v0.3.0-Beta1",
 "     iMM$$;;: ;;;;i$$$$$$$MMMMM$$$$MMMMMMMMMMYYYYY      ",
 "     `$$$$i .. ``:iiii!*\"``.$$$$$$$$$MMMMMMM$YiYYY      ",
 "      :Y$$iii;;;.. ` ..;;i$$$$$$$$$MMMMMM$$YYYYiYY:     ",
@@ -226,30 +226,21 @@ void system_fetch() {
                     dogeio_println("Error reading exFAT");
                 }
                 break;
-            case 10:
-                if (metrics_status == 0 && total_clusters > 0) {
-                    uint32_t used_clusters = total_clusters - free_clusters;
-                    uint32_t percentage = (used_clusters * 100U) / total_clusters;
-                    
-                    dogeio_print("Disk Map: [");
-                    uint32_t bar_width = 12;
-                    uint32_t filled = (percentage * bar_width) / 100U;
-                    for (uint32_t j = 0; j < bar_width; j++) {
-                        if (j < filled) {
-                            dogeio_print("=");
-                        } else {
-                            dogeio_print(".");
-                        }
-                    }
-                    dogeio_print("] ");
-                    str_itoa((int)percentage, storage_buf);
-                    dogeio_print(storage_buf);
-                    dogeio_println("%");
-                } else {
-                    dogeio_println("");
-                }
+            case 10: {
+                char width[32];
+                char height[32];
+
+                dogeio_print("Display: ");
+
+                str_itoa(dogeio_screen_width(), width);
+                str_itoa(dogeio_screen_height(), height);
+
+                dogeio_print(width);
+                dogeio_print("x");
+                dogeio_println(height);
                 break;
-            case 11:
+            }
+            case 12:
                 dogeio_background_change(COLOR_RED);
                 dogeio_print("   ");
                 dogeio_background_change(COLOR_ORANGE);
@@ -267,7 +258,7 @@ void system_fetch() {
                 dogeio_background_change(COLOR_BLACK);
                 dogeio_println("");
                 break;
-            case 12:
+            case 13:
                 dogeio_background_change(COLOR_BRIGHT_RED);
                 dogeio_print("   ");
                 dogeio_background_change(COLOR_BRIGHT_ORANGE);
