@@ -277,15 +277,14 @@ void nvme_pci_callback(uint8_t b, uint8_t d, uint8_t f, uint16_t ven, uint16_t d
 #define COPY_FILE    10
 
 #define PRINT        11
-#define PRINTLN      12
-#define CLEAR        13
-#define INPUT        14
-#define GET_KEY      15
-#define PRINT_AT     16
-#define TEXT_COLOR   17
-#define BACKGROUND_COLOR 18
-#define MKDIR_RECURSIVE 19
-#define GET_TIME     20
+#define CLEAR        12
+#define INPUT        13
+#define GET_KEY      14
+#define PRINT_AT     15
+#define TEXT_COLOR   16
+#define BACKGROUND_COLOR 17
+#define MKDIR_RECURSIVE 18
+#define GET_TIME     19
 
 // stdlib
 #define SHELL        21

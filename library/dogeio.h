@@ -173,7 +173,8 @@ static inline uint64_t print(const char *text) {
 }
 
 static inline uint64_t println(const char *text) {
-    return syscall_1(PRINTLN, (uint64_t)text);
+    syscall_1(PRINT, (uint64_t)text);
+    return syscall_1(PRINT, (uint64_t)"\n");
 }
 
 static inline uint64_t clear(void) {
