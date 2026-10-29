@@ -163,4 +163,7 @@ int exec_flat_binary(const char *filename, int argc, char **argv);
 void kernel_rle_decompress(char *src_path, uint64_t src_size, char *dst_path);
 void kernel_rle_compress(char *src_path, uint64_t src_size, char *dst_path);
 
+void* kmalloc(size_t size);
+void kfree(void* ptr);
+
 #endif
