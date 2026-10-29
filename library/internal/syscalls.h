@@ -21,8 +21,7 @@
 #define PRINT_AT     15
 #define TEXT_COLOR   16
 #define BACKGROUND_COLOR 17
-#define MKDIR_RECURSIVE 18
-#define GET_TIME     19
+#define GET_TIME     18
 
 // stdlib
 #define SHELL        21
