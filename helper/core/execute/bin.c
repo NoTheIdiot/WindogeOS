@@ -4,7 +4,10 @@
 #include <basicutil.h>
 #include <dogeio.h>
 #include <string.h>
+#include <boot/syscall_internal.h>
 #include <boot/limine.h>
+
+static uint32_t next_pid = 1;
 
 extern volatile struct limine_hhdm_request hhdm_request;
 
@@ -165,4 +168,35 @@ void system_run_bin_args_impl(char *filename, int program_size, int argc, char *
 
     to_userland_ring3_args(USER_CODE_BASE, user_stack_top, (uint64_t)argc,
                            user_argv);
+}
+
+process_t* spawn_process(void (*entry_point)(void), uint64_t user_stack_top, uint64_t page_dir) {
+    process_t* proc = (process_t*)kmalloc(sizeof(process_t));
+    if (!proc) return NULL;
+
+    size_t kstack_size = 8192;
+    uint8_t* kstack_base = (uint8_t*)kmalloc(kstack_size);
+    if (!kstack_base) return NULL;
+
+    uint8_t* kstack_top = kstack_base + kstack_size;
+    syscall_registers_t* frame = (syscall_registers_t*)(kstack_top - sizeof(syscall_registers_t));
+    
+    uint64_t* raw_frame = (uint64_t*)frame;
+    for (size_t i = 0; i < sizeof(syscall_registers_t) / 8; i++) {
+        raw_frame[i] = 0;
+    }
+
+    frame->rcx = (uint64_t)entry_point;
+    frame->r11 = 0x202;
+    frame->user_rsp = user_stack_top;
+    frame->rax = 0xDEADC0DE;
+    frame->rbx = 0x11111111;
+
+    proc->kernel_rsp = (uint64_t*)frame;
+    proc->pid = next_pid++;
+    proc->status = 1;
+    proc->page_directory = page_dir;
+    proc->next = NULL;
+
+    return proc;
 }
