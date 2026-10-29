@@ -770,32 +770,6 @@ uint64_t syscall_handler(syscall_registers_t *regs) {
             ret_val = 1;
             break;
 
-        case MKDIR_RECURSIVE: {
-            char path[USER_PATH_LIMIT];
-            if (!copy_user_string(regs->rdi, path, sizeof(path), NULL)) {
-                return (uint64_t)-1;
-            }
-
-            char *cursor = path;
-            while (*cursor != '\0') {
-                if (*cursor == '/') {
-                    char saved = *cursor;
-                    *cursor = '\0';
-                    if (path[0] != '\0' && !fs_exists(path)) {
-                        if (fs_mkdir(path) != 0) {
-                            *cursor = saved;
-                            return (uint64_t)-1;
-                        }
-                    }
-                    *cursor = saved;
-                }
-                cursor++;
-            }
-
-            ret_val = (uint64_t)(int64_t)fs_mkdir(path);
-            break;
-        }
-
         case GET_TIME: {
             if (regs->rdi == 0 || !user_range_accessible(regs->rdi, sizeof(uint64_t), true)) {
                 return (uint64_t)-1;
