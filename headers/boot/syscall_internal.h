@@ -24,6 +24,14 @@ typedef struct {
     uint64_t user_rsp;
 } __attribute__((packed)) syscall_registers_t;
 
+typedef struct {
+    uint64_t* kernel_rsp;
+    uint32_t pid;
+    uint32_t status; 
+    uint64_t page_directory;
+    struct process* next;
+} process_t;
+
 bool user_page_accessible(uint64_t address, bool write_access);
 bool user_range_accessible(uint64_t address, uint64_t length, bool write_access);
 bool copy_user_string(uint64_t address, char *buffer, size_t capacity,
