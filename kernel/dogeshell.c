@@ -692,6 +692,14 @@ static int dogeshell_execute(int argc, char **argv) {
         }
         return 0;
     }
+
+    if (str_strcmp(argv[0], "bright") == 0) {
+        if (argv[1] == NULL) return 1;
+        int num = str_atoi(argv[1]);
+        dogeio_change_brightness_switch(num);
+        return 0;
+    }
+
     if (str_strcmp(argv[0], "mkdir") == 0) {
         if (argc != 2) {
             dogeio_println("Usage: mkdir <directory>");

@@ -21,9 +21,11 @@
 #define PRINT_AT     15
 #define TEXT_COLOR   16
 #define BACKGROUND_COLOR 17
-#define GET_TIME     18
+#define MKDIR_RECURSIVE 18
+#define GET_TIME     19
 
 // stdlib
+#define BRIGHTNESS   20
 #define SHELL        21
 #define EXEC         22
 #define STAT         23
@@ -61,12 +63,14 @@
 #define CLEAR_RAW 52
 #define EXPAND_USER_PAGES 53
 
-#define USER_MEMORY_READ    0x1
-#define USER_MEMORY_WRITE   0x2
-#define USER_MEMORY_EXEC    0x4
-#define USER_MEMORY_MAX_SIZE (16 * 1024 * 1024)
+#define SPECIAL 90
 
-#define SYS_EXIT           60
+#define USER_MEMORY_READ    0x1ULL
+#define USER_MEMORY_WRITE   0x2ULL
+#define USER_MEMORY_EXEC    0x4ULL
+#define USER_MEMORY_MAX_SIZE (16ULL * 1024 * 1024)
+
+#define SYS_EXIT     60
 
 static inline uint64_t syscall_0(uint64_t num) {
     uint64_t ret;

@@ -66,6 +66,15 @@ extern const uint8_t spleen[];
 #define COLOR_BRIGHT_YELLOW         0xF9F1A5
 #define COLOR_BRIGHT_WHITE          0xFFFFFF
 
+#define BRIGHTNESS_LEVEL_TO_FACTOR(level) (((level) * 256) / 10)
+#define BRIGHTNESS_FACTOR_TO_LEVEL(factor) (((factor) * 10) / 256)
+
+void dogeio_set_brightness(int level);
+void dogeio_refresh_screen(void);
+void dogeio_change_brightness_switch(int new_level);
+void dogeio_brightness_increase(void);
+void dogeio_brightness_decrease(void);
+
 void dogeio_putchar(char c, uint32_t x, uint32_t y);
 void dogeio_clear(void);
 void dogeio_printchar(char c);

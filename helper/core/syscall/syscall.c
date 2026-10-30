@@ -819,6 +819,13 @@ uint64_t syscall_handler(syscall_registers_t *regs) {
             break;
         }
 
+        case BRIGHTNESS: {
+            uint64_t brightnesss = regs->rdi;
+            dogeio_change_brightness_switch((int)brightnesss);
+            ret_val = (uint64_t)1;
+            break;
+        }
+
         case SHELL: {
             char text[USER_STRING_LIMIT];
             if (!copy_user_string(regs->rdi, text, sizeof(text), NULL)) {

@@ -19,6 +19,10 @@ static inline uint64_t exec_args(const char *path, uint64_t argc,
     return syscall_3(EXEC_ARGS, (uint64_t)path, argc, (uint64_t)argv);
 }
 
+static inline uint64_t change_brightness(int level) {
+    return syscall_1(BRIGHTNESS, (uint64_t)level);
+}
+
 static inline uint64_t exec_elf(const char *path) {
     return syscall_1(EXEC_ELF, (uint64_t)path);
 }
@@ -65,8 +69,6 @@ static block_header_t* heap_start = (block_header_t*)0;
 static size_t total_mapped_size = 0;
 
 #define MAP_USER_MEMORY 28
-#define USER_MEMORY_READ 0x1
-#define USER_MEMORY_WRITE 0x2
 #define PAGE_SIZE 4096
 
 static inline void* extend_heap(size_t size) {
