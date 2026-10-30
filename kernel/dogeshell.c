@@ -902,7 +902,7 @@ static int dogeshell_execute(int argc, char **argv) {
         return 0;
     }
     if (str_strcmp(argv[0], "cpuinfo") == 0) {
-        dogeio_println(cpuid());
+        dogeio_println(cpuid_string());
         return 0;
     }
     if (str_strcmp(argv[0], "raminfo") == 0) {

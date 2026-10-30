@@ -71,7 +71,7 @@ const char* doge_ascii_full[24] = {
 "================================================================================================================"
 };
 
-char* cpuid(void) {
+char* cpuid_string(void) {
     static char brand[49];
     uint32_t regs[4];
 
@@ -190,7 +190,7 @@ void system_fetch() {
                 break;
             case 7:
                 dogeio_print("CPU: ");
-                dogeio_println(cpuid());
+                dogeio_println(cpuid_string());
                 break;
             case 8:
                 dogeio_print("RAM: ");

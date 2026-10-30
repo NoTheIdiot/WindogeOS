@@ -29,6 +29,6 @@ void duolog(const char* str);
 void panic(char* reason, char *file, int line);
 
 // info
-char* cpuid(void);
+char* cpuid_string(void);
 
 #endif

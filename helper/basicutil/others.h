@@ -45,4 +45,14 @@ static inline void invlpg(uint64_t vaddr) {
     __asm__ volatile ("invlpg (%0)" :: "r"(vaddr) : "memory");
 }
 
+static inline void cpuid(uint32_t leaf, uint32_t *eax, uint32_t *edx) {
+    uint32_t ebx, ecx;
+    __asm__ volatile (
+        "cpuid"
+        : "=a"(*eax), "=b"(ebx), "=c"(ecx), "=d"(*edx)
+        : "a"(leaf)
+    );
+}
+
+
 #endif

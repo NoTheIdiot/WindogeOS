@@ -139,7 +139,7 @@ static void settings_show_system_information(void) {
     dogeio_print("Version: ");
     dogeio_println(windoge_version);
     dogeio_print("CPU: ");
-    dogeio_println(cpuid());
+    dogeio_println(cpuid_string());
     dogeio_print("RAM: ");
     char ram_used_str[32];
                 
