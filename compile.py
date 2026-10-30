@@ -6,7 +6,7 @@ import subprocess
 import importlib.util
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-DISK_IMAGE_SIZE_MB = 5
+DISK_IMAGE_SIZE_MB = 8
 
 def rle_compress_data(data: bytes) -> bytes:
     original_size = len(data)
@@ -248,7 +248,6 @@ def main():
                     os.path.splitext(os.path.basename(app_src))[0],
                 )
                 app_elf = os.path.join(os.path.dirname(app_src), binary_name + ".elf")
-                app_bin = os.path.join(os.path.dirname(app_src), binary_name + ".bin")
 
                 system_apps_dir = os.path.abspath(
                     os.path.join("apps", "system")
@@ -259,9 +258,9 @@ def main():
                 )
 
                 if normalized_app_path.startswith(system_apps_dir + os.sep):
-                    compiled_system_apps.append(app_bin)
+                    compiled_system_apps.append(app_elf)
                 else:
-                    compiled_apps.append(app_bin)
+                    compiled_apps.append(app_elf)
 
                 if ftype == "c":
                     compile_step = f"{tools['c_compiler']} {arch_cfg['app_flags']} {common_flags} -c {app_src} -o {app_obj}"
@@ -271,11 +270,12 @@ def main():
                 chain_cmd = (
                     f"{compile_step} && "
                     f"{tools['linker']} {arch_cfg['linker_flags']} --no-relax --gc-sections "
-                    f"-T {arch_cfg['app_linker_script']} {app_obj} {' '.join(app_library_objects)} -o {app_elf} && "
-                    f"{tools['objcopy']} -O binary {app_elf} {app_bin} && "
-                    f"rm -f {app_obj} {app_elf}"
+                    f"{app_obj} {' '.join(app_library_objects)} -o {app_elf} && "
+                    f"rm -f {app_obj}"
                 )
                 app_cmds.append(chain_cmd)
+
+            run_parallel(app_cmds)
 
             for pkg_src, ftype in package_sources:
                 ext = ".c" if ftype == "c" else ".asm"
@@ -321,8 +321,6 @@ def main():
                 if not success:
                     print(f"\n[Not Wow] Build failed on package:\n  {failed_item}")
                     sys.exit(1)
-
-            run_parallel(app_cmds)
         else:
             print("[3/4] Warning: No application source files found in source_folders_apps!")
 
@@ -395,31 +393,31 @@ def main():
                 cmd(f"sudo mkdir -p {mnt_dir}/apps/text")
                 cmd(f"sudo mkdir -p {mnt_dir}/system")
 
-                for app_bin in compiled_apps:
-                    if os.path.exists(app_bin):
-                        app_name = os.path.basename(app_bin)
+                for app_elf in compiled_apps:
+                    if os.path.exists(app_elf):
+                        app_name = os.path.basename(app_elf)
 
                         cmd(
-                            f"sudo cp '{app_bin}' "
+                            f"sudo cp '{app_elf}' "
                             f"'{mnt_dir}/apps/{app_name}'"
                         )
 
                         print(
-                            f"[dogeing] Injected application "
+                            f"[dogeing] Injected application ELF "
                             f"to exFAT /apps: {app_name}"
                         )
 
-                for app_bin in compiled_system_apps:
-                    if os.path.exists(app_bin):
-                        app_name = os.path.basename(app_bin)
+                for app_elf in compiled_system_apps:
+                    if os.path.exists(app_elf):
+                        app_name = os.path.basename(app_elf)
 
                         cmd(
-                            f"sudo cp '{app_bin}' "
+                            f"sudo cp '{app_elf}' "
                             f"'{mnt_dir}/system/{app_name}'"
                         )
 
                         print(
-                            f"[dogeing] Injected system application "
+                            f"[dogeing] Injected system application ELF "
                             f"to exFAT /system: {app_name}"
                         )
 
@@ -437,9 +435,6 @@ def main():
                             f"to exFAT /apps/packages: {pkg_name}"
                         )
 
-                #
-                # Assets -> /apps/text
-                #
                 assets_source_dir = os.path.join("apps", "text")
 
                 if os.path.isdir(assets_source_dir):
