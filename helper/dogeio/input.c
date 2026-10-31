@@ -7,6 +7,10 @@
 #include <time.h>
 #include <boot/kernel.h>
 
+#ifndef KEY_CTRL_TAB
+#define KEY_CTRL_TAB 0x101
+#endif
+
 const char map_lower[] = {
     0,  0, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', 0,
     0, 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']', 0,   0,
@@ -77,6 +81,11 @@ static uint16_t dogeio_decode_key(uint8_t code)
     switch (code) {
         case 0x1C: return KEY_ENTER;
         case 0x0E: return KEY_BACKSPACE;
+        case 0x0F: 
+            if (global_ctrl_pressed) {
+                return KEY_CTRL_TAB;
+            }
+            return KEY_TAB;
 
         case 0x48: return KEY_UP;
         case 0x50: return KEY_DOWN;
@@ -168,6 +177,15 @@ void dogeio_input(const char *prompt, char *buffer, size_t max_size) {
 
     while (true) {
         uint16_t key = dogeio_get_key();
+
+        if (key == KEY_CTRL_TAB) {
+            dogeio_println("");
+            sys_switch_terminal();
+
+            buffer[len] = '\0';
+            return;
+            break;
+        }
 
         if (key == KEY_ENTER) {
             dogeio_print("\n");
