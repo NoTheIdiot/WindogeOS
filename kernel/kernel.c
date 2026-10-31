@@ -73,9 +73,9 @@ static void install_root_apps(void) {
 
         const char *extension = name + name_length - 4;
         if (extension[0] != '.' ||
-           (extension[1] != 'b' && extension[1] != 'B') ||
-           (extension[2] != 'i' && extension[2] != 'I') ||
-           (extension[3] != 'n' && extension[3] != 'N')) {
+           (extension[1] != 'e' && extension[1] != 'E') ||
+           (extension[2] != 'l' && extension[2] != 'L') ||
+           (extension[3] != 'f' && extension[3] != 'F')) {
             continue;
         }
 
@@ -142,16 +142,7 @@ void kernel_main(void) {
     log("[Wow] Memory Map has been found.");
 
     log("Mounting Drive");
-    if (fs_mount()) {
-        log("Drive mounted");
-    } else {
-        log("Something went wrong, guess im formatting");
-        fs_format();
-        if (!fs_mount()) {
-            log("[setup] unable to mount filesystem after formatting");
-            halt();
-        }
-    }
+    fs_mount();
 
     log("[setup] installing root applications");
     install_root_apps();

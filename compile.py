@@ -282,7 +282,6 @@ def main():
                 pkg_obj = pkg_src.replace(ext, ".o")
                 binary_name = os.path.splitext(os.path.basename(pkg_src))[0]
                 pkg_elf = os.path.join(os.path.dirname(pkg_src), binary_name + ".elf")
-                pkg_bin = os.path.join(os.path.dirname(pkg_src), binary_name + ".bin")
                 pkg_rle = os.path.join(os.path.dirname(pkg_src), binary_name + ".rle")
                 compressed_packages.append(pkg_rle)
 
@@ -299,9 +298,12 @@ def main():
 
                 link_and_copy_cmd = (
                     f"{compile_step} && "
-                    f"{tools['linker']} {arch_cfg['linker_flags']} --no-relax --gc-sections "
-                    f"-T {arch_cfg['app_linker_script']} {pkg_obj} {' '.join(app_library_objects)} -o {pkg_elf} && "
-                    f"{tools['objcopy']} -O binary {pkg_elf} {pkg_bin}"
+                    f"{tools['linker']} "
+                    f"{arch_cfg['linker_flags']} "
+                    f"--no-relax --gc-sections "
+                    f"-T {arch_cfg['app_linker_script']} "
+                    f"{pkg_obj} {' '.join(app_library_objects)} "
+                    f"-o {pkg_elf}"
                 )
                 
                 def build_package():
@@ -309,10 +311,9 @@ def main():
                     if not success:
                         return False, pkg_src
                     try:
-                        compress_file_task(pkg_bin, pkg_rle)
+                        compress_file_task(pkg_elf, pkg_rle)
                         if os.path.exists(pkg_obj): os.remove(pkg_obj)
                         if os.path.exists(pkg_elf): os.remove(pkg_elf)
-                        if os.path.exists(pkg_bin): os.remove(pkg_bin)
                         return True, pkg_src
                     except Exception as e:
                         return False, pkg_src

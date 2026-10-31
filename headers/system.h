@@ -335,9 +335,10 @@ void nvme_pci_callback(uint8_t b, uint8_t d, uint8_t f, uint16_t ven, uint16_t d
 #define SYS_EXIT     60
 
 // actual running
-int system_run_elf(char* filename, uint64_t size);
+int system_run_elf_impl(char* filename, uint64_t size);
 void system_run_bin(char *filename, int program_size);
 void system_exec(char* path);
+int system_run_elf_args_impl(char *filename, uint64_t size, int argc, char **argv);
 
 // random utilities
 int util_hexdump(char* filename);

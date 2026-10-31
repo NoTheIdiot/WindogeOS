@@ -10,7 +10,7 @@ void system_exec(char* path) {
     fs_read_raw(path, buffer, 4);
 
     if (*(uint32_t*)buffer == ELF_MAGIC) {
-        system_run_elf(path, MAX_FLAT_BINARY_SIZE);
+        system_run_elf_impl(path, MAX_FLAT_BINARY_SIZE);
     } else {
         system_run_bin(path, MAX_FLAT_BINARY_SIZE);
     }

@@ -440,7 +440,7 @@ static int dogeshell_find_app(const char *command, char *app_path,
         return 1;
     }
     if (!has_extension &&
-        dogeshell_append(filename, sizeof(filename), &name_length, ".bin") != 0) {
+        dogeshell_append(filename, sizeof(filename), &name_length, ".elf") != 0) {
         return 1;
     }
     if (dogeshell_append(path, sizeof(path), &path_length, "/apps/") != 0 ||
@@ -480,9 +480,9 @@ static int dogeshell_list_apps(void) {
 
         const char *extension = dogeshell_app_names[i] + name_length - 4;
         if (extension[0] != '.' ||
-            (extension[1] != 'b' && extension[1] != 'B') ||
-            (extension[2] != 'i' && extension[2] != 'I') ||
-            (extension[3] != 'n' && extension[3] != 'N')) {
+            (extension[1] != 'e' && extension[1] != 'E') ||
+            (extension[2] != 'l' && extension[2] != 'L') ||
+            (extension[3] != 'f' && extension[3] != 'F')) {
             continue;
         }
 
@@ -1019,13 +1019,13 @@ static int dogeshell_execute(int argc, char **argv) {
     if (argc == 1) {
         char app_path[160];
         if (dogeshell_find_app(argv[0], app_path, sizeof(app_path)) == 0) {
-            system_run_bin(app_path, MAX_FLAT_BINARY_SIZE);
+            system_run_elf_impl(app_path, MAX_FLAT_BINARY_SIZE);
             return 0;
         }
     } else {
         char app_path[160];
         if (dogeshell_find_app(argv[0], app_path, sizeof(app_path)) == 0) {
-            system_run_bin_args(app_path, MAX_FLAT_BINARY_SIZE, argc - 1,
+            system_run_elf_args_impl(app_path, MAX_FLAT_BINARY_SIZE, argc - 1,
                                 argv + 1);
             return 0;
         }

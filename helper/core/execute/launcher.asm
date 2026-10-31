@@ -3,12 +3,14 @@ bits 64
 global system_run_bin
 global system_run_bin_args
 global system_run_elf
+global system_run_elf_args
 global syscall_exit_to_launcher
 
 extern kernel_program_launcher_rsp
 extern kernel_program_launcher_rflags
 extern system_run_bin_impl
 extern system_run_bin_args_impl
+extern system_run_elf_args_impl
 extern system_run_elf_impl
 
 section .text
@@ -46,6 +48,22 @@ system_run_elf:
     add rsp, 8
     mov qword [rel kernel_program_launcher_rsp], 0
     mov qword [rel kernel_program_launcher_rflags], 0
+    ret
+
+system_run_elf_args:
+    pushfq
+    pop rax
+
+    mov [rel kernel_program_launcher_rsp], rsp
+    mov [rel kernel_program_launcher_rflags], rax
+
+    sub rsp, 8
+    call system_run_elf_args_impl
+    add rsp, 8
+
+    mov qword [rel kernel_program_launcher_rsp], 0
+    mov qword [rel kernel_program_launcher_rflags], 0
+
     ret
 
 syscall_exit_to_launcher:

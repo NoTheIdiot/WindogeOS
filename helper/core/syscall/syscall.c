@@ -331,7 +331,7 @@ static uint64_t run_elf_binary(char *filename) {
     }
     launcher_context_t parent = save_launcher_context();
     bool parent_linux_abi = linux_syscall_abi_active;
-    int result = system_run_elf(filename, file_size);
+    int result = system_run_elf_impl(filename, file_size);
     syscall_set_linux_abi(parent_linux_abi);
     if (!restore_user_pages(parent_pages)) {
         return (uint64_t)-1;
