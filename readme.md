@@ -54,6 +54,18 @@ At most four stacked child processes are allowed at once.
 
 Oh yeah, it probably sucks for now.
 
+### dogeutil
+`dogeutil` is a system utility program available at `/system/dogeutil.elf`.
+It provides `grep`, current-directory filename search (`find`), `wc`, `stat`,
+`exists`, `ls`, `random`, `time`, `user`, `cwd`, `uname`, and `which` commands.
+Run `dogeutil --help` for argument formats.
+
+Other user applications can invoke a command synchronously with
+`process_stack("/system/dogeutil.elf", argc, argv)` from
+`library/dogelib.h`. The arguments are the utility subcommand and its
+parameters; output is printed by dogeutil and its exit status is returned to
+the caller.
+
 ### Running in VM
 Run `python start_vm.py`. This will open the .img file in QEMU.
 If you would like to run WindogeOS in a different VM for some reason, open the .img file in your preferred VM.
