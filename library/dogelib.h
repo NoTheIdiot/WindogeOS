@@ -27,6 +27,12 @@ static inline uint64_t exec_elf(const char *path) {
     return syscall_1(EXEC_ELF, (uint64_t)path);
 }
 
+/* Runs an ELF child synchronously; returns its exit status or -1 on failure. */
+static inline uint64_t process_stack(const char *path, uint64_t argc,
+                                     char *const argv[]) {
+    return syscall_3(PROCESS_STACK, (uint64_t)path, argc, (uint64_t)argv);
+}
+
 static inline uint64_t doge_get_pid(void) {
     return syscall_0(GET_PID);
 }

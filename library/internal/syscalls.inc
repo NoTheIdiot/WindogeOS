@@ -39,6 +39,7 @@
 %define IS_BAR_ON 51
 %define CLEAR_RAW 52
 %define EXPAND_USER_PAGES 53
+%define PROCESS_STACK 54
 
 %define SPECIAL 90
 

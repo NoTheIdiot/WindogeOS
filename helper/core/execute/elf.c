@@ -6,6 +6,7 @@
 #include <basicutil.h>
 #include <boot/limine.h>
 #include <boot/syscall_internal.h>
+#include "arguments.h"
 
 #define ELF_CLASS_64 2
 #define ELF_DATA_LSB 1
@@ -22,6 +23,7 @@
 #define MAX_ELF_FILE_SIZE (16ULL * 1024 * 1024)
 #define MAX_ELF_MEMORY_SIZE (64ULL * 1024 * 1024)
 #define MAX_ELF_PROGRAM_HEADERS 64
+#define USER_ARGUMENT_AREA_SIZE (PAGE_SIZE / 2)
 
 typedef struct __attribute__((packed)) {
     uint8_t  e_ident[16];
@@ -129,9 +131,11 @@ static bool elf_uses_linux_abi(char *filename, const elf64_ehdr *ehdr,
     return false;
 }
 
-int system_run_elf_impl(char *filename, uint64_t size) {
+int system_run_elf_args_impl(char *filename, uint64_t size, int argc,
+                             char **argv) {
     if (filename == NULL || filename[0] == '\0' ||
-        size < sizeof(elf64_ehdr) || size > MAX_ELF_FILE_SIZE) {
+        size < sizeof(elf64_ehdr) || size > MAX_ELF_FILE_SIZE ||
+        argc < 0 || argc > 32 || (argc > 0 && argv == NULL)) {
         log("sys (elf): invalid name or file size");
         return -1;
     }
@@ -294,15 +298,30 @@ int system_run_elf_impl(char *filename, uint64_t size) {
     }
     map_user_page(USER_STACK_VADDR, stack_phys);
 
+    uint64_t user_argv;
+    uint8_t *stack_memory =
+        (uint8_t *)(stack_phys + hhdm_request.response->offset);
+    if (prepare_user_arguments(stack_memory, USER_STACK_VADDR,
+                               USER_ARGUMENT_AREA_SIZE, argc, argv,
+                               &user_argv) != 0) {
+        result = -5;
+        goto failure;
+    }
+
     bool linux_abi = elf_uses_linux_abi(filename, &ehdr, phdrs, size);
     syscall_set_linux_abi(linux_abi);
     if (linux_abi) {
         linux_syscall_set_heap_base(align_up_page(highest_load_address));
     }
-    to_userland_ring3(ehdr.e_entry, USER_STACK_VADDR + PAGE_SIZE - 8);
+    to_userland_ring3_args(ehdr.e_entry, USER_STACK_VADDR + PAGE_SIZE - 8,
+                           (uint64_t)argc, user_argv);
     syscall_set_linux_abi(false);
 
 failure:
     cleanup_user_pages();
     return result;
+}
+
+int system_run_elf_impl(char *filename, uint64_t size) {
+    return system_run_elf_args_impl(filename, size, 0, NULL);
 }

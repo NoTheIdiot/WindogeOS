@@ -32,6 +32,168 @@ static bool global_ctrl_pressed  = false;
 
 static bool status_bar_enabled = true;
 
+#define KEYBOARD_SCANCODE_BUFFER_SIZE 256
+
+static volatile uint8_t keyboard_scancodes[KEYBOARD_SCANCODE_BUFFER_SIZE];
+static volatile uint8_t keyboard_scancode_head;
+static volatile uint8_t keyboard_scancode_tail;
+
+static uint64_t interrupt_save_disable(void)
+{
+    uint64_t rflags;
+    __asm__ volatile ("pushfq; pop %0; cli"
+                      : "=r"(rflags) : : "memory");
+    return rflags;
+}
+
+static void interrupt_restore(uint64_t rflags)
+{
+    if ((rflags & (1ULL << 9)) != 0) {
+        sti();
+    }
+}
+
+#define MOUSE_PACKET_SIZE 3
+
+static volatile uint8_t mouse_packet[MOUSE_PACKET_SIZE];
+static volatile uint8_t mouse_packet_index;
+static volatile int32_t mouse_delta_x;
+static volatile int32_t mouse_delta_y;
+static volatile uint8_t mouse_buttons;
+
+static bool ps2_wait_input_empty(void)
+{
+    for (uint32_t i = 0; i < 100000U; i++) {
+        if ((ports_inb(0x64) & 0x02U) == 0) {
+            return true;
+        }
+        __asm__ volatile ("pause");
+    }
+    return false;
+}
+
+static bool ps2_wait_output_full(void)
+{
+    for (uint32_t i = 0; i < 100000U; i++) {
+        if ((ports_inb(0x64) & 0x01U) != 0) {
+            return true;
+        }
+        __asm__ volatile ("pause");
+    }
+    return false;
+}
+
+static bool ps2_send_mouse_command(uint8_t command)
+{
+    if (!ps2_wait_input_empty()) {
+        return false;
+    }
+    ports_outb(0x64, 0xD4);
+    if (!ps2_wait_input_empty()) {
+        return false;
+    }
+    ports_outb(0x60, command);
+    if (!ps2_wait_output_full()) {
+        return false;
+    }
+    return ports_inb(0x60) == 0xFA;
+}
+
+bool dogeio_mouse_init(void)
+{
+    if (!ps2_wait_input_empty()) {
+        return false;
+    }
+    ports_outb(0x64, 0xA8);
+
+    if (!ps2_wait_input_empty()) {
+        return false;
+    }
+    ports_outb(0x64, 0x20);
+    if (!ps2_wait_output_full()) {
+        return false;
+    }
+    uint8_t controller_config = ports_inb(0x60);
+
+    if (!ps2_wait_input_empty()) {
+        return false;
+    }
+    ports_outb(0x64, 0x60);
+    if (!ps2_wait_input_empty()) {
+        return false;
+    }
+    ports_outb(0x60, (uint8_t)((controller_config | 0x02U) & ~0x20U));
+
+    if (!ps2_send_mouse_command(0xF6) ||
+        !ps2_send_mouse_command(0xF4)) {
+        return false;
+    }
+
+    mouse_packet_index = 0;
+    mouse_delta_x = 0;
+    mouse_delta_y = 0;
+    mouse_buttons = 0;
+    return true;
+}
+
+void dogeio_keyboard_irq(void)
+{
+    uint8_t scancode = ports_inb(0x60);
+    uint8_t next_head = (uint8_t)(keyboard_scancode_head + 1U);
+
+    if (next_head != keyboard_scancode_tail) {
+        keyboard_scancodes[keyboard_scancode_head] = scancode;
+        keyboard_scancode_head = next_head;
+    }
+}
+
+void dogeio_mouse_irq(void)
+{
+    uint8_t byte = ports_inb(0x60);
+    uint8_t index = mouse_packet_index;
+
+    if (index == 0 && (byte & 0x08U) == 0) {
+        return;
+    }
+
+    mouse_packet[index] = byte;
+    index++;
+    if (index < MOUSE_PACKET_SIZE) {
+        mouse_packet_index = index;
+        return;
+    }
+
+    mouse_packet_index = 0;
+    uint8_t flags = mouse_packet[0];
+    if ((flags & 0xC0U) != 0) {
+        return;
+    }
+
+    mouse_delta_x += (int8_t)mouse_packet[1];
+    mouse_delta_y -= (int8_t)mouse_packet[2];
+    mouse_buttons = (uint8_t)(flags & 0x07U);
+}
+
+bool dogeio_mouse_read(int32_t *delta_x, int32_t *delta_y,
+                       uint8_t *buttons)
+{
+    if (delta_x == NULL || delta_y == NULL || buttons == NULL) {
+        return false;
+    }
+
+    uint64_t rflags;
+    __asm__ volatile ("pushfq; pop %0; cli" : "=r"(rflags) : : "memory");
+    *delta_x = mouse_delta_x;
+    *delta_y = mouse_delta_y;
+    *buttons = mouse_buttons;
+    mouse_delta_x = 0;
+    mouse_delta_y = 0;
+    if ((rflags & (1ULL << 9)) != 0) {
+        sti();
+    }
+    return true;
+}
+
 static uint16_t dogeio_decode_key(uint8_t code)
 {
     static bool escaped = false;
@@ -116,17 +278,19 @@ static uint16_t dogeio_decode_key(uint8_t code)
 }
 
 uint16_t dogeio_get_key_delay(uint64_t loops) {
-    while (loops--) {
+    uint64_t rflags = interrupt_save_disable();
+    while (loops > 0 && keyboard_scancode_tail != keyboard_scancode_head) {
+        uint8_t scancode = keyboard_scancodes[keyboard_scancode_tail];
+        keyboard_scancode_tail = (uint8_t)(keyboard_scancode_tail + 1U);
+        loops--;
 
-        if ((ports_inb(0x64) & 1) != 0) {
-            uint8_t code = ports_inb(0x60);
-
-            return dogeio_decode_key(code);
+        uint16_t key = dogeio_decode_key(scancode);
+        if (key != KEY_UNKNOWN) {
+            interrupt_restore(rflags);
+            return key;
         }
-
-        __asm__ volatile ("pause");
     }
-
+    interrupt_restore(rflags);
     return KEY_UNKNOWN;
 }
 
@@ -134,14 +298,22 @@ uint16_t dogeio_get_key(void) {
     char last_seen_time[16] = {0};
 
     while (true) {
+        uint64_t rflags = interrupt_save_disable();
+        if (keyboard_scancode_tail != keyboard_scancode_head) {
+            uint8_t scancode = keyboard_scancodes[keyboard_scancode_tail];
+            keyboard_scancode_tail = (uint8_t)(keyboard_scancode_tail + 1U);
+            interrupt_restore(rflags);
 
-        uint16_t key = dogeio_get_key_delay(1);
-
-        if (key != KEY_UNKNOWN) {
-            return key;
+            uint16_t key = dogeio_decode_key(scancode);
+            if (key != KEY_UNKNOWN) {
+                return key;
+            }
+            continue;
         }
 
-       if (status_bar_enabled && !is_kernel_dead) {
+        __asm__ volatile ("sti; hlt" ::: "memory");
+
+        if (status_bar_enabled && !is_kernel_dead) {
             char *current_time = time_get();
 
             if (str_strcmp(current_time, last_seen_time) != 0) {
@@ -158,8 +330,6 @@ uint16_t dogeio_get_key(void) {
                 last_seen_time[15] = '\0';
             }
         }
-
-        __asm__ volatile ("pause");
     }
 }
 

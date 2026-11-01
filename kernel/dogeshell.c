@@ -344,7 +344,7 @@ static void dogeshell_print_help(void) {
         " fetch, settings, tab     | system UI and terminal controls     | calc <expression>          | evaluate a calculator expression                               ",
         " edit <file>              | open the text editor                | hexdump <file>             | display file bytes                                             ",
         " pci                      | list PCI devices                    | run <file>                 | run a flat binary                                              ",
-        " bash                     | open Bash; exit returns here        | <app>[.bin] [args...]      | run an app from /apps                                          ",
+        " bash                     | open Bash; exit returns here        | <app>[.elf] [args...]      | run an app from /apps                                          ",
         " exit                     | leave Dogeshell                     | dogestore                  | install and uninstall apps from dogestore                      ",
         "===============================================================================================================================================================",
         " Use ; between commands. Quoted or escaped semicolons are literal. Paths may be quoted; use ~ for your home directory."
@@ -432,15 +432,15 @@ static int dogeshell_find_app(const char *command, char *app_path,
     if (name_length >= 4) {
         const char *extension = command + name_length - 4;
         has_extension = extension[0] == '.' &&
-                        (extension[1] == 'b' || extension[1] == 'B') &&
-                        (extension[2] == 'i' || extension[2] == 'I') &&
-                        (extension[3] == 'n' || extension[3] == 'N');
+                        (extension[1] == 'e' || extension[1] == 'E') &&
+                        (extension[2] == 'l' || extension[2] == 'L') &&
+                        (extension[3] == 'f' || extension[3] == 'F');
     }
     if (dogeshell_copy(filename, sizeof(filename), command) != 0) {
         return 1;
     }
     if (!has_extension &&
-        dogeshell_append(filename, sizeof(filename), &name_length, ".bin") != 0) {
+        dogeshell_append(filename, sizeof(filename), &name_length, ".elf") != 0) {
         return 1;
     }
     if (dogeshell_append(path, sizeof(path), &path_length, "/apps/") != 0 ||
@@ -480,9 +480,9 @@ static int dogeshell_list_apps(void) {
 
         const char *extension = dogeshell_app_names[i] + name_length - 4;
         if (extension[0] != '.' ||
-            (extension[1] != 'b' && extension[1] != 'B') ||
-            (extension[2] != 'i' && extension[2] != 'I') ||
-            (extension[3] != 'n' && extension[3] != 'N')) {
+            (extension[1] != 'e' && extension[1] != 'E') ||
+            (extension[2] != 'l' && extension[2] != 'L') ||
+            (extension[3] != 'f' && extension[3] != 'F')) {
             continue;
         }
 
@@ -959,8 +959,7 @@ static int dogeshell_execute(int argc, char **argv) {
             return 127;
         }
         char *editor_args[] = {path};
-        system_run_bin_args(editor_path, MAX_FLAT_BINARY_SIZE, 1,
-                            editor_args);
+        system_exec_args(editor_path, 1, editor_args);
         return 0;
     }
     if (str_strcmp(argv[0], "settings") == 0) {
@@ -1011,7 +1010,7 @@ static int dogeshell_execute(int argc, char **argv) {
     }
     if (str_strcmp(argv[0], "sleep") == 0) {
         fs_set_auth_override(1);
-        system_run_bin("/system/sleep.bin", 512);
+        system_exec("/system/sleep.elf");
         fs_set_auth_override(0);
         return 0;
     }
@@ -1019,14 +1018,13 @@ static int dogeshell_execute(int argc, char **argv) {
     if (argc == 1) {
         char app_path[160];
         if (dogeshell_find_app(argv[0], app_path, sizeof(app_path)) == 0) {
-            system_run_bin(app_path, MAX_FLAT_BINARY_SIZE);
+            system_exec(app_path);
             return 0;
         }
     } else {
         char app_path[160];
         if (dogeshell_find_app(argv[0], app_path, sizeof(app_path)) == 0) {
-            system_run_bin_args(app_path, MAX_FLAT_BINARY_SIZE, argc - 1,
-                                argv + 1);
+            system_exec_args(app_path, argc - 1, argv + 1);
             return 0;
         }
     }

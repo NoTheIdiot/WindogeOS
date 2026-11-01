@@ -6,6 +6,7 @@
 #include <string.h>
 #include <boot/syscall_internal.h>
 #include <boot/limine.h>
+#include "arguments.h"
 
 static uint32_t next_pid = 1;
 
@@ -19,58 +20,8 @@ extern volatile struct limine_hhdm_request hhdm_request;
 #define USER_ARGUMENT_AREA_SIZE (USER_STACK_SIZE / 2)
 #define DATA_SECTION_SIZE       (8 * 1024)
 
-static size_t bin_argument_length(const char *argument) {
-    size_t length = 0;
-    while (length < 256 && argument[length] != '\0') {
-        length++;
-    }
-    return length;
-}
-
 void system_run_bin_impl(char *filename, int program_size) {
     system_run_bin_args_impl(filename, program_size, 0, NULL);
-}
-
-static int prepare_user_arguments(uint8_t *stack_memory, int argc, char **argv,
-                                uint64_t *user_argv) {
-    uint64_t argument_addresses[32];
-    size_t cursor = 0;
-
-    if (argc < 0 || argc > 32 || (argc > 0 && argv == NULL)) {
-        return -1;
-    }
-
-    for (int i = 0; i < argc; i++) {
-        if (argv[i] == NULL) {
-            return -1;
-        }
-        size_t length = bin_argument_length(argv[i]);
-        if (length == 256 || cursor > USER_ARGUMENT_AREA_SIZE ||
-            length + 1 > USER_ARGUMENT_AREA_SIZE - cursor) {
-            return -1;
-        }
-        argument_addresses[i] = USER_STACK_BASE + cursor;
-        for (size_t j = 0; j < length; j++) {
-            stack_memory[cursor + j] = (uint8_t)argv[i][j];
-        }
-        stack_memory[cursor + length] = '\0';
-        cursor += length + 1;
-    }
-
-    cursor = (cursor + sizeof(uint64_t) - 1U) &
-             ~(sizeof(uint64_t) - 1U);
-    size_t vector_size = ((size_t)argc + 1U) * sizeof(uint64_t);
-    if (cursor > USER_ARGUMENT_AREA_SIZE ||
-        vector_size > USER_ARGUMENT_AREA_SIZE - cursor) {
-        return -1;
-    }
-    uint64_t *vector = (uint64_t *)(stack_memory + cursor);
-    for (int i = 0; i < argc; i++) {
-        vector[i] = argument_addresses[i];
-    }
-    vector[argc] = 0;
-    *user_argv = USER_STACK_BASE + cursor;
-    return 0;
 }
 
 void system_run_bin_args_impl(char *filename, int program_size, int argc, char **argv) {
@@ -155,8 +106,9 @@ void system_run_bin_args_impl(char *filename, int program_size, int argc, char *
     }
 
     uint64_t user_argv = 0;
-    if (prepare_user_arguments((uint8_t *)USER_STACK_BASE,
-                               argc, argv, &user_argv) != 0) {
+    if (prepare_user_arguments((uint8_t *)USER_STACK_BASE, USER_STACK_BASE,
+                               USER_ARGUMENT_AREA_SIZE, argc, argv,
+                               &user_argv) != 0) {
         dogeio_println("[Error] Application arguments exceed the user stack.");
         cleanup_user_pages();
         return;

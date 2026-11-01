@@ -9,11 +9,11 @@ Most x86_64 CPUs will work. Intel Atoms, early Pentiums (2000-2010), and Core 2 
 and very compatible.
 
 Your PC must be able to run WindogeOS in BIOS mode. UEFI PCs in CSM mode will function too.
-You will also need 4MB of RAM and 5MB of storage.
+You will also need 6MB of RAM and 8MB of storage.
 
 ## Recommended Specs
-Any CPU, 6MB of RAM and 8MB of storage for the best experience.
-Dogescript for advanced scripts also needs 8MB of RAM.
+Any CPU, 8MB of RAM and 12MB of storage for the best experience.
+Dogescript for advanced scripts also needs 10MB of RAM.
 
 ## Updates
 To see updates, read commits and release descriptions.
@@ -35,6 +35,24 @@ If you are on Windows, install WSL with `wsl --install Ubuntu`.
   
   that's it, you might have to type in your sudo password
   for `compile.py`
+
+Applications are built and installed as ELF `.elf` files. Packages retain their
+compressed `.rle` archive format and install as ELF applications.
+
+### Synchronous process stacking
+User applications can run another ELF application without discarding their
+current address space by calling `process_stack` from `library/dogelib.h`:
+
+```c
+char *arguments[] = {"--example"};
+uint64_t status = process_stack("apps/example.elf", 1, arguments);
+```
+
+The call waits for the child to exit, then resumes the caller and returns the
+child's exit status. It returns `(uint64_t)-1` if the child cannot be started.
+At most four stacked child processes are allowed at once.
+
+Oh yeah, it probably sucks for now.
 
 ### Running in VM
 Run `python start_vm.py`. This will open the .img file in QEMU.

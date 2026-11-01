@@ -9,6 +9,9 @@
 #define PAGE_PRESENT  (1ULL << 0)
 #define PAGE_WRITABLE (1ULL << 1)
 #define PAGE_USER     (1ULL << 2)
+#define PAGE_WRITE_THROUGH (1ULL << 3)
+#define PAGE_CACHE_DISABLE (1ULL << 4)
+#define PAGE_LARGE    (1ULL << 7)
 #define PAGE_NO_EXECUTE (1ULL << 63)
 #define PAGE_ADDRESS_MASK 0x000FFFFFFFFFF000ULL
 #define MSR_IA32_EFER 0xC0000080
@@ -218,6 +221,57 @@ static inline uint64_t* get_or_alloc_table(uint64_t* table, size_t index, uint64
         table[index] |= PAGE_USER_FLAGS;
     }
     return (uint64_t *)((table[index] & ~0xFFFULL) + hhdm_offset);
+}
+
+bool map_kernel_mmio_page(uint64_t virt_addr, uint64_t phys_addr) {
+    if (hhdm_request.response == NULL ||
+        (virt_addr & 0xFFFULL) != 0 ||
+        (phys_addr & 0xFFFULL) != 0) {
+        return false;
+    }
+
+    uint64_t hhdm_offset = hhdm_request.response->offset;
+    uint64_t *table = (uint64_t *)((read_cr3() & PAGE_ADDRESS_MASK) +
+                                   hhdm_offset);
+    const size_t indices[] = {
+        (size_t)((virt_addr >> 39) & 0x1FF),
+        (size_t)((virt_addr >> 30) & 0x1FF),
+        (size_t)((virt_addr >> 21) & 0x1FF),
+        (size_t)((virt_addr >> 12) & 0x1FF)
+    };
+
+    for (size_t level = 0; level < 3; level++) {
+        uint64_t entry = table[indices[level]];
+        if ((entry & PAGE_PRESENT) != 0) {
+            if ((entry & PAGE_LARGE) != 0) {
+                return false;
+            }
+            table = (uint64_t *)((entry & PAGE_ADDRESS_MASK) + hhdm_offset);
+            continue;
+        }
+
+        uint64_t next_table_phys = pmm_alloc_zeroed_page();
+        if (next_table_phys == 0) {
+            return false;
+        }
+        table[indices[level]] = next_table_phys |
+                                PAGE_PRESENT | PAGE_WRITABLE;
+        table = (uint64_t *)(next_table_phys + hhdm_offset);
+    }
+
+    uint64_t *entry = &table[indices[3]];
+    if ((*entry & PAGE_PRESENT) != 0 &&
+        (*entry & PAGE_ADDRESS_MASK) != (phys_addr & PAGE_ADDRESS_MASK)) {
+        return false;
+    }
+
+    *entry = (phys_addr & PAGE_ADDRESS_MASK) | PAGE_PRESENT | PAGE_WRITABLE |
+             PAGE_WRITE_THROUGH | PAGE_CACHE_DISABLE;
+    if ((rdmsr(MSR_IA32_EFER) & EFER_NXE) != 0) {
+        *entry |= PAGE_NO_EXECUTE;
+    }
+    invlpg(virt_addr);
+    return true;
 }
 
 void map_user_page(uint64_t virt_addr, uint64_t phys_addr) {

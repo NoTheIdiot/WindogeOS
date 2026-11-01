@@ -42,7 +42,7 @@ typedef struct __attribute__((packed)) {
 static idt_entry_t idt[256];
 static idtr_t      idtr;
 
-extern uint64_t isr_stub_table[32];
+extern uint64_t isr_stub_table[49];
 extern void idt_load(idtr_t *idtr_ptr);
 bool is_kernel_dead = false;
 
@@ -149,6 +149,21 @@ void isr_common_handler(interrupt_frame_t *frame) {
     char str_buf[64];
     char log_buf[128];
     int selected_option = 0;
+
+    if (frame->vector >= 32 && frame->vector < 48) {
+        uint8_t irq = (uint8_t)(frame->vector - 32);
+        if (irq == 1) {
+            dogeio_keyboard_irq();
+        } else if (irq == 12) {
+            dogeio_mouse_irq();
+        }
+        pic_send_eoi(irq);
+        apic_eoi();
+        return;
+    }
+    if (frame->vector == 255) {
+        return;
+    }
 
     if ((frame->cs & 0x03u) == 3) {
         uint64_to_dec_forward(frame->vector, str_buf);
@@ -319,6 +334,11 @@ void init_idt(void) {
         }
         idt_set_gate(vector, isr_stub_table[vector], ist_index, IDT_GATE_INT32);
     }
+
+    for (uint8_t vector = 32; vector < 48; vector++) {
+        idt_set_gate(vector, isr_stub_table[vector], 0, IDT_GATE_INT32);
+    }
+    idt_set_gate(255, isr_stub_table[48], 0, IDT_GATE_INT32);
     
     idtr.limit = sizeof(idt) - 1;
     idtr.base  = (uint64_t)&idt;

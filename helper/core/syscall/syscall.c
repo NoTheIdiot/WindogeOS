@@ -14,6 +14,7 @@
 #define MSR_IA32_STAR            0xC0000081
 #define MSR_IA32_LSTAR           0xC0000082
 #define MSR_IA32_FMASK           0xC0000084
+#define MSR_IA32_GS_BASE         0xC0000101
 #define MSR_IA32_KERNEL_GS_BASE  0xC0000102
 
 #define EFER_SCE                 (1ULL << 0)
@@ -32,6 +33,10 @@
 #define USER_STRING_LIMIT 4096
 #define USER_PATH_LIMIT 256
 #define USER_INPUT_LIMIT 256
+#define MAX_PROCESS_STACK_DEPTH 4
+#define PROCESS_STACK_ARGUMENTS_SIZE 2048
+#define MAX_SYSCALL_CONTEXTS (MAX_PROCESS_STACK_DEPTH + 1)
+#define SYSCALL_STACK_SIZE 65536
 
 extern void syscall_entry(void);
 extern volatile struct limine_hhdm_request hhdm_request;
@@ -41,13 +46,17 @@ typedef struct {
     uint64_t user_rsp_scratch;
 } __attribute__((packed)) per_cpu_data_t;
 
-static uint8_t syscall_stack[65536] __attribute__((aligned(16)));
-static per_cpu_data_t bsp_cpu_data;
+static uint8_t syscall_stack[MAX_SYSCALL_CONTEXTS][SYSCALL_STACK_SIZE]
+    __attribute__((aligned(16)));
+static per_cpu_data_t syscall_cpu_data[MAX_SYSCALL_CONTEXTS];
+uint64_t syscall_context_gs_bases[MAX_SYSCALL_CONTEXTS];
+uint32_t syscall_context_depth;
 uint64_t kernel_program_launcher_rsp = 0;
 uint64_t kernel_program_launcher_rflags = 0;
 static bool linux_syscall_abi_active;
 static bool cpu_supports_nx;
 static bool cpu_supports_rdrand;
+static uint32_t process_stack_depth;
 
 static bool try_rdrand(uint64_t *value) __attribute__((target("rdrnd")));
 
@@ -289,6 +298,10 @@ static void copy_uname_field(char destination[65], const char *source) {
 }
 
 static uint64_t run_flat_binary(char *filename) {
+    if (syscall_context_depth >= MAX_SYSCALL_CONTEXTS - 1) {
+        return (uint64_t)-1;
+    }
+
     uint64_t parent_pages[256];
     if (!suspend_user_pages(parent_pages)) {
         return (uint64_t)-1;
@@ -304,6 +317,10 @@ static uint64_t run_flat_binary(char *filename) {
 
 static uint64_t run_flat_binary_args(char *filename, int argc,
                                      char **argv) {
+    if (syscall_context_depth >= MAX_SYSCALL_CONTEXTS - 1) {
+        return (uint64_t)-1;
+    }
+
     uint64_t parent_pages[256];
     if (!suspend_user_pages(parent_pages)) {
         return (uint64_t)-1;
@@ -317,11 +334,14 @@ static uint64_t run_flat_binary_args(char *filename, int argc,
     return 1;
 }
 
-static uint64_t run_elf_binary(char *filename) {
+static uint64_t run_elf_binary_args(char *filename, int argc, char **argv) {
     uint64_t file_size;
     bool is_dir;
     if (fs_get_info(filename, &file_size, &is_dir) != 0 ||
-        is_dir || file_size == 0 || file_size > MAX_FLAT_BINARY_SIZE) {
+        is_dir || file_size == 0 || file_size > MAX_FLAT_BINARY_SIZE ||
+        argc < 0 || argc > 32 || (argc > 0 && argv == NULL) ||
+        process_stack_depth >= MAX_PROCESS_STACK_DEPTH ||
+        syscall_context_depth >= MAX_SYSCALL_CONTEXTS - 1) {
         return (uint64_t)-1;
     }
 
@@ -331,13 +351,22 @@ static uint64_t run_elf_binary(char *filename) {
     }
     launcher_context_t parent = save_launcher_context();
     bool parent_linux_abi = linux_syscall_abi_active;
-    int result = system_run_elf(filename, file_size);
+    process_stack_depth++;
+    int result = system_run_elf_args(filename, file_size, argc, argv);
+    process_stack_depth--;
     syscall_set_linux_abi(parent_linux_abi);
     if (!restore_user_pages(parent_pages)) {
         return (uint64_t)-1;
     }
     restore_launcher_context(parent);
+    if (result < 0) {
+        return (uint64_t)-1;
+    }
     return (uint64_t)(int64_t)result;
+}
+
+static uint64_t run_elf_binary(char *filename) {
+    return run_elf_binary_args(filename, 0, NULL);
 }
 
 static uint64_t native_random_bytes(uint64_t address, uint64_t length) {
@@ -702,6 +731,47 @@ uint64_t syscall_handler(syscall_registers_t *regs) {
             }
             return run_elf_binary(filename);
         }
+
+        case PROCESS_STACK: {
+            char filename[USER_PATH_LIMIT];
+            if (!copy_user_string(regs->rdi, filename, sizeof(filename), NULL) ||
+                regs->rsi > 32 ||
+                (regs->rsi != 0 &&
+                 !user_range_accessible(regs->rdx,
+                                        regs->rsi * sizeof(uint64_t), false))) {
+                return (uint64_t)-1;
+            }
+            if (!fs_exists(filename)) {
+                return (uint64_t)-1;
+            }
+
+            char argument_storage[PROCESS_STACK_ARGUMENTS_SIZE];
+            char *arguments[32];
+            int argc = (int)regs->rsi;
+            size_t argument_offset = 0;
+            for (int i = 0; i < argc; i++) {
+                uint64_t argument_address;
+                memcpy(&argument_address,
+                       (const void *)(regs->rdx +
+                                      (uint64_t)i * sizeof(uint64_t)),
+                       sizeof(argument_address));
+                if (argument_offset >= sizeof(argument_storage)) {
+                    return (uint64_t)-1;
+                }
+                size_t argument_length;
+                size_t remaining = sizeof(argument_storage) - argument_offset;
+                size_t capacity = remaining < 256 ? remaining : 256;
+                if (!copy_user_string(argument_address,
+                                      &argument_storage[argument_offset],
+                                      capacity, &argument_length)) {
+                    return (uint64_t)-1;
+                }
+                arguments[i] = &argument_storage[argument_offset];
+                argument_offset += argument_length + 1;
+            }
+
+            return run_elf_binary_args(filename, argc, arguments);
+        }
         
         case PRINT: {
             char text[USER_STRING_LIMIT];
@@ -995,8 +1065,13 @@ void init_syscalls(void) {
     wrmsr(MSR_IA32_LSTAR, (uint64_t)syscall_entry);
     wrmsr(MSR_IA32_FMASK, RFLAGS_IF | RFLAGS_TF | RFLAGS_DF);
 
-    bsp_cpu_data.kernel_rsp = (uint64_t)&syscall_stack[sizeof(syscall_stack)];
-    bsp_cpu_data.user_rsp_scratch = 0;
+    for (size_t i = 0; i < MAX_SYSCALL_CONTEXTS; i++) {
+        syscall_cpu_data[i].kernel_rsp =
+            (uint64_t)&syscall_stack[i][SYSCALL_STACK_SIZE];
+        syscall_cpu_data[i].user_rsp_scratch = 0;
+        syscall_context_gs_bases[i] = (uint64_t)&syscall_cpu_data[i];
+    }
 
-    wrmsr(MSR_IA32_KERNEL_GS_BASE, (uint64_t)&bsp_cpu_data);
+    wrmsr(MSR_IA32_GS_BASE, 0);
+    wrmsr(MSR_IA32_KERNEL_GS_BASE, syscall_context_gs_bases[0]);
 }

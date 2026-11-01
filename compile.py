@@ -6,7 +6,7 @@ import subprocess
 import importlib.util
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-DISK_IMAGE_SIZE_MB = 5
+DISK_IMAGE_SIZE_MB = 12
 
 def rle_compress_data(data: bytes) -> bytes:
     original_size = len(data)
@@ -82,8 +82,8 @@ def main():
         app_sources = []
         package_sources = []
 
-        compiled_apps = []
-        compiled_system_apps = []
+        compiled_app_elfs = []
+        compiled_system_app_elfs = []
         compressed_packages = []
 
         config_path = "compile_config.py"
@@ -248,7 +248,6 @@ def main():
                     os.path.splitext(os.path.basename(app_src))[0],
                 )
                 app_elf = os.path.join(os.path.dirname(app_src), binary_name + ".elf")
-                app_bin = os.path.join(os.path.dirname(app_src), binary_name + ".bin")
 
                 system_apps_dir = os.path.abspath(
                     os.path.join("apps", "system")
@@ -259,21 +258,28 @@ def main():
                 )
 
                 if normalized_app_path.startswith(system_apps_dir + os.sep):
-                    compiled_system_apps.append(app_bin)
+                    compiled_system_app_elfs.append(app_elf)
                 else:
-                    compiled_apps.append(app_bin)
+                    compiled_app_elfs.append(app_elf)
 
                 if ftype == "c":
                     compile_step = f"{tools['c_compiler']} {arch_cfg['app_flags']} {common_flags} -c {app_src} -o {app_obj}"
                 else:
                     compile_step = f"{tools['assembler']} -f elf64 -g -F dwarf {app_src} -o {app_obj}"
 
+                linker_inputs = f"{app_obj} {' '.join(app_library_objects)}"
+                linker_args = (
+                    f"{tools['linker']} {arch_cfg['linker_flags']} "
+                    f"--no-relax --gc-sections"
+                )
+                elf_linker_script = arch_cfg.get(
+                    "app_elf_linker_script", arch_cfg["app_linker_script"]
+                )
                 chain_cmd = (
                     f"{compile_step} && "
-                    f"{tools['linker']} {arch_cfg['linker_flags']} --no-relax --gc-sections "
-                    f"-T {arch_cfg['app_linker_script']} {app_obj} {' '.join(app_library_objects)} -o {app_elf} && "
-                    f"{tools['objcopy']} -O binary {app_elf} {app_bin} && "
-                    f"rm -f {app_obj} {app_elf}"
+                    f"{linker_args} -T {elf_linker_script} "
+                    f"{linker_inputs} -o {app_elf} && "
+                    f"rm -f {app_obj}"
                 )
                 app_cmds.append(chain_cmd)
 
@@ -282,7 +288,6 @@ def main():
                 pkg_obj = pkg_src.replace(ext, ".o")
                 binary_name = os.path.splitext(os.path.basename(pkg_src))[0]
                 pkg_elf = os.path.join(os.path.dirname(pkg_src), binary_name + ".elf")
-                pkg_bin = os.path.join(os.path.dirname(pkg_src), binary_name + ".bin")
                 pkg_rle = os.path.join(os.path.dirname(pkg_src), binary_name + ".rle")
                 compressed_packages.append(pkg_rle)
 
@@ -291,17 +296,19 @@ def main():
                 else:
                     compile_step = f"{tools['assembler']} -f elf64 -g -F dwarf {pkg_src} -o {pkg_obj}"
 
-                def compress_file_task(bin_path, rle_path):
-                    with open(bin_path, "rb") as f_in:
+                def compress_file_task(elf_path, rle_path):
+                    with open(elf_path, "rb") as f_in:
                         compressed_data = rle_compress_data(f_in.read())
                     with open(rle_path, "wb") as f_out:
                         f_out.write(compressed_data)
 
+                package_elf_linker_script = arch_cfg.get(
+                    "app_elf_linker_script", arch_cfg["app_linker_script"]
+                )
                 link_and_copy_cmd = (
                     f"{compile_step} && "
                     f"{tools['linker']} {arch_cfg['linker_flags']} --no-relax --gc-sections "
-                    f"-T {arch_cfg['app_linker_script']} {pkg_obj} {' '.join(app_library_objects)} -o {pkg_elf} && "
-                    f"{tools['objcopy']} -O binary {pkg_elf} {pkg_bin}"
+                    f"-T {package_elf_linker_script} {pkg_obj} {' '.join(app_library_objects)} -o {pkg_elf}"
                 )
                 
                 def build_package():
@@ -309,10 +316,9 @@ def main():
                     if not success:
                         return False, pkg_src
                     try:
-                        compress_file_task(pkg_bin, pkg_rle)
+                        compress_file_task(pkg_elf, pkg_rle)
                         if os.path.exists(pkg_obj): os.remove(pkg_obj)
                         if os.path.exists(pkg_elf): os.remove(pkg_elf)
-                        if os.path.exists(pkg_bin): os.remove(pkg_bin)
                         return True, pkg_src
                     except Exception as e:
                         return False, pkg_src
@@ -378,7 +384,7 @@ def main():
         
         cmd(f"mkfs.exfat -b 4K -L WINDOGEOS {part2_img}")
 
-        if compiled_apps or compiled_system_apps or compressed_packages:
+        if compiled_app_elfs or compiled_system_app_elfs or compressed_packages:
             mnt_dir = "/tmp/windoge_p2_mnt"
             os.makedirs(mnt_dir, exist_ok=True)
 
@@ -395,32 +401,20 @@ def main():
                 cmd(f"sudo mkdir -p {mnt_dir}/apps/text")
                 cmd(f"sudo mkdir -p {mnt_dir}/system")
 
-                for app_bin in compiled_apps:
-                    if os.path.exists(app_bin):
-                        app_name = os.path.basename(app_bin)
-
+                for app_elf in compiled_app_elfs:
+                    if os.path.exists(app_elf):
+                        elf_name = os.path.basename(app_elf)
                         cmd(
-                            f"sudo cp '{app_bin}' "
-                            f"'{mnt_dir}/apps/{app_name}'"
+                            f"sudo cp '{app_elf}' "
+                            f"'{mnt_dir}/apps/{elf_name}'"
                         )
 
-                        print(
-                            f"[dogeing] Injected application "
-                            f"to exFAT /apps: {app_name}"
-                        )
-
-                for app_bin in compiled_system_apps:
-                    if os.path.exists(app_bin):
-                        app_name = os.path.basename(app_bin)
-
+                for app_elf in compiled_system_app_elfs:
+                    if os.path.exists(app_elf):
+                        elf_name = os.path.basename(app_elf)
                         cmd(
-                            f"sudo cp '{app_bin}' "
-                            f"'{mnt_dir}/system/{app_name}'"
-                        )
-
-                        print(
-                            f"[dogeing] Injected system application "
-                            f"to exFAT /system: {app_name}"
+                            f"sudo cp '{app_elf}' "
+                            f"'{mnt_dir}/system/{elf_name}'"
                         )
 
                 for pkg_rle in compressed_packages:

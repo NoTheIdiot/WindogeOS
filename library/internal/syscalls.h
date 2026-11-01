@@ -49,6 +49,7 @@
 #define LIST_DIR           41
 #define WRITE_FILE_RAW     42
 #define GET_USER           43
+#define PROCESS_STACK      54
 
 // video
 #define SET_VIDEO_MODE 44

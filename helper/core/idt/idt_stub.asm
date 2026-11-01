@@ -52,6 +52,14 @@ ISR_NOERRCODE i
 %assign i i+1
 %endrep
 
+%assign i 32
+%rep 16
+ISR_NOERRCODE i
+%assign i i+1
+%endrep
+
+ISR_NOERRCODE 255
+
 isr_common_stub:
     push rax
     push rbx
@@ -95,7 +103,8 @@ section .rodata
 global isr_stub_table
 isr_stub_table:
 %assign i 0
-%rep 32
+%rep 48
     dq isr_stub_%[i]
 %assign i i+1
 %endrep
+    dq isr_stub_255

@@ -25,6 +25,7 @@ compiler_flags = {
         "app_flags"           : "-target x86_64-unknown-none-elf -m64 -march=x86-64 -mabi=sysv -mno-80387 -mno-mmx -mno-sse -mno-sse2 -mno-red-zone -mcmodel=large -DWINDOGE_APP",
         "kernel_linker_script": "linker-files/x86_64.ld",
         "app_linker_script"   : "linker-files/apps.ld",
+        "app_elf_linker_script": "linker-files/apps_elf.ld",
         "linker_flags"        : "-m elf_x86_64",
         "limine_sys"          : "binaries/limine-bios.sys",
     },

@@ -51,6 +51,7 @@ extern void to_userland_ring3_args(uint64_t user_rip, uint64_t user_rsp,
     __attribute__((noreturn));
 
 // paging
+bool map_kernel_mmio_page(uint64_t virt_addr, uint64_t phys_addr);
 void setup_ring3_memory(uint64_t user_code_virt, uint64_t user_stack_virt, const uint8_t *user_code, size_t code_size);
 void map_user_page(uint64_t virt_addr, uint64_t phys_addr);
 bool protect_user_page(uint64_t virt_addr, bool present, bool write_access,
@@ -324,6 +325,7 @@ void nvme_pci_callback(uint8_t b, uint8_t d, uint8_t f, uint16_t ven, uint16_t d
 #define IS_BAR_ON 51
 #define CLEAR_RAW 52
 #define EXPAND_USER_PAGES 53
+#define PROCESS_STACK 54
 
 #define SPECIAL 90
 
@@ -336,8 +338,10 @@ void nvme_pci_callback(uint8_t b, uint8_t d, uint8_t f, uint16_t ven, uint16_t d
 
 // actual running
 int system_run_elf(char* filename, uint64_t size);
+int system_run_elf_args(char *filename, uint64_t size, int argc, char **argv);
 void system_run_bin(char *filename, int program_size);
 void system_exec(char* path);
+void system_exec_args(char *path, int argc, char **argv);
 
 // random utilities
 int util_hexdump(char* filename);

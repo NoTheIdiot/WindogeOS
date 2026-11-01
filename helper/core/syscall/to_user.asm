@@ -3,6 +3,9 @@ bits 64
 global to_userland_ring3
 global to_userland_ring3_args
 
+extern syscall_context_depth
+extern syscall_context_gs_bases
+
 section .text
 to_userland_ring3:
     xor edx, edx
@@ -14,6 +17,19 @@ to_userland_ring3_args:
     mov r10, rdx
     mov r11, rcx
     cli
+
+    mov ecx, 0xC0000101
+    xor eax, eax
+    xor edx, edx
+    wrmsr
+
+    mov ecx, [rel syscall_context_depth]
+    lea rdx, [rel syscall_context_gs_bases]
+    mov rax, [rdx + rcx * 8]
+    mov rdx, rax
+    shr rdx, 32
+    mov ecx, 0xC0000102
+    wrmsr
 
     mov ax, 0x1b
     mov ds, ax

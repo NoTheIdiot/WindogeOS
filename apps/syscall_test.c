@@ -1,4 +1,5 @@
 #include "../library/dogeio.h"
+#include "../library/dogelib.h"
 #include "../library/string.h"
 #include "../library/stddef.h"
 
@@ -81,6 +82,23 @@ void _start(void) {
     println("WindogeOS syscall test");
     println("Filesystem tests use a temporary directory.");
     println("");
+
+    report("PROCESS_STACK (missing executable)",
+           process_stack("/apps/process_stack_missing.elf", 0, NULL) ==
+               (uint64_t)-1);
+
+    char *process_arguments[] = {"outer"};
+    int process_stack_ok = 1;
+    for (int run = 0; run < 2; run++) {
+        uint64_t process_status = process_stack(
+            "/apps/process_stack_child.elf", 1, process_arguments);
+        if (process_status != 38) {
+            process_stack_ok = 0;
+            break;
+        }
+    }
+    report("PROCESS_STACK (repeated nested child and exit status)",
+           process_stack_ok);
 
     int available_name_found = 0;
     for (int candidate = 0; candidate < 100; candidate++) {

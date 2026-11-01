@@ -855,7 +855,7 @@ static int execute_command(int argc, char **argv) {
     }
     if (str_strcmp(argv[0], "sleep") == 0) {
         fs_set_auth_override(1);
-        system_run_bin("/system/sleep.bin", 512);
+        system_exec("/system/sleep.elf");
         fs_set_auth_override(0);
         return 0;
     }
@@ -1078,15 +1078,15 @@ static int execute_command(int argc, char **argv) {
             dogeio_println("bash: edit: unable to create file");
             return 1;
         }
-        char editor_path[32] = "/apps/editor.bin";
+        char editor_path[32] = "/apps/editor.elf";
         if (!fs_exists(editor_path)) {
-            str_strncpy(editor_path, "/editor.bin", sizeof(editor_path));
+            str_strncpy(editor_path, "/editor.elf", sizeof(editor_path));
         }
         if (!fs_exists(editor_path)) {
             dogeio_println("bash: edit: editor app is not installed");
             return 127;
         }
-        system_run_bin_args(editor_path, MAX_FLAT_BINARY_SIZE, 1, &argv[1]);
+        system_exec_args(editor_path, 1, &argv[1]);
         return 0;
     }
     if (str_strcmp(argv[0], "run") == 0) {
@@ -1179,8 +1179,7 @@ static int execute_command(int argc, char **argv) {
                 return 126;
             }
             if (fs_exists(argv[0])) {
-                system_run_bin_args(argv[0], MAX_FLAT_BINARY_SIZE,
-                                    argc - 1, argv + 1);
+                system_exec_args(argv[0], argc - 1, argv + 1);
                 return 0;
             }
             dogeio_print("bash: ");
@@ -1200,9 +1199,9 @@ static int execute_command(int argc, char **argv) {
         if (app_name_length >= 4) {
             const char *extension = argv[0] + app_name_length - 4;
             has_extension = extension[0] == '.' &&
-                            (extension[1] == 'b' || extension[1] == 'B') &&
-                            (extension[2] == 'i' || extension[2] == 'I') &&
-                            (extension[3] == 'n' || extension[3] == 'N');
+                            (extension[1] == 'e' || extension[1] == 'E') &&
+                            (extension[2] == 'l' || extension[2] == 'L') &&
+                            (extension[3] == 'f' || extension[3] == 'F');
         }
         if (has_extension) {
             if (str_strncpy(app_name, argv[0], sizeof(app_name)) != 0) {
@@ -1211,7 +1210,7 @@ static int execute_command(int argc, char **argv) {
         } else {
             if (str_strncpy(app_name, argv[0], sizeof(app_name)) != 0 ||
                 append_text(app_name, sizeof(app_name), &app_name_length,
-                            ".bin") != 0) {
+                        ".elf") != 0) {
                 return 127;
             }
         }
@@ -1237,8 +1236,7 @@ static int execute_command(int argc, char **argv) {
             }
         }
         if (fs_exists(path)) {
-            system_run_bin_args(path, MAX_FLAT_BINARY_SIZE, argc - 1,
-                                argv + 1);
+            system_exec_args(path, argc - 1, argv + 1);
             return 0;
         }
     }

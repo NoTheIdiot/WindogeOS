@@ -81,7 +81,7 @@ int kernel_package(int argc, char **argv) {
                     char sub_dst_path[MAX_PATH_LEN];
                     str_strcpy(sub_dst_path, APPS_DIR);
                     str_strcat(sub_dst_path, file_clean_name);
-                    str_strcat(sub_dst_path, ".bin");
+                    str_strcat(sub_dst_path, ".elf");
 
                     uint64_t sub_size = 0;
                     bool sub_is_dir = false;
@@ -112,7 +112,7 @@ int kernel_package(int argc, char **argv) {
         char dst_path[MAX_PATH_LEN];
         str_strcpy(dst_path, APPS_DIR);
         str_strcat(dst_path, pkg_name);
-        str_strcat(dst_path, ".bin");
+        str_strcat(dst_path, ".elf");
 
         uint64_t src_size = 0;
         bool is_dir = false;
@@ -148,7 +148,7 @@ int kernel_package(int argc, char **argv) {
         char dst_path[MAX_PATH_LEN];
         str_strcpy(dst_path, APPS_DIR);
         str_strcat(dst_path, pkg_name);
-        str_strcat(dst_path, ".bin");
+        str_strcat(dst_path, ".elf");
 
         uint64_t src_size = 0;
         bool is_dir = false;
@@ -195,12 +195,12 @@ int kernel_package(int argc, char **argv) {
                     clean_name[j] = rle_files[i][j];
                 }
 
-                char check_bin[MAX_PATH_LEN];
-                str_strcpy(check_bin, APPS_DIR);
-                str_strcat(check_bin, clean_name);
-                str_strcat(check_bin, ".bin");
+                char check_elf[MAX_PATH_LEN];
+                str_strcpy(check_elf, APPS_DIR);
+                str_strcat(check_elf, clean_name);
+                str_strcat(check_elf, ".elf");
 
-                if (!fs_exists(check_bin)) {
+                if (!fs_exists(check_elf)) {
                     dogeio_print("-> ");
                     dogeio_println(clean_name);
                     shown_count++;
@@ -267,14 +267,14 @@ int kernel_package(int argc, char **argv) {
                 }
 
                 if (match_found) {
-                    char check_bin[MAX_PATH_LEN];
-                    str_strcpy(check_bin, APPS_DIR);
-                    str_strcat(check_bin, clean_name);
-                    str_strcat(check_bin, ".bin");
+                    char check_elf[MAX_PATH_LEN];
+                    str_strcpy(check_elf, APPS_DIR);
+                    str_strcat(check_elf, clean_name);
+                    str_strcat(check_elf, ".elf");
 
                     dogeio_print("-> ");
                     dogeio_print(clean_name);
-                    if (fs_exists(check_bin)) {
+                    if (fs_exists(check_elf)) {
                         dogeio_println(" [Installed]");
                     } else {
                         dogeio_println(" [Available]");

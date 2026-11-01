@@ -63,7 +63,10 @@ void start_setup(void);
 void init_gdt_tss(void);
 void init_idt(void);
 void init_syscalls(void);
+void init_legacy_pic(void);
 void init_apic(void);
+void pic_send_eoi(uint8_t irq);
+void apic_eoi(void);
 
 
 #endif

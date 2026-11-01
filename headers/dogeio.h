@@ -83,6 +83,11 @@ void dogeio_println(const char *str);
 void dogeio_print_at(const char *str, uint32_t x_pos, uint32_t y_pos, uint32_t text_color);
 void dogeio_input(const char* prompt, char* buffer, size_t max_str_length);
 uint16_t dogeio_get_key(void);
+void dogeio_keyboard_irq(void);
+bool dogeio_mouse_init(void);
+void dogeio_mouse_irq(void);
+bool dogeio_mouse_read(int32_t *delta_x, int32_t *delta_y,
+                       uint8_t *buttons);
 void dogeio_color_change(uint32_t color);
 void dogeio_background_change(uint32_t color);
 void dogeio_clear_raw(void);

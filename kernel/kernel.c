@@ -115,6 +115,7 @@ static void install_root_apps(void) {
 }
 
 void kernel_main(void) {
+    cli();
     serial_init();
     log("[Wow] Serial Initialize Sucess, very wow.");
 
@@ -160,6 +161,15 @@ void kernel_main(void) {
     init_gdt_tss();
     log("[dogeing] initializing idt");
     init_idt();
+    log("[dogeing] initializing legacy interrupt controller");
+    init_legacy_pic();
+    if (dogeio_mouse_init()) {
+        log("[Wow] PS/2 mouse interrupt reporting enabled.");
+    } else {
+        log("[Info] PS/2 mouse unavailable; keyboard interrupts remain active.");
+    }
+    log("[dogeing] initializing local apic");
+    init_apic();
     log("[dogeing] initializing syscalls");
     init_syscalls();
     log("[dogeing] initializing pcie");

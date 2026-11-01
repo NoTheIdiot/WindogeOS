@@ -278,7 +278,7 @@ static void settings_select_font(void) {
 static void settings_run_test(void) {
     char* save = fs_dirname();
     fs_chdir("/");
-    system_dogeshell_ex("run /apps/syscall_test.bin");
+    system_dogeshell_ex("run /apps/syscall_test.elf");
     fs_chdir(save);
 }
 
