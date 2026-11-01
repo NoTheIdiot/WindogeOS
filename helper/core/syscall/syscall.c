@@ -34,8 +34,8 @@
 #define USER_PATH_LIMIT 256
 #define USER_INPUT_LIMIT 256
 #define MAX_PROCESS_STACK_DEPTH 4
-#define PROCESS_STACK_ARGUMENTS_SIZE 2048
-#define MAX_SYSCALL_CONTEXTS (MAX_PROCESS_STACK_DEPTH + 1)
+#define PROCESS_STACK_ARGUMENTS_SIZE (32 * 256)
+#define MAX_SYSCALL_CONTEXTS (MAX_PROCESS_STACK_DEPTH + 2)
 #define SYSCALL_STACK_SIZE 65536
 
 extern void syscall_entry(void);
@@ -345,6 +345,14 @@ static uint64_t run_elf_binary_args(char *filename, int argc, char **argv) {
         return (uint64_t)-1;
     }
 
+    char parent_cwd[256];
+    const char *working_directory = fs_dirname();
+    if (working_directory == NULL ||
+        str_strlen(working_directory) >= sizeof(parent_cwd)) {
+        return (uint64_t)-1;
+    }
+    memcpy(parent_cwd, working_directory, str_strlen(working_directory) + 1);
+
     uint64_t parent_pages[256];
     if (!suspend_user_pages(parent_pages)) {
         return (uint64_t)-1;
@@ -355,10 +363,17 @@ static uint64_t run_elf_binary_args(char *filename, int argc, char **argv) {
     int result = system_run_elf_args(filename, file_size, argc, argv);
     process_stack_depth--;
     syscall_set_linux_abi(parent_linux_abi);
-    if (!restore_user_pages(parent_pages)) {
+    bool pages_restored = restore_user_pages(parent_pages);
+    int cwd_restored = fs_chdir(parent_cwd);
+    restore_launcher_context(parent);
+    if (!pages_restored) {
+        log("syscall: failed to restore parent user pages");
         return (uint64_t)-1;
     }
-    restore_launcher_context(parent);
+    if (cwd_restored != 0) {
+        log("syscall: failed to restore parent working directory");
+        return (uint64_t)-1;
+    }
     if (result < 0) {
         return (uint64_t)-1;
     }
@@ -589,6 +604,70 @@ uint64_t syscall_handler(syscall_registers_t *regs) {
 
             memcpy((char *)regs->rdi, cwd, cwd_length + 1);
             ret_val = (uint64_t)cwd_length;
+            break;
+        }
+
+        case CHECK_PATH_ACCESS: {
+            char path[USER_PATH_LIMIT];
+            if (!copy_user_string(regs->rdi, path, sizeof(path), NULL)) {
+                return (uint64_t)-1;
+            }
+            ret_val = system_can_access_path(current_user, path) ? 1U : 0U;
+            break;
+        }
+
+        case SYSTEM_CONTROL:
+            if (regs->rdi == SYSTEM_CONTROL_REBOOT) {
+                core_reboot();
+            } else if (regs->rdi == SYSTEM_CONTROL_SHUTDOWN) {
+                core_shutdown();
+            } else {
+                return (uint64_t)-1;
+            }
+            ret_val = 0;
+            break;
+
+        case PACKAGE_COMMAND: {
+            uint64_t argc = regs->rdi;
+            if (argc == 0 || argc > 16 ||
+                !user_range_accessible(regs->rsi, argc * sizeof(uint64_t), false)) {
+                return (uint64_t)-1;
+            }
+            char argument_storage[16][256];
+            char *arguments[16];
+            for (uint64_t i = 0; i < argc; i++) {
+                uint64_t argument_address;
+                memcpy(&argument_address,
+                       (const void *)(regs->rsi + i * sizeof(uint64_t)),
+                       sizeof(argument_address));
+                if (!copy_user_string(argument_address, argument_storage[i],
+                                      sizeof(argument_storage[i]), NULL)) {
+                    return (uint64_t)-1;
+                }
+                arguments[i] = argument_storage[i];
+            }
+            ret_val = (uint64_t)(int64_t)kernel_package((int)argc, arguments);
+            break;
+        }
+
+        case LZ4_CODEC: {
+            char source[USER_PATH_LIMIT];
+            char destination[USER_PATH_LIMIT];
+            uint64_t file_size;
+            bool is_dir;
+            if ((regs->rdi != LZ4_CODEC_COMPRESS &&
+                 regs->rdi != LZ4_CODEC_DECOMPRESS) ||
+                !copy_user_string(regs->rsi, source, sizeof(source), NULL) ||
+                !copy_user_string(regs->rdx, destination,
+                                  sizeof(destination), NULL) ||
+                str_strcmp(source, destination) == 0 ||
+                fs_get_info(source, &file_size, &is_dir) != 0 || is_dir) {
+                return (uint64_t)-1;
+            }
+            ret_val = (uint64_t)(int64_t)(
+                regs->rdi == LZ4_CODEC_COMPRESS
+                    ? kernel_lz4_compress(source, file_size, destination)
+                    : kernel_lz4_decompress(source, file_size, destination));
             break;
         }
 

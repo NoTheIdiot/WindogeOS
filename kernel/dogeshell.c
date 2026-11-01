@@ -621,7 +621,7 @@ static int dogeshell_execute(int argc, char **argv) {
     if (str_strcmp(argv[0], "pack") == 0) {
         if (argc == 2) {
             if (str_strcmp(argv[1], "--help") == 0) {
-                dogeio_println("RLEPACK (Kernel Package Utility)");
+                dogeio_println("LZ4PACK (Kernel Package Utility)");
                 dogeio_println("Usage: pack [file]");
                 return 1;
             }
@@ -655,23 +655,22 @@ static int dogeshell_execute(int argc, char **argv) {
             return -1;
         }
 
-        if (len > 4 && str_strcmp(target_filename + len - 4, ".rle") == 0) {
+        if (len > 4 && str_strcmp(target_filename + len - 4, ".lz4") == 0) {
             dogeio_println("Action: Decompressing archive stream...");
             
             str_strcpy(out_name, target_filename);
             out_name[len - 4] = '\0';
 
-            kernel_rle_decompress(target_filename, file_size, out_name);
+            return kernel_lz4_decompress(target_filename, file_size, out_name);
         } 
         else {
             dogeio_println("Action: Compressing raw binary target...");
 
             str_strcpy(out_name, target_filename);
-            str_strcat(out_name, ".rle");
+            str_strcat(out_name, ".lz4");
 
-            kernel_rle_compress(target_filename, file_size, out_name);
+            return kernel_lz4_compress(target_filename, file_size, out_name);
         }
-        return 0;
     }
 
     if (str_strcmp(argv[0], "create") == 0 || str_strcmp(argv[0], "touch") == 0) {

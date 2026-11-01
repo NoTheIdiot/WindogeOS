@@ -20,10 +20,13 @@
 #define PAGE_SIZE 4096ULL
 #define USER_ADDRESS_LIMIT 0x0000800000000000ULL
 #define USER_STACK_VADDR 0x00007FFFFFFFF000ULL
+#define USER_STACK_PAGE_COUNT 8
+#define USER_STACK_SIZE (PAGE_SIZE * USER_STACK_PAGE_COUNT)
+#define USER_STACK_BASE (USER_STACK_VADDR + PAGE_SIZE - USER_STACK_SIZE)
 #define MAX_ELF_FILE_SIZE (16ULL * 1024 * 1024)
 #define MAX_ELF_MEMORY_SIZE (64ULL * 1024 * 1024)
 #define MAX_ELF_PROGRAM_HEADERS 64
-#define USER_ARGUMENT_AREA_SIZE (PAGE_SIZE / 2)
+#define USER_ARGUMENT_AREA_SIZE (USER_STACK_SIZE / 2)
 
 typedef struct __attribute__((packed)) {
     uint8_t  e_ident[16];
@@ -207,8 +210,8 @@ int system_run_elf_args_impl(char *filename, uint64_t size, int argc,
             phdr->p_offset > size ||
             phdr->p_filesz > size - phdr->p_offset ||
             phdr->p_vaddr < PAGE_SIZE ||
-            phdr->p_vaddr >= USER_STACK_VADDR ||
-            phdr->p_memsz > USER_STACK_VADDR - phdr->p_vaddr) {
+            phdr->p_vaddr >= USER_STACK_BASE ||
+            phdr->p_memsz > USER_STACK_BASE - phdr->p_vaddr) {
             result = -5;
             goto failure;
         }
@@ -291,17 +294,23 @@ int system_run_elf_args_impl(char *filename, uint64_t size, int argc,
         goto failure;
     }
 
-    uint64_t stack_phys = pmm_alloc_zeroed_page();
-    if (stack_phys == 0) {
-        result = -3;
-        goto failure;
+    uint64_t stack_phys = 0;
+    for (uint64_t i = 0; i < USER_STACK_PAGE_COUNT; i++) {
+        uint64_t page_phys = pmm_alloc_zeroed_page();
+        if (page_phys == 0) {
+            result = -3;
+            goto failure;
+        }
+        map_user_page(USER_STACK_BASE + i * PAGE_SIZE, page_phys);
+        if (i == 0) {
+            stack_phys = page_phys;
+        }
     }
-    map_user_page(USER_STACK_VADDR, stack_phys);
 
     uint64_t user_argv;
     uint8_t *stack_memory =
         (uint8_t *)(stack_phys + hhdm_request.response->offset);
-    if (prepare_user_arguments(stack_memory, USER_STACK_VADDR,
+    if (prepare_user_arguments(stack_memory, USER_STACK_BASE,
                                USER_ARGUMENT_AREA_SIZE, argc, argv,
                                &user_argv) != 0) {
         result = -5;

@@ -15,7 +15,7 @@ int kernel_package(int argc, char **argv) {
         dogeio_println("Usage: dogestore <command> [arguments]");
         dogeio_println("");
         dogeio_println("Commands:");
-        dogeio_println("  install <pkg>     Decompress and install an .rle package or folder ending with .rle from /apps/packages/");
+        dogeio_println("  install <pkg>     Decompress and install an .lz4 package or folder ending with .lz4 from /apps/packages/");
         dogeio_println("  uninstall <pkg>   Remove an installed package executable from /apps/");
         dogeio_println("  list              Show uninstalled packages available for installation");
         dogeio_println("  search <query>    Search for installable packages in the repository");
@@ -32,7 +32,7 @@ int kernel_package(int argc, char **argv) {
         char *pkg_name = argv[1];
 
         if ((str_strlen(REPO_DIR) + str_strlen(pkg_name) + 5) >= MAX_PATH_LEN ||
-            (str_strlen(APPS_DIR) + str_strlen(pkg_name) + 4) >= MAX_PATH_LEN) {
+            (str_strlen(APPS_DIR) + str_strlen(pkg_name) + 5) >= MAX_PATH_LEN) {
             dogeio_println("[PKG] Error: Package name is too long.");
             return -1;
         }
@@ -43,8 +43,8 @@ int kernel_package(int argc, char **argv) {
 
         if (fs_isdir(pkg_path)) {
             size_t pkg_len = str_strlen(pkg_name);
-            if (pkg_len <= 4 || str_strcmp(&pkg_name[pkg_len - 4], ".rle") != 0) {
-                dogeio_println("[PKG] Error: Folder name in repository must end with .rle.");
+            if (pkg_len <= 4 || str_strcmp(&pkg_name[pkg_len - 4], ".lz4") != 0) {
+                dogeio_println("[PKG] Error: Folder name in repository must end with .lz4.");
                 return -1;
             }
 
@@ -63,16 +63,29 @@ int kernel_package(int argc, char **argv) {
 
             char entries[MAX_NAMES][256];
             int count = fs_list_entries(".", entries, MAX_NAMES);
-            if (count < 0) count = 0;
+            if (count < 0) {
+                (void)fs_chdir(original_dir);
+                dogeio_println("[PKG] Error: Unable to list package folder.");
+                return -1;
+            }
 
-            int installed_any = 0;
+            int installed_count = 0;
+            int failed_count = 0;
             for (int i = 0; i < count; i++) {
                 size_t entry_len = str_strlen(entries[i]);
-                if (entry_len > 4 && str_strcmp(&entries[i][entry_len - 4], ".rle") == 0) {
+                if (entry_len > 4 && str_strcmp(&entries[i][entry_len - 4], ".lz4") == 0) {
                     char file_clean_name[MAX_PATH_LEN];
                     memset(file_clean_name, 0, sizeof(file_clean_name));
                     for (size_t j = 0; j < entry_len - 4 && j < MAX_PATH_LEN - 1; j++) {
                         file_clean_name[j] = entries[i][j];
+                    }
+
+                    if (str_strlen(APPS_DIR) + str_strlen(file_clean_name) + 5 >=
+                        MAX_PATH_LEN) {
+                        dogeio_print("[PKG] Error: Package entry path is too long: ");
+                        dogeio_println(file_clean_name);
+                        failed_count++;
+                        continue;
                     }
 
                     char sub_src_path[MAX_PATH_LEN];
@@ -88,26 +101,41 @@ int kernel_package(int argc, char **argv) {
                     if (fs_get_info(sub_src_path, &sub_size, &sub_is_dir) == 0 && !sub_is_dir && sub_size > 0) {
                         dogeio_print("[PKG] Installing sub-package payload: ");
                         dogeio_println(file_clean_name);
-                        kernel_rle_decompress(sub_src_path, sub_size, sub_dst_path);
-                        installed_any = 1;
+                        if (kernel_lz4_decompress(sub_src_path, sub_size,
+                                                  sub_dst_path) == 0) {
+                            installed_count++;
+                        } else {
+                            failed_count++;
+                        }
+                    } else {
+                        dogeio_print("[PKG] Error: Invalid package entry: ");
+                        dogeio_println(entries[i]);
+                        failed_count++;
                     }
                 }
             }
 
-            fs_chdir(original_dir);
-
-            if (!installed_any) {
-                dogeio_println("[PKG] Warning: No valid .rle files found inside the package folder.");
-            } else {
-                dogeio_println("[PKG] Folder package installed successfully.");
+            if (fs_chdir(original_dir) != 0) {
+                dogeio_println("[PKG] Error: Unable to restore working directory.");
+                return -1;
             }
-            return 0;
+
+            if (installed_count == 0) {
+                dogeio_println("[PKG] Warning: No valid .lz4 files found inside the package folder.");
+                return -1;
+            }
+            if (failed_count == 0) {
+                dogeio_println("[PKG] Folder package installed successfully.");
+                return 0;
+            }
+            dogeio_println("[PKG] Error: One or more folder entries failed to install.");
+            return -1;
         }
 
         char src_path[MAX_PATH_LEN];
         str_strcpy(src_path, REPO_DIR);
         str_strcat(src_path, pkg_name);
-        str_strcat(src_path, ".rle");
+        str_strcat(src_path, ".lz4");
 
         char dst_path[MAX_PATH_LEN];
         str_strcpy(dst_path, APPS_DIR);
@@ -118,12 +146,15 @@ int kernel_package(int argc, char **argv) {
         bool is_dir = false;
         
         if (fs_get_info(src_path, &src_size, &is_dir) != 0 || src_size == 0 || is_dir) {
-            dogeio_println("[PKG] Error: Package source file (.rle) does not exist in /apps/packages/.");
+            dogeio_println("[PKG] Error: Package source file (.lz4) does not exist in /apps/packages/.");
             return -1;
         }
 
         dogeio_println("[PKG] Decompressing package payload to /apps...");
-        kernel_rle_decompress(src_path, src_size, dst_path);
+        if (kernel_lz4_decompress(src_path, src_size, dst_path) != 0) {
+            dogeio_println("[PKG] Error: Failed to install package payload.");
+            return -1;
+        }
         dogeio_println("[PKG] Package installed successfully.");
     } 
     else if (str_strcmp(argv[0], "uninstall") == 0) {
@@ -135,7 +166,7 @@ int kernel_package(int argc, char **argv) {
         char *pkg_name = argv[1];
 
         if ((str_strlen(REPO_DIR) + str_strlen(pkg_name) + 5) >= MAX_PATH_LEN ||
-            (str_strlen(APPS_DIR) + str_strlen(pkg_name) + 4) >= MAX_PATH_LEN) {
+            (str_strlen(APPS_DIR) + str_strlen(pkg_name) + 5) >= MAX_PATH_LEN) {
             dogeio_println("[PKG] Error: Package name is too long.");
             return -1;
         }
@@ -143,7 +174,7 @@ int kernel_package(int argc, char **argv) {
         char src_path[MAX_PATH_LEN];
         str_strcpy(src_path, REPO_DIR);
         str_strcat(src_path, pkg_name);
-        str_strcat(src_path, ".rle");
+        str_strcat(src_path, ".lz4");
 
         char dst_path[MAX_PATH_LEN];
         str_strcpy(dst_path, APPS_DIR);
@@ -152,8 +183,9 @@ int kernel_package(int argc, char **argv) {
 
         uint64_t src_size = 0;
         bool is_dir = false;
-        if (fs_get_info(src_path, &src_size, &is_dir) != 0 || src_size == 0) {
-            dogeio_println("[PKG] Error: Cannot uninstall. Matching source file (.rle) missing from /apps/packages/.");
+        if (fs_get_info(src_path, &src_size, &is_dir) != 0 || is_dir ||
+            src_size == 0) {
+            dogeio_println("[PKG] Error: Cannot uninstall. Matching source file (.lz4) missing from /apps/packages/.");
             return -1;
         }
 
@@ -171,28 +203,32 @@ int kernel_package(int argc, char **argv) {
         }
     } 
     else if (str_strcmp(argv[0], "list") == 0) {
-        static char rle_files[MAX_NAMES][256];
-        memset(rle_files, 0, sizeof(rle_files));
+        static char lz4_files[MAX_NAMES][256];
+        memset(lz4_files, 0, sizeof(lz4_files));
 
-        int rle_count = fs_list_files(REPO_DIR, rle_files, MAX_NAMES);
+        int lz4_count = fs_list_files(REPO_DIR, lz4_files, MAX_NAMES);
 
         dogeio_println("--- Available Packages (Uninstalled) ---");
-        if (rle_count <= 0) {
+        if (lz4_count < 0) {
+            dogeio_println("[PKG] Error: Unable to list package repository.");
+            return -1;
+        }
+        if (lz4_count == 0) {
             dogeio_println("No source packages found in /apps/packages/.");
             return 0;
         }
 
         int shown_count = 0;
-        for (int i = 0; i < rle_count; i++) {
-            size_t len = str_strlen(rle_files[i]);
+        for (int i = 0; i < lz4_count; i++) {
+            size_t len = str_strlen(lz4_files[i]);
             if (len <= 4) continue;
 
-            if (str_strcmp(&rle_files[i][len - 4], ".rle") == 0) {
+            if (str_strcmp(&lz4_files[i][len - 4], ".lz4") == 0) {
                 char clean_name[MAX_PATH_LEN];
                 memset(clean_name, 0, sizeof(clean_name));
                 
                 for (size_t j = 0; j < len - 4 && j < (MAX_PATH_LEN - 1); j++) {
-                    clean_name[j] = rle_files[i][j];
+                    clean_name[j] = lz4_files[i][j];
                 }
 
                 char check_elf[MAX_PATH_LEN];
@@ -220,31 +256,35 @@ int kernel_package(int argc, char **argv) {
         char *search_term = argv[1];
         size_t search_len = str_strlen(search_term);
 
-        static char rle_files[MAX_NAMES][256];
-        memset(rle_files, 0, sizeof(rle_files));
+        static char lz4_files[MAX_NAMES][256];
+        memset(lz4_files, 0, sizeof(lz4_files));
 
-        int rle_count = fs_list_files(REPO_DIR, rle_files, MAX_NAMES);
+        int lz4_count = fs_list_files(REPO_DIR, lz4_files, MAX_NAMES);
 
         dogeio_print("--- Search Results for '");
         dogeio_print(search_term);
         dogeio_println("' ---");
 
-        if (rle_count <= 0) {
+        if (lz4_count < 0) {
+            dogeio_println("[PKG] Error: Unable to search package repository.");
+            return -1;
+        }
+        if (lz4_count == 0) {
             dogeio_println("No packages found in repository.");
             return 0;
         }
 
         int found_count = 0;
-        for (int i = 0; i < rle_count; i++) {
-            size_t len = str_strlen(rle_files[i]);
+        for (int i = 0; i < lz4_count; i++) {
+            size_t len = str_strlen(lz4_files[i]);
             if (len <= 4) continue;
 
-            if (str_strcmp(&rle_files[i][len - 4], ".rle") == 0) {
+            if (str_strcmp(&lz4_files[i][len - 4], ".lz4") == 0) {
                 char clean_name[MAX_PATH_LEN];
                 memset(clean_name, 0, sizeof(clean_name));
                 
                 for (size_t j = 0; j < len - 4 && j < (MAX_PATH_LEN - 1); j++) {
-                    clean_name[j] = rle_files[i][j];
+                    clean_name[j] = lz4_files[i][j];
                 }
 
                 size_t clean_len = str_strlen(clean_name);

@@ -42,7 +42,7 @@ void menubar_draw(void) {
             ver_buffer[i] = '\0';
             ver = ver_buffer;
         } else {
-            ver = windoge_version;
+            ver = windoge_version != NULL ? windoge_version : "WindogeOS";
         }
     }
     
@@ -75,12 +75,15 @@ void menubar_draw(void) {
 
     char left_section[64];
     size_t left_len = 0;
-    while (ver[left_len] != '\0' && left_len < sizeof(left_section) - 7) {
+    while (ver[left_len] != '\0' && left_len < sizeof(left_section) - 10) {
         left_section[left_len] = ver[left_len];
         left_len++;
     }
     left_section[left_len++] = ' ';
     left_section[left_len++] = '[';
+    left_section[left_len++] = 'W';
+    left_section[left_len++] = 'S';
+    left_section[left_len++] = ' ';
     left_section[left_len++] = (char)('1' + current_terminal_id);
     left_section[left_len++] = '/';
     left_section[left_len++] = (char)('0' + MAX_TERMINALS);

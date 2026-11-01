@@ -1,6 +1,6 @@
 bits 64
 
-%define MAX_SYSCALL_CONTEXT_DEPTH 4
+%define MAX_SYSCALL_CONTEXT_DEPTH 5
 
 global system_run_bin
 global system_run_bin_args

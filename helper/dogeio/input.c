@@ -7,19 +7,15 @@
 #include <time.h>
 #include <boot/kernel.h>
 
-#ifndef KEY_CTRL_TAB
-#define KEY_CTRL_TAB 0x101
-#endif
-
 const char map_lower[] = {
-    0,  0, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', 0,
+    0, 27, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', 0,
     0, 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']', 0,   0,
    'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', '`', 0, '\\',
    'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/', 0, '*', 0, ' '
 };
 
 const char map_upper[] = {
-    0,  0, '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', 0,
+    0, 27, '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', 0,
     0, 'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '{', '}', 0,   0,
    'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ':', '"', '~', 0, '|',
    'Z', 'X', 'C', 'V', 'B', 'N', 'M', '<', '>', '?', 0, '*', 0, ' '
@@ -295,9 +291,12 @@ uint16_t dogeio_get_key_delay(uint64_t loops) {
 }
 
 uint16_t dogeio_get_key(void) {
-    char last_seen_time[16] = {0};
-
     while (true) {
+        if (status_bar_enabled && !is_kernel_dead &&
+            pit_take_status_bar_refresh()) {
+            menubar_draw();
+        }
+
         uint64_t rflags = interrupt_save_disable();
         if (keyboard_scancode_tail != keyboard_scancode_head) {
             uint8_t scancode = keyboard_scancodes[keyboard_scancode_tail];
@@ -306,30 +305,16 @@ uint16_t dogeio_get_key(void) {
 
             uint16_t key = dogeio_decode_key(scancode);
             if (key != KEY_UNKNOWN) {
+                if (status_bar_enabled && !is_kernel_dead &&
+                    pit_take_status_bar_refresh()) {
+                    menubar_draw();
+                }
                 return key;
             }
             continue;
         }
 
         __asm__ volatile ("sti; hlt" ::: "memory");
-
-        if (status_bar_enabled && !is_kernel_dead) {
-            char *current_time = time_get();
-
-            if (str_strcmp(current_time, last_seen_time) != 0) {
-                menubar_draw();
-
-                for (int i = 0; i < 15; i++) {
-                    last_seen_time[i] = current_time[i];
-
-                    if (current_time[i] == '\0') {
-                        break;
-                    }
-                }
-
-                last_seen_time[15] = '\0';
-            }
-        }
     }
 }
 
@@ -350,11 +335,16 @@ void dogeio_input(const char *prompt, char *buffer, size_t max_size) {
 
         if (key == KEY_CTRL_TAB) {
             dogeio_println("");
+            dogeio_println("[Input cancelled]");
             sys_switch_terminal();
-
-            buffer[len] = '\0';
-            return;
-            break;
+            len = 0;
+            pos = 0;
+            buffer[0] = '\0';
+            if (prompt != NULL) {
+                dogeio_print(prompt);
+            }
+            dogeio_cursor_show();
+            continue;
         }
 
         if (key == KEY_ENTER) {

@@ -117,6 +117,7 @@ bool dogeio_status_bar_enabled(void);
 #define KEY_F2        0x106
 #define KEY_CTRL_O    0x110
 #define KEY_CTRL_N    0x111
+#define KEY_CTRL_TAB  0x112
 
 #define FS_PERM_READ   0x01u
 #define FS_PERM_WRITE  0x02u
@@ -174,8 +175,8 @@ int dogeio_screen_width(void);
 int dogeio_screen_height(void);
 
 int exec_flat_binary(const char *filename, int argc, char **argv);
-void kernel_rle_decompress(char *src_path, uint64_t src_size, char *dst_path);
-void kernel_rle_compress(char *src_path, uint64_t src_size, char *dst_path);
+int kernel_lz4_decompress(char *src_path, uint64_t src_size, char *dst_path);
+int kernel_lz4_compress(char *src_path, uint64_t src_size, char *dst_path);
 
 void* kmalloc(size_t size);
 void kfree(void* ptr);

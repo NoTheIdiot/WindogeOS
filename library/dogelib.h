@@ -33,6 +33,16 @@ static inline uint64_t process_stack(const char *path, uint64_t argc,
     return syscall_3(PROCESS_STACK, (uint64_t)path, argc, (uint64_t)argv);
 }
 
+static inline uint64_t package_command(uint64_t argc, char *const argv[]) {
+    return syscall_2(PACKAGE_COMMAND, argc, (uint64_t)argv);
+}
+
+static inline uint64_t lz4_codec(uint64_t action, const char *source,
+                                 const char *destination) {
+    return syscall_3(LZ4_CODEC, action, (uint64_t)source,
+                     (uint64_t)destination);
+}
+
 static inline uint64_t doge_get_pid(void) {
     return syscall_0(GET_PID);
 }

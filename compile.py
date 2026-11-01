@@ -8,38 +8,78 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 
 DISK_IMAGE_SIZE_MB = 12
 
-def rle_compress_data(data: bytes) -> bytes:
-    original_size = len(data)
+def lz4_compress_block(data: bytes) -> bytes:
     compressed = bytearray()
-    compressed.extend(original_size.to_bytes(4, byteorder='little'))
-    src_idx = 0
-    src_size = original_size
-    while src_idx < src_size:
-        run_len = 1
-        current_val = data[src_idx]
-        while src_idx + run_len < src_size and run_len < 128:
-            if data[src_idx + run_len] != current_val:
-                break
-            run_len += 1
-        if run_len >= 2:
-            ctrl = (-(run_len - 1)) & 0xFF
-            compressed.append(ctrl)
-            compressed.append(current_val)
-            src_idx += run_len
-        else:
-            lit_buf = bytearray()
-            lit_len = 0
-            while src_idx + lit_len < src_size and lit_len < 128:
-                if src_idx + lit_len + 1 < src_size:
-                    if data[src_idx + lit_len] == data[src_idx + lit_len + 1]:
-                        break
-                lit_buf.append(data[src_idx + lit_len])
-                lit_len += 1
-            if lit_len > 0:
-                ctrl = (lit_len - 1) & 0xFF
-                compressed.append(ctrl)
-                compressed.extend(lit_buf)
-                src_idx += lit_len
+    hash_table = {}
+
+    def write_length(length: int) -> None:
+        while length >= 255:
+            compressed.append(255)
+            length -= 255
+        compressed.append(length)
+
+    def write_sequence(anchor: int, end: int, match_length: int = 0,
+                       match_offset: int = 0) -> None:
+        literal_length = end - anchor
+        encoded_match_length = max(0, match_length - 4)
+        compressed.append(
+            (min(literal_length, 15) << 4) |
+            min(encoded_match_length, 15)
+        )
+        if literal_length >= 15:
+            write_length(literal_length - 15)
+        compressed.extend(data[anchor:end])
+
+        if match_length:
+            compressed.extend(match_offset.to_bytes(2, byteorder="little"))
+            if encoded_match_length >= 15:
+                write_length(encoded_match_length - 15)
+
+    index = 0
+    anchor = 0
+    while len(data) >= 12 and index <= len(data) - 12:
+        word = int.from_bytes(data[index:index + 4], "little")
+        key = (word * 2654435761) >> 20
+        candidate = hash_table.get(key)
+        hash_table[key] = index
+
+        if (candidate is None or index - candidate > 4096 or
+                data[candidate:candidate + 4] != data[index:index + 4]):
+            index += 1
+            continue
+
+        match_length = 4
+        maximum_match = len(data) - 5 - index
+        while (match_length < maximum_match and
+               data[candidate + match_length] ==
+               data[index + match_length]):
+            match_length += 1
+
+        write_sequence(anchor, index, match_length, index - candidate)
+        match_end = index + match_length
+        for position in range(index + 1, min(match_end, len(data) - 3)):
+            word = int.from_bytes(data[position:position + 4], "little")
+            hash_table[(word * 2654435761) >> 20] = position
+        index = match_end
+        anchor = index
+
+    if data:
+        write_sequence(anchor, len(data))
+    return bytes(compressed)
+
+
+def lz4_compress_data(data: bytes) -> bytes:
+    if len(data) > 0xFFFFFFFF:
+        raise ValueError("LZ4 package exceeds the 4 GiB format limit")
+
+    compressed = bytearray(len(data).to_bytes(4, byteorder="little"))
+    compressed.extend(b"LZ4C")
+    for offset in range(0, len(data), 4096):
+        block = data[offset:offset + 4096]
+        encoded_block = lz4_compress_block(block)
+        compressed.extend(len(block).to_bytes(4, byteorder="little"))
+        compressed.extend(len(encoded_block).to_bytes(4, byteorder="little"))
+        compressed.extend(encoded_block)
     return bytes(compressed)
 
 def cmd(cmd_str, critical=True):
@@ -50,8 +90,16 @@ def cmd(cmd_str, critical=True):
     return res.returncode == 0
 
 def run_cmd(cmd_str):
-    res = subprocess.run(cmd_str, shell=True)
-    return res.returncode == 0, cmd_str
+    res = subprocess.run(cmd_str, shell=True, capture_output=True, text=True)
+    return res.returncode == 0, cmd_str, res.stdout, res.stderr
+
+def print_command_output(stdout, stderr):
+    if stdout:
+        sys.stdout.write(stdout)
+        sys.stdout.flush()
+    if stderr:
+        sys.stderr.write(stderr)
+        sys.stderr.flush()
 
 def run_parallel(commands):
     if not commands:
@@ -59,7 +107,8 @@ def run_parallel(commands):
     with ProcessPoolExecutor() as executor:
         futures = [executor.submit(run_cmd, c) for c in commands]
         for future in as_completed(futures):
-            success, failed_cmd = future.result()
+            success, failed_cmd, stdout, stderr = future.result()
+            print_command_output(stdout, stderr)
             if not success:
                 print(f"\n[Not Wow] Build failed on command:\n  {failed_cmd}")
                 executor.shutdown(wait=False, cancel_futures=True)
@@ -185,11 +234,19 @@ def main():
             print("[0/4] Running Static Analyzer (parallel)...")
             analyzer_bin = tools.get("analyzer", tools["c_compiler"])
             analyze_flag = "-fanalyzer -fsyntax-only" if "gcc" in analyzer_bin else "--analyze"
-            analyze_cmds = [
-                f"{analyzer_bin} {analyze_flag} {arch_cfg['kernel_flags']} {common_flags} {src}"
-                for src in c_source
-            ] + [
-                f"{analyzer_bin} {analyze_flag} {arch_cfg['app_flags']} {common_flags} {src}"
+            analyzer_output = (
+                "" if "gcc" in analyzer_bin
+                else " -Xanalyzer -analyzer-output=text"
+            )
+            analyze_cmds = []
+            for src in c_source:
+                analyze_cmds.append(
+                    f"{analyzer_bin} {analyze_flag} {arch_cfg['kernel_flags']} "
+                    f"{common_flags}{analyzer_output} {src}"
+                )
+            analyze_cmds += [
+                f"{analyzer_bin} {analyze_flag} {arch_cfg['app_flags']} "
+                f"{common_flags}{analyzer_output} {src}"
                 for src, ftype in app_sources + package_sources if ftype == "c"
             ]
             for lib_src in app_library_paths:
@@ -197,7 +254,7 @@ def main():
                     lib_flags = " -Wno-conversion" if os.path.basename(lib_src) == "chasm.c" else ""
                     analyze_cmds.append(
                         f"{analyzer_bin} {analyze_flag} {arch_cfg['app_flags']} "
-                        f"{common_flags}{lib_flags} {lib_src}"
+                        f"{common_flags}{analyzer_output}{lib_flags} {lib_src}"
                     )
             if analyze_cmds:
                 run_parallel(analyze_cmds)
@@ -288,18 +345,18 @@ def main():
                 pkg_obj = pkg_src.replace(ext, ".o")
                 binary_name = os.path.splitext(os.path.basename(pkg_src))[0]
                 pkg_elf = os.path.join(os.path.dirname(pkg_src), binary_name + ".elf")
-                pkg_rle = os.path.join(os.path.dirname(pkg_src), binary_name + ".rle")
-                compressed_packages.append(pkg_rle)
+                pkg_lz4 = os.path.join(os.path.dirname(pkg_src), binary_name + ".lz4")
+                compressed_packages.append(pkg_lz4)
 
                 if ftype == "c":
                     compile_step = f"{tools['c_compiler']} {arch_cfg['app_flags']} {common_flags} -c {pkg_src} -o {pkg_obj}"
                 else:
                     compile_step = f"{tools['assembler']} -f elf64 -g -F dwarf {pkg_src} -o {pkg_obj}"
 
-                def compress_file_task(elf_path, rle_path):
+                def compress_file_task(elf_path, lz4_path):
                     with open(elf_path, "rb") as f_in:
-                        compressed_data = rle_compress_data(f_in.read())
-                    with open(rle_path, "wb") as f_out:
+                        compressed_data = lz4_compress_data(f_in.read())
+                    with open(lz4_path, "wb") as f_out:
                         f_out.write(compressed_data)
 
                 package_elf_linker_script = arch_cfg.get(
@@ -312,16 +369,17 @@ def main():
                 )
                 
                 def build_package():
-                    success, _ = run_cmd(link_and_copy_cmd)
+                    success, _, stdout, stderr = run_cmd(link_and_copy_cmd)
+                    print_command_output(stdout, stderr)
                     if not success:
                         return False, pkg_src
                     try:
-                        compress_file_task(pkg_elf, pkg_rle)
+                        compress_file_task(pkg_elf, pkg_lz4)
                         if os.path.exists(pkg_obj): os.remove(pkg_obj)
                         if os.path.exists(pkg_elf): os.remove(pkg_elf)
                         return True, pkg_src
-                    except Exception as e:
-                        return False, pkg_src
+                    except (OSError, ValueError) as error:
+                        return False, f"{pkg_src}: {error}"
 
                 success, failed_item = build_package()
                 if not success:
@@ -417,12 +475,12 @@ def main():
                             f"'{mnt_dir}/system/{elf_name}'"
                         )
 
-                for pkg_rle in compressed_packages:
-                    if os.path.exists(pkg_rle):
-                        pkg_name = os.path.basename(pkg_rle)
+                for pkg_lz4 in compressed_packages:
+                    if os.path.exists(pkg_lz4):
+                        pkg_name = os.path.basename(pkg_lz4)
 
                         cmd(
-                            f"sudo cp '{pkg_rle}' "
+                            f"sudo cp '{pkg_lz4}' "
                             f"'{mnt_dir}/apps/packages/{pkg_name}'"
                         )
 

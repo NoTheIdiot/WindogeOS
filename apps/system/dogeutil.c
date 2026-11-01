@@ -221,8 +221,14 @@ static int command_find(const char *fragment)
     }
 
     char names[DOGEUTIL_LIST_CAPACITY][256];
+    for (size_t i = 0; i < DOGEUTIL_LIST_CAPACITY; i++) {
+        for (size_t j = 0; j < sizeof(names[i]); j++) {
+            names[i][j] = '\0';
+        }
+    }
+
     int64_t count = (int64_t)list_dir(names, DOGEUTIL_LIST_CAPACITY);
-    if (count < 0) {
+    if (count < 0 || count > DOGEUTIL_LIST_CAPACITY) {
         println("dogeutil: unable to list current directory");
         return 1;
     }
@@ -311,8 +317,9 @@ static int command_random(const char *count_text)
         return 2;
     }
 
-    uint8_t bytes[32];
-    if ((int64_t)doge_random_bytes(bytes, count) < 0) {
+    uint8_t bytes[32] = {0};
+    int64_t bytes_read = (int64_t)doge_random_bytes(bytes, count);
+    if (bytes_read < 0 || (uint64_t)bytes_read != count) {
         println("dogeutil: random source failed");
         return 1;
     }

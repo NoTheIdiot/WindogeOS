@@ -671,16 +671,22 @@ void _start(void) {
             str_strcpy(latest_result, res_str);
 
             if (history_count < MAX_HISTORY) {
-                for (int i = 0; i < INPUT_BUF_LEN; i++) history[history_count].query[i] = input_buf[i];
-                for (int i = 0; i < 32; i++) history[history_count].result[i] = res_str[i];
+                str_strncpy(history[history_count].query, input_buf,
+                            sizeof(history[history_count].query));
+                str_strncpy(history[history_count].result, res_str,
+                            sizeof(history[history_count].result));
                 history_count++;
             } else {
                 for (int i = 0; i < MAX_HISTORY - 1; i++) {
-                    for (int k = 0; k < INPUT_BUF_LEN; k++) history[i].query[k] = history[i + 1].query[k];
-                    for (int k = 0; k < 32; k++) history[i].result[k] = history[i + 1].result[k];
+                    str_strncpy(history[i].query, history[i + 1].query,
+                                sizeof(history[i].query));
+                    str_strncpy(history[i].result, history[i + 1].result,
+                                sizeof(history[i].result));
                 }
-                for (int i = 0; i < INPUT_BUF_LEN; i++) history[MAX_HISTORY - 1].query[i] = input_buf[i];
-                for (int i = 0; i < 32; i++) history[MAX_HISTORY - 1].result[i] = res_str[i];
+                str_strncpy(history[MAX_HISTORY - 1].query, input_buf,
+                            sizeof(history[MAX_HISTORY - 1].query));
+                str_strncpy(history[MAX_HISTORY - 1].result, res_str,
+                            sizeof(history[MAX_HISTORY - 1].result));
             }
 
             input_len = 0;

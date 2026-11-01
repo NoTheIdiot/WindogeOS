@@ -13,6 +13,7 @@ extern int current_terminal_id;
 void menubar_draw(void);
 void sys_switch_terminal(void);
 void sys_init_terminals(void);
+bool pit_take_status_bar_refresh(void);
 
 // init sum gdt tss and idt
 // though i equally suck at all of these ta

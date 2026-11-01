@@ -223,11 +223,11 @@ static inline uint64_t* get_or_alloc_table(uint64_t* table, size_t index, uint64
     return (uint64_t *)((table[index] & ~0xFFFULL) + hhdm_offset);
 }
 
-bool map_kernel_mmio_page(uint64_t virt_addr, uint64_t phys_addr) {
+uintptr_t map_kernel_mmio_page(uintptr_t virt_addr, uint64_t phys_addr) {
     if (hhdm_request.response == NULL ||
         (virt_addr & 0xFFFULL) != 0 ||
         (phys_addr & 0xFFFULL) != 0) {
-        return false;
+        return 0;
     }
 
     uint64_t hhdm_offset = hhdm_request.response->offset;
@@ -244,7 +244,7 @@ bool map_kernel_mmio_page(uint64_t virt_addr, uint64_t phys_addr) {
         uint64_t entry = table[indices[level]];
         if ((entry & PAGE_PRESENT) != 0) {
             if ((entry & PAGE_LARGE) != 0) {
-                return false;
+                return 0;
             }
             table = (uint64_t *)((entry & PAGE_ADDRESS_MASK) + hhdm_offset);
             continue;
@@ -252,7 +252,7 @@ bool map_kernel_mmio_page(uint64_t virt_addr, uint64_t phys_addr) {
 
         uint64_t next_table_phys = pmm_alloc_zeroed_page();
         if (next_table_phys == 0) {
-            return false;
+            return 0;
         }
         table[indices[level]] = next_table_phys |
                                 PAGE_PRESENT | PAGE_WRITABLE;
@@ -262,7 +262,7 @@ bool map_kernel_mmio_page(uint64_t virt_addr, uint64_t phys_addr) {
     uint64_t *entry = &table[indices[3]];
     if ((*entry & PAGE_PRESENT) != 0 &&
         (*entry & PAGE_ADDRESS_MASK) != (phys_addr & PAGE_ADDRESS_MASK)) {
-        return false;
+        return 0;
     }
 
     *entry = (phys_addr & PAGE_ADDRESS_MASK) | PAGE_PRESENT | PAGE_WRITABLE |
@@ -271,7 +271,7 @@ bool map_kernel_mmio_page(uint64_t virt_addr, uint64_t phys_addr) {
         *entry |= PAGE_NO_EXECUTE;
     }
     invlpg(virt_addr);
-    return true;
+    return virt_addr;
 }
 
 void map_user_page(uint64_t virt_addr, uint64_t phys_addr) {

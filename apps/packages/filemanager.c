@@ -4,9 +4,11 @@
 #include "../library/stdint.h"
 #include "../library/stddef.h"
 
-#define MAX_ITEMS 8
+#define MAX_ITEMS 256
 #define PATH_CAPACITY 512
 #define MAX_VISIBLE_ROWS 15
+
+static char file_names[MAX_ITEMS][256];
 
 static int get_resolved_path(const char* path, char* resolved_out) {
     if (!path || !resolved_out) return -1;
@@ -87,9 +89,9 @@ static int safe_change_dir(const char* path) {
 
 void _start(void) {
     int selected = 0;
+    int first_visible_item = 0;
     uint64_t count = 0;
 
-    char file_names[MAX_ITEMS + 4][256];
     char cwd[PATH_CAPACITY];
 
     background_color(COLOR_BACKGROUND);
@@ -103,9 +105,17 @@ void _start(void) {
 
         memset(file_names, 0, sizeof(file_names));
         count = list_dir(file_names, MAX_ITEMS);
+        if (count == (uint64_t)-1) {
+            clear();
+            print_at("Unable to list the current directory.", 2, 3,
+                     COLOR_BRIGHT_RED);
+            print_at("Press any key to retry...", 2, 5, COLOR_WHITE);
+            get_key();
+            continue;
+        }
         
-        if (count > MAX_ITEMS + 4) {
-            count = MAX_ITEMS + 4;
+        if (count > MAX_ITEMS) {
+            count = MAX_ITEMS;
         }
 
         clear();
@@ -125,14 +135,19 @@ void _start(void) {
                 selected = 0;
             }
 
-            for (uint64_t i = 0; i < count; i++) {
+            if (selected < first_visible_item) {
+                first_visible_item = selected;
+            } else if (selected >= first_visible_item + MAX_VISIBLE_ROWS) {
+                first_visible_item = selected - MAX_VISIBLE_ROWS + 1;
+            }
+
+            for (uint64_t i = (uint64_t)first_visible_item;
+                 i < count && i < (uint64_t)(first_visible_item + MAX_VISIBLE_ROWS);
+                 i++) {
                 file_names[i][sizeof(file_names[i]) - 1] = '\0';
 
-                uint32_t current_y = 5 + (uint32_t)i;
-                
-                if (current_y > 5 + MAX_VISIBLE_ROWS) {
-                    break;
-                }
+                uint32_t current_y =
+                    5 + (uint32_t)(i - (uint64_t)first_visible_item);
 
                 uint32_t text_color_to_use = COLOR_WHITE;
 
@@ -163,7 +178,9 @@ void _start(void) {
             }
         }
 
-        uint32_t footer_y = 6 + (uint32_t)(count < MAX_VISIBLE_ROWS ? count : MAX_VISIBLE_ROWS);
+        uint32_t visible_count =
+            count < MAX_VISIBLE_ROWS ? (uint32_t)count : MAX_VISIBLE_ROWS;
+        uint32_t footer_y = 6 + visible_count;
         if (footer_y < 20) footer_y = 20;
         if (footer_y > 23) footer_y = 23;
 
@@ -181,6 +198,7 @@ void _start(void) {
         else if (key == 8 || key == 127) {
             safe_change_dir("..");
             selected = 0;
+            first_visible_item = 0;
         }
         else if (key == 'R' || key == 'r') {
             if (count > 0) {
@@ -275,6 +293,7 @@ void _start(void) {
                 if (target_stat.is_dir) {
                     safe_change_dir(file_names[selected]);
                     selected = 0;
+                    first_visible_item = 0;
                 } else {
                     clear();
                     print_at("=== FILE VIEWER ===", 2, 1, COLOR_BRIGHT_ORANGE);

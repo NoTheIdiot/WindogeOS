@@ -4,7 +4,7 @@
 #include "../library/stddef.h"
 #include "../library/string.h"
 
-#define DOGESCRIPT_MAX_SCRIPT_SIZE 65535
+#define DOGESCRIPT_MAX_SCRIPT_SIZE 1048576
 #define DOGESCRIPT_MAX_LINE_SIZE 256
 #define DOGESCRIPT_READ_BUFFER_SIZE 512
 #define DOGESCRIPT_MAX_TOKENS 16
@@ -950,7 +950,7 @@ static int run_script(const char *path, int argc, char **argv) {
         return 1;
     }
     if (file_stat.size > DOGESCRIPT_MAX_SCRIPT_SIZE) {
-        println("dogescript: script exceeds the 65535-byte size limit");
+        println("dogescript: script exceeds the 1 MiB size limit");
         return 1;
     }
     script_reader_t reader;

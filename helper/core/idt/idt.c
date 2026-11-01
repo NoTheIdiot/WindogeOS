@@ -8,6 +8,8 @@
 #include <basicutil.h>
 #include <start.h>
 
+#define PIT_INPUT_FREQUENCY 1193182U
+
 typedef struct __attribute__((packed)) {
     uint16_t offset_low;      
     uint16_t selector;        
@@ -41,10 +43,58 @@ typedef struct __attribute__((packed)) {
 
 static idt_entry_t idt[256];
 static idtr_t      idtr;
+static volatile uint32_t pit_ticks;
+static volatile uint32_t pit_ticks_per_second;
+static volatile bool status_bar_refresh_pending;
 
 extern uint64_t isr_stub_table[49];
 extern void idt_load(idtr_t *idtr_ptr);
 bool is_kernel_dead = false;
+
+void init_pit(uint32_t target_frequency) {
+    if (target_frequency == 0) {
+        log("[Error] PIT frequency must be greater than zero.");
+        return;
+    }
+
+    uint32_t divisor = PIT_INPUT_FREQUENCY / target_frequency;
+    if (divisor == 0) {
+        divisor = 1;
+    } else if (divisor > 0xFFFFU) {
+        divisor = 0xFFFFU;
+    }
+
+    pit_ticks = 0;
+    pit_ticks_per_second = PIT_INPUT_FREQUENCY / divisor;
+    status_bar_refresh_pending = false;
+
+    ports_outb(0x43, 0x36);
+    ports_outb(0x40, (uint8_t)(divisor & 0xFFU));
+    ports_outb(0x40, (uint8_t)(divisor >> 8));
+
+    uint8_t pic_mask = ports_inb(0x21);
+    ports_outb(0x21, (uint8_t)(pic_mask & (uint8_t)~0x01U));
+}
+
+bool pit_take_status_bar_refresh(void) {
+    uint64_t rflags;
+    __asm__ volatile ("pushfq; pop %0; cli"
+                      : "=r"(rflags) : : "memory");
+    bool refresh_pending = status_bar_refresh_pending;
+    status_bar_refresh_pending = false;
+    if ((rflags & (1ULL << 9)) != 0) {
+        sti();
+    }
+    return refresh_pending;
+}
+
+void pit_handler(void) {
+    pit_ticks++;
+    if (pit_ticks >= pit_ticks_per_second) {
+        pit_ticks = 0;
+        status_bar_refresh_pending = true;
+    }
+}
 
 static void uint64_to_dec_forward(uint64_t value, char* buf) {
     if (value == 0) {
@@ -152,7 +202,9 @@ void isr_common_handler(interrupt_frame_t *frame) {
 
     if (frame->vector >= 32 && frame->vector < 48) {
         uint8_t irq = (uint8_t)(frame->vector - 32);
-        if (irq == 1) {
+        if (irq == 0) {
+            pit_handler();
+        } else if (irq == 1) {
             dogeio_keyboard_irq();
         } else if (irq == 12) {
             dogeio_mouse_irq();

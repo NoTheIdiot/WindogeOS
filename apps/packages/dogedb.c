@@ -4,16 +4,29 @@
 #include "../library/stdint.h"
 #include "../library/stddef.h"
 
-#define MAX_RECORDS 64
-#define MAX_COLS 5
-#define FIELD_LEN 16
+#define MAX_RECORDS 128
+#define MAX_COLS 8
+#define FIELD_LEN 32
 #define PATH_CAPACITY 256
+#define DB_FILE_SIZE 33280
+#define VIEW_ROWS 11
 
 typedef struct {
     char fields[MAX_COLS][FIELD_LEN];
 } db_row_t;
 
 static char headers[MAX_COLS][FIELD_LEN];
+static db_row_t rows[MAX_RECORDS];
+static char file_buf[DB_FILE_SIZE];
+static char new_content[DB_FILE_SIZE];
+static int db_truncated;
+
+static void set_default_header(int column) {
+    static const char *defaults[MAX_COLS] = {
+        "NAME", "PHONE", "AGE", "BALANCE", "STATUS", "COL6", "COL7", "COL8"
+    };
+    str_strcpy(headers[column], defaults[column]);
+}
 
 static int ends_with_csv(const char* filename) {
     if (!filename) return 0;
@@ -46,7 +59,7 @@ static uint64_t parse_csv_line(const char* line, db_row_t* row) {
         }
         p++;
     }
-    return field >= (MAX_COLS - 1) ? 0 : (uint64_t)-1;
+    return field < MAX_COLS ? 0 : (uint64_t)-1;
 }
 
 static void serialize_row(const db_row_t* row, char* dest, size_t max_len) {
@@ -109,11 +122,11 @@ static void serialize_headers(char* dest, size_t max_len) {
     str_strncpy(dest, temp, max_len);
 }
 
-static void rewrite_db_file(const char* db_file, db_row_t* rows, int row_count) {
-    char new_content[4096];
+static int rewrite_db_file(const char* db_file, db_row_t* rows, int row_count) {
+    if (db_truncated) return 0;
     memset(new_content, 0, sizeof(new_content));
 
-    char header_line[128];
+    char header_line[MAX_COLS * FIELD_LEN + MAX_COLS + 1];
     memset(header_line, 0, sizeof(header_line));
     for (int c = 0; c < MAX_COLS; c++) {
         str_strcat(header_line, headers[c]);
@@ -123,7 +136,7 @@ static void rewrite_db_file(const char* db_file, db_row_t* rows, int row_count) 
     str_strcpy(new_content, header_line);
 
     for (int i = 0; i < row_count; i++) {
-        char line_buf[128];
+        char line_buf[MAX_COLS * FIELD_LEN + MAX_COLS + 1];
         memset(line_buf, 0, sizeof(line_buf));
         for (int c = 0; c < MAX_COLS; c++) {
             str_strcat(line_buf, rows[i].fields[c]);
@@ -133,11 +146,27 @@ static void rewrite_db_file(const char* db_file, db_row_t* rows, int row_count) 
         str_strcat(new_content, line_buf);
     }
 
-    delete_file((char*)db_file);
-    if (new_content[0] != '\0') {
-        create_file((char*)db_file);
-        append_file(db_file, (const uint8_t*)new_content, str_strlen(new_content));
+    return (int64_t)write_file_raw(db_file, (const uint8_t*)new_content,
+                                   str_strlen(new_content)) >= 0;
+}
+
+static void report_save_error(void) {
+    print_at("[ERROR] Unable to save database", 2, 19, COLOR_BRIGHT_RED);
+    print_at("Press any key to continue...", 2, 20, COLOR_WHITE);
+    get_key();
+}
+
+static void show_record_details(const db_row_t* row) {
+    clear();
+    print_at("=== Record Details ===", 2, 1, COLOR_BRIGHT_ORANGE);
+    for (int c = 0; c < MAX_COLS; c++) {
+        uint32_t y = 3 + (uint32_t)c;
+        print_at(headers[c], 2, y, COLOR_BRIGHT_YELLOW);
+        print_at(":", 36, y, COLOR_DARK_GRAY);
+        print_at(row->fields[c], 38, y, COLOR_WHITE);
     }
+    print_at("Press any key to return...", 2, 13, COLOR_BRIGHT_GREEN);
+    get_key();
 }
 
 void _start(void) {
@@ -199,16 +228,12 @@ void _start(void) {
                     input(prompt_buf, headers[c], FIELD_LEN - 1);
                     
                     if (headers[c][0] == '\0') {
-                        if (c == 0) str_strcpy(headers[c], "NAME");
-                        else if (c == 1) str_strcpy(headers[c], "PHONE");
-                        else if (c == 2) str_strcpy(headers[c], "AGE");
-                        else if (c == 3) str_strcpy(headers[c], "BALANCE");
-                        else if (c == 4) str_strcpy(headers[c], "STATUS");
+                        set_default_header(c);
                     }
                 }
 
                 create_file(db_file);
-                char header_line[128];
+                char header_line[MAX_COLS * FIELD_LEN + MAX_COLS + 1];
                 memset(header_line, 0, sizeof(header_line));
                 for (int c = 0; c < MAX_COLS; c++) {
                     str_strcat(header_line, headers[c]);
@@ -222,14 +247,21 @@ void _start(void) {
     }
 
     int selected = 0;
+    int first_visible_row = 0;
     int needs_redraw = 1;
 
     while (1) {
-        db_row_t rows[MAX_RECORDS];
         int row_count = 0;
-        char file_buf[4096];
+        db_truncated = 0;
         memset(file_buf, 0, sizeof(file_buf));
-        int bytes = (int)read_file((char*)db_file, file_buf, sizeof(file_buf) - 1);
+        memset(rows, 0, sizeof(rows));
+        dogec_stat_t db_stat;
+        memset(&db_stat, 0, sizeof(db_stat));
+        if ((int64_t)stat(db_file, &db_stat) == 0 &&
+            db_stat.size > sizeof(file_buf) - 1) {
+            db_truncated = 1;
+        }
+        int bytes = (int)read_file(db_file, file_buf, sizeof(file_buf) - 1);
 
         int line_idx = 0;
         if (bytes > 0) {
@@ -248,11 +280,7 @@ void _start(void) {
                                 if (*hp == ',') {
                                     headers[h_col][h_idx] = '\0';
                                     if (headers[h_col][0] == '\0') {
-                                        if (h_col == 0) str_strcpy(headers[h_col], "NAME");
-                                        else if (h_col == 1) str_strcpy(headers[h_col], "PHONE");
-                                        else if (h_col == 2) str_strcpy(headers[h_col], "AGE");
-                                        else if (h_col == 3) str_strcpy(headers[h_col], "BALANCE");
-                                        else if (h_col == 4) str_strcpy(headers[h_col], "STATUS");
+                                        set_default_header(h_col);
                                     }
                                     h_col++;
                                     h_idx = 0;
@@ -266,17 +294,21 @@ void _start(void) {
                             if (h_col < MAX_COLS) {
                                 headers[h_col][h_idx] = '\0';
                                 if (headers[h_col][0] == '\0') {
-                                    if (h_col == 0) str_strcpy(headers[h_col], "NAME");
-                                    else if (h_col == 1) str_strcpy(headers[h_col], "PHONE");
-                                    else if (h_col == 2) str_strcpy(headers[h_col], "AGE");
-                                    else if (h_col == 3) str_strcpy(headers[h_col], "BALANCE");
-                                    else if (h_col == 4) str_strcpy(headers[h_col], "STATUS");
+                                    set_default_header(h_col);
+                                }
+                            }
+                            for (int c = 0; c < MAX_COLS; c++) {
+                                if (headers[c][0] == '\0') {
+                                    set_default_header(c);
                                 }
                             }
                         } else {
                             if (parse_csv_line(line_start, &rows[row_count]) == 0) {
                                 row_count++;
-                                if (row_count >= MAX_RECORDS) break;
+                                if (row_count >= MAX_RECORDS) {
+                                    if (i + 1 < bytes) db_truncated = 1;
+                                    break;
+                                }
                             }
                         }
                         line_idx++;
@@ -292,6 +324,11 @@ void _start(void) {
         }
         if (selected < 0) {
             selected = 0;
+        }
+        if (selected < first_visible_row) {
+            first_visible_row = selected;
+        } else if (selected >= first_visible_row + VIEW_ROWS) {
+            first_visible_row = selected - VIEW_ROWS + 1;
         }
 
         if (needs_redraw) {
@@ -311,9 +348,9 @@ void _start(void) {
             if (row_count == 0) {
                 print_at("[ No Records Found - Press 'N' to Add ]", 4, 6, COLOR_BRIGHT_BLACK);
             } else {
-                for (int i = 0; i < row_count; i++) {
-                    uint32_t y = 5 + (uint32_t)i;
-                    if (y > 15) break;
+                for (int i = first_visible_row;
+                     i < row_count && i < first_visible_row + VIEW_ROWS; i++) {
+                    uint32_t y = 5 + (uint32_t)(i - first_visible_row);
 
                     char formatted_row[128];
                     serialize_row(&rows[i], formatted_row, sizeof(formatted_row));
@@ -329,7 +366,12 @@ void _start(void) {
             }
 
             print_at("====================================================================", 2, 16, COLOR_DARK_GRAY);
-            print_at("[W/S/Up/Down] Nav | [N] New | [D] Del | [C] Change Labels | [Q] Exit", 2, 17, COLOR_BRIGHT_GREEN);
+            print_at("[W/S/Arrows] Nav | [V] View | [N] New | [D] Del | [C] Labels | [Q] Exit",
+                     2, 17, COLOR_BRIGHT_GREEN);
+            if (db_truncated) {
+                print_at("[Database exceeds the 128-record/file-size limit; edits disabled]",
+                         2, 19, COLOR_BRIGHT_RED);
+            }
             
             needs_redraw = 0;
         }
@@ -352,6 +394,12 @@ void _start(void) {
             }
         } 
         else if (key == 'n' || key == 'N') {
+            if (row_count >= MAX_RECORDS) {
+                print_at("[Record limit reached]", 2, 19, COLOR_BRIGHT_RED);
+                get_key();
+                needs_redraw = 1;
+                continue;
+            }
             print_at("                                                         ", 2, 18, COLOR_BACKGROUND);
             print_at("                                                         ", 2, 19, COLOR_BACKGROUND);
             
@@ -375,8 +423,14 @@ void _start(void) {
                     str_strncpy(rows[row_count].fields[c], field_bufs[c], FIELD_LEN - 1);
                 }
                 row_count++;
-                rewrite_db_file(db_file, rows, row_count);
+                if (!rewrite_db_file(db_file, rows, row_count)) {
+                    report_save_error();
+                }
             }
+            needs_redraw = 1;
+        }
+        else if ((key == 'v' || key == 'V') && row_count > 0) {
+            show_record_details(&rows[selected]);
             needs_redraw = 1;
         }
         else if (key == 'c' || key == 'C') {
@@ -401,16 +455,22 @@ void _start(void) {
                 }
             }
 
-            rewrite_db_file(db_file, rows, row_count);
+            if (!rewrite_db_file(db_file, rows, row_count)) {
+                report_save_error();
+            }
             needs_redraw = 1;
         }
         else if (key == 'd' || key == 'D') {
             if (row_count > 0) {
                 for (int i = selected; i < row_count - 1; i++) {
-                    rows[i] = rows[i + 1];
+                    for (int c = 0; c < MAX_COLS; c++) {
+                        str_strcpy(rows[i].fields[c], rows[i + 1].fields[c]);
+                    }
                 }
                 row_count--;
-                rewrite_db_file(db_file, rows, row_count);
+                if (!rewrite_db_file(db_file, rows, row_count)) {
+                    report_save_error();
+                }
                 if (selected > 0 && selected >= row_count) selected--;
                 needs_redraw = 1;
             }

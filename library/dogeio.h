@@ -167,6 +167,14 @@ static inline uint64_t get_cwd(char *buffer, uint64_t capacity) {
     return syscall_2(GET_CWD, (uint64_t)buffer, capacity);
 }
 
+static inline uint64_t check_path_access(const char *path) {
+    return syscall_1(CHECK_PATH_ACCESS, (uint64_t)path);
+}
+
+static inline uint64_t system_control(uint64_t action) {
+    return syscall_1(SYSTEM_CONTROL, action);
+}
+
 static inline uint64_t list_dir(char (*names)[256], uint64_t capacity) {
     return syscall_2(LIST_DIR, (uint64_t)names, capacity);
 }

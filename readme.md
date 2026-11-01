@@ -36,35 +36,11 @@ If you are on Windows, install WSL with `wsl --install Ubuntu`.
   that's it, you might have to type in your sudo password
   for `compile.py`
 
-Applications are built and installed as ELF `.elf` files. Packages retain their
-compressed `.rle` archive format and install as ELF applications.
-
-### Synchronous process stacking
-User applications can run another ELF application without discarding their
-current address space by calling `process_stack` from `library/dogelib.h`:
-
-```c
-char *arguments[] = {"--example"};
-uint64_t status = process_stack("apps/example.elf", 1, arguments);
-```
-
-The call waits for the child to exit, then resumes the caller and returns the
-child's exit status. It returns `(uint64_t)-1` if the child cannot be started.
-At most four stacked child processes are allowed at once.
-
-Oh yeah, it probably sucks for now.
-
-### dogeutil
-`dogeutil` is a system utility program available at `/system/dogeutil.elf`.
-It provides `grep`, current-directory filename search (`find`), `wc`, `stat`,
-`exists`, `ls`, `random`, `time`, `user`, `cwd`, `uname`, and `which` commands.
-Run `dogeutil --help` for argument formats.
-
-Other user applications can invoke a command synchronously with
-`process_stack("/system/dogeutil.elf", argc, argv)` from
-`library/dogelib.h`. The arguments are the utility subcommand and its
-parameters; output is printed by dogeutil and its exit status is returned to
-the caller.
+### vi package
+Install the BusyBox-style `vi` package with `dogestore install vi`, then run
+`vi [file]`. It provides normal and insert modes, `h/j/k/l` movement,
+`i/a/o`, `x`, `dd`, `yy`/`p`, `u`, `/` search, and the `:w`, `:q`, `:q!`,
+and `:wq` commands.
 
 ### Running in VM
 Run `python start_vm.py`. This will open the .img file in QEMU.

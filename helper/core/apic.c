@@ -101,13 +101,13 @@ void init_apic(void)
     }
 
     uintptr_t phys_base = cpu_get_apic_base();
-    if (!map_kernel_mmio_page(LAPIC_VIRTUAL_BASE,
-                              (uint64_t)phys_base)) {
+    lapic_base = map_kernel_mmio_page((uintptr_t)LAPIC_VIRTUAL_BASE,
+                                      (uint64_t)phys_base);
+    if (lapic_base == 0) {
         log("[Error] Could not map local APIC MMIO; using legacy PIC.");
         return;
     }
 
-    lapic_base = (uintptr_t)LAPIC_VIRTUAL_BASE;
     cpu_set_apic_base(phys_base);
 
     write_reg(APIC_REG_TPR, 0);

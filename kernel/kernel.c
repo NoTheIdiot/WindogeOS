@@ -163,6 +163,8 @@ void kernel_main(void) {
     init_idt();
     log("[dogeing] initializing legacy interrupt controller");
     init_legacy_pic();
+    log("[dogeing] initializing PIT status timer");
+    init_pit(100);
     if (dogeio_mouse_init()) {
         log("[Wow] PS/2 mouse interrupt reporting enabled.");
     } else {

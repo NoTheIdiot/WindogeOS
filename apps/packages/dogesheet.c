@@ -4,11 +4,12 @@
 #include "../library/stdint.h"
 #include "../library/stddef.h"
 
-#define MAX_ROWS 16
-#define MAX_COLS 5
-#define CELL_LEN 12
+#define MAX_ROWS 64
+#define MAX_COLS 8
+#define CELL_LEN 32
 #define PATH_CAPACITY 256
-#define FILE_BUF_SIZE 1024
+#define FILE_BUF_SIZE 32768
+#define VIEW_ROWS 17
 
 typedef struct {
     char text[CELL_LEN];
@@ -40,13 +41,16 @@ static int ends_with_slk(const char* filename) {
            (ext[3] == 'k' || ext[3] == 'K'));
 }
 
-static void serialize_cell_display(const cell_t* cell, char* dest, size_t max_len) {
+static void serialize_cell_display(const cell_t* cell, char* dest,
+                                   size_t max_len) {
     char padded[13];
-    memset(padded, ' ', 12);
-    padded[12] = '\0';
+    memset(padded, ' ', sizeof(padded) - 1);
+    padded[sizeof(padded) - 1] = '\0';
 
     int len = (int)str_strlen(cell->text);
-    if (len > 12) len = 12;
+    if (len > (int)sizeof(padded) - 1) {
+        len = (int)sizeof(padded) - 1;
+    }
     for (int i = 0; i < len; i++) {
         padded[i] = cell->text[i];
     }
@@ -130,55 +134,59 @@ static void load_slk_file(void) {
     }
 }
 
-static void save_slk_file(void) {
+static int append_text(char *destination, size_t capacity, size_t *length,
+                       const char *text) {
+    size_t text_length = str_strlen(text);
+    if (*length >= capacity || text_length >= capacity - *length) {
+        return 0;
+    }
+    memcpy(destination + *length, text, text_length);
+    *length += text_length;
+    destination[*length] = '\0';
+    return 1;
+}
+
+static int save_slk_file(void) {
     memset(file_content, 0, sizeof(file_content));
-    str_strcpy(file_content, "ID;P\n");
+    size_t content_length = 0;
+    if (!append_text(file_content, sizeof(file_content), &content_length,
+                     "ID;P\n")) {
+        return 0;
+    }
 
     for (int r = 0; r < MAX_ROWS; r++) {
         for (int c = 0; c < MAX_COLS; c++) {
             if (sheet[r][c].text[0] != '\0') {
-                char entry[64];
-                memset(entry, 0, sizeof(entry));
-                int yr = r + 1;
-                int xc = c + 1;
-                
-                char y_str[8], x_str[8];
-                int y_idx = 0, x_idx = 0;
-                int ty = yr;
-                do { y_str[y_idx++] = (char)('0' + (ty % 10)); ty /= 10; } while (ty > 0 && y_idx < 7);
-                y_str[y_idx] = '\0';
-                for (int i = 0; i < y_idx / 2; i++) {
-                    char tmp = y_str[i];
-                    y_str[i] = y_str[y_idx - 1 - i];
-                    y_str[y_idx - 1 - i] = tmp;
+                char row_text[21];
+                char column_text[21];
+                str_u64toa((uint64_t)(r + 1), row_text);
+                str_u64toa((uint64_t)(c + 1), column_text);
+                if (!append_text(file_content, sizeof(file_content),
+                                 &content_length, "C;Y") ||
+                    !append_text(file_content, sizeof(file_content),
+                                 &content_length, row_text) ||
+                    !append_text(file_content, sizeof(file_content),
+                                 &content_length, ";X") ||
+                    !append_text(file_content, sizeof(file_content),
+                                 &content_length, column_text) ||
+                    !append_text(file_content, sizeof(file_content),
+                                 &content_length, ";K\"") ||
+                    !append_text(file_content, sizeof(file_content),
+                                 &content_length, sheet[r][c].text) ||
+                    !append_text(file_content, sizeof(file_content),
+                                 &content_length, "\"\n")) {
+                    return 0;
                 }
-
-                int tx = xc;
-                do { x_str[x_idx++] = (char)('0' + (tx % 10)); tx /= 10; } while (tx > 0 && x_idx < 7);
-                x_str[x_idx] = '\0';
-                for (int i = 0; i < x_idx / 2; i++) {
-                    char tmp = x_str[i];
-                    x_str[i] = x_str[x_idx - 1 - i];
-                    x_str[x_idx - 1 - i] = tmp;
-                }
-
-                str_strcpy(entry, "C;Y");
-                str_strcat(entry, y_str);
-                str_strcat(entry, ";X");
-                str_strcat(entry, x_str);
-                str_strcat(entry, ";K\"");
-                str_strcat(entry, sheet[r][c].text);
-                str_strcat(entry, "\"\n");
-
-                str_strcat(file_content, entry);
             }
         }
     }
-    str_strcat(file_content, "E\n");
+    if (!append_text(file_content, sizeof(file_content), &content_length,
+                     "E\n")) {
+        return 0;
+    }
 
-    delete_file(sheet_file);
-    create_file(sheet_file);
-    append_file(sheet_file, (const uint8_t*)file_content, str_strlen(file_content));
+    return (int64_t)write_file_raw(sheet_file, (const uint8_t *)file_content,
+                                   (uint64_t)content_length) >= 0;
 }
 
 void _start(void) {
@@ -253,8 +261,11 @@ void _start(void) {
                     }
                 }
 
-                create_file(sheet_file);
-                save_slk_file();
+                if ((int64_t)create_file(sheet_file) < 0 ||
+                    !save_slk_file()) {
+                    println("Unable to create or save spreadsheet.");
+                    sys_exit(1);
+                }
                 break;
             }
         }
@@ -264,6 +275,7 @@ void _start(void) {
 
     int cur_r = 0;
     int cur_c = 0;
+    int first_visible_row = 0;
     int needs_redraw = 1;
 
     while (1) {
@@ -277,30 +289,24 @@ void _start(void) {
             text_color(COLOR_BRIGHT_ORANGE);
             print("]\n");
             text_color(COLOR_DARK_GRAY);
-            print("  ====================================================================\n");
+            print("  ==========================================================================================================\n");
             text_color(COLOR_BRIGHT_YELLOW);
-            print("       |     A      |     B      |     C      |     D      |     E      \n");
+            print("       |     A      |     B      |     C      |     D      |     E      |     F      |     G      |     H\n");
             text_color(COLOR_DARK_GRAY);
-            print("  ====================================================================\n");
+            print("  ==========================================================================================================\n");
 
-            for (int r = 0; r < MAX_ROWS; r++) {
-                uint32_t y = 5 + (uint32_t)r;
-                if (y > 21) break;
+            for (int visible_row = 0;
+                 visible_row < VIEW_ROWS &&
+                 first_visible_row + visible_row < MAX_ROWS;
+                 visible_row++) {
+                int r = first_visible_row + visible_row;
+                uint32_t y = 5 + (uint32_t)visible_row;
 
-                char row_label[16];
-                memset(row_label, 0, sizeof(row_label));
-                row_label[0] = ' ';
-                if (r + 1 < 10) {
-                    row_label[1] = ' ';
-                    row_label[2] = (char)('1' + r);
-                    row_label[3] = ' ';
-                    row_label[4] = '\0';
-                } else {
-                    row_label[1] = '1';
-                    row_label[2] = (char)('0' + (r - 9));
-                    row_label[3] = ' ';
-                    row_label[4] = '\0';
-                }
+                char row_number[21];
+                char row_label[24] = " ";
+                str_u64toa((uint64_t)(r + 1), row_number);
+                str_strcat(row_label, row_number);
+                str_strcat(row_label, " ");
 
                 print_at(row_label, 0, y, COLOR_BRIGHT_GREEN);
                 print_at("|", 5, y, COLOR_DARK_GRAY);
@@ -321,8 +327,10 @@ void _start(void) {
                 }
             }
 
-            print_at("  ====================================================================", 0, 22, COLOR_DARK_GRAY);
-            print_at("  [W/S/A/D/Up/Down/Left/Right] Move | [E] Edit | [Q] Exit", 0, 23, COLOR_BRIGHT_GREEN);
+            print_at("  ==========================================================================================================", 0, 22, COLOR_DARK_GRAY);
+            print_at("  [W/S/A/D/Arrows] Move | [E] Edit | [Q] Save and exit", 0, 23, COLOR_BRIGHT_GREEN);
+            print_at("  Selected value: ", 0, 24, COLOR_BRIGHT_YELLOW);
+            print_at(sheet[cur_r][cur_c].text, 18, 24, COLOR_BRIGHT_CYAN);
             
             needs_redraw = 0;
         }
@@ -362,7 +370,8 @@ void _start(void) {
             text_color(COLOR_WHITE);
             print("  Edit [");
             text_color(COLOR_BRIGHT_YELLOW);
-            print(cur_c == 0 ? "A" : cur_c == 1 ? "B" : cur_c == 2 ? "C" : cur_c == 3 ? "D" : "E");
+            char column_label[2] = {(char)('A' + cur_c), '\0'};
+            print(column_label);
             
             char r_str[8];
             int r_val = cur_r + 1;
@@ -383,13 +392,25 @@ void _start(void) {
             trim_newline(sheet[cur_r][cur_c].text);
             sheet[cur_r][cur_c].text[CELL_LEN - 1] = '\0';
             
-            save_slk_file();
+            if (!save_slk_file()) {
+                println("\nUnable to save spreadsheet.");
+                get_key();
+            }
             needs_redraw = 1;
         }
         else if (key == 'q' || key == 'Q') {
-            save_slk_file();
+            if (!save_slk_file()) {
+                println("Unable to save spreadsheet.");
+                sys_exit(1);
+            }
             clear();
             sys_exit(0);
+        }
+
+        if (cur_r < first_visible_row) {
+            first_visible_row = cur_r;
+        } else if (cur_r >= first_visible_row + VIEW_ROWS) {
+            first_visible_row = cur_r - VIEW_ROWS + 1;
         }
     }
 }

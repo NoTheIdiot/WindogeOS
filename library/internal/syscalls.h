@@ -50,6 +50,14 @@
 #define WRITE_FILE_RAW     42
 #define GET_USER           43
 #define PROCESS_STACK      54
+#define CHECK_PATH_ACCESS  55
+#define SYSTEM_CONTROL     56
+#define SYSTEM_CONTROL_REBOOT 1
+#define SYSTEM_CONTROL_SHUTDOWN 2
+#define PACKAGE_COMMAND   57
+#define LZ4_CODEC         58
+#define LZ4_CODEC_COMPRESS 1
+#define LZ4_CODEC_DECOMPRESS 2
 
 // video
 #define SET_VIDEO_MODE 44

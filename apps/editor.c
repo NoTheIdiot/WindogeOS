@@ -19,7 +19,7 @@
 
 #define MAX_LINES       4096
 #define MAX_LINE_LEN    256
-#define MAX_FILE_SIZE   32768
+#define MAX_FILE_SIZE   65536
 
 #define TOP_MARGIN      1  
 #define BOTTOM_MARGIN   1  
@@ -27,22 +27,24 @@
 #define VIEWPORT_ROWS   (TERMINAL_ROWS - TOP_MARGIN - BOTTOM_MARGIN)
 #define VIEWPORT_COLS   (TERMINAL_COLS - LEFT_MARGIN)
 
-static char lines[MAX_LINES][MAX_LINE_LEN]
-    __attribute__((section(".data.editor"))) = {{1}};
-static uint32_t line_lens[MAX_LINES]
-    __attribute__((section(".data.editor"))) = {1};
-static uint32_t total_lines __attribute__((section(".data.editor"))) = 1;
+static char lines[MAX_LINES][MAX_LINE_LEN];
+static uint32_t line_lens[MAX_LINES];
+static uint32_t total_lines;
 
-static uint32_t cursor_col __attribute__((section(".data.editor"))) = 0;
-static uint32_t cursor_row __attribute__((section(".data.editor"))) = 0;
+static uint32_t cursor_col;
+static uint32_t cursor_row;
 
-static uint32_t scroll_row __attribute__((section(".data.editor"))) = 0;
-static uint32_t scroll_col __attribute__((section(".data.editor"))) = 0;
+static uint32_t scroll_row;
+static uint32_t scroll_col;
 
-static char current_filename[128] __attribute__((section(".data.editor"))) =
-    "untitled.txt";
-static bool is_modified __attribute__((section(".data.editor"))) = false;
-static bool should_quit __attribute__((section(".data.editor"))) = false;
+static char current_filename[128];
+static bool is_modified;
+static bool should_quit;
+static char status_message[128];
+
+static void set_status_message(const char *message) {
+    str_strncpy(status_message, message, sizeof(status_message));
+}
 
 static int text_equal(const char *left, const char *right) {
     while (*left != '\0' && *right != '\0' && *left == *right) {
@@ -88,16 +90,31 @@ static bool load_file_from_disk(const char *filename) {
     char requested_filename[sizeof(current_filename)];
     memcpy(requested_filename, filename, name_len + 1);
 
-    static char raw_buf[MAX_FILE_SIZE]
-        __attribute__((section(".data.editor"))) = {1};
+    static char raw_buf[MAX_FILE_SIZE + 1];
     int64_t bytes_read = 0;
     if (file_exists(requested_filename) == 1) {
+        dogec_stat_t file_stat;
+        memset(&file_stat, 0, sizeof(file_stat));
+        if ((int64_t)stat(requested_filename, &file_stat) < 0 ||
+            file_stat.size > MAX_FILE_SIZE) {
+            return false;
+        }
         bytes_read = (int64_t)read_file(requested_filename, raw_buf,
                                         sizeof(raw_buf) - 1);
         if (bytes_read < 0) {
             return false;
         }
         raw_buf[bytes_read] = '\0';
+    }
+
+    uint32_t required_lines = 1;
+    for (int64_t i = 0; i < bytes_read; i++) {
+        if (raw_buf[i] == '\n') {
+            required_lines++;
+        }
+    }
+    if (required_lines > MAX_LINES) {
+        return false;
     }
 
     reset_editor_buffer();
@@ -135,17 +152,16 @@ static bool load_file_from_disk(const char *filename) {
 }
 
 static bool save_file_to_disk(void) {
-    static char save_buf[MAX_FILE_SIZE]
-        __attribute__((section(".data.editor"))) = {1};
+    static char save_buf[MAX_FILE_SIZE + 1];
     uint32_t ptr = 0;
 
     for (uint32_t i = 0; i < total_lines; i++) {
         for (uint32_t j = 0; j < line_lens[i]; j++) {
-            if (ptr < sizeof(save_buf) - 2) {
-                save_buf[ptr++] = lines[i][j];
-            }
+            if (ptr >= sizeof(save_buf) - 1) return false;
+            save_buf[ptr++] = lines[i][j];
         }
-        if (i < total_lines - 1 && ptr < sizeof(save_buf) - 2) {
+        if (i < total_lines - 1) {
+            if (ptr >= sizeof(save_buf) - 1) return false;
             save_buf[ptr++] = '\n';
         }
     }
@@ -172,16 +188,19 @@ static void render_status_bar(void) {
     (void)background_color(COLOR_DARK_GRAY);
     (void)print_at(blank_line, 0, status_y, COLOR_WHITE);
 
-    (void)print_at(current_filename, 1, status_y, COLOR_WHITE);
-    if (is_modified) {
-        (void)print_at("[*]", (uint32_t)(str_strlen(current_filename)) + 2,
+    const char *controls = "^S: Save | ^X: Quit | ^O: Open | ^N: New | ^G: Goto | ^F: Find";
+    if (status_message[0] != '\0') {
+        (void)print_at(status_message, 1, status_y, COLOR_BRIGHT_RED);
+    } else {
+        (void)print_at(current_filename, 1, status_y, COLOR_WHITE);
+        if (is_modified) {
+            (void)print_at("[*]", (uint32_t)(str_strlen(current_filename)) + 2,
+                           status_y, COLOR_WHITE);
+        }
+        (void)print_at(controls,
+                       TERMINAL_COLS - (uint32_t)(str_strlen(controls)) - 1,
                        status_y, COLOR_WHITE);
     }
-    
-    const char *controls = "^S: Save | ^X: Quit | ^O: Open | ^N: New | ^G: Goto | ^F: Find";
-    (void)print_at(controls,
-                   TERMINAL_COLS - (uint32_t)(str_strlen(controls)) - 1,
-                   status_y, COLOR_WHITE);
     (void)background_color(COLOR_BLACK);
 }
 
@@ -450,7 +469,11 @@ static bool editor_confirm_changes(void) {
         return false;
     }
     if (answer[0] == 'y' || answer[0] == 'Y') {
-        return save_file_to_disk();
+        if (!save_file_to_disk()) {
+            set_status_message("Unable to save file (size limit or I/O error)");
+            return false;
+        }
+        return true;
     }
     return answer[0] == 'n' || answer[0] == 'N';
 }
@@ -467,7 +490,9 @@ static void editor_open_file(void) {
     if (!editor_confirm_changes()) {
         return;
     }
-    (void)load_file_from_disk(filename);
+    if (!load_file_from_disk(filename)) {
+        set_status_message("Unable to load: exceeds 64 KiB or 4096 lines");
+    }
 }
 
 static void editor_new_file(void) {
@@ -482,7 +507,9 @@ static void editor_new_file(void) {
     if (!editor_confirm_changes()) {
         return;
     }
-    (void)load_file_from_disk(filename);
+    if (!load_file_from_disk(filename)) {
+        set_status_message("Unable to create/open file");
+    }
 }
 
 void _start(int argc, char **argv) {
@@ -514,6 +541,9 @@ void _start(int argc, char **argv) {
         render_editor();
 
         uint16_t key = (uint16_t)get_key();
+        if (key != 0) {
+            status_message[0] = '\0';
+        }
 
         switch (key) {
             case KEY_UP:
@@ -561,7 +591,9 @@ void _start(int argc, char **argv) {
                 break;
 
             case 0x13:
-                (void)save_file_to_disk();
+                if (!save_file_to_disk()) {
+                    set_status_message("Unable to save file (size limit or I/O error)");
+                }
                 break;
 
             case 0x18:
