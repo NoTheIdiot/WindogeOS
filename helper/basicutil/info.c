@@ -9,7 +9,7 @@ extern volatile struct limine_memmap_request memmap_request;
 
 char current_user[64];
 const char* dogeshell_version = "Dogeshell v2.3";
-char* windoge_version = "WindogeOS v0.3-Beta1";
+char* windoge_version = "WindogeOS v0.3";
 
 #if defined(__x86_64__) || defined(_M_X64) 
     const char* windoge_arch = "x86_64 (Intel/AMD)";
@@ -60,7 +60,7 @@ const char* doge_ascii_full[24] = {
 "   .._$MMMMM$!YYYYYYYYYi;.`\"  .;iiMMM$MMMMMMMYY       #  #  #  #  #    ## #     # #     # #     # #       ",
 "    ._$MMMP` ```\"\"4$$$$$iiiiiiii$MMMMMMMMMMMMMY;       ## ##  ### #     # ######  #######  #####  #######",
 "     MMMM$:       :$$$$$$$MMMMMMMMMMM$$MMMMMMMYYL     ================  ",
-"    :MMMM$$.    .;PPb$$$$MMMMMMMMMM$$$$MMMMMMiYYU:    v0.3.0-Beta1",
+"    :MMMM$$.    .;PPb$$$$MMMMMMMMMM$$$$MMMMMMiYYU:    v0.3.0",
 "     iMM$$;;: ;;;;i$$$$$$$MMMMM$$$$MMMMMMMMMMYYYYY      ",
 "     `$$$$i .. ``:iiii!*\"``.$$$$$$$$$MMMMMMM$YiYYY      ",
 "      :Y$$iii;;;.. ` ..;;i$$$$$$$$$MMMMMM$$YYYYiYY:     ",
