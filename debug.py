@@ -46,6 +46,8 @@ def analyze_exceptions(filename="qemu.log"):
             vector_str = match.group(1) or match.group(2)
             if vector_str:
                 vector_val = int(vector_str, 16)
+                if vector_val >= 32:
+                    continue
                 name = EXCEPTION_NAMES.get(vector_val, f"Unknown Exception (Vector {vector_val})")
                 found_exceptions.append((idx + 1, vector_val, name, line.strip()))
 
