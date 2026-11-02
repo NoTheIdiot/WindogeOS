@@ -7,7 +7,6 @@
 #include <system.h>
 #include <string.h>
 
-#define SCHEDULER_TASK_LIMIT 8
 #define TASK_KERNEL_STACK_SIZE 16384
 #define MSR_IA32_GS_BASE 0xC0000101
 #define MSR_IA32_KERNEL_GS_BASE 0xC0000102

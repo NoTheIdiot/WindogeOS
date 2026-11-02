@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <boot/task_info.h>
 
 typedef struct __attribute__((packed)) {
     uint64_t r15, r14, r13, r12, r11, r10, r9, r8;
@@ -10,12 +11,6 @@ typedef struct __attribute__((packed)) {
     uint64_t vector, error_code;
     uint64_t rip, cs, rflags, rsp, ss;
 } interrupt_frame_t;
-
-typedef struct {
-    uint32_t pid;
-    uint32_t state;
-    uint32_t workspace_id;
-} scheduler_task_info_t;
 
 void scheduler_init(void);
 interrupt_frame_t *scheduler_on_timer(interrupt_frame_t *frame);

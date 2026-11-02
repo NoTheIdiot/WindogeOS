@@ -58,6 +58,7 @@
 #define LZ4_CODEC         58
 #define LZ4_CODEC_COMPRESS 1
 #define LZ4_CODEC_DECOMPRESS 2
+#define LIST_TASKS        59
 
 // video
 #define SET_VIDEO_MODE 44
@@ -73,6 +74,9 @@
 #define EXPAND_USER_PAGES 53
 
 #define SPECIAL 90
+
+#define KILL_TASK         61
+#define SPAWN_TASK        62
 
 #define USER_MEMORY_READ    0x1ULL
 #define USER_MEMORY_WRITE   0x2ULL

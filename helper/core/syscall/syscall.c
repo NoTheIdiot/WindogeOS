@@ -5,6 +5,7 @@
 #include <bool.h>
 #include <core.h>
 #include <basicutil.h>
+#include <boot/kernel.h>
 #include <boot/limine.h>
 #include <boot/syscall_internal.h>
 #include <boot/syscall.h>
@@ -761,6 +762,69 @@ uint64_t syscall_handler(syscall_registers_t *regs) {
         case GET_PID:
             return scheduler_current_pid() == 0 ? 1 :
                    scheduler_current_pid();
+
+        case LIST_TASKS: {
+            scheduler_task_info_t tasks[SCHEDULER_TASK_LIMIT - 1];
+            uint64_t capacity = regs->rsi;
+            if (capacity > SCHEDULER_TASK_LIMIT - 1 ||
+                (capacity != 0 &&
+                 (regs->rdi == 0 ||
+                  !user_range_accessible(
+                      regs->rdi,
+                      capacity * sizeof(scheduler_task_info_t), true)))) {
+                return (uint64_t)-1;
+            }
+
+            size_t count = scheduler_list(tasks, (size_t)capacity);
+            size_t copied_count = count < (size_t)capacity
+                                      ? count : (size_t)capacity;
+            if (copied_count != 0) {
+                memcpy((void *)regs->rdi, tasks,
+                       copied_count * sizeof(scheduler_task_info_t));
+            }
+            return (uint64_t)count;
+        }
+
+        case KILL_TASK:
+            if (regs->rdi > UINT32_MAX ||
+                (uint32_t)regs->rdi == scheduler_current_pid()) {
+                return (uint64_t)-1;
+            }
+            return (uint64_t)(int64_t)scheduler_kill((uint32_t)regs->rdi);
+
+        case SPAWN_TASK: {
+            char path[USER_PATH_LIMIT];
+            uint64_t workspace_id = regs->rsi;
+            size_t path_length;
+            if (workspace_id >= MAX_TERMINALS ||
+                !copy_user_string(regs->rdi, path, sizeof(path),
+                                  &path_length) ||
+                path_length == 0 || path[0] != '/' ||
+                !system_can_access_path(current_user, path)) {
+                return (uint64_t)-1;
+            }
+
+            for (size_t i = 0; i < path_length; i++) {
+                if (path[i] == '\\') {
+                    return (uint64_t)-1;
+                }
+                if (path[i] == '/' &&
+                    (path[i + 1] == '.' &&
+                     (path[i + 2] == '/' || path[i + 2] == '\0' ||
+                      (path[i + 2] == '.' &&
+                       (path[i + 3] == '/' || path[i + 3] == '\0'))))) {
+                    return (uint64_t)-1;
+                }
+            }
+
+            char *arguments[] = {path};
+            uint32_t pid;
+            if (scheduler_spawn_elf(path, 1, arguments,
+                                    (uint32_t)workspace_id, &pid) != 0) {
+                return (uint64_t)-1;
+            }
+            return pid;
+        }
 
         case GET_UID:
         case GET_GID:

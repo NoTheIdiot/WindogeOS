@@ -5,6 +5,7 @@
 #include "internal/syscalls.h"
 #include "bool.h"
 #include <boot/syscall.h>
+#include <boot/task_info.h>
 
 typedef struct {
     uint64_t size;
@@ -173,6 +174,19 @@ static inline uint64_t check_path_access(const char *path) {
 
 static inline uint64_t system_control(uint64_t action) {
     return syscall_1(SYSTEM_CONTROL, action);
+}
+
+static inline uint64_t list_tasks(scheduler_task_info_t *tasks,
+                                  uint64_t capacity) {
+    return syscall_2(LIST_TASKS, (uint64_t)tasks, capacity);
+}
+
+static inline uint64_t kill_task(uint32_t pid) {
+    return syscall_1(KILL_TASK, pid);
+}
+
+static inline uint64_t spawn_task(const char *path, uint32_t workspace_id) {
+    return syscall_2(SPAWN_TASK, (uint64_t)path, workspace_id);
 }
 
 static inline uint64_t list_dir(char (*names)[256], uint64_t capacity) {
