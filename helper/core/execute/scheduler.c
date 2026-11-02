@@ -1,4 +1,5 @@
 #include <boot/scheduler.h>
+#include <boot/kernel.h>
 #include <boot/syscall_internal.h>
 #include <basicutil.h>
 #include <dogeio.h>
@@ -8,11 +9,16 @@
 
 #define SCHEDULER_TASK_LIMIT 8
 #define TASK_KERNEL_STACK_SIZE 16384
+#define MSR_IA32_GS_BASE 0xC0000101
+#define MSR_IA32_KERNEL_GS_BASE 0xC0000102
 
 typedef struct {
     uint32_t pid;
     uint32_t active;
+    uint32_t workspace_id;
     uint64_t cr3;
+    uint64_t gs_base;
+    uint64_t kernel_gs_base;
     bool linux_abi;
     bool fs_context_valid;
     uint8_t drive;
@@ -75,7 +81,11 @@ static void scheduler_activate(size_t index) {
     if (task->linux_abi) {
         linux_syscall_context_restore(&task->linux_context);
     }
+    wrmsr(MSR_IA32_GS_BASE, task->gs_base);
+    wrmsr(MSR_IA32_KERNEL_GS_BASE, task->kernel_gs_base);
     __asm__ volatile ("fxrstor64 %0" : : "m"(task->fpu_state));
+    sys_workspace_load(task->workspace_id,
+                       task->workspace_id == (uint32_t)current_terminal_id);
 }
 
 static size_t scheduler_find_next(size_t after) {
@@ -96,6 +106,8 @@ void scheduler_init(void) {
     tasks[0].active = 1;
     tasks[0].cr3 = kernel_cr3;
     tasks[0].pid = 0;
+    tasks[0].gs_base = rdmsr(MSR_IA32_GS_BASE);
+    tasks[0].kernel_gs_base = rdmsr(MSR_IA32_KERNEL_GS_BASE);
     scheduler_save_fs_context(&tasks[0]);
     linux_syscall_context_init(&tasks[0].linux_context);
     __asm__ volatile ("fxsave64 %0" : "=m"(tasks[0].fpu_state));
@@ -110,15 +122,29 @@ interrupt_frame_t *scheduler_on_timer(interrupt_frame_t *frame) {
     scheduler_task_t *outgoing = &tasks[current_task];
     outgoing->frame = frame;
     outgoing->cr3 = read_cr3() & ~0xFFFULL;
+    outgoing->gs_base = rdmsr(MSR_IA32_GS_BASE);
+    outgoing->kernel_gs_base = rdmsr(MSR_IA32_KERNEL_GS_BASE);
     outgoing->linux_abi = syscall_linux_abi_active();
     if (outgoing->linux_abi) {
         linux_syscall_context_save(&outgoing->linux_context);
     }
     scheduler_save_fs_context(outgoing);
     memcpy(outgoing->fpu_state, isr_fpu_temp, sizeof(isr_fpu_temp));
+    sys_workspace_save(outgoing->workspace_id);
 
+    bool workspace_switched = sys_workspace_take_switch_request();
+    if (workspace_switched) {
+        sys_switch_terminal();
+    }
     size_t next = scheduler_find_next(current_task);
     if (next == current_task) {
+        if (workspace_switched) {
+            scheduler_activate(current_task);
+        } else {
+            sys_workspace_load(outgoing->workspace_id,
+                               outgoing->workspace_id ==
+                                   (uint32_t)current_terminal_id);
+        }
         __asm__ volatile ("fxrstor64 %0" : : "m"(outgoing->fpu_state));
         return frame;
     }
@@ -127,9 +153,10 @@ interrupt_frame_t *scheduler_on_timer(interrupt_frame_t *frame) {
 }
 
 int scheduler_spawn_elf(const char *path, int argc, char **argv,
-                        uint32_t *out_pid) {
+                        uint32_t workspace_id, uint32_t *out_pid) {
     if (path == NULL || path[0] == '\0' || out_pid == NULL ||
-        argc < 0 || argc > 32 || (argc > 0 && argv == NULL)) {
+        argc < 0 || argc > 32 || (argc > 0 && argv == NULL) ||
+        workspace_id >= MAX_TERMINALS) {
         return -1;
     }
 
@@ -149,6 +176,7 @@ int scheduler_spawn_elf(const char *path, int argc, char **argv,
     scheduler_task_t *task = &tasks[slot];
     scheduler_save_fs_context(&tasks[current_task]);
     memset(task, 0, sizeof(*task));
+    task->workspace_id = workspace_id;
     task->drive = tasks[current_task].drive;
     task->fs_context_valid = tasks[current_task].fs_context_valid;
     memcpy(task->cwd, tasks[current_task].cwd, sizeof(task->cwd));
@@ -194,6 +222,8 @@ int scheduler_spawn_elf(const char *path, int argc, char **argv,
         next_pid = 2;
     }
     task->cr3 = pml4;
+    task->gs_base = 0;
+    task->kernel_gs_base = syscall_user_kernel_gs_base();
     task->linux_abi = linux_abi;
     task->frame = (interrupt_frame_t *)
         ((uint64_t)&task->kernel_stack[TASK_KERNEL_STACK_SIZE] -
@@ -232,6 +262,7 @@ size_t scheduler_list(scheduler_task_info_t *output, size_t capacity) {
         if (output != NULL && count < capacity) {
             output[count].pid = tasks[i].pid;
             output[count].state = i == current_task ? 2U : 1U;
+            output[count].workspace_id = tasks[i].workspace_id;
         }
         count++;
     }
@@ -261,6 +292,19 @@ uint32_t scheduler_current_pid(void) {
     return tasks[current_task].pid;
 }
 
+uint32_t scheduler_current_workspace(void) {
+    return tasks[current_task].workspace_id;
+}
+
+void scheduler_set_shell_workspace(uint32_t workspace_id) {
+    if (workspace_id >= MAX_TERMINALS) {
+        return;
+    }
+    uint64_t flags = scheduler_disable_interrupts();
+    tasks[0].workspace_id = workspace_id;
+    scheduler_restore_interrupts(flags);
+}
+
 void scheduler_exit_current(uint64_t status) {
     (void)status;
     if (current_task == 0 || !tasks[current_task].active) {
@@ -276,6 +320,7 @@ void scheduler_exit_current(uint64_t status) {
         linux_syscall_context_save(&task->linux_context);
     }
     scheduler_save_fs_context(task);
+    sys_workspace_save(task->workspace_id);
     uint64_t pml4 = task->cr3;
     task->active = 0;
     size_t next = scheduler_find_next(exiting);

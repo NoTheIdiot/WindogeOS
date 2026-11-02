@@ -17,6 +17,7 @@ static const uint32_t brightness_factors[11] = {
 };
 
 static int current_brightness_level = 10;
+bool dogeio_framebuffer_render_enabled = true;
 
 const uint8_t* current_font = vga_text;
 
@@ -57,7 +58,9 @@ static inline uint32_t apply_brightness(uint32_t color) {
 }
 
 void dogeio_render_glyph(char c, uint32_t x, uint32_t y, uint32_t fg_color, uint32_t bg_color) {
-    if (framebuffer_request.response == NULL || framebuffer_request.response->framebuffer_count < 1) {
+    if (!dogeio_framebuffer_render_enabled ||
+        framebuffer_request.response == NULL ||
+        framebuffer_request.response->framebuffer_count < 1) {
         return;
     }
 
@@ -85,6 +88,10 @@ void dogeio_render_glyph(char c, uint32_t x, uint32_t y, uint32_t fg_color, uint
             framebuffer_ptr[row_offset + (size_t)bit] = ((bits >> (7 - bit)) & 1) ? fg_color : bg_color;
         }
     }
+}
+
+void dogeio_set_render_enabled(bool enabled) {
+    dogeio_framebuffer_render_enabled = enabled;
 }
 
 void dogeio_set_brightness(int level) {
@@ -137,7 +144,9 @@ void dogeio_putchar_reverted_glyph(char c, uint32_t x, uint32_t y) {
 }
 
 void dogeio_render_pixel_glyph(char c, uint32_t pixel_x, uint32_t pixel_y, uint32_t fg_color, uint32_t bg_color) {
-    if (framebuffer_request.response == NULL || framebuffer_request.response->framebuffer_count < 1) {
+    if (!dogeio_framebuffer_render_enabled ||
+        framebuffer_request.response == NULL ||
+        framebuffer_request.response->framebuffer_count < 1) {
         return;
     }
 

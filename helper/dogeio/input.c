@@ -6,6 +6,7 @@
 #include <string.h>
 #include <time.h>
 #include <boot/kernel.h>
+#include <boot/scheduler.h>
 
 const char map_lower[] = {
     0, 27, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', 0,
@@ -25,6 +26,7 @@ extern char text_grid[TERMINAL_ROWS * TERMINAL_COLS];
 
 static bool global_shift_pressed = false;
 static bool global_ctrl_pressed  = false;
+static bool irq_ctrl_pressed = false;
 
 static bool status_bar_enabled = true;
 
@@ -135,6 +137,15 @@ bool dogeio_mouse_init(void)
 void dogeio_keyboard_irq(void)
 {
     uint8_t scancode = ports_inb(0x60);
+    if (scancode == 0x1D) {
+        irq_ctrl_pressed = true;
+    } else if (scancode == 0x9D) {
+        irq_ctrl_pressed = false;
+    } else if (scancode == 0x0F && irq_ctrl_pressed) {
+        sys_workspace_request_switch();
+        return;
+    }
+
     uint8_t next_head = (uint8_t)(keyboard_scancode_head + 1U);
 
     if (next_head != keyboard_scancode_tail) {
@@ -275,6 +286,11 @@ static uint16_t dogeio_decode_key(uint8_t code)
 
 uint16_t dogeio_get_key_delay(uint64_t loops) {
     uint64_t rflags = interrupt_save_disable();
+    if (scheduler_current_workspace() != (uint32_t)current_terminal_id) {
+        interrupt_restore(rflags);
+        return KEY_UNKNOWN;
+    }
+
     while (loops > 0 && keyboard_scancode_tail != keyboard_scancode_head) {
         uint8_t scancode = keyboard_scancodes[keyboard_scancode_tail];
         keyboard_scancode_tail = (uint8_t)(keyboard_scancode_tail + 1U);
@@ -290,14 +306,37 @@ uint16_t dogeio_get_key_delay(uint64_t loops) {
     return KEY_UNKNOWN;
 }
 
+void dogeio_discard_pending_keys(void) {
+    uint64_t rflags = interrupt_save_disable();
+    keyboard_scancode_tail = keyboard_scancode_head;
+    global_shift_pressed = false;
+    global_ctrl_pressed = false;
+    interrupt_restore(rflags);
+}
+
 uint16_t dogeio_get_key(void) {
+    uint32_t workspace_generation = sys_workspace_generation();
     while (true) {
+        if (workspace_generation != sys_workspace_generation()) {
+            return KEY_CTRL_TAB;
+        }
+
+        if (scheduler_current_workspace() != (uint32_t)current_terminal_id) {
+            __asm__ volatile ("sti; hlt" ::: "memory");
+            continue;
+        }
+
         if (status_bar_enabled && !is_kernel_dead &&
             pit_take_status_bar_refresh()) {
             menubar_draw();
         }
 
         uint64_t rflags = interrupt_save_disable();
+        if (scheduler_current_workspace() !=
+            (uint32_t)current_terminal_id) {
+            interrupt_restore(rflags);
+            continue;
+        }
         if (keyboard_scancode_tail != keyboard_scancode_head) {
             uint8_t scancode = keyboard_scancodes[keyboard_scancode_tail];
             keyboard_scancode_tail = (uint8_t)(keyboard_scancode_tail + 1U);
@@ -326,6 +365,7 @@ void dogeio_input(const char *prompt, char *buffer, size_t max_size) {
 
     size_t len = 0;
     size_t pos = 0;
+    uint32_t workspace_generation = sys_workspace_generation();
     buffer[0] = '\0';
 
     dogeio_cursor_show();
@@ -333,10 +373,25 @@ void dogeio_input(const char *prompt, char *buffer, size_t max_size) {
     while (true) {
         uint16_t key = dogeio_get_key();
 
+        if (workspace_generation != sys_workspace_generation()) {
+            dogeio_println("");
+            dogeio_println("[Input cancelled]");
+            len = 0;
+            pos = 0;
+            buffer[0] = '\0';
+            workspace_generation = sys_workspace_generation();
+            if (prompt != NULL) {
+                dogeio_print(prompt);
+            }
+            dogeio_cursor_show();
+            continue;
+        }
+
         if (key == KEY_CTRL_TAB) {
             dogeio_println("");
             dogeio_println("[Input cancelled]");
             sys_switch_terminal();
+            workspace_generation = sys_workspace_generation();
             len = 0;
             pos = 0;
             buffer[0] = '\0';

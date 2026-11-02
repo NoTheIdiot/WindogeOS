@@ -36,7 +36,9 @@ void dogeio_set_video_mode(bool enabled) {
 }
 
 void dogeio_draw_pixel(uint32_t x, uint32_t y, uint32_t color) {
-    if (framebuffer_request.response == NULL || framebuffer_request.response->framebuffer_count < 1) {
+    if (!dogeio_framebuffer_render_enabled ||
+        framebuffer_request.response == NULL ||
+        framebuffer_request.response->framebuffer_count < 1) {
         return;
     }
 
@@ -51,7 +53,9 @@ void dogeio_draw_pixel(uint32_t x, uint32_t y, uint32_t color) {
 }
 
 void dogeio_draw_rect(uint32_t x, uint32_t y, uint32_t width, uint32_t height, uint32_t color) {
-    if (framebuffer_request.response == NULL || framebuffer_request.response->framebuffer_count < 1) {
+    if (!dogeio_framebuffer_render_enabled ||
+        framebuffer_request.response == NULL ||
+        framebuffer_request.response->framebuffer_count < 1) {
         return;
     }
 

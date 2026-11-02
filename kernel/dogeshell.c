@@ -425,7 +425,7 @@ static void dogeshell_print_help(void) {
         " pci                      | list PCI devices                    | run <file>                 | run a flat binary                                              ",
         " bash                     | open Bash; exit returns here        | <app>[.elf] [args...]      | run an app from /apps                                          ",
         " exit                     | leave Dogeshell                     | dogestore                  | install and uninstall apps from dogestore                      ",
-        " spawn <elf> [args...]    | start an app in background           | ps / kill <pid>            | list or stop background apps                                  ",
+        " spawn [-w N] <elf> [args...] | start an app in a workspace      | ps / kill <pid>            | list or stop background apps                                  ",
         "===============================================================================================================================================================",
         " Use ; between commands. Quoted or escaped semicolons are literal. Paths may be quoted; use ~ for your home directory."
     };
@@ -589,23 +589,40 @@ static int dogeshell_execute(int argc, char **argv) {
         return 0;
     }
     if (str_strcmp(argv[0], "spawn") == 0) {
-        if (argc < 2 || argc > 33) {
-            dogeio_println("Usage: spawn <elf> [args...]");
+        int executable_index = 1;
+        uint32_t workspace_id = scheduler_current_workspace();
+        if (argc >= 2 && str_strcmp(argv[1], "-w") == 0) {
+            if (argc < 4 || argv[2][0] == '\0') {
+                dogeio_println("Usage: spawn [-w 1-4] <elf> [args...]");
+                return 1;
+            }
+            if (argv[2][1] != '\0' || argv[2][0] < '1' ||
+                argv[2][0] > '0' + MAX_TERMINALS) {
+                dogeio_println("Error: workspace must be between 1 and 4.");
+                return 1;
+            }
+            workspace_id = (uint32_t)(argv[2][0] - '1');
+            executable_index = 3;
+        }
+        if (argc <= executable_index ||
+            argc - executable_index > 32) {
+            dogeio_println("Usage: spawn [-w 1-4] <elf> [args...]");
             return 1;
         }
         char executable[256];
-        if (!dogeshell_authorize_path(argv[1], executable,
+        if (!dogeshell_authorize_path(argv[executable_index], executable,
                                      sizeof(executable))) {
             dogeio_println("Error: application path is not accessible.");
             return 1;
         }
         char *arguments[32];
         arguments[0] = executable;
-        for (int i = 2; i < argc; i++) {
-            arguments[i - 1] = argv[i];
+        for (int i = executable_index + 1; i < argc; i++) {
+            arguments[i - executable_index] = argv[i];
         }
         uint32_t pid;
-        if (scheduler_spawn_elf(executable, argc - 1, arguments, &pid) != 0) {
+        if (scheduler_spawn_elf(executable, argc - executable_index,
+                                arguments, workspace_id, &pid) != 0) {
             dogeio_println("Error: unable to start application.");
             return 1;
         }
@@ -630,7 +647,7 @@ static int dogeshell_execute(int argc, char **argv) {
         scheduler_task_info_t tasks[7];
         size_t count = scheduler_list(tasks,
                                       sizeof(tasks) / sizeof(tasks[0]));
-        dogeio_println("PID  STATE");
+        dogeio_println("PID  STATE    WORKSPACE");
         for (size_t i = 0; i < count &&
                            i < sizeof(tasks) / sizeof(tasks[0]); i++) {
             char pid_text[16];
@@ -648,7 +665,11 @@ static int dogeshell_execute(int argc, char **argv) {
             pid_text[digits] = '\0';
             dogeio_print(pid_text);
             dogeio_print("  ");
-            dogeio_println(tasks[i].state == 2 ? "running" : "ready");
+            dogeio_print(tasks[i].state == 2 ? "running  " : "ready    ");
+            char workspace_text[2] = {
+                (char)('1' + tasks[i].workspace_id), '\0'
+            };
+            dogeio_println(workspace_text);
         }
         return 0;
     }

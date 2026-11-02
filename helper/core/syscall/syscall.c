@@ -449,6 +449,14 @@ bool syscall_linux_abi_active(void) {
     return linux_syscall_abi_active;
 }
 
+uint64_t syscall_user_kernel_gs_base(void) {
+    uint32_t depth = syscall_context_depth;
+    if (depth >= MAX_SYSCALL_CONTEXTS) {
+        return 0;
+    }
+    return syscall_context_gs_bases[depth];
+}
+
 uint64_t syscall_handler(syscall_registers_t *regs) {
     if (linux_syscall_abi_active) {
         return linux_syscall_handler(regs);

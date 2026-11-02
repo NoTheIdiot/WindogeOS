@@ -73,5 +73,6 @@ void syscall_exit_to_launcher(uint64_t exit_code) __attribute__((noreturn));
 void syscall_set_linux_abi(bool enabled);
 void syscall_select_linux_abi(bool enabled);
 bool syscall_linux_abi_active(void);
+uint64_t syscall_user_kernel_gs_base(void);
 
 #endif

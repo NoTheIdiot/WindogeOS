@@ -13,6 +13,11 @@ extern int current_terminal_id;
 void menubar_draw(void);
 void sys_switch_terminal(void);
 void sys_init_terminals(void);
+void sys_workspace_save(uint32_t workspace_id);
+void sys_workspace_load(uint32_t workspace_id, bool render);
+void sys_workspace_request_switch(void);
+bool sys_workspace_take_switch_request(void);
+uint32_t sys_workspace_generation(void);
 bool pit_take_status_bar_refresh(void);
 
 // init sum gdt tss and idt
