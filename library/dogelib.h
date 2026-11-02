@@ -37,6 +37,14 @@ static inline uint64_t package_command(uint64_t argc, char *const argv[]) {
     return syscall_2(PACKAGE_COMMAND, argc, (uint64_t)argv);
 }
 
+static inline uint64_t reboot(void) {
+    return syscall_0(SYSTEM_CONTROL_REBOOT);
+}
+
+static inline uint64_t shutdown(void) {
+    return syscall_0(SYSTEM_CONTROL_SHUTDOWN);
+}
+
 static inline uint64_t lz4_codec(uint64_t action, const char *source,
                                  const char *destination) {
     return syscall_3(LZ4_CODEC, action, (uint64_t)source,
