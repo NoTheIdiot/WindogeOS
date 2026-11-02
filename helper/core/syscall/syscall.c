@@ -345,7 +345,7 @@ static uint64_t run_elf_binary_args(char *filename, int argc, char **argv) {
         return (uint64_t)-1;
     }
 
-    char parent_cwd[256];
+    char parent_cwd[260];
     const char *working_directory = fs_dirname();
     if (working_directory == NULL ||
         str_strlen(working_directory) >= sizeof(parent_cwd)) {

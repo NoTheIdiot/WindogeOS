@@ -22,6 +22,12 @@ int system_can_access_path(const char* username, const char* target_path) {
     }
 
     const char* p = target_path;
+    if (p[0] != '\0' &&
+        ((p[0] >= 'A' && p[0] <= 'Z') ||
+         (p[0] >= 'a' && p[0] <= 'z')) &&
+        p[1] == ':') {
+        p += 2;
+    }
     while (p[0] == '/') {
         p++;
     }

@@ -199,6 +199,7 @@ static int dogeshell_resolve_path(const char *input, char *output,
                                   size_t output_capacity) {
     char combined[512] = {0};
     const char *working_directory = fs_dirname();
+    char drive_letter = 'C';
     size_t combined_length = 0;
     size_t output_length = 1;
     size_t index = 0;
@@ -207,24 +208,58 @@ static int dogeshell_resolve_path(const char *input, char *output,
         return -1;
     }
 
-    if (input[0] == '~' && (input[1] == '\0' || input[1] == '/')) {
-        if (dogeshell_build_home(combined, sizeof(combined)) != 0) {
+    if (((input[0] >= 'A' && input[0] <= 'Z') ||
+         (input[0] >= 'a' && input[0] <= 'z')) &&
+        input[1] == ':') {
+        drive_letter = input[0];
+        if (drive_letter >= 'a' && drive_letter <= 'z') {
+            drive_letter = (char)(drive_letter - 'a' + 'A');
+        }
+        if (drive_letter != 'C' && drive_letter != 'D') {
             return -1;
         }
-        combined_length = dogeshell_strlen(combined);
-        input++;
-    } else if (input[0] != '/') {
-        if (working_directory == NULL ||
-            dogeshell_append(combined, sizeof(combined), &combined_length,
-                             working_directory) != 0 ||
-            (combined_length > 0 && combined[combined_length - 1] != '/' &&
-             dogeshell_append(combined, sizeof(combined), &combined_length,
-                              "/") != 0)) {
+        input += 2;
+        if (input[0] == '\0' || input[0] != '/') {
+            if (dogeshell_append(combined, sizeof(combined), &combined_length,
+                                 "/") != 0) {
+                return -1;
+            }
+        }
+        if (dogeshell_append(combined, sizeof(combined), &combined_length,
+                             input) != 0) {
             return -1;
         }
-    }
-    if (dogeshell_append(combined, sizeof(combined), &combined_length, input) != 0) {
-        return -1;
+    } else {
+        if (working_directory != NULL &&
+            ((working_directory[0] >= 'A' && working_directory[0] <= 'Z') ||
+             (working_directory[0] >= 'a' && working_directory[0] <= 'z')) &&
+            working_directory[1] == ':' && working_directory[2] == '/') {
+            drive_letter = working_directory[0];
+            if (drive_letter >= 'a' && drive_letter <= 'z') {
+                drive_letter = (char)(drive_letter - 'a' + 'A');
+            }
+            working_directory += 2;
+        }
+        if (input[0] == '~' && (input[1] == '\0' || input[1] == '/')) {
+            if (dogeshell_build_home(combined, sizeof(combined)) != 0) {
+                return -1;
+            }
+            combined_length = dogeshell_strlen(combined);
+            input++;
+        } else if (input[0] != '/') {
+            if (working_directory == NULL ||
+                dogeshell_append(combined, sizeof(combined), &combined_length,
+                                 working_directory) != 0 ||
+                (combined_length > 0 && combined[combined_length - 1] != '/' &&
+                 dogeshell_append(combined, sizeof(combined), &combined_length,
+                                  "/") != 0)) {
+                return -1;
+            }
+        }
+        if (dogeshell_append(combined, sizeof(combined), &combined_length,
+                             input) != 0) {
+            return -1;
+        }
     }
 
     output[0] = '/';
@@ -272,6 +307,15 @@ static int dogeshell_resolve_path(const char *input, char *output,
         }
         output[output_length] = '\0';
     }
+
+    if (output_length + 3 > output_capacity) {
+        return -1;
+    }
+    for (size_t i = output_length + 1; i > 0; i--) {
+        output[i + 1] = output[i - 1];
+    }
+    output[0] = drive_letter;
+    output[1] = ':';
     return 0;
 }
 
@@ -288,14 +332,44 @@ static int dogeshell_authorize_path(const char *path, char *resolved,
     return 1;
 }
 
+static int dogeshell_is_protected_path(const char *path) {
+    char resolved[256];
+    if (dogeshell_resolve_path(path, resolved, sizeof(resolved)) != 0) {
+        return 0;
+    }
+
+    const char *root_path = resolved + 2;
+    return str_strcmp(root_path, "/.windoge") == 0 ||
+           str_strcmp(root_path, "/system") == 0 ||
+           str_strcmp(root_path, "/apps") == 0 ||
+           str_strcmp(root_path, "/users") == 0;
+}
+
+static int dogeshell_is_drive_root_path(const char *path) {
+    char resolved[256];
+    return dogeshell_resolve_path(path, resolved, sizeof(resolved)) == 0 &&
+           (str_strcmp(resolved, "C:/") == 0 ||
+            str_strcmp(resolved, "D:/") == 0);
+}
+
 static int dogeshell_history_path(char *path, size_t capacity) {
     size_t length = 0;
     path[0] = '\0';
-    return dogeshell_append(path, capacity, &length, "/users/") == 0 &&
+    return dogeshell_append(path, capacity, &length, "C:/users/") == 0 &&
                    dogeshell_append(path, capacity, &length, current_user) == 0 &&
                    dogeshell_append(path, capacity, &length, "/.history") == 0
                ? 0
                : -1;
+}
+
+static int dogeshell_finish_history_operation(uint8_t previous_drive,
+                                             int result) {
+    if (fs_current_drive() != previous_drive &&
+        fs_select_drive(previous_drive) != 0) {
+        log("[dogeshell] failed to restore drive after history access");
+        return -1;
+    }
+    return result;
 }
 
 static int dogeshell_append_history(const char *command) {
@@ -313,14 +387,17 @@ static int dogeshell_append_history(const char *command) {
         dogeshell_history_path(path, sizeof(path)) != 0) {
         return -1;
     }
+    uint8_t previous_drive = fs_current_drive();
     if (!fs_exists(path) && fs_create(path) != 0) {
-        return -1;
+        return dogeshell_finish_history_operation(previous_drive, -1);
     }
     for (size_t i = 0; i < length; i++) {
         line[i] = command[i];
     }
     line[length++] = '\n';
-    return fs_append_data(path, (const uint8_t *)line, (uint32_t)length);
+    int result = fs_append_data(path, (const uint8_t *)line,
+                                (uint32_t)length);
+    return dogeshell_finish_history_operation(previous_drive, result);
 }
 
 static void dogeshell_print_help(void) {
@@ -337,6 +414,7 @@ static void dogeshell_print_help(void) {
         " time, date               | show current time or date           | rename <old> <new>         | rename a file                                                  ",
         " shutdown, reboot         | power off or restart the system     | whereami                   | print the current directory                                    ",
         "                                                                | cd [directory]             | change directory                                               ",
+        "                                                                | drives / C: / D:            | list or switch between hard drives                             ",
         "==================================================================+============================================================================================",
         " SYSTEM AND UTILITIES                                           |                                                                                              ",
         "==================================================================+============================================================================================",
@@ -357,13 +435,18 @@ static void dogeshell_print_help(void) {
 static int dogeshell_show_history(void) {
     static char contents[8192];
     char path[160];
-    int bytes_read;
 
     if (dogeshell_history_path(path, sizeof(path)) != 0) {
         dogeio_println("History error: path is too long.");
         return 1;
     }
-    bytes_read = fs_read(path, contents, sizeof(contents) - 1);
+    uint8_t previous_drive = fs_current_drive();
+    int bytes_read = fs_read(path, contents, sizeof(contents) - 1);
+    if (dogeshell_finish_history_operation(previous_drive,
+                                           bytes_read < 0 ? -1 : 0) != 0) {
+        dogeio_println("History error: unable to restore current drive.");
+        return 1;
+    }
     if (bytes_read < 0) {
         dogeio_println("No history available.");
         return 1;
@@ -503,6 +586,33 @@ static int dogeshell_execute(int argc, char **argv) {
     if (argc == 0) {
         return 0;
     }
+    if (str_strcmp(argv[0], "drives") == 0) {
+        for (uint8_t drive = 0; drive < 2; drive++) {
+            dogeio_print(drive == 0 ? "C: primary IDE master" :
+                                      "D: primary IDE slave");
+            if (!fs_drive_present(drive)) {
+                dogeio_println(" [not present]");
+            } else {
+                if (fs_current_drive() == drive) {
+                    dogeio_print(" [current]");
+                }
+                dogeio_println("");
+            }
+        }
+        return 0;
+    }
+    if ((str_strcmp(argv[0], "C:") == 0 ||
+         str_strcmp(argv[0], "c:") == 0 ||
+         str_strcmp(argv[0], "D:") == 0 ||
+         str_strcmp(argv[0], "d:") == 0)) {
+        uint8_t drive = (argv[0][0] == 'C' || argv[0][0] == 'c') ? 0 : 1;
+        if (fs_select_drive(drive) != 0) {
+            dogeio_println("Error: drive is absent or has no supported exFAT volume.");
+            return 1;
+        }
+        dogeio_println(fs_dirname());
+        return 0;
+    }
     if (str_strcmp(argv[0], "exit") == 0) {
         dogeshell_exit_requested = 1;
         return dogeshell_last_status;
@@ -558,11 +668,22 @@ static int dogeshell_execute(int argc, char **argv) {
             dogeio_println("History error: path is too long.");
             return 1;
         }
+        uint8_t previous_drive = fs_current_drive();
+        int result = 0;
         if (fs_exists(history_path) && fs_delete(history_path) != 1) {
+            result = -1;
+        } else if (fs_create(history_path) != 0) {
+            result = -2;
+        }
+        if (dogeshell_finish_history_operation(previous_drive, result) < 0) {
+            dogeio_println("History error: unable to restore current drive.");
+            return 1;
+        }
+        if (result == -1) {
             dogeio_println("History error: unable to delete history.");
             return 1;
         }
-        if (fs_create(history_path) != 0) {
+        if (result == -2) {
             dogeio_println("History error: unable to create history.");
             return 1;
         }
@@ -756,38 +877,17 @@ static int dogeshell_execute(int argc, char **argv) {
             return 1;
         }
         for (int i = 1; i < argc; i++) {
-            if (!dogeshell_authorize_path(argv[1], path, sizeof(path))) {
+            if (!dogeshell_authorize_path(argv[i], path, sizeof(path))) {
                 return 1;
             }
 
-            if (str_strcmp(argv[i], "/") == 0 || str_strcmp(argv[i], "/.") == 0) {
+            if (dogeshell_is_drive_root_path(path)) {
                 dogeio_println("[Error] no deleting the entire drive.");
                 return 1;
             }
 
-            if (str_strcmp(argv[i], "/.windoge") == 0 || 
-                str_strcmp(argv[i], ".windoge") == 0 || 
-                str_strcmp(argv[i], "/./.windoge") == 0 ||
-                str_strcmp(argv[i], "./.windoge") == 0) {
-                dogeio_println("[Error] no deleting boot file");
-                return 1;
-            }
-
-            if (str_strcmp(argv[i], "/system") == 0 || (str_strcmp(argv[i], "system") == 0 || str_strcmp(fs_dirname(), "/") == 0) || 
-                str_strcmp(argv[i], "/./system") == 0 || str_strcmp(argv[i], "./system") == 0) {
-                dogeio_println("[Error] no deleting system files");
-                return 1;
-            }
-
-            if (str_strcmp(argv[i], "/apps") == 0 || (str_strcmp(argv[i], "apps") == 0 && str_strcmp(fs_dirname(), "/") == 0) 
-            || str_strcmp(argv[i], "/./apps") == 0 || str_strcmp(argv[i], "./apps") == 0) {
-                dogeio_println("[Error] no deleting system files");
-                return 1;
-            }
-            
-            if (str_strcmp(argv[i], "/users") == 0 || (str_strcmp(argv[i], "users") == 0 && str_strcmp(fs_dirname(), "/") == 0) 
-            || str_strcmp(argv[i], "/./users") == 0 || str_strcmp(argv[i], "./users") == 0) {
-                dogeio_println("[Error] no deleting system files");
+            if (dogeshell_is_protected_path(path)) {
+                dogeio_println("[Error] no deleting system or boot files");
                 return 1;
             }
 
@@ -814,21 +914,8 @@ static int dogeshell_execute(int argc, char **argv) {
             return 1;
         }
 
-        if (str_strcmp(argv[1], "/system") == 0 || (str_strcmp(argv[1], "system") == 0 || str_strcmp(fs_dirname(), "/") == 0) || 
-            str_strcmp(argv[1], "/./system") == 0 || str_strcmp(argv[1], "./system") == 0) {
-            dogeio_println("[Error] no deleting system files");
-            return 1;
-        }
-
-        if (str_strcmp(argv[1], "/apps") == 0 || (str_strcmp(argv[1], "apps") == 0 && str_strcmp(fs_dirname(), "/") == 0) 
-        || str_strcmp(argv[1], "/./apps") == 0 || str_strcmp(argv[1], "./apps") == 0) {
-            dogeio_println("[Error] no deleting system files");
-            return 1;
-        }
-            
-        if (str_strcmp(argv[1], "/users") == 0 || (str_strcmp(argv[1], "users") == 0 && str_strcmp(fs_dirname(), "/") == 0) 
-        || str_strcmp(argv[1], "/./users") == 0 || str_strcmp(argv[1], "./users") == 0) {
-            dogeio_println("[Error] no deleting system files");
+        if (dogeshell_is_protected_path(source_path)) {
+            dogeio_println("[Error] no deleting system or boot files");
             return 1;
         }
 

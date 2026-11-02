@@ -43,8 +43,16 @@ Install the BusyBox-style `vi` package with `dogestore install vi`, then run
 and `:wq` commands.
 
 ### Running in VM
-Run `python start_vm.py`. This will open the .img file in QEMU.
+Run `python start_vm.py`. This will open the .img file in QEMU. To attach a
+second raw IDE disk image on x86_64, use
+`python start_vm.py --secondary-disk data.img`.
 If you would like to run WindogeOS in a different VM for some reason, open the .img file in your preferred VM.
+
+WindogeOS detects primary IDE master and slave drives as `C:` and `D:`.
+Unformatted detected drives are automatically formatted when the OS starts;
+formatting erases existing data. The exFAT volume grows to fit the drive up to
+128 MiB. The disk must be at least 4 MiB, and the filesystem starts at sector
+4096. Use `drives` to list drives, `D:` to switch, or paths like `D:/files`.
 
 ### Booting on real hardware (very wow)
 __*Note*__: It's probably not a good idea to flash WindogeOS to your main machine. A test 

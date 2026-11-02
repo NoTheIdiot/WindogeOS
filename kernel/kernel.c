@@ -143,16 +143,11 @@ void kernel_main(void) {
     log("[Wow] Memory Map has been found.");
 
     log("Mounting Drive");
-    if (fs_mount()) {
-        log("Drive mounted");
-    } else {
-        log("Something went wrong, guess im formatting");
-        fs_format();
-        if (!fs_mount()) {
-            log("[setup] unable to mount filesystem after formatting");
-            halt();
-        }
+    if (!fs_mount()) {
+        log("[setup] unable to mount the C: drive");
+        halt();
     }
+    log("Drive mounted");
 
     log("[setup] installing root applications");
     install_root_apps();

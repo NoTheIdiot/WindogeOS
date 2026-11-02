@@ -4,8 +4,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#define REPO_DIR "/apps/packages/"
-#define APPS_DIR "/apps/"
+#define REPO_DIR "C:/apps/packages/"
+#define APPS_DIR "C:/apps/"
 #define MAX_PATH_LEN 256
 #define MAX_NAMES 64
 
@@ -24,6 +24,7 @@ int kernel_package(int argc, char **argv) {
     }
 
     if (str_strcmp(argv[0], "install") == 0) {
+        char* old_dir = fs_dirname();
         if (argc < 2) {
             dogeio_println("[PKG] Error: Missing package name.");
             dogeio_println("Usage: dogestore install <package_name>");
@@ -48,7 +49,7 @@ int kernel_package(int argc, char **argv) {
                 return -1;
             }
 
-            char original_dir[MAX_PATH_LEN];
+            char original_dir[MAX_PATH_LEN + 4];
             char *curr = fs_dirname();
             if (curr) {
                 str_strcpy(original_dir, curr);
@@ -155,6 +156,7 @@ int kernel_package(int argc, char **argv) {
             dogeio_println("[PKG] Error: Failed to install package payload.");
             return -1;
         }
+        fs_chdir(old_dir);
         dogeio_println("[PKG] Package installed successfully.");
     } 
     else if (str_strcmp(argv[0], "uninstall") == 0) {

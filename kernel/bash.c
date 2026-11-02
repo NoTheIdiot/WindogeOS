@@ -343,6 +343,7 @@ static int tokenize(char *source, bash_token_t *tokens, size_t *token_count,
 static int canonicalize_path(const char *path, char *output, size_t capacity) {
     const char *working_directory = fs_dirname();
     char combined[512] = {0};
+    char drive_letter = 'C';
     size_t combined_length = 0;
     size_t output_length = 1;
 
@@ -351,17 +352,48 @@ static int canonicalize_path(const char *path, char *output, size_t capacity) {
     }
     combined[0] = '\0';
 
-    if (path[0] != '/') {
-        if (working_directory == NULL ||
-            append_text(combined, sizeof(combined), &combined_length,
-                        working_directory) != 0 ||
-            (combined_length > 0 && combined[combined_length - 1] != '/' &&
-             append_text(combined, sizeof(combined), &combined_length, "/") != 0) ||
-            append_text(combined, sizeof(combined), &combined_length, path) != 0) {
+    if (((path[0] >= 'A' && path[0] <= 'Z') ||
+         (path[0] >= 'a' && path[0] <= 'z')) &&
+        path[1] == ':') {
+        drive_letter = path[0];
+        if (drive_letter >= 'a' && drive_letter <= 'z') {
+            drive_letter = (char)(drive_letter - 'a' + 'A');
+        }
+        if (drive_letter != 'C' && drive_letter != 'D') {
             return -1;
         }
-    } else if (str_strncpy(combined, path, sizeof(combined)) != 0) {
-        return -1;
+        path += 2;
+        if (path[0] == '\0' || path[0] != '/') {
+            if (append_text(combined, sizeof(combined), &combined_length, "/") != 0) {
+                return -1;
+            }
+        }
+        if (append_text(combined, sizeof(combined), &combined_length, path) != 0) {
+            return -1;
+        }
+    } else {
+        if (working_directory != NULL &&
+            ((working_directory[0] >= 'A' && working_directory[0] <= 'Z') ||
+             (working_directory[0] >= 'a' && working_directory[0] <= 'z')) &&
+            working_directory[1] == ':' && working_directory[2] == '/') {
+            drive_letter = working_directory[0];
+            if (drive_letter >= 'a' && drive_letter <= 'z') {
+                drive_letter = (char)(drive_letter - 'a' + 'A');
+            }
+            working_directory += 2;
+        }
+        if (path[0] != '/') {
+            if (working_directory == NULL ||
+                append_text(combined, sizeof(combined), &combined_length,
+                            working_directory) != 0 ||
+                (combined_length > 0 && combined[combined_length - 1] != '/' &&
+                 append_text(combined, sizeof(combined), &combined_length, "/") != 0)) {
+                return -1;
+            }
+        }
+        if (append_text(combined, sizeof(combined), &combined_length, path) != 0) {
+            return -1;
+        }
     }
 
     output[0] = '/';
@@ -407,6 +439,15 @@ static int canonicalize_path(const char *path, char *output, size_t capacity) {
         }
         output[output_length] = '\0';
     }
+
+    if (output_length + 3 > capacity) {
+        return -1;
+    }
+    for (size_t i = output_length + 1; i > 0; i--) {
+        output[i + 1] = output[i - 1];
+    }
+    output[0] = drive_letter;
+    output[1] = ':';
     return 0;
 }
 
@@ -421,6 +462,26 @@ static int authorize_path(const char *path) {
         return 0;
     }
     return 1;
+}
+
+static int is_protected_path(const char *path) {
+    char canonical_path[256];
+    if (canonicalize_path(path, canonical_path, sizeof(canonical_path)) != 0) {
+        return 0;
+    }
+
+    const char *root_path = canonical_path + 2;
+    return str_strcmp(root_path, "/.windoge") == 0 ||
+           str_strcmp(root_path, "/system") == 0 ||
+           str_strcmp(root_path, "/apps") == 0 ||
+           str_strcmp(root_path, "/users") == 0;
+}
+
+static int is_drive_root_path(const char *path) {
+    char canonical_path[256];
+    return canonicalize_path(path, canonical_path, sizeof(canonical_path)) == 0 &&
+           (str_strcmp(canonical_path, "C:/") == 0 ||
+            str_strcmp(canonical_path, "D:/") == 0);
 }
 
 static int build_home_path(char *path, size_t capacity) {
@@ -515,7 +576,7 @@ static int print_help(void) {
     static const char *const help[] = {
         "Mini Bash for WindogeOS",
         "Built-ins: cd pwd ls echo cat touch mkdir rm mv cp clear history ver",
-        "           export unset env date time whoami uname calc edit run",
+        "           drives C: D: export unset env date time whoami uname calc edit run",
         "           cpuinfo raminfo hexdump pci settings fetch true false exit",
         "           dogestore",
         "Syntax: quotes and escapes, $NAME and ${NAME}, ;, &&, ||",
@@ -530,6 +591,33 @@ static int print_help(void) {
 static int execute_command(int argc, char **argv) {
     char path[256];
     if (argc == 0) {
+        return 0;
+    }
+    if (str_strcmp(argv[0], "drives") == 0) {
+        for (uint8_t drive = 0; drive < 2; drive++) {
+            dogeio_print(drive == 0 ? "C: primary IDE master" :
+                                      "D: primary IDE slave");
+            if (!fs_drive_present(drive)) {
+                dogeio_println(" [not present]");
+            } else {
+                if (fs_current_drive() == drive) {
+                    dogeio_print(" [current]");
+                }
+                dogeio_println("");
+            }
+        }
+        return 0;
+    }
+    if ((str_strcmp(argv[0], "C:") == 0 ||
+         str_strcmp(argv[0], "c:") == 0 ||
+         str_strcmp(argv[0], "D:") == 0 ||
+         str_strcmp(argv[0], "d:") == 0)) {
+        uint8_t drive = (argv[0][0] == 'C' || argv[0][0] == 'c') ? 0 : 1;
+        if (fs_select_drive(drive) != 0) {
+            dogeio_println("bash: drive is absent or has no supported exFAT volume");
+            return 1;
+        }
+        dogeio_println(fs_dirname());
         return 0;
     }
 
@@ -771,34 +859,13 @@ static int execute_command(int argc, char **argv) {
                 return 1;
             }
 
-            if (str_strcmp(argv[i], "/") == 0 || str_strcmp(argv[i], "/.") == 0) {
+            if (is_drive_root_path(argv[i])) {
                 dogeio_println("[Error] no deleting the entire drive.");
                 return 1;
             }
 
-            if (str_strcmp(argv[i], "/.windoge") == 0 || 
-                str_strcmp(argv[i], ".windoge") == 0 || 
-                str_strcmp(argv[i], "/./.windoge") == 0 ||
-                str_strcmp(argv[i], "./.windoge") == 0) {
-                dogeio_println("[Error] no deleting boot file");
-                return 1;
-            }
-
-            if (str_strcmp(argv[i], "/system") == 0 || (str_strcmp(argv[i], "system") == 0 || str_strcmp(fs_dirname(), "/") == 0) || 
-                str_strcmp(argv[i], "/./system") == 0 || str_strcmp(argv[i], "./system") == 0) {
-                dogeio_println("[Error] no deleting system files");
-                return 1;
-            }
-
-            if (str_strcmp(argv[i], "/apps") == 0 || (str_strcmp(argv[i], "apps") == 0 && str_strcmp(fs_dirname(), "/") == 0) 
-            || str_strcmp(argv[i], "/./apps") == 0 || str_strcmp(argv[i], "./apps") == 0) {
-                dogeio_println("[Error] no deleting system files");
-                return 1;
-            }
-            
-            if (str_strcmp(argv[i], "/users") == 0 || (str_strcmp(argv[i], "users") == 0 && str_strcmp(fs_dirname(), "/") == 0) 
-            || str_strcmp(argv[i], "/./users") == 0 || str_strcmp(argv[i], "./users") == 0) {
-                dogeio_println("[Error] no deleting system files");
+            if (is_protected_path(argv[i])) {
+                dogeio_println("[Error] no deleting system or boot files");
                 return 1;
             }
 
@@ -822,21 +889,8 @@ static int execute_command(int argc, char **argv) {
             return 1;
         }
 
-        if (str_strcmp(argv[1], "/system") == 0 || (str_strcmp(argv[1], "system") == 0 || str_strcmp(fs_dirname(), "/") == 0) || 
-            str_strcmp(argv[1], "/./system") == 0 || str_strcmp(argv[1], "./system") == 0) {
-            dogeio_println("[Error] no deleting system files");
-            return 1;
-        }
-
-        if (str_strcmp(argv[1], "/apps") == 0 || (str_strcmp(argv[1], "apps") == 0 && str_strcmp(fs_dirname(), "/") == 0) 
-        || str_strcmp(argv[1], "/./apps") == 0 || str_strcmp(argv[1], "./apps") == 0) {
-            dogeio_println("[Error] no deleting system files");
-            return 1;
-        }
-            
-        if (str_strcmp(argv[1], "/users") == 0 || (str_strcmp(argv[1], "users") == 0 && str_strcmp(fs_dirname(), "/") == 0) 
-        || str_strcmp(argv[1], "/./users") == 0 || str_strcmp(argv[1], "./users") == 0) {
-            dogeio_println("[Error] no deleting system files");
+        if (is_protected_path(argv[1])) {
+            dogeio_println("[Error] no deleting system or boot files");
             return 1;
         }
 

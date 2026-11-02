@@ -1,20 +1,18 @@
 #ifndef DISK_H
 #define DISK_H
 
-#include <basicutil.h>
 #include <stdint.h>
-#include <stddef.h>
 
-static inline int ata_Ready(void) {
-    for (volatile int i = 0; i < 4; i++) {
-        ports_inb(ATA_STATUS);
-    }
-    uint8_t status;
-    do {
-        status = ports_inb(ATA_STATUS);
-        if (status & 0x21) return -1;
-    } while ((status & 0x80) || !(status & 0x08));
-    return 0;
-}
+#define ATA_PRIMARY_MASTER 0
+#define ATA_PRIMARY_SLAVE  1
+#define ATA_DRIVE_COUNT    2
+
+void ata_probe_devices(void);
+int ata_drive_present(uint8_t drive);
+uint64_t ata_drive_sector_count(uint8_t drive);
+int ata_select_drive(uint8_t drive);
+uint8_t ata_current_drive(void);
+int ata_read_sector(uint8_t drive, uint64_t lba, uint8_t *buffer);
+int ata_write_sector(uint8_t drive, uint64_t lba, const uint8_t *buffer);
 
 #endif

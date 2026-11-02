@@ -6,20 +6,13 @@
 #include <basicutil.h>
 #include <bool.h>
 #include <system.h>
-
-extern int ata_ReadSector(uint64_t lba, uint8_t *buffer);
-
-#define ATA_STATUS     0x1F7
-#define ATA_DRIVE_HEAD 0x1F6
-#define ATA_SECTOR_CNT 0x1F2
-#define ATA_LBA_LOW    0x1F3
-#define ATA_LBA_MID    0x1F4
-#define ATA_LBA_HIGH   0x1F5
-#define ATA_COMMAND    0x1F7
-#define ATA_DATA       0x1F0
+#include "disk.h"
 
 #define EXFAT_PARTITION_LBA 4096
-#define EXFAT_TOTAL_SECTORS 2097152
+#define EXFAT_DEFAULT_TOTAL_SECTORS 2097152
+#define EXFAT_MAX_BITMAP_CLUSTERS 32768
+#define EXFAT_MAX_TOTAL_SECTORS (2048 + (EXFAT_MAX_BITMAP_CLUSTERS * 8))
+#define EXFAT_MIN_TOTAL_SECTORS 4096
 
 #define EXFAT_TYPE_BITMAP 0x81
 #define EXFAT_TYPE_UPCASE 0x82
@@ -100,6 +93,8 @@ static char     g_current_path[256] = "/";
 static uint32_t g_cluster_heap_offset = 2048;
 static uint32_t g_sectors_per_cluster = 8;
 static uint32_t g_root_cluster         = 4;
+static uint32_t g_cluster_count =
+    (EXFAT_DEFAULT_TOTAL_SECTORS - 2048) / 8;
 
 static const uint8_t exfat_upcase_default[128] = {
     0x61, 0x00, 0x00, 0x00, 0x1A, 0x00, 0x41, 0x00
@@ -121,85 +116,20 @@ static inline uint64_t exfat_cluster_lba(uint32_t cluster) {
     return EXFAT_PARTITION_LBA + g_cluster_heap_offset + ((uint64_t)(cluster - 2) * g_sectors_per_cluster);
 }
 
-static inline int exfat_hw_ready(void) {
-    for (volatile int i = 0; i < 4; i++) ports_inb(ATA_STATUS);
-    uint8_t status;
-    do {
-        status = ports_inb(ATA_STATUS);
-        if (status & 0x21) {
-            log("fs (err) ATA status hardware fault!");
-            return -1;
-        }
-    } while ((status & 0x80) || !(status & 0x08));
-    return 0;
-}
-
 static int exfat_sector_read(uint64_t lba, uint8_t *buffer) {
-    if (lba > 0x000FFFFFFFFFFFFULL) {
+    if (lba >= (1ULL << 48)) {
         log("fs (err) Read LBA out of 48-bit bounds");
         return -1;
     }
-
-    ports_outb(ATA_DRIVE_HEAD, 0x40);
-    for (volatile int i = 0; i < 4; i++) ports_inb(ATA_STATUS);
-
-    ports_outb(ATA_SECTOR_CNT, 0);
-    ports_outb(ATA_LBA_LOW,  (uint8_t)(lba >> 24));
-    ports_outb(ATA_LBA_MID,  (uint8_t)(lba >> 32));
-    ports_outb(ATA_LBA_HIGH, (uint8_t)(lba >> 40));
-
-    ports_outb(ATA_SECTOR_CNT, 1);
-    ports_outb(ATA_LBA_LOW,  (uint8_t)lba);
-    ports_outb(ATA_LBA_MID,  (uint8_t)(lba >> 8));
-    ports_outb(ATA_LBA_HIGH, (uint8_t)(lba >> 16));
-    ports_outb(ATA_COMMAND,  0x24);
-
-    if (exfat_hw_ready() != 0) return -1;
-
-    uint16_t *ptr = (uint16_t *)buffer;
-    for (int i = 0; i < 256; i++) ptr[i] = ports_inw(ATA_DATA);
-    return 0;
+    return ata_read_sector(ata_current_drive(), lba, buffer);
 }
 
 static int exfat_sector_write(uint64_t lba, const uint8_t *buffer) {
-    if (lba > 0x000FFFFFFFFFFFFULL) {
+    if (lba >= (1ULL << 48)) {
         log("fs (err) Write LBA out of 48-bit bounds");
         return -1;
     }
-
-    ports_outb(ATA_DRIVE_HEAD, 0x40);
-    for (volatile int i = 0; i < 4; i++) ports_inb(ATA_STATUS);
-
-    ports_outb(ATA_SECTOR_CNT, 0);
-    ports_outb(ATA_LBA_LOW,  (uint8_t)(lba >> 24));
-    ports_outb(ATA_LBA_MID,  (uint8_t)(lba >> 32));
-    ports_outb(ATA_LBA_HIGH, (uint8_t)(lba >> 40));
-
-    ports_outb(ATA_SECTOR_CNT, 1);
-    ports_outb(ATA_LBA_LOW,  (uint8_t)lba);
-    ports_outb(ATA_LBA_MID,  (uint8_t)(lba >> 8));
-    ports_outb(ATA_LBA_HIGH, (uint8_t)(lba >> 16));
-    ports_outb(ATA_COMMAND,  0x34);
-
-    if (exfat_hw_ready() != 0) return -1;
-
-    const uint16_t *ptr = (const uint16_t *)buffer;
-    for (int i = 0; i < 256; i++) ports_outw(ATA_DATA, ptr[i]);
-
-    for (volatile int i = 0; i < 4; i++) ports_inb(ATA_STATUS);
-    while (ports_inb(ATA_STATUS) & 0x80);
-
-    ports_outb(ATA_COMMAND, 0xE7);
-    uint8_t status;
-    do {
-        status = ports_inb(ATA_STATUS);
-        if (status & 0x21) {
-            log("fs (err) Cache flush failed after write");
-            return -1;
-        }
-    } while (status & 0x80);
-
-    return 0;
+    return ata_write_sector(ata_current_drive(), lba, buffer);
 }
 
 static uint32_t exfat_calc_boot_crc(const uint8_t *sector, size_t bytes, uint32_t crc, bool is_vbr) {
@@ -235,7 +165,7 @@ static uint32_t exfat_alloc_blocks(uint32_t count) {
     if (count == 0) return 0;
     uint8_t sector[512];
     uint64_t bitmap_base_lba = exfat_cluster_lba(2);
-    uint32_t total_clusters = (EXFAT_TOTAL_SECTORS - 2048) / 8;
+    uint32_t total_clusters = g_cluster_count;
     uint32_t bitmap_sectors = (total_clusters + 4095) / 4096;
 
     uint32_t consecutive = 0;
@@ -388,13 +318,26 @@ int exfat_mount(void) {
     exfat_header_t *vbr = (exfat_header_t *)sector;
 
     if (memcmp(vbr->fs_name, "EXFAT   ", 8) != 0) {
-        log("fs (err) Invalid exFAT magic signature");
+        log("fs (info) No exFAT volume found");
+        return 0;
+    }
+
+    if (vbr->bytes_per_sector_shift != 9 ||
+        vbr->sectors_per_cluster_shift >= 32 ||
+        vbr->cluster_heap_offset == 0 ||
+        vbr->root_dir_cluster < 2 ||
+        vbr->cluster_count == 0) {
+        log("fs (err) Invalid exFAT volume geometry");
         return -1;
     }
 
     g_cluster_heap_offset = vbr->cluster_heap_offset;
     g_sectors_per_cluster = 1 << vbr->sectors_per_cluster_shift;
     g_root_cluster        = vbr->root_dir_cluster;
+    g_cluster_count = vbr->cluster_count;
+    if (g_cluster_count > EXFAT_MAX_BITMAP_CLUSTERS) {
+        g_cluster_count = EXFAT_MAX_BITMAP_CLUSTERS;
+    }
 
     g_current_cluster = g_root_cluster;
     str_strcpy(g_current_path, "/");
@@ -405,18 +348,33 @@ int exfat_mount(void) {
 
 int exfat_wipe_and_format(void) {
     log("fs (log) Formatting volume...");
+    uint64_t drive_sector_count = ata_drive_sector_count(ata_current_drive());
+    if (drive_sector_count <= EXFAT_PARTITION_LBA) {
+        log("fs (err) Unable to determine drive capacity");
+        return -1;
+    }
+
+    uint64_t available_sectors = drive_sector_count - EXFAT_PARTITION_LBA;
+    if (available_sectors < EXFAT_MIN_TOTAL_SECTORS) {
+        log("fs (err) Drive is too small for the exFAT volume");
+        return -1;
+    }
+
+    uint32_t total_sectors = available_sectors > EXFAT_MAX_TOTAL_SECTORS
+                                 ? EXFAT_MAX_TOTAL_SECTORS
+                                 : (uint32_t)available_sectors;
     uint8_t sector[512];
     memset(sector, 0, 512);
 
     uint32_t heap_offset = 2048;
-    uint32_t cluster_cnt = (EXFAT_TOTAL_SECTORS - heap_offset) / 8;
+    uint32_t cluster_cnt = (total_sectors - heap_offset) / 8;
     uint32_t fat_len = ((cluster_cnt + 2) * 4 + 511) / 512;
 
     exfat_header_t *vbr = (exfat_header_t *)sector;
     vbr->jump_boot[0] = 0xEB; vbr->jump_boot[1] = 0x76; vbr->jump_boot[2] = 0x90;
     memcpy(vbr->fs_name, "EXFAT   ", 8);
     vbr->partition_offset = EXFAT_PARTITION_LBA;
-    vbr->volume_length = EXFAT_TOTAL_SECTORS;
+    vbr->volume_length = total_sectors;
     vbr->fat_offset = 128;
     vbr->fat_length = fat_len;
     vbr->cluster_heap_offset = heap_offset;
@@ -432,32 +390,51 @@ int exfat_wipe_and_format(void) {
 
     uint32_t crc = exfat_calc_boot_crc(sector, 512, 0, true);
     if (exfat_sector_write(EXFAT_PARTITION_LBA + 0, sector) != 0) return -1;
-    exfat_sector_write(EXFAT_PARTITION_LBA + 12, sector);
+    if (exfat_sector_write(EXFAT_PARTITION_LBA + 12, sector) != 0) return -1;
 
     uint8_t zero_sector[512] = {0};
     for (int i = 1; i <= 10; i++) {
         crc = exfat_calc_boot_crc(zero_sector, 512, crc, false);
-        exfat_sector_write(EXFAT_PARTITION_LBA + (uint64_t)i, zero_sector);
-        exfat_sector_write(EXFAT_PARTITION_LBA + (uint64_t)12 + (uint64_t)i, zero_sector);
+        if (exfat_sector_write(EXFAT_PARTITION_LBA + (uint64_t)i,
+                               zero_sector) != 0 ||
+            exfat_sector_write(EXFAT_PARTITION_LBA + (uint64_t)12 +
+                               (uint64_t)i, zero_sector) != 0) {
+            return -1;
+        }
     }
 
     uint32_t crc_table[128];
     for (int i = 0; i < 128; i++) crc_table[i] = crc;
-    exfat_sector_write(EXFAT_PARTITION_LBA + 11, (uint8_t*)crc_table);
-    exfat_sector_write(EXFAT_PARTITION_LBA + 23, (uint8_t*)crc_table);
+    if (exfat_sector_write(EXFAT_PARTITION_LBA + 11,
+                           (uint8_t*)crc_table) != 0 ||
+        exfat_sector_write(EXFAT_PARTITION_LBA + 23,
+                           (uint8_t*)crc_table) != 0) {
+        return -1;
+    }
 
     memset(sector, 0, 512);
     uint32_t *fat = (uint32_t *)sector; // PRESERVED: exFAT FAT entries are strictly 32-bit
     fat[0] = 0xFFFFFFF8; fat[1] = 0xFFFFFFFF;
     fat[2] = 0xFFFFFFFF; fat[3] = 0xFFFFFFFF; fat[4] = 0xFFFFFFFF;
-    exfat_sector_write(EXFAT_PARTITION_LBA + 128, sector);
+    if (exfat_sector_write(EXFAT_PARTITION_LBA + 128, sector) != 0) return -1;
 
-    memset(sector, 0, 512); sector[0] = 0x07;
-    exfat_sector_write(EXFAT_PARTITION_LBA + heap_offset + (0 * 8), sector);
+    uint32_t bitmap_sectors = (cluster_cnt + 4095) / 4096;
+    for (uint32_t i = 0; i < bitmap_sectors; i++) {
+        memset(sector, 0, 512);
+        if (i == 0) {
+            sector[0] = 0x07;
+        }
+        if (exfat_sector_write(EXFAT_PARTITION_LBA + heap_offset + i,
+                               sector) != 0) {
+            return -1;
+        }
+    }
 
     memset(sector, 0, 512);
     memcpy(sector, exfat_upcase_default, sizeof(exfat_upcase_default));
-    exfat_sector_write(EXFAT_PARTITION_LBA + heap_offset + (1 * 8), sector);
+    if (exfat_sector_write(EXFAT_PARTITION_LBA + heap_offset + 8, sector) != 0) {
+        return -1;
+    }
 
     memset(sector, 0, 512);
     sector[0] = EXFAT_TYPE_BITMAP;
@@ -469,8 +446,12 @@ int exfat_wipe_and_format(void) {
     *(uint32_t *)&sector[32 + 20] = 3;
     *(uint64_t *)&sector[32 + 24] = sizeof(exfat_upcase_default);
 
-    exfat_sector_write(EXFAT_PARTITION_LBA + heap_offset + (2 * 8), sector);
+    if (exfat_sector_write(EXFAT_PARTITION_LBA + heap_offset + 16,
+                           sector) != 0) {
+        return -1;
+    }
 
+    g_cluster_count = cluster_cnt;
     g_current_cluster = 4;
     str_strcpy(g_current_path, "/");
     log("fs (log) Format complete.");
@@ -1043,7 +1024,7 @@ int exfat_get_space_metrics(uint32_t *out_total_clusters, uint32_t *out_free_clu
     if (out_total_clusters == NULL || out_free_clusters == NULL) return -1;
 
     uint8_t boot_sector[512];
-    if (ata_ReadSector(FS_BASE_LBA, boot_sector) != 0) return -1;
+    if (exfat_sector_read(FS_BASE_LBA, boot_sector) != 0) return -1;
 
     uint32_t cluster_count = *(uint32_t*)&boot_sector[88];
     uint32_t free_count = cluster_count;
