@@ -61,6 +61,8 @@ void start_shell(void);
 void start_setup(void);
 
 void init_gdt_tss(void);
+void gdt_set_kernel_stack(uint64_t stack_top);
+uint64_t gdt_kernel_stack_top(void);
 void init_idt(void);
 void init_syscalls(void);
 void init_legacy_pic(void);

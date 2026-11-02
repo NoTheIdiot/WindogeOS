@@ -54,6 +54,11 @@ formatting erases existing data. The exFAT volume grows to fit the drive up to
 128 MiB. The disk must be at least 4 MiB, and the filesystem starts at sector
 4096. Use `drives` to list drives, `D:` to switch, or paths like `D:/files`.
 
+### Background applications
+Dogeshell can run ELF applications as preemptively scheduled background
+processes. Use `spawn <elf> [args...]` to start one, `ps` to list processes,
+and `kill <pid>` to stop one. The scheduler uses round-robin time slices.
+
 ### Booting on real hardware (very wow)
 __*Note*__: It's probably not a good idea to flash WindogeOS to your main machine. A test 
 machine or an older spare machine is a better idea.

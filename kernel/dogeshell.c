@@ -5,6 +5,7 @@
 #include <dogeio.h>
 #include <string.h>
 #include <system.h>
+#include <boot/scheduler.h>
 #include <core.h>
 #include <basicutil.h>
 #include <boot/limine.h>
@@ -424,6 +425,7 @@ static void dogeshell_print_help(void) {
         " pci                      | list PCI devices                    | run <file>                 | run a flat binary                                              ",
         " bash                     | open Bash; exit returns here        | <app>[.elf] [args...]      | run an app from /apps                                          ",
         " exit                     | leave Dogeshell                     | dogestore                  | install and uninstall apps from dogestore                      ",
+        " spawn <elf> [args...]    | start an app in background           | ps / kill <pid>            | list or stop background apps                                  ",
         "===============================================================================================================================================================",
         " Use ; between commands. Quoted or escaped semicolons are literal. Paths may be quoted; use ~ for your home directory."
     };
@@ -584,6 +586,91 @@ static int dogeshell_execute(int argc, char **argv) {
     char path[256];
 
     if (argc == 0) {
+        return 0;
+    }
+    if (str_strcmp(argv[0], "spawn") == 0) {
+        if (argc < 2 || argc > 33) {
+            dogeio_println("Usage: spawn <elf> [args...]");
+            return 1;
+        }
+        char executable[256];
+        if (!dogeshell_authorize_path(argv[1], executable,
+                                     sizeof(executable))) {
+            dogeio_println("Error: application path is not accessible.");
+            return 1;
+        }
+        char *arguments[32];
+        arguments[0] = executable;
+        for (int i = 2; i < argc; i++) {
+            arguments[i - 1] = argv[i];
+        }
+        uint32_t pid;
+        if (scheduler_spawn_elf(executable, argc - 1, arguments, &pid) != 0) {
+            dogeio_println("Error: unable to start application.");
+            return 1;
+        }
+        char pid_text[16];
+        uint32_t value = pid;
+        size_t digits = 0;
+        do {
+            pid_text[digits++] = (char)('0' + value % 10);
+            value /= 10;
+        } while (value != 0 && digits < sizeof(pid_text) - 1);
+        for (size_t i = 0; i < digits / 2; i++) {
+            char temp = pid_text[i];
+            pid_text[i] = pid_text[digits - i - 1];
+            pid_text[digits - i - 1] = temp;
+        }
+        pid_text[digits] = '\0';
+        dogeio_print("Started process ");
+        dogeio_println(pid_text);
+        return 0;
+    }
+    if (str_strcmp(argv[0], "ps") == 0) {
+        scheduler_task_info_t tasks[7];
+        size_t count = scheduler_list(tasks,
+                                      sizeof(tasks) / sizeof(tasks[0]));
+        dogeio_println("PID  STATE");
+        for (size_t i = 0; i < count &&
+                           i < sizeof(tasks) / sizeof(tasks[0]); i++) {
+            char pid_text[16];
+            uint32_t value = tasks[i].pid;
+            size_t digits = 0;
+            do {
+                pid_text[digits++] = (char)('0' + value % 10);
+                value /= 10;
+            } while (value != 0 && digits < sizeof(pid_text) - 1);
+            for (size_t j = 0; j < digits / 2; j++) {
+                char temp = pid_text[j];
+                pid_text[j] = pid_text[digits - j - 1];
+                pid_text[digits - j - 1] = temp;
+            }
+            pid_text[digits] = '\0';
+            dogeio_print(pid_text);
+            dogeio_print("  ");
+            dogeio_println(tasks[i].state == 2 ? "running" : "ready");
+        }
+        return 0;
+    }
+    if (str_strcmp(argv[0], "kill") == 0) {
+        if (argc != 2 || argv[1][0] == '\0') {
+            dogeio_println("Usage: kill <pid>");
+            return 1;
+        }
+        uint32_t pid = 0;
+        for (size_t i = 0; argv[1][i] != '\0'; i++) {
+            if (argv[1][i] < '0' || argv[1][i] > '9' ||
+                pid > (UINT32_MAX - (uint32_t)(argv[1][i] - '0')) / 10U) {
+                dogeio_println("Error: invalid process ID.");
+                return 1;
+            }
+            pid = pid * 10U + (uint32_t)(argv[1][i] - '0');
+        }
+        if (scheduler_kill(pid) != 0) {
+            dogeio_println("Error: process not found.");
+            return 1;
+        }
+        dogeio_println("Process stopped.");
         return 0;
     }
     if (str_strcmp(argv[0], "drives") == 0) {

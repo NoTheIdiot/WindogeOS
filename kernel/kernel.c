@@ -7,6 +7,7 @@
 #include <stddef.h>
 #include <math.h>
 #include <start.h>
+#include <boot/scheduler.h>
 #include <basicutil.h>
 #include <boot/kernel.h>
 #include <sysinfo.h>
@@ -205,6 +206,8 @@ void kernel_main(void) {
     log("WindogeOS fully booted. very wow. (clear screen and draw status bar)");
     dogeio_clear();
     menubar_draw();
+
+    scheduler_init();
 
     // enable interrupts
     sti();

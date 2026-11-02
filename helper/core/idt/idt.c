@@ -7,6 +7,7 @@
 #include <bool.h>
 #include <basicutil.h>
 #include <start.h>
+#include <boot/scheduler.h>
 
 #define PIT_INPUT_FREQUENCY 1193182U
 
@@ -26,18 +27,6 @@ typedef struct __attribute__((packed)) {
     uint16_t limit;
     uint64_t base;
 } idtr_t;
-
-typedef struct __attribute__((packed)) {
-    uint64_t r15, r14, r13, r12, r11, r10, r9, r8;
-    uint64_t rbp, rdi, rsi, rdx, rcx, rbx, rax;
-    uint64_t vector;
-    uint64_t error_code;
-    uint64_t rip;
-    uint64_t cs;
-    uint64_t rflags;
-    uint64_t rsp;
-    uint64_t ss;
-} interrupt_frame_t;
 
 #define IDT_GATE_INT32 0x8E 
 
@@ -195,7 +184,7 @@ static void dump_stack_frames(uint64_t start_rip, uint64_t start_rbp, bool to_sc
     }
 }
 
-void isr_common_handler(interrupt_frame_t *frame) {
+interrupt_frame_t *isr_common_handler(interrupt_frame_t *frame) {
     char str_buf[64];
     char log_buf[128];
     int selected_option = 0;
@@ -211,10 +200,10 @@ void isr_common_handler(interrupt_frame_t *frame) {
         }
         pic_send_eoi(irq);
         apic_eoi();
-        return;
+        return irq == 0 ? scheduler_on_timer(frame) : frame;
     }
     if (frame->vector == 255) {
-        return;
+        return frame;
     }
 
     if ((frame->cs & 0x03u) == 3) {
@@ -235,6 +224,10 @@ void isr_common_handler(interrupt_frame_t *frame) {
             str_strcat(log_buf, " | CR2: ");
             str_strcat(log_buf, str_buf);
             log(log_buf);
+        }
+
+        if (scheduler_current_pid() != 0) {
+            scheduler_exit_current(frame->vector);
         }
 
         dogeio_println("");

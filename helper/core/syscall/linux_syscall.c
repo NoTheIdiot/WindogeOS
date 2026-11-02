@@ -1,20 +1,12 @@
 #include <dogeio.h>
 #include <system.h>
 #include <boot/syscall_internal.h>
+#include <boot/scheduler.h>
 #include <boot/limine.h>
 #include <string.h>
 #include <time.h>
 
-typedef struct {
-    bool open;
-    bool readable;
-    bool writable;
-    bool append;
-    bool is_dir;
-    bool is_terminal;
-    uint64_t offset;
-    char path[USER_PATH_LIMIT];
-} linux_file_descriptor_t;
+typedef linux_task_fd_t linux_file_descriptor_t;
 
 typedef struct {
     uint64_t st_dev;
@@ -62,6 +54,7 @@ static uint64_t linux_mmap_cursor;
 static uint64_t linux_heap_start;
 static uint8_t linux_file_image[LINUX_FILE_IO_LIMIT];
 static uint8_t linux_write_data[USER_IO_LIMIT];
+static linux_task_context_t linux_context_scratch;
 extern volatile struct limine_hhdm_request hhdm_request;
 
 static uint64_t linux_error(uint64_t error) {
@@ -90,6 +83,37 @@ static void linux_reset_process_state(void) {
 
 void linux_syscall_reset(void) {
     linux_reset_process_state();
+}
+
+void linux_syscall_context_save(linux_task_context_t *context) {
+    if (context == NULL) {
+        return;
+    }
+    memset(context, 0, sizeof(*context));
+    memcpy(context->file_descriptors, file_descriptors,
+           sizeof(file_descriptors));
+    context->program_break = linux_program_break;
+    context->mmap_cursor = linux_mmap_cursor;
+    context->heap_start = linux_heap_start;
+}
+
+void linux_syscall_context_restore(const linux_task_context_t *context) {
+    if (context == NULL) {
+        linux_reset_process_state();
+        return;
+    }
+    memcpy(file_descriptors, context->file_descriptors,
+           sizeof(file_descriptors));
+    linux_program_break = context->program_break;
+    linux_mmap_cursor = context->mmap_cursor;
+    linux_heap_start = context->heap_start;
+}
+
+void linux_syscall_context_init(linux_task_context_t *context) {
+    linux_syscall_context_save(&linux_context_scratch);
+    linux_reset_process_state();
+    linux_syscall_context_save(context);
+    linux_syscall_context_restore(&linux_context_scratch);
 }
 
 void linux_syscall_set_heap_base(uint64_t address) {
@@ -643,7 +667,8 @@ uint64_t linux_syscall_handler(syscall_registers_t *regs) {
             return regs->rdi;
         }
         case LINUX_SYS_GETPID:
-            return 1;
+            return scheduler_current_pid() == 0 ? 1 :
+                   scheduler_current_pid();
         case LINUX_SYS_GETUID:
         case LINUX_SYS_GETEUID:
         case LINUX_SYS_GETGID:
@@ -704,6 +729,9 @@ uint64_t linux_syscall_handler(syscall_registers_t *regs) {
         }
         case LINUX_SYS_EXIT:
         case LINUX_SYS_EXIT_GROUP:
+            if (scheduler_current_pid() != 0) {
+                scheduler_exit_current(regs->rdi);
+            }
             if (kernel_program_launcher_rsp == 0) {
                 return linux_error(LINUX_EINVAL);
             }

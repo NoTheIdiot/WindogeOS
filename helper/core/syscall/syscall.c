@@ -8,6 +8,7 @@
 #include <boot/limine.h>
 #include <boot/syscall_internal.h>
 #include <boot/syscall.h>
+#include <boot/scheduler.h>
 #include <time.h>
 
 #define MSR_IA32_EFER            0xC0000080
@@ -298,6 +299,9 @@ static void copy_uname_field(char destination[65], const char *source) {
 }
 
 static uint64_t run_flat_binary(char *filename) {
+    if (scheduler_current_pid() != 0) {
+        return (uint64_t)-1;
+    }
     if (syscall_context_depth >= MAX_SYSCALL_CONTEXTS - 1) {
         return (uint64_t)-1;
     }
@@ -317,6 +321,9 @@ static uint64_t run_flat_binary(char *filename) {
 
 static uint64_t run_flat_binary_args(char *filename, int argc,
                                      char **argv) {
+    if (scheduler_current_pid() != 0) {
+        return (uint64_t)-1;
+    }
     if (syscall_context_depth >= MAX_SYSCALL_CONTEXTS - 1) {
         return (uint64_t)-1;
     }
@@ -335,6 +342,9 @@ static uint64_t run_flat_binary_args(char *filename, int argc,
 }
 
 static uint64_t run_elf_binary_args(char *filename, int argc, char **argv) {
+    if (scheduler_current_pid() != 0) {
+        return (uint64_t)-1;
+    }
     uint64_t file_size;
     bool is_dir;
     if (fs_get_info(filename, &file_size, &is_dir) != 0 ||
@@ -359,10 +369,17 @@ static uint64_t run_elf_binary_args(char *filename, int argc, char **argv) {
     }
     launcher_context_t parent = save_launcher_context();
     bool parent_linux_abi = linux_syscall_abi_active;
+    linux_task_context_t parent_linux_context;
+    if (parent_linux_abi) {
+        linux_syscall_context_save(&parent_linux_context);
+    }
     process_stack_depth++;
     int result = system_run_elf_args(filename, file_size, argc, argv);
     process_stack_depth--;
-    syscall_set_linux_abi(parent_linux_abi);
+    syscall_select_linux_abi(parent_linux_abi);
+    if (parent_linux_abi) {
+        linux_syscall_context_restore(&parent_linux_context);
+    }
     bool pages_restored = restore_user_pages(parent_pages);
     int cwd_restored = fs_chdir(parent_cwd);
     restore_launcher_context(parent);
@@ -424,6 +441,14 @@ void syscall_set_linux_abi(bool enabled) {
     linux_syscall_reset();
 }
 
+void syscall_select_linux_abi(bool enabled) {
+    linux_syscall_abi_active = enabled;
+}
+
+bool syscall_linux_abi_active(void) {
+    return linux_syscall_abi_active;
+}
+
 uint64_t syscall_handler(syscall_registers_t *regs) {
     if (linux_syscall_abi_active) {
         return linux_syscall_handler(regs);
@@ -434,6 +459,9 @@ uint64_t syscall_handler(syscall_registers_t *regs) {
 
     switch (sc_num) {
         case SYS_EXIT: {
+            if (scheduler_current_pid() != 0) {
+                scheduler_exit_current(regs->rdi);
+            }
             if (kernel_program_launcher_rsp == 0) {
                 return (uint64_t)-1;
             }
@@ -723,7 +751,8 @@ uint64_t syscall_handler(syscall_registers_t *regs) {
         }
 
         case GET_PID:
-            return 1;
+            return scheduler_current_pid() == 0 ? 1 :
+                   scheduler_current_pid();
 
         case GET_UID:
         case GET_GID:

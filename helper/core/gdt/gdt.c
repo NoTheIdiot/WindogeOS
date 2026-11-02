@@ -106,3 +106,11 @@ void init_gdt_tss(void) {
     gdtr.base  = (uint64_t)&gdt;
     gdt_flush(&gdtr);
 }
+
+void gdt_set_kernel_stack(uint64_t stack_top) {
+    tss.rsp0 = stack_top;
+}
+
+uint64_t gdt_kernel_stack_top(void) {
+    return (uint64_t)&kernel_stack[sizeof(kernel_stack)];
+}

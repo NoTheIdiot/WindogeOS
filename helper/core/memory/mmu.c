@@ -184,6 +184,22 @@ void switch_user_pml4(uint64_t pml4_phys) {
     }
 }
 
+void destroy_user_pml4(uint64_t pml4_phys) {
+    if (pml4_phys == 0 || hhdm_request.response == NULL) {
+        return;
+    }
+    uint64_t current_cr3 = read_cr3() & ~0xFFFULL;
+    uint64_t target_cr3 = pml4_phys & ~0xFFFULL;
+    if (current_cr3 != target_cr3) {
+        write_cr3(target_cr3);
+    }
+    cleanup_user_pages();
+    if (current_cr3 != target_cr3) {
+        write_cr3(current_cr3);
+    }
+    pmm_free_page(target_cr3, hhdm_request.response->offset);
+}
+
 bool suspend_user_pages(uint64_t *page_table_context) {
     if (page_table_context == NULL || hhdm_request.response == NULL) {
         return false;

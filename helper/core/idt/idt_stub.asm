@@ -7,6 +7,8 @@ idt_load:
     ret
 
 extern isr_common_handler
+extern isr_fpu_temp
+global isr_resume_frame
 
 %macro ISR_NOERRCODE 1
 global isr_stub_%1
@@ -77,8 +79,12 @@ isr_common_stub:
     push r14
     push r15
 
+    cld
+    fxsave64 [rel isr_fpu_temp]
     mov rdi, rsp           
+    and rsp, -16
     call isr_common_handler
+    mov rsp, rax
 
     pop r15
     pop r14
@@ -97,6 +103,26 @@ isr_common_stub:
     pop rax
 
     add rsp, 16            
+    iretq
+
+isr_resume_frame:
+    mov rsp, rdi
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop r11
+    pop r10
+    pop r9
+    pop r8
+    pop rbp
+    pop rdi
+    pop rsi
+    pop rdx
+    pop rcx
+    pop rbx
+    pop rax
+    add rsp, 16
     iretq
 
 section .rodata

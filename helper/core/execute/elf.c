@@ -134,11 +134,15 @@ static bool elf_uses_linux_abi(char *filename, const elf64_ehdr *ehdr,
     return false;
 }
 
-int system_run_elf_args_impl(char *filename, uint64_t size, int argc,
-                             char **argv) {
+int system_load_elf_args(char *filename, uint64_t size, int argc,
+                         char **argv, uint64_t *entry, uint64_t *stack,
+                         uint64_t *out_user_argv,
+                         bool *out_linux_abi, uint64_t *heap_base) {
     if (filename == NULL || filename[0] == '\0' ||
         size < sizeof(elf64_ehdr) || size > MAX_ELF_FILE_SIZE ||
-        argc < 0 || argc > 32 || (argc > 0 && argv == NULL)) {
+        argc < 0 || argc > 32 || (argc > 0 && argv == NULL) ||
+        entry == NULL || stack == NULL || out_user_argv == NULL ||
+        out_linux_abi == NULL || heap_base == NULL) {
         log("sys (elf): invalid name or file size");
         return -1;
     }
@@ -152,9 +156,6 @@ int system_run_elf_args_impl(char *filename, uint64_t size, int argc,
         log("sys (elf): HHDM response is unavailable");
         return -2;
     }
-
-    syscall_set_linux_abi(false);
-    cleanup_user_pages();
 
     int result = -3;
     elf64_ehdr ehdr;
@@ -318,17 +319,40 @@ int system_run_elf_args_impl(char *filename, uint64_t size, int argc,
     }
 
     bool linux_abi = elf_uses_linux_abi(filename, &ehdr, phdrs, size);
-    syscall_set_linux_abi(linux_abi);
-    if (linux_abi) {
-        linux_syscall_set_heap_base(align_up_page(highest_load_address));
-    }
-    to_userland_ring3_args(ehdr.e_entry, USER_STACK_VADDR + PAGE_SIZE - 8,
-                           (uint64_t)argc, user_argv);
-    syscall_set_linux_abi(false);
+    *entry = ehdr.e_entry;
+    *stack = USER_STACK_VADDR + PAGE_SIZE - 8;
+    *out_user_argv = user_argv;
+    *out_linux_abi = linux_abi;
+    *heap_base = align_up_page(highest_load_address);
+    return 0;
 
 failure:
-    cleanup_user_pages();
     return result;
+}
+
+int system_run_elf_args_impl(char *filename, uint64_t size, int argc,
+                             char **argv) {
+    cleanup_user_pages();
+    uint64_t entry;
+    uint64_t stack;
+    uint64_t user_argv;
+    uint64_t heap_base;
+    bool linux_abi;
+    int result = system_load_elf_args(filename, size, argc, argv,
+                                      &entry, &stack, &user_argv,
+                                      &linux_abi, &heap_base);
+    if (result != 0) {
+        cleanup_user_pages();
+        return result;
+    }
+    syscall_set_linux_abi(linux_abi);
+    if (linux_abi) {
+        linux_syscall_set_heap_base(heap_base);
+    }
+    to_userland_ring3_args(entry, stack, (uint64_t)argc, user_argv);
+    syscall_set_linux_abi(false);
+    cleanup_user_pages();
+    return 0;
 }
 
 int system_run_elf_impl(char *filename, uint64_t size) {
