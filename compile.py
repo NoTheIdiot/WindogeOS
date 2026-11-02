@@ -547,6 +547,9 @@ def main():
         cmd(f"dd if={part2_img} of={img_file} bs=512 seek={p2_start} conv=notrunc 2>/dev/null")
 
         elapsed = time.perf_counter() - start_time
+        
+        cmd("find . -name \"*.elf\" -type f -delete")
+        cmd("find . -name \"*.lz4\" -type f -delete")
 
         print(f"\n[dogeing] Build success, doesn't mean it will work >:)")
         print(f"[dogeing] Output generated: {img_file}")
