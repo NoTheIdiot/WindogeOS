@@ -785,6 +785,12 @@ uint64_t syscall_handler(syscall_registers_t *regs) {
             return (uint64_t)count;
         }
 
+        case SELECT_DRIVE: {
+            uint8_t drive = (uint8_t)regs->rdi;
+            ret_val = (uint64_t)fs_select_drive(drive);
+            return ret_val;
+        }
+
         case KILL_TASK:
             if (regs->rdi > UINT32_MAX ||
                 (uint32_t)regs->rdi == scheduler_current_pid()) {
@@ -1064,6 +1070,11 @@ uint64_t syscall_handler(syscall_registers_t *regs) {
             break;
         }
 
+        case CURRENT_DRIVE: {
+            ret_val = (uint64_t)fs_current_drive();
+            return ret_val;
+        }
+
         case LIST_DIR: {
             uint64_t capacity = regs->rsi;
             if (capacity == 0 ||
@@ -1187,11 +1198,17 @@ uint64_t syscall_handler(syscall_registers_t *regs) {
             ret_val = 1;
             break;
 
-        default:
+        default: {
             // for some reason a signature for unknown syscall
-            duolog("[error] unknown syscall attempted to execute.");
+            char str[32];
+            serial_print("[error] unknown syscall attempted to execute.");
+            dogeio_print("[error] unknown syscall attempted to execute.");
+            str_itoa((int)sc_num, str);
+            log(str);
+            dogeio_println(str);
             ret_val = (uint64_t)0xFFFF;
             break;
+        }
     }
 
     return ret_val;

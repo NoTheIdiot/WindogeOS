@@ -341,6 +341,8 @@ void nvme_pci_callback(uint8_t b, uint8_t d, uint8_t f, uint16_t ven, uint16_t d
 #define LIST_TASKS 59
 #define KILL_TASK 61
 #define SPAWN_TASK 62
+#define CURRENT_DRIVE 63
+#define SELECT_DRIVE 64
 
 #define SPECIAL 90
 

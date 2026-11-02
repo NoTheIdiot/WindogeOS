@@ -74,11 +74,11 @@ static inline int str_strcmp(const char *str1, const char *str2) {
         if (str1 == str2) return 0;
         return (str1 == NULL) ? -1 : 1;
     }
-    while (*str1 != '\0' && *str1 == *str2) {
+    while (*str1 && (*str1 == *str2)) {
         str1++;
         str2++;
     }
-    return (int)(uint8_t)*str1 - (int)(uint8_t)*str2;
+    return (int)(unsigned char)*str1 - (int)(unsigned char)*str2;
 }
 
 static inline int str_strncmp(const char *str1, const char *str2, size_t n) {

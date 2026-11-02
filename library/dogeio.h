@@ -227,6 +227,14 @@ static inline uint64_t get_key(void) {
     return syscall_0(GET_KEY);
 }
 
+static inline uint8_t current_drive(void) {
+    return (uint8_t)syscall_0(CURRENT_DRIVE);
+}
+
+static inline uint64_t select_drive(uint8_t drive) {
+    return syscall_1(SELECT_DRIVE, drive);
+}
+
 static inline uint64_t print_at(const char *text, uint32_t x, uint32_t y,
                                 uint32_t color) {
     return syscall_4(PRINT_AT, (uint64_t)text, x, y, color);

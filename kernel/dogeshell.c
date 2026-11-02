@@ -1179,6 +1179,12 @@ static int dogeshell_execute(int argc, char **argv) {
         system_bash();
         return 0;
     }
+    
+    if (str_strcmp(argv[0], "dogeshell-experimental") == 0) {
+        system_exec("/system/dogeshell.elf");
+        return 0;
+    }
+    
     if (str_strcmp(argv[0], "run") == 0) {
         if (argc != 2) {
             dogeio_println("Usage: run <file>");

@@ -49,16 +49,6 @@
 #define LIST_DIR           41
 #define WRITE_FILE_RAW     42
 #define GET_USER           43
-#define PROCESS_STACK      54
-#define CHECK_PATH_ACCESS  55
-#define SYSTEM_CONTROL     56
-#define SYSTEM_CONTROL_REBOOT 1
-#define SYSTEM_CONTROL_SHUTDOWN 2
-#define PACKAGE_COMMAND   57
-#define LZ4_CODEC         58
-#define LZ4_CODEC_COMPRESS 1
-#define LZ4_CODEC_DECOMPRESS 2
-#define LIST_TASKS        59
 
 // video
 #define SET_VIDEO_MODE 44
@@ -72,11 +62,23 @@
 #define IS_BAR_ON 51
 #define CLEAR_RAW 52
 #define EXPAND_USER_PAGES 53
+#define PROCESS_STACK 54
+#define CHECK_PATH_ACCESS 55
+#define SYSTEM_CONTROL 56
+
+#define SYSTEM_CONTROL_REBOOT 1
+#define SYSTEM_CONTROL_SHUTDOWN 2
+#define PACKAGE_COMMAND 57
+#define LZ4_CODEC 58
+#define LZ4_CODEC_COMPRESS 1
+#define LZ4_CODEC_DECOMPRESS 2
+#define LIST_TASKS 59
+#define KILL_TASK 61
+#define SPAWN_TASK 62
+#define CURRENT_DRIVE 63
+#define SELECT_DRIVE 64
 
 #define SPECIAL 90
-
-#define KILL_TASK         61
-#define SPAWN_TASK        62
 
 #define USER_MEMORY_READ    0x1ULL
 #define USER_MEMORY_WRITE   0x2ULL
@@ -84,6 +86,7 @@
 #define USER_MEMORY_MAX_SIZE (16ULL * 1024 * 1024)
 
 #define SYS_EXIT     60
+
 
 static inline uint64_t syscall_0(uint64_t num) {
     uint64_t ret;
