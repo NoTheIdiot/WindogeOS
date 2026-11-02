@@ -804,15 +804,28 @@ uint64_t syscall_handler(syscall_registers_t *regs) {
                 return (uint64_t)-1;
             }
 
-            for (size_t i = 0; i < path_length; i++) {
+            for (size_t i = 0; i < path_length;) {
                 if (path[i] == '\\') {
                     return (uint64_t)-1;
                 }
-                if (path[i] == '/' &&
-                    (path[i + 1] == '.' &&
-                     (path[i + 2] == '/' || path[i + 2] == '\0' ||
-                      (path[i + 2] == '.' &&
-                       (path[i + 3] == '/' || path[i + 3] == '\0'))))) {
+                if (path[i] != '/') {
+                    i++;
+                    continue;
+                }
+
+                size_t component_start = ++i;
+                while (i < path_length && path[i] != '/') {
+                    if (path[i] == '\\') {
+                        return (uint64_t)-1;
+                    }
+                    i++;
+                }
+                size_t component_length = i - component_start;
+                if ((component_length == 1 &&
+                     path[component_start] == '.') ||
+                    (component_length == 2 &&
+                     path[component_start] == '.' &&
+                     path[component_start + 1] == '.')) {
                     return (uint64_t)-1;
                 }
             }
