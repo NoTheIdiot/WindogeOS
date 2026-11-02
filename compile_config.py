@@ -28,6 +28,7 @@ compiler_flags = {
         "app_elf_linker_script": "linker-files/apps_elf.ld",
         "linker_flags"        : "-m elf_x86_64",
         "limine_sys"          : "binaries/limine-bios.sys",
+        "uefi_bootloader"     : "binaries/BOOTX64.EFI",
     },
 
     "arm64" : {
@@ -36,7 +37,7 @@ compiler_flags = {
         "kernel_linker_script": "linker-files/arm64.ld",
         "app_linker_script"   : "linker-files/apps.ld",
         "linker_flags"        : "-m aarch64elf",
-        "limine_sys"          : "binaries/limine-uefi-aarch64.efi",
+        "uefi_bootloader"     : "binaries/BOOTAA64.EFI",
     }
 }
 

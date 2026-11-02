@@ -25,7 +25,8 @@ Building on Arch Linux and other distros is possible by changing a few packages/
 ### Compiling
 If you are on Windows, install WSL with `wsl --install Ubuntu`.
 
-- install `git`, `python`, `clang`, `lld`, `llvm`, `mtools`, `exfatprogs`, and `exfat-fuse`
+- install `git`, `python`, `clang`, `lld`, `llvm`, `mtools`, `exfatprogs`,
+  and `exfat-fuse`. Install `ovmf` to run a UEFI image in QEMU.
 
 - clone the github repo via `git clone https://github.com/NoTheIdiot/WindogeOS`
 

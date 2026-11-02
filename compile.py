@@ -4,6 +4,7 @@ import time
 import argparse
 import subprocess
 import importlib.util
+import tempfile
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 DISK_IMAGE_SIZE_MB = 12
@@ -146,12 +147,23 @@ def main():
 
         parser = argparse.ArgumentParser(description=f"{cfg.project_name} Dual-Partition Build Engine")
         parser.add_argument("-a", "--arch", default=cfg.default_arch, help="Target architecture (default: %(default)s)")
+        parser.add_argument(
+            "--boot-mode",
+            choices=("bios", "uefi"),
+            help="Boot firmware mode (default: BIOS for x86_64, UEFI for arm64)",
+        )
         parser.add_argument("--skip-analyze", action="store_true", help="Skip running Clang Static Analyzer")
         args = parser.parse_args()
 
         arch = args.arch
         if arch not in cfg.compiler_flags:
             print(f"[Not Wow] Unknown architecture '{arch}'. Supported options: {list(cfg.compiler_flags.keys())}")
+            sys.exit(1)
+
+        is_arm64 = arch in ["arm64", "aarch64"]
+        boot_mode = args.boot_mode or ("uefi" if is_arm64 else "bios")
+        if boot_mode == "bios" and is_arm64:
+            print("[Not Wow] BIOS boot is only supported for x86_64.")
             sys.exit(1)
 
         arch_cfg = cfg.compiler_flags[arch]
@@ -398,43 +410,71 @@ def main():
 
         cmd(f"dd if=/dev/zero bs=1M count={DISK_IMAGE_SIZE_MB} of={img_file} 2>/dev/null")
 
-        partition_type_p1 = "8300" if arch == "x86_64" else "ef00"
+        partition_type_p1 = "ef00" if boot_mode == "uefi" else "8300"
         
         p2_start = 4096
         total_sectors = (DISK_IMAGE_SIZE_MB * 1024 * 1024) // 512
         p2_end = total_sectors - 2048
         
-        cmd(
+        partition_command = (
             f"PATH=$PATH:/usr/sbin:/sbin sgdisk {img_file} "
             f"-n 1:2048:4095 -t 1:{partition_type_p1} "
-            f"-n 2:{p2_start}:{p2_end} -t 2:0700 -m 1 2>/dev/null"
+            f"-n 2:{p2_start}:{p2_end} -t 2:0700"
         )
+        if boot_mode == "bios":
+            partition_command += " -m 1"
+        cmd(partition_command + " 2>/dev/null")
 
-        if arch == "x86_64" and os.path.exists("binaries/limine"):
+        if boot_mode == "bios" and arch == "x86_64" and os.path.exists("binaries/limine"):
             cmd("chmod +x binaries/limine 2>/dev/null || true", critical=False)
             cmd(f"./binaries/limine bios-install {img_file} 2>/dev/null", critical=False)
 
         boot_offset = 1048576
+        esp_image = None
+        if boot_mode == "uefi":
+            esp_fd, esp_image = tempfile.mkstemp(prefix="windoge-esp-", suffix=".img")
+            os.close(esp_fd)
+            with open(esp_image, "wb") as esp_file:
+                esp_file.truncate(boot_offset)
+            boot_volume = esp_image
+        else:
+            boot_volume = f"{img_file}@@{boot_offset}"
 
-        cmd(f"mformat -i {img_file}@@{boot_offset} -v BOOT")
-        cmd(f"mmd -i {img_file}@@{boot_offset} ::/boot")
-        cmd(f"mmd -i {img_file}@@{boot_offset} ::/boot/limine")
-        if arch in ["arm64", "aarch64"]:
-            cmd(f"mmd -i {img_file}@@{boot_offset} ::/EFI")
-            cmd(f"mmd -i {img_file}@@{boot_offset} ::/EFI/BOOT")
+        try:
+            cmd(f"mformat -i {boot_volume} -v BOOT")
+            cmd(f"mmd -i {boot_volume} ::/boot")
+            cmd(f"mmd -i {boot_volume} ::/boot/limine")
+            if boot_mode == "uefi":
+                cmd(f"mmd -i {boot_volume} ::/EFI")
+                cmd(f"mmd -i {boot_volume} ::/EFI/BOOT")
 
-        cmd(f"mcopy -i {img_file}@@{boot_offset} kernel.elf ::/boot/kernel.elf")
+            cmd(f"mcopy -i {boot_volume} kernel.elf ::/boot/kernel.elf")
 
-        if os.path.exists("limine.conf"):
-            cmd(f"mcopy -i {img_file}@@{boot_offset} limine.conf ::/limine.conf")
-            cmd(f"mcopy -i {img_file}@@{boot_offset} limine.conf ::/boot/limine/limine.conf")
+            if os.path.exists("limine.conf"):
+                cmd(f"mcopy -i {boot_volume} limine.conf ::/limine.conf")
+                cmd(f"mcopy -i {boot_volume} limine.conf ::/boot/limine/limine.conf")
 
-        sys_binary = arch_cfg.get("limine_sys", "")
-        if os.path.exists(sys_binary):
-            if arch == "x86_64":
-                cmd(f"mcopy -i {img_file}@@{boot_offset} {sys_binary} ::/boot/limine/limine-bios.sys")
-            elif arch in ["arm64", "aarch64"]:
-                cmd(f"mcopy -i {img_file}@@{boot_offset} {sys_binary} ::/EFI/BOOT/BOOTAA64.EFI")
+            if boot_mode == "bios":
+                sys_binary = arch_cfg.get("limine_sys", "")
+                if os.path.exists(sys_binary):
+                    cmd(f"mcopy -i {boot_volume} {sys_binary} ::/boot/limine/limine-bios.sys")
+            else:
+                uefi_bootloader = arch_cfg.get("uefi_bootloader", "")
+                if not uefi_bootloader or not os.path.exists(uefi_bootloader):
+                    print(f"[Not Wow] UEFI bootloader not found: {uefi_bootloader}")
+                    sys.exit(1)
+                efi_filename = "BOOTAA64.EFI" if is_arm64 else "BOOTX64.EFI"
+                cmd(
+                    f"mcopy -i {boot_volume} {uefi_bootloader} "
+                    f"::/EFI/BOOT/{efi_filename}"
+                )
+                cmd(
+                    f"dd if={esp_image} of={img_file} bs=512 "
+                    f"seek=2048 conv=notrunc 2>/dev/null"
+                )
+        finally:
+            if esp_image is not None and os.path.exists(esp_image):
+                os.remove(esp_image)
 
         part2_img = "part2_exfat.img"
         p2_sectors = p2_end - p2_start + 1
