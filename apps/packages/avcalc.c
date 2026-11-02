@@ -548,7 +548,7 @@ void _start(void) {
             needs_redraw = 1;
         } else if (key == KEY_CTRL_Q || key == 0x11) {
             clear();
-            sys_exit(0);
+            exit(0);
         } else if (key == KEY_BACKSPACE || key == 0x08 || key == 127) {
             if (input_len > 0) {
                 input_len--;
@@ -559,7 +559,7 @@ void _start(void) {
             if (input_len == 0) continue;
 
             if (str_strcmp(input_buf, "exit") == 0 || str_strcmp(input_buf, "quit") == 0) {
-                sys_exit(0);
+                exit(0);
             }
             if (str_strcmp(input_buf, "clear") == 0 || str_strcmp(input_buf, "cls") == 0) {
                 history_count = 0;
@@ -701,5 +701,5 @@ void _start(void) {
         }
     }
 
-    sys_exit(0);
+    exit(0);
 }

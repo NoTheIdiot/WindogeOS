@@ -276,7 +276,7 @@ static inline uint64_t clear_raw(void) {
     return syscall_0(CLEAR_RAW);
 }
 
-static inline uint64_t sys_exit(uint64_t status) {
+static inline uint64_t exit(uint64_t status) {
     return syscall_1(SYS_EXIT, status);
 }
 

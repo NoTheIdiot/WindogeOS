@@ -200,7 +200,7 @@ void _start(void) {
             uint64_t key = get_key();
             if (key == 'q' || key == 'Q') {
                 clear();
-                sys_exit(0);
+                exit(0);
             } else if (key == 'n' || key == 'N') {
                 clear();
                 print_at("=== Doge Databaser v1.0 - Schema Setup ===", 2, 1, COLOR_BRIGHT_ORANGE);
@@ -213,7 +213,7 @@ void _start(void) {
                 if (!ends_with_csv(new_path)) {
                     clear();
                     print_at("[ERROR] File must end in .csv. Exiting...", 2, 3, COLOR_BRIGHT_RED);
-                    sys_exit(0);
+                    exit(0);
                 }
                 str_strcpy(db_file, new_path);
 
@@ -477,7 +477,7 @@ void _start(void) {
         }
         else if (key == 'q' || key == 'Q') {
             clear();
-            sys_exit(0);
+            exit(0);
         }
     }
 }

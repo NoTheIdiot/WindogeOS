@@ -1076,5 +1076,5 @@ void _start(int argc, char **argv) {
             status = assemble_file(input_path, output_path);
         }
     }
-    sys_exit((uint64_t)status);
+    exit((uint64_t)status);
 }

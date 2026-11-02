@@ -37,5 +37,5 @@ UNUSED static inline void compress(char* file, uint64_t size, char* dest) {
 }*/
 
 void _start(void) {
-    sys_exit(0);
+    exit(0);
 }

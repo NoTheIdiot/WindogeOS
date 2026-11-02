@@ -199,7 +199,7 @@ void _start(void) {
 
     if (!grow_capacity()) {
         println("Unable to allocate task list.");
-        sys_exit(1);
+        exit(1);
     }
 
     if (!file_exists("/.todo")) {
@@ -208,7 +208,7 @@ void _start(void) {
 
     if (!load()) {
         println("Unable to load task list.");
-        sys_exit(1);
+        exit(1);
     }
 
     while (1) {
@@ -288,5 +288,5 @@ void _start(void) {
     }
 
     clear();
-    sys_exit(0);
+    exit(0);
 }

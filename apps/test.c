@@ -8,5 +8,5 @@ void _start(void) {
         write(file, data, sizeof(data) - 1);
         close(file);
     }
-    sys_exit(0);
+    exit(0);
 }

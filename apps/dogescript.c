@@ -1172,14 +1172,14 @@ void _start(int argc, char **argv) {
         println("Flow:     if else endif while endwhile repeat endrepeat");
         println("          break continue. Other commands run in Dogeshell.");
         println("Variables: $name, ${name}, $0 (script), $1..$N, $argc");
-        sys_exit(0);
+        exit(0);
         return;
     }
     if (argc < 1 || argv == NULL || argv[0] == NULL ||
         argv[0][0] == '\0') {
         println("Usage: dogescript <script-file> [arguments...]");
-        sys_exit(2);
+        exit(2);
         return;
     }
-    sys_exit((uint64_t)run_script(argv[0], argc, argv));
+    exit((uint64_t)run_script(argv[0], argc, argv));
 }

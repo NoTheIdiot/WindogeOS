@@ -5,7 +5,7 @@
 void _start(int argc, char** argv) {
     if (argc < 1 || argv == (void*)0 || argv[0] == (void*)0) {
         print("Usage: calc <expression>\n");
-        sys_exit(1);
+        exit(1);
         return;
     } 
     
@@ -13,13 +13,13 @@ void _start(int argc, char** argv) {
         print("Calculator\n");
         print("Usage: calc <expression>\n");
         print("Example: calc \"2 + 3 * 4\"\n");
-        sys_exit(0);
+        exit(0);
         return;
     }
 
     char* string = argv[0];
     if (string == (void*)0) {
-        sys_exit(1);
+        exit(1);
         return;
     }
 
@@ -79,7 +79,7 @@ void _start(int argc, char** argv) {
         total_result = -total_result;
     } else if (total_result == 0) {
         print("0\n");
-        sys_exit(0);
+        exit(0);
         return;
     }
 
@@ -96,5 +96,5 @@ void _start(int argc, char** argv) {
     }
     
     print("\n");
-    sys_exit(0);
+    exit(0);
 }

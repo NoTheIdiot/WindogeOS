@@ -518,13 +518,13 @@ void _start(int argc, char **argv) {
          text_equal(argv[0], "--version"))) {
         println(text_equal(argv[0], "--help") ? "Usage: edit <file>"
                                               : "Dogeedit v2.3");
-        sys_exit(0);
+        exit(0);
     }
     if (argc != 1 || argv == NULL || argv[0] == NULL ||
         argv[0][0] == '\0' ||
         copy_text(current_filename, sizeof(current_filename), argv[0]) != 0) {
         println("Usage: edit <file>");
-        sys_exit(2);
+        exit(2);
     }
 
     (void)background_color(COLOR_BACKGROUND);
@@ -534,7 +534,7 @@ void _start(int argc, char **argv) {
     should_quit = false;
     if (!load_file_from_disk(current_filename)) {
         println("Unable to read file.");
-        sys_exit(1);
+        exit(1);
     }
 
     while (!should_quit) {
@@ -627,5 +627,5 @@ void _start(int argc, char **argv) {
     }
 
     clear();
-    sys_exit(0);
+    exit(0);
 }

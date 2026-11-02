@@ -230,7 +230,7 @@ void _start(void) {
             uint64_t key = get_key();
             if (key == 'q' || key == 'Q') {
                 clear();
-                sys_exit(0);
+                exit(0);
             } else if (key == 'n' || key == 'N') {
                 clear();
                 text_color(COLOR_BRIGHT_ORANGE);
@@ -251,7 +251,7 @@ void _start(void) {
                     clear();
                     text_color(COLOR_BRIGHT_RED);
                     print("  [ERROR] File must end in .slk. Exiting...\n");
-                    sys_exit(0);
+                    exit(0);
                 }
                 str_strcpy(sheet_file, new_path);
 
@@ -264,7 +264,7 @@ void _start(void) {
                 if ((int64_t)create_file(sheet_file) < 0 ||
                     !save_slk_file()) {
                     println("Unable to create or save spreadsheet.");
-                    sys_exit(1);
+                    exit(1);
                 }
                 break;
             }
@@ -401,10 +401,10 @@ void _start(void) {
         else if (key == 'q' || key == 'Q') {
             if (!save_slk_file()) {
                 println("Unable to save spreadsheet.");
-                sys_exit(1);
+                exit(1);
             }
             clear();
-            sys_exit(0);
+            exit(0);
         }
 
         if (cur_r < first_visible_row) {

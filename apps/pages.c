@@ -209,20 +209,20 @@ void _start(int argc, char **argv) {
             println("Usage: pages <file>");
             println("Page with Up/Down or Space/B; press G to return to the start.");
             println("Press Q to quit.");
-            sys_exit(0);
+            exit(0);
         }
         if (text_equal(argv[0], "--version")) {
             println("WindogeOS pages 1.0");
-            sys_exit(0);
+            exit(0);
         }
     }
 
     if (argc != 1 || argv == NULL || argv[0] == NULL ||
         argv[0][0] == '\0') {
         println("Usage: pages <file>");
-        sys_exit(2);
+        exit(2);
         return;
     }
 
-    sys_exit((uint64_t)view_file(argv[0]));
+    exit((uint64_t)view_file(argv[0]));
 }

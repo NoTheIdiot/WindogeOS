@@ -878,7 +878,7 @@ static void vi_handle_normal_key(uint64_t key) {
 void _start(int argc, char **argv) {
     if (argc < 0 || argc > 1) {
         println("Usage: vi [file]");
-        sys_exit(2);
+        exit(2);
         return;
     }
 
@@ -886,12 +886,12 @@ void _start(int argc, char **argv) {
     if (argc == 1) {
         if (argv == NULL || argv[0] == NULL || argv[0][0] == '\0') {
             println("Usage: vi [file]");
-            sys_exit(2);
+            exit(2);
             return;
         }
         if (vi_copy_text(vi_filename, sizeof(vi_filename), argv[0]) != 0) {
             println("vi: filename is too long");
-            sys_exit(2);
+            exit(2);
             return;
         }
     }
@@ -901,7 +901,7 @@ void _start(int argc, char **argv) {
     (void)text_color(COLOR_WHITE);
     if (vi_filename[0] != '\0' && vi_load_file(vi_filename) != 0) {
         println(vi_status);
-        sys_exit(1);
+        exit(1);
         return;
     }
     if (vi_filename[0] == '\0') {
@@ -930,7 +930,7 @@ void _start(int argc, char **argv) {
         }
         if (vi_pending_command == 0x100) {
             clear();
-            sys_exit(0);
+            exit(0);
             return;
         }
     }

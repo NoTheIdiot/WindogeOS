@@ -415,5 +415,5 @@ void _start(int argc, char **argv) {
     }
 
     clear();
-    sys_exit(0);
+    exit(0);
 }

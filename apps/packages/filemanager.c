@@ -322,7 +322,7 @@ void _start(void) {
         } 
         else if (key == 'q' || key == 'Q') {
             clear();
-            sys_exit((uint64_t)0);
+            exit((uint64_t)0);
         }
     }
 }

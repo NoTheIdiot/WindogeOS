@@ -22,5 +22,5 @@ void _start(void) {
     }
     enable_bar();
     println("");
-    sys_exit(0);
+    exit(0);
 }

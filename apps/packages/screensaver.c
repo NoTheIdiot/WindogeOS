@@ -59,5 +59,5 @@ void _start(void)
     if (restore_bar) {
         enable_bar();
     }
-    sys_exit(0);
+    exit(0);
 }
