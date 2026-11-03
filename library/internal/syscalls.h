@@ -77,6 +77,7 @@
 #define SPAWN_TASK 62
 #define CURRENT_DRIVE 63
 #define SELECT_DRIVE 64
+#define READ_MOUSE 65
 
 #define SPECIAL 90
 

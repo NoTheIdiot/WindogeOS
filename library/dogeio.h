@@ -284,6 +284,10 @@ static inline uint64_t clear_raw(void) {
     return syscall_0(CLEAR_RAW);
 }
 
+static inline uint64_t read_mouse(int32_t* delta_x, int32_t* delta_y, uint8_t* buttons) {
+    return syscall_3(READ_MOUSE, (uint64_t)delta_x, (uint64_t)delta_y, (uint64_t)buttons);
+}
+
 static inline uint64_t exit(uint64_t status) {
     return syscall_1(SYS_EXIT, status);
 }

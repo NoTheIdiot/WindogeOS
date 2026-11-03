@@ -29,12 +29,52 @@ int execute(int argc, char** argv) {
     }
 
     if (str_strcmp(argv[0], "reboot") == 0) {
+        println("Rebooting");
         reboot();
         return 0;
     }
 
     if (str_strcmp(argv[0], "shutdown") == 0) {
+        println("Shutting down");
         shutdown();
+        return 0;
+    }
+
+    if (str_strcmp(argv[0], "dir") == 0) {
+        char get_cwd_str[64];
+        char files[64][256];
+
+        for (int i = 0; i < 64; i++) {
+            files[i][0] = '\0';
+        }
+        
+        get_cwd(get_cwd_str, 64);
+        println("---------------------------------------------------------");
+        print("In Folder: "); println(get_cwd_str);
+        println("---------------------------------------------------------");
+        
+        list_dir(files, 64);
+        
+        for (int i = 0; i < 64; i++) {
+            if (files[i][0] == '\0') {
+                continue;
+            }
+            dogec_stat_t buffer;
+            stat(files[i], &buffer);
+            if (buffer.is_dir) {
+                print("DIR  ");
+            } else {
+                print("FILE ");
+            }
+            char final[24];
+            str_pad(final, files[i], 24, ' ');
+            print(final);
+            print(" | ");
+            char size[16];
+            str_u64toa(buffer.size, size);
+            print(size);
+            println(" bytes");
+        }
         return 0;
     }
     
@@ -52,22 +92,88 @@ int execute(int argc, char** argv) {
         return 0;
     }
 
-    if (str_strcmp(argv[0], "ver") == 0) {
-        println("Experimental DogeShell");
+    if (str_strcmp(argv[0], "test-mouse") == 0) {
+        println("Middle click to exit.");
+        while (1)
+        {
+            int32_t dx, dy;
+            uint8_t buttons;
+
+            read_mouse(&dx, &dy, &buttons);
+
+            if (dx || dy)
+            {
+                println("mouse moved");
+            }
+
+            if (buttons & 1)
+            {
+                println("left click");
+            }
+
+            if (buttons & 2)
+            {
+                println("right click");
+            }
+
+            if (buttons & 4)
+            {
+                println("middle click");
+                break;
+            }
+        }
         return 0;
     }
 
-    if (str_strcmp(argv[0], "help") == 0) {
-        help_me();
+    if (str_strcmp(argv[0], "test-gui") == 0) {
+        println("Press any key to start, middle click to exit.");
+        get_key();
+        
+        set_video_mode();
+
+        uint32_t screen_width = 800; 
+        uint32_t screen_height = 1280;
+        uint32_t bg_color = COLOR_BRIGHT_BLUE;
+
+        draw_rec(0, 0, screen_width, screen_height, bg_color);
+
+        while (1)
+        {
+            int32_t dx = 0, dy = 0;
+            uint8_t buttons = 0;
+
+            read_mouse(&dx, &dy, &buttons);
+
+            if (buttons & 4)
+            {
+                break;
+            }
+        }
+
+        set_text_mode();
+        clear();
+        println("Returned to WindogeOS shell environment.");
+        
         return 0;
     }
 
-    else {
-        println("command not found");
-        return -2;
+
+        if (str_strcmp(argv[0], "ver") == 0) {
+            println("Experimental DogeShell");
+            return 0;
+        }
+
+        if (str_strcmp(argv[0], "help") == 0) {
+            help_me();
+            return 0;
+        }
+
+        else {
+            println("command not found");
+            return -2;
+        }
+        return -127;
     }
-    return -127;
-}
 
 int tokenize(char* command, int argc_max, char** argv_buf) {
     int argc_count = 0;
@@ -84,6 +190,10 @@ int tokenize(char* command, int argc_max, char** argv_buf) {
         } else {
             if (start != NULL) {
                 if (argc_count < argc_max) {
+                    if (len >= ARG_SIZE) {
+                        len = ARG_SIZE - 1;
+                    }
+
                     memcpy(argv_buf[argc_count], start, (size_t)len);
                     argv_buf[argc_count][len] = '\0';
                     argc_count++;
@@ -120,7 +230,6 @@ void _start(void) {
     while (true) {
         str_strcpy(prompt, "experimental WindogeOS > ");
         input(prompt, command, 256);
-        
         
         int argc_actual = tokenize(command, MAX_ARGS, argv_buffer);
         

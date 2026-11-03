@@ -1192,6 +1192,31 @@ uint64_t syscall_handler(syscall_registers_t *regs) {
             break;
         }
 
+        case READ_MOUSE: {
+            if (regs->rdi == 0 ||
+                regs->rsi == 0 ||
+                regs->rdx == 0 ||
+                !user_range_accessible(regs->rdi, sizeof(int32_t), true) ||
+                !user_range_accessible(regs->rsi, sizeof(int32_t), true) ||
+                !user_range_accessible(regs->rdx, sizeof(uint8_t), true)) {
+                return (uint64_t)-1;
+            }
+
+            int32_t delta_x;
+            int32_t delta_y;
+            uint8_t buttons;
+
+            ret_val = dogeio_mouse_read(&delta_x, &delta_y, &buttons);
+
+            if (ret_val) {
+                *(int32_t *)regs->rdi = delta_x;
+                *(int32_t *)regs->rsi = delta_y;
+                *(uint8_t *)regs->rdx = buttons;
+            }
+
+            break;
+        }
+
         case SPECIAL:
             dogeio_println("TESTING");
             log("TESTING");
