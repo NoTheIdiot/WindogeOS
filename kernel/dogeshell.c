@@ -1184,15 +1184,18 @@ static int dogeshell_execute(int argc, char **argv) {
         system_exec("/system/dogeshell.elf");
         return 0;
     }
+
+    if (str_strcmp(argv[0], "gui") == 0) {
+        system_exec("/system/gui.elf");
+        return 0;
+    }
     
     if (str_strcmp(argv[0], "run") == 0) {
         if (argc != 2) {
             dogeio_println("Usage: run <file>");
             return 1;
         }
-        if (!dogeshell_authorize_path(argv[1], path, sizeof(path))) {
-            return 1;
-        }
+
         if (!fs_exists(path)) {
             dogeio_println("Error: program doesn't exist.");
             return 1;
