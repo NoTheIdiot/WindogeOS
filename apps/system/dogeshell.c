@@ -134,8 +134,14 @@ int execute(int argc, char** argv) {
         uint32_t screen_width = 800; 
         uint32_t screen_height = 1280;
         uint32_t bg_color = COLOR_BRIGHT_BLUE;
+        uint32_t cursor_color = COLOR_CURSOR;
 
         draw_rec(0, 0, screen_width, screen_height, bg_color);
+
+        int32_t mouse_x = (int32_t)(screen_width / 2);
+        int32_t mouse_y = (int32_t)(screen_height / 2);
+
+        draw_rec((uint32_t)mouse_x, (uint32_t)mouse_y, 9, 9, cursor_color);
 
         while (1)
         {
@@ -143,6 +149,26 @@ int execute(int argc, char** argv) {
             uint8_t buttons = 0;
 
             read_mouse(&dx, &dy, &buttons);
+
+            if (dx || dy)
+            {
+                int32_t next_x = mouse_x + dx;
+                int32_t next_y = mouse_y + dy;
+
+                if (next_x < 0) next_x = 0;
+                if (next_y < 0) next_y = 0;
+                if (next_x > (int32_t)(screen_width - 9))  next_x = (int32_t)(screen_width - 9);
+                if (next_y > (int32_t)(screen_height - 9)) next_y = (int32_t)(screen_height - 9);
+
+                if (next_x != mouse_x || next_y != mouse_y) 
+                {
+                    draw_rec((uint32_t)mouse_x, (uint32_t)mouse_y, 9, 9, bg_color);
+                    draw_rec((uint32_t)next_x, (uint32_t)next_y, 9, 9, cursor_color);
+                    
+                    mouse_x = next_x;
+                    mouse_y = next_y;
+                }
+            }
 
             if (buttons & 4)
             {
@@ -157,23 +183,22 @@ int execute(int argc, char** argv) {
         return 0;
     }
 
-
-        if (str_strcmp(argv[0], "ver") == 0) {
-            println("Experimental DogeShell");
-            return 0;
-        }
-
-        if (str_strcmp(argv[0], "help") == 0) {
-            help_me();
-            return 0;
-        }
-
-        else {
-            println("command not found");
-            return -2;
-        }
-        return -127;
+    if (str_strcmp(argv[0], "ver") == 0) {
+        println("Experimental DogeShell");
+        return 0;
     }
+
+    if (str_strcmp(argv[0], "help") == 0) {
+        help_me();
+        return 0;
+    }
+
+    else {
+        println("command not found");
+        return -2;
+    }
+    return -127;
+}
 
 int tokenize(char* command, int argc_max, char** argv_buf) {
     int argc_count = 0;
