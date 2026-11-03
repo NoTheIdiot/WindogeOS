@@ -64,6 +64,7 @@ typedef struct {
 #define KEY_F2        0x106
 #define KEY_CTRL_O    0x110
 #define KEY_CTRL_N    0x111
+#define KEY_CTRL_TAB  0x112
 
 static inline uint64_t read_file(const char *path, void *buffer, uint64_t size) {
     return syscall_3(READ_FILE, (uint64_t)path, (uint64_t)buffer, size);

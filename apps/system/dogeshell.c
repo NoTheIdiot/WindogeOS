@@ -125,7 +125,7 @@ int execute(int argc, char** argv) {
         return 0;
     }
 
-    if (str_strcmp(argv[0], "test-gui") == 0) {
+        if (str_strcmp(argv[0], "test-gui") == 0) {
         println("Press any key to start, middle click to exit.");
         get_key();
         
@@ -136,24 +136,61 @@ int execute(int argc, char** argv) {
         uint32_t bg_color = COLOR_BRIGHT_BLUE;
         uint32_t cursor_color = COLOR_CURSOR;
 
+        int32_t accel_option = 1;
+
         draw_rec(0, 0, screen_width, screen_height, bg_color);
 
         int32_t mouse_x = (int32_t)(screen_width / 2);
         int32_t mouse_y = (int32_t)(screen_height / 2);
 
-        draw_rec((uint32_t)mouse_x, (uint32_t)mouse_y, 9, 9, cursor_color);
+        for (int32_t r = 0; r < 9; r++) {
+            for (int32_t c = 0; c < 9; c++) {
+                draw_pixel((uint32_t)(mouse_x + c), (uint32_t)(mouse_y + r), cursor_color);
+            }
+        }
 
         while (1)
         {
             int32_t dx = 0, dy = 0;
             uint8_t buttons = 0;
-
+            
             read_mouse(&dx, &dy, &buttons);
 
             if (dx || dy)
             {
-                int32_t next_x = mouse_x + dx;
-                int32_t next_y = mouse_y + dy;
+                int32_t multiplier_fp = 256; 
+                int32_t abs_dx = dx < 0 ? -dx : dx;
+                int32_t abs_dy = dy < 0 ? -dy : dy;
+                int32_t speed = abs_dx > abs_dy ? abs_dx : abs_dy;
+
+                if (accel_option == 1)
+                {
+                    if (speed > 4) {
+                        multiplier_fp = 281; 
+                    }
+                }
+                else if (accel_option == 2)
+                {
+                    if (speed > 3 && speed <= 8) {
+                        multiplier_fp = 384; 
+                    } else if (speed > 8) {
+                        multiplier_fp = 512; 
+                    }
+                }
+                else if (accel_option == 3)
+                {
+                    if (speed > 2 && speed <= 6) {
+                        multiplier_fp = 512; 
+                    } else if (speed > 6) {
+                        multiplier_fp = 768; 
+                    }
+                }
+
+                int32_t accel_dx = (dx * multiplier_fp) / 256;
+                int32_t accel_dy = (dy * multiplier_fp) / 256;
+
+                int32_t next_x = mouse_x + accel_dx;
+                int32_t next_y = mouse_y + accel_dy;
 
                 if (next_x < 0) next_x = 0;
                 if (next_y < 0) next_y = 0;
@@ -162,8 +199,17 @@ int execute(int argc, char** argv) {
 
                 if (next_x != mouse_x || next_y != mouse_y) 
                 {
-                    draw_rec((uint32_t)mouse_x, (uint32_t)mouse_y, 9, 9, bg_color);
-                    draw_rec((uint32_t)next_x, (uint32_t)next_y, 9, 9, cursor_color);
+                    for (int32_t r = 0; r < 9; r++) {
+                        for (int32_t c = 0; c < 9; c++) {
+                            draw_pixel((uint32_t)(mouse_x + c), (uint32_t)(mouse_y + r), bg_color);
+                        }
+                    }
+
+                    for (int32_t r = 0; r < 9; r++) {
+                        for (int32_t c = 0; c < 9; c++) {
+                            draw_pixel((uint32_t)(next_x + c), (uint32_t)(next_y + r), cursor_color);
+                        }
+                    }
                     
                     mouse_x = next_x;
                     mouse_y = next_y;
@@ -182,6 +228,7 @@ int execute(int argc, char** argv) {
         
         return 0;
     }
+
 
     if (str_strcmp(argv[0], "ver") == 0) {
         println("Experimental DogeShell");
