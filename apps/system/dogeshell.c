@@ -175,7 +175,7 @@ void _start(void) {
     while (true) {
         get_cwd(current_directory, 256);
         str_strcpy(prompt, current_directory);
-        str_strcpy(prompt, " > ");
+        str_strcat(prompt, " > ");
         input(prompt, command, 256);
         
         int argc_actual = tokenize(command, MAX_ARGS, argv_buffer);
