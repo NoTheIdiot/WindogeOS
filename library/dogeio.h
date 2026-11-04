@@ -262,7 +262,7 @@ static inline uint64_t draw_pixel(uint32_t x, uint32_t y, uint32_t color) {
 }
 
 static inline uint64_t draw_rec(uint32_t x, uint32_t y, uint32_t width, uint32_t height, uint32_t color) {
-    return syscall_5(DRAW_REC, x, y, height, width, color);
+    return syscall_5(DRAW_REC, x, y, width, height, color);
 }
 
 static inline uint64_t get_key_delay(uint64_t loops) {

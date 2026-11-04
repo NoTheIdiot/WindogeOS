@@ -4,6 +4,7 @@
 // include headers
 #include <stdint.h>
 #include <stddef.h>
+#include <bool.h>
 
 // port io and assembly wrappers
 #include "../helper/basicutil/io.h"
@@ -22,6 +23,8 @@ int serial_transmit_empty();
 void serial_putchar(char c);
 void serial_print(const char* str);
 void serial_println(const char* str);
+bool serial_received(void);
+uint8_t serial_read(void);
 
 // basic
 void log(const char* str);

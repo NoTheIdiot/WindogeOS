@@ -92,37 +92,8 @@ int execute(int argc, char** argv) {
         return 0;
     }
 
-    if (str_strcmp(argv[0], "test-mouse") == 0) {
-        println("Middle click to exit.");
-        while (1)
-        {
-            int32_t dx, dy;
-            uint8_t buttons;
+    if (str_strcmp(argv[0], "") == 0) {
 
-            read_mouse(&dx, &dy, &buttons);
-
-            if (dx || dy)
-            {
-                println("mouse moved");
-            }
-
-            if (buttons & 1)
-            {
-                println("left click");
-            }
-
-            if (buttons & 2)
-            {
-                println("right click");
-            }
-
-            if (buttons & 4)
-            {
-                println("middle click");
-                break;
-            }
-        }
-        return 0;
     }
 
     if (str_strcmp(argv[0], "test-gui") == 0) {
@@ -192,6 +163,7 @@ void _start(void) {
 
     char command[512];
     char prompt[96];
+    char current_directory[256];
     
     char arguments[MAX_ARGS][ARG_SIZE];
     char* argv_buffer[MAX_ARGS];
@@ -201,7 +173,9 @@ void _start(void) {
     }
 
     while (true) {
-        str_strcpy(prompt, "experimental WindogeOS > ");
+        get_cwd(current_directory, 256);
+        str_strcpy(prompt, current_directory);
+        str_strcpy(prompt, " > ");
         input(prompt, command, 256);
         
         int argc_actual = tokenize(command, MAX_ARGS, argv_buffer);

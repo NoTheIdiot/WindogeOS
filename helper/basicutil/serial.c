@@ -1,4 +1,5 @@
 #include <basicutil.h>
+#include <bool.h>
 
 #define SERIAL_PORT 0x3F8
 
@@ -10,6 +11,16 @@ void serial_init() {
 	ports_outb(SERIAL_PORT + 3, 0x03);
 	ports_outb(SERIAL_PORT + 2, 0xC7);
 	ports_outb(SERIAL_PORT + 4, 0x0B);
+}
+
+bool serial_received(void)
+{
+    return (ports_inb(SERIAL_PORT + 5) & 0x01U) != 0;
+}
+
+uint8_t serial_read(void)
+{
+    return ports_inb(SERIAL_PORT);
 }
 
 int serial_transmit_empty() {

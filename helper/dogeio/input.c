@@ -28,6 +28,14 @@ static bool global_shift_pressed = false;
 static bool global_ctrl_pressed  = false;
 static bool irq_ctrl_pressed = false;
 
+#define SERIAL_PORT 0x2F8
+
+static volatile uint8_t serial_mouse_packet[3];
+static volatile uint8_t serial_mouse_index;
+
+static volatile uint8_t ps2_buttons;
+static volatile uint8_t serial_buttons;
+
 static bool status_bar_enabled = true;
 
 #define KEYBOARD_SCANCODE_BUFFER_SIZE 256
@@ -97,7 +105,68 @@ static bool ps2_send_mouse_command(uint8_t command)
     return ports_inb(0x60) == 0xFA;
 }
 
-bool dogeio_mouse_init(void)
+static void serial_mouse_parse(uint8_t byte)
+{
+    if (byte & 0x40U) {
+        serial_mouse_index = 0;
+    }
+
+    if (serial_mouse_index >= 3) {
+        serial_mouse_index = 0;
+    }
+
+    serial_mouse_packet[serial_mouse_index++] = byte;
+
+    if (serial_mouse_index != 3) {
+        return;
+    }
+
+    serial_mouse_index = 0;
+
+    uint8_t b1 = serial_mouse_packet[0];
+    uint8_t b2 = serial_mouse_packet[1];
+    uint8_t b3 = serial_mouse_packet[2];
+
+    int dx =
+        ((int)((b1 & 0x03U) << 6)) |
+        ((int)(b2 & 0x3FU));
+
+    int dy =
+        ((int)((b1 & 0x0CU) << 4)) |
+        ((int)(b3 & 0x3FU));
+
+    if (dx & 0x80) {
+        dx -= 256;
+    }
+
+    if (dy & 0x80) {
+        dy -= 256;
+    }
+
+    mouse_delta_x += dx;
+    mouse_delta_y -= dy;
+
+    serial_buttons = 0;
+
+    if (b1 & 0x20U) {
+        serial_buttons |= 0x01;
+    }
+
+    if (b1 & 0x10U) {
+        serial_buttons |= 0x02;
+    }
+
+    mouse_buttons = ps2_buttons | serial_buttons;
+}
+
+void dogeio_serial_mouse_irq(void)
+{
+    while (serial_received()) {
+        serial_mouse_parse(serial_read());
+    }
+}
+
+bool dogeio_ps2_mouse_init(void)
 {
     if (!ps2_wait_input_empty()) {
         return false;
@@ -130,7 +199,23 @@ bool dogeio_mouse_init(void)
     mouse_packet_index = 0;
     mouse_delta_x = 0;
     mouse_delta_y = 0;
+
     mouse_buttons = 0;
+    ps2_buttons = 0;
+    serial_buttons = 0;
+
+    serial_mouse_index = 0;
+
+    return true;
+}
+
+bool dogeio_serial_mouse_init(void)
+{
+    serial_mouse_index = 0;
+
+    ports_outb(SERIAL_PORT + 4, 0x0B);
+    ports_outb(SERIAL_PORT + 1, 0x01);
+
     return true;
 }
 

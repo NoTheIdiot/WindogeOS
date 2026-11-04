@@ -6,7 +6,7 @@
 
 void _start(void) {
     println("WindogeOS GUI v0.0.1-Beta1");
-    println("Press any key to start, Ctrl+O to exit, Middle click to reset cursor.");
+    println("Press any key to start, Ctrl+X to exit, Middle click to reset cursor.");
     get_key();
 
     set_video_mode();
@@ -18,7 +18,7 @@ void _start(void) {
 
     int32_t accel_option = 1;
 
-    draw_rec(0, 0, screen_height, screen_width, bg_color);
+    draw_rec(0, 0, screen_width, screen_height, bg_color);
 
     int32_t mouse_x = (int32_t)(screen_width / 2);
     int32_t mouse_y = (int32_t)(screen_height / 2);
@@ -31,9 +31,8 @@ void _start(void) {
 
     while (1)
     {
-        uint64_t key = get_key_delay(1);
-        if (key == KEY_CTRL_O) 
-        {
+        uint16_t key = (uint16_t)get_key_delay(1);
+        if (key == 0x18) {
             break;
         }
 
@@ -41,27 +40,6 @@ void _start(void) {
         uint8_t buttons = 0;
         
         read_mouse(&dx, &dy, &buttons);
-
-        if (buttons & 4)
-        {
-            for (int32_t r = 0; r < 9; r++) {
-                for (int32_t c = 0; c < 9; c++) {
-                    draw_pixel((uint32_t)(mouse_x + c), (uint32_t)(mouse_y + r), bg_color);
-                }
-            }
-            
-            mouse_x = (int32_t)(screen_width / 2);
-            mouse_y = (int32_t)(screen_height / 2);
-
-            for (int32_t r = 0; r < 9; r++) {
-                for (int32_t c = 0; c < 9; c++) {
-                    draw_pixel((uint32_t)(mouse_x + c), (uint32_t)(mouse_y + r), cursor_color);
-                }
-            }
-            
-            dx = 0;
-            dy = 0;
-        }
 
         if (dx || dy)
         {
@@ -126,4 +104,5 @@ void _start(void) {
 
     set_text_mode();
     clear();
+    exit(0);
 }

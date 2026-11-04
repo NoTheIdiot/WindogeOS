@@ -161,7 +161,7 @@ void kernel_main(void) {
     init_legacy_pic();
     log("[dogeing] initializing PIT status timer");
     init_pit(100);
-    if (dogeio_mouse_init()) {
+    if (dogeio_ps2_mouse_init()) {
         log("[Wow] PS/2 mouse interrupt reporting enabled.");
     } else {
         log("[Info] PS/2 mouse unavailable; keyboard interrupts remain active.");

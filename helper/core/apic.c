@@ -54,6 +54,40 @@ bool check_apic() {
    return (edx & CPUID_FEAT_EDX_APIC) != 0;
 }
 
+void pic_set_mask(uint8_t irq)
+{
+    uint16_t port;
+    uint8_t value;
+
+    if (irq < 8) {
+        port = MASTER_PIC_DATA_PORT;
+    } else {
+        port = SLAVE_PIC_DATA_PORT;
+        irq -= 8;
+    }
+
+    value = ports_inb(port);
+    value |= (uint8_t)(1U << irq);
+    ports_outb(port, value);
+}
+
+void pic_clear_mask(uint8_t irq)
+{
+    uint16_t port;
+    uint8_t value;
+
+    if (irq < 8) {
+        port = MASTER_PIC_DATA_PORT;
+    } else {
+        port = SLAVE_PIC_DATA_PORT;
+        irq -= 8;
+    }
+
+    value = ports_inb(port);
+    value &= (uint8_t)~(1U << irq);
+    ports_outb(port, value);
+}
+
 static void io_wait(void) {
     (void)ports_inb(0x80);
 }
@@ -78,9 +112,16 @@ void init_legacy_pic(void) {
     io_wait();
     ports_outb(SLAVE_PIC_DATA_PORT, 0x01);
     io_wait();
+    ports_outb(MASTER_PIC_DATA_PORT, 0xFF);
+    ports_outb(SLAVE_PIC_DATA_PORT, 0xFF);
 
-    ports_outb(MASTER_PIC_DATA_PORT, 0xF9);
-    ports_outb(SLAVE_PIC_DATA_PORT, 0xEF);
+    pic_clear_mask(1);
+
+    pic_clear_mask(2);
+
+    pic_clear_mask(3);
+
+    pic_clear_mask(12);
 }
 
 void pic_send_eoi(uint8_t irq) {
@@ -92,33 +133,57 @@ void pic_send_eoi(uint8_t irq) {
 
 void init_apic(void)
 {
-    if (!check_apic() || hhdm_request.response == NULL)
+    if (!check_apic() || hhdm_request.response == NULL) {
         return;
+    }
 
     uint64_t apic_base_msr = rdmsr(IA32_APIC_BASE_MSR);
-    if ((apic_base_msr & IA32_APIC_BASE_MSR_X2APIC) != 0) {
+
+    if (apic_base_msr & IA32_APIC_BASE_MSR_X2APIC) {
         return;
     }
 
     uintptr_t phys_base = cpu_get_apic_base();
-    lapic_base = map_kernel_mmio_page((uintptr_t)LAPIC_VIRTUAL_BASE,
-                                      (uint64_t)phys_base);
+
+    lapic_base = map_kernel_mmio_page(
+        (uintptr_t)LAPIC_VIRTUAL_BASE,
+        (uint64_t)phys_base
+    );
+
     if (lapic_base == 0) {
-        log("[Error] Could not map local APIC MMIO; using legacy PIC.");
+        log("[APIC] failed to map LAPIC MMIO");
         return;
     }
 
     cpu_set_apic_base(phys_base);
 
     write_reg(APIC_REG_TPR, 0);
-    write_reg(APIC_REG_LVT_TIMER, APIC_REGISTER_MASKED | 0x20U);
-    write_reg(APIC_REG_LVT_THERMAL, APIC_REGISTER_MASKED);
-    write_reg(APIC_REG_LVT_PERF, APIC_REGISTER_MASKED);
-    write_reg(APIC_REG_LVT_LINT0, 0x700U);
-    write_reg(APIC_REG_LVT_LINT1, APIC_REGISTER_MASKED);
-    write_reg(APIC_REG_LVT_ERR, APIC_REGISTER_MASKED);
-    write_reg(APIC_REG_SVR, APIC_SPURIOUS_VECTOR | APIC_SVR_SOFTWARE_ENABLE);
+
+    write_reg(APIC_REG_LVT_TIMER,
+              APIC_REGISTER_MASKED);
+
+    write_reg(APIC_REG_LVT_THERMAL,
+              APIC_REGISTER_MASKED);
+
+    write_reg(APIC_REG_LVT_PERF,
+              APIC_REGISTER_MASKED);
+
+    write_reg(APIC_REG_LVT_LINT0,
+              0x700U);
+
+    write_reg(APIC_REG_LVT_LINT1,
+              0x400U);
+
+    write_reg(APIC_REG_LVT_ERR,
+              APIC_REGISTER_MASKED);
+
+    write_reg(APIC_REG_SVR,
+              APIC_SPURIOUS_VECTOR |
+              APIC_SVR_SOFTWARE_ENABLE);
+
+    log("[APIC] local APIC enabled");
 }
+
 
 void apic_eoi(void)
 {

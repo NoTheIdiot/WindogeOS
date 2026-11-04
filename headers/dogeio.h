@@ -111,7 +111,7 @@ void dogeio_disable_status_bar(void);
 bool dogeio_status_bar_enabled(void);
 bool dogeio_mouse_read(int32_t *delta_x, int32_t *delta_y,
                        uint8_t *buttons);
-bool dogeio_mouse_init(void);
+bool dogeio_ps2_mouse_init(void);
 
 #define KEY_UP        0x101
 #define KEY_DOWN      0x102
