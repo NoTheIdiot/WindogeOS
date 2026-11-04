@@ -209,14 +209,13 @@ static int dogeshell_resolve_path(const char *input, char *output,
         return -1;
     }
 
-    if (((input[0] >= 'A' && input[0] <= 'Z') ||
-         (input[0] >= 'a' && input[0] <= 'z')) &&
+    if (((input[0] >= 'a' && input[0] <= 'z')) &&
         input[1] == ':') {
         drive_letter = input[0];
         if (drive_letter >= 'a' && drive_letter <= 'z') {
-            drive_letter = (char)(drive_letter - 'a' + 'A');
+            drive_letter = (char)(drive_letter - 'a' + 'a');
         }
-        if (drive_letter != 'C' && drive_letter != 'D') {
+        if (drive_letter != 'c' && drive_letter != 'd') {
             return -1;
         }
         input += 2;
@@ -232,12 +231,11 @@ static int dogeshell_resolve_path(const char *input, char *output,
         }
     } else {
         if (working_directory != NULL &&
-            ((working_directory[0] >= 'A' && working_directory[0] <= 'Z') ||
-             (working_directory[0] >= 'a' && working_directory[0] <= 'z')) &&
+            ((working_directory[0] >= 'a' && working_directory[0] <= 'z')) &&
             working_directory[1] == ':' && working_directory[2] == '/') {
             drive_letter = working_directory[0];
             if (drive_letter >= 'a' && drive_letter <= 'z') {
-                drive_letter = (char)(drive_letter - 'a' + 'A');
+                drive_letter = (char)(drive_letter - 'a' + 'a');
             }
             working_directory += 2;
         }
@@ -349,14 +347,14 @@ static int dogeshell_is_protected_path(const char *path) {
 static int dogeshell_is_drive_root_path(const char *path) {
     char resolved[256];
     return dogeshell_resolve_path(path, resolved, sizeof(resolved)) == 0 &&
-           (str_strcmp(resolved, "C:/") == 0 ||
-            str_strcmp(resolved, "D:/") == 0);
+           (str_strcmp(resolved, "c:/") == 0 ||
+            str_strcmp(resolved, "d:/") == 0);
 }
 
 static int dogeshell_history_path(char *path, size_t capacity) {
     size_t length = 0;
     path[0] = '\0';
-    return dogeshell_append(path, capacity, &length, "C:/users/") == 0 &&
+    return dogeshell_append(path, capacity, &length, ":/users/") == 0 &&
                    dogeshell_append(path, capacity, &length, current_user) == 0 &&
                    dogeshell_append(path, capacity, &length, "/.history") == 0
                ? 0

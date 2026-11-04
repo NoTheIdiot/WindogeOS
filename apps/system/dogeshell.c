@@ -162,8 +162,8 @@ void _start(void) {
         \nit to be fully featured like the kernel space one (default).");
 
     char command[512];
-    char prompt[96];
     char current_directory[256];
+    char username[64];
     
     char arguments[MAX_ARGS][ARG_SIZE];
     char* argv_buffer[MAX_ARGS];
@@ -174,9 +174,15 @@ void _start(void) {
 
     while (true) {
         get_cwd(current_directory, 256);
-        str_strcpy(prompt, current_directory);
-        str_strcat(prompt, " > ");
-        input(prompt, command, 256);
+        doge_get_user_name(username, 64);
+
+        text_color(0xFF00FF00);
+        print(username);
+        print(" ");
+        text_color(COLOR_GRAY);
+        print(current_directory);
+        
+        input("> ", command, 256);
         
         int argc_actual = tokenize(command, MAX_ARGS, argv_buffer);
         

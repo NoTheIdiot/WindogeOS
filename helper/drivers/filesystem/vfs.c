@@ -105,17 +105,16 @@ static int fs_prepare_path(const char *path, char *out, size_t out_size) {
         return -1;
     }
 
-    if (((path[0] >= 'A' && path[0] <= 'Z') ||
-         (path[0] >= 'a' && path[0] <= 'z')) &&
+    if ((path[0] >= 'a' && path[0] <= 'z') &&
         path[1] == ':') {
         char drive_letter = path[0];
         if (drive_letter >= 'a' && drive_letter <= 'z') {
-            drive_letter = (char)(drive_letter - 'a' + 'A');
+            drive_letter = (char)(drive_letter - 'a' + 'a');
         }
-        if (drive_letter != 'C' && drive_letter != 'D') {
+        if (drive_letter != 'c' && drive_letter != 'd') {
             return -1;
         }
-        if (fs_select_drive_internal((uint8_t)(drive_letter - 'C')) != 0) {
+        if (fs_select_drive_internal((uint8_t)(drive_letter - 'c')) != 0) {
             return -1;
         }
         path += 2;
@@ -624,7 +623,7 @@ char* fs_dirname(void) {
     if (working_dir == NULL) {
         return NULL;
     }
-    g_current_drive_path[0] = (char)('C' + g_current_drive);
+    g_current_drive_path[0] = (char)('c' + g_current_drive);
     g_current_drive_path[1] = ':';
     str_strcpy(g_current_drive_path + 2, working_dir);
     return g_current_drive_path;
