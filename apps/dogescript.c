@@ -1143,9 +1143,9 @@ static int run_script(const char *path, int argc, char **argv) {
         int status = run_command(count, tokens, argc, argv, path, line,
                                  &exit_requested, &exit_status);
         if (status != 0) {
-            char message[96] = "dogescript: command failed on line ";
-            size_t message_length =
-                sizeof("dogescript: command failed on line ") - 1;
+            char message[96];
+            str_strcpy(message, "dogescript: command failed on line ");
+            size_t message_length = sizeof("dogescript: command failed on line ") - 1;
             char number_text[21];
             uint64_t line_number = get_line_number(&reader, program_counter);
             if (line_number == 0) {

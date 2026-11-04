@@ -120,7 +120,7 @@ static void get_reminder_for_date(int year, int month, int day, char *out_msg, s
     out_msg[0] = '\0';
     if (!file_exists(CALENDAR_FILE)) return;
 
-    dogec_stat_t st = {0};
+    dogec_stat_t st;
     if (stat(CALENDAR_FILE, &st) != 0 || st.size == 0 || st.is_dir) return;
 
     char file_buf[256];
@@ -164,7 +164,7 @@ static void save_reminder_for_date(int year, int month, int day, const char *new
 
     uint64_t fsize = 0;
     if (file_exists(CALENDAR_FILE)) {
-        dogec_stat_t st = {0};
+        dogec_stat_t st;
         if (stat(CALENDAR_FILE, &st) == 0 && st.size > 0 && !st.is_dir) {
             uint64_t bytes_to_read = st.size < 255 ? st.size : 255;
             int64_t br = (int64_t)read_file(CALENDAR_FILE, file_buf, bytes_to_read);

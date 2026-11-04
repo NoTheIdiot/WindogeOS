@@ -22,7 +22,7 @@ tools = {
 compiler_flags = {
     "x86_64" : {
         "kernel_flags"        : "-target x86_64-unknown-none-elf -m64 -march=x86-64 -mabi=sysv -mno-80387 -mno-mmx -mno-sse -mno-sse2 -mno-red-zone -mcmodel=kernel",
-        "app_flags"           : "-target x86_64-unknown-none-elf -m64 -march=x86-64 -mabi=sysv -mno-80387 -mno-mmx -mno-sse -mno-sse2 -mno-red-zone -mcmodel=large -DWINDOGE_APP",
+        "app_flags"           : "-target x86_64-unknown-none-elf -m64 -march=x86-64 -mabi=sysv -mno-80387 -mno-mmx -mno-sse -mno-sse2 -mno-red-zone -mcmodel=small -DWINDOGE_APP",
         "kernel_linker_script": "linker-files/x86_64.ld",
         "app_linker_script"   : "linker-files/apps.ld",
         "app_elf_linker_script": "linker-files/apps_elf.ld",

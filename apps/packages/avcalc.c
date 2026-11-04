@@ -467,8 +467,10 @@ void _start(void) {
     int input_len = 0;
     input_buf[0] = '\0';
 
-    fixed_t last_answer = {0, 0};
+    fixed_t last_answer;
+    memset(&last_answer, 0, sizeof(fixed_t));
     fixed_t memory_reg = {0, 0};
+    memset(&memory_reg, 0, sizeof(fixed_t));
     Variable vars[MAX_VARS];
     int var_count = 0;
     int show_help = 0;

@@ -802,11 +802,11 @@ uint64_t syscall_handler(syscall_registers_t *regs) {
             char path[USER_PATH_LIMIT];
             uint64_t workspace_id = regs->rsi;
             size_t path_length;
+
             if (workspace_id >= MAX_TERMINALS ||
-                !copy_user_string(regs->rdi, path, sizeof(path),
-                                  &path_length) ||
+                !copy_user_string(regs->rdi, path, sizeof(path), &path_length) ||
                 path_length == 0 || path[0] != '/' ||
-                !system_can_access_path(current_user, path)) {
+                fs_check_access(path, FS_PERM_READ | FS_PERM_EXEC) != 0) {
                 return (uint64_t)-1;
             }
 
@@ -827,22 +827,58 @@ uint64_t syscall_handler(syscall_registers_t *regs) {
                     i++;
                 }
                 size_t component_length = i - component_start;
-                if ((component_length == 1 &&
-                     path[component_start] == '.') ||
-                    (component_length == 2 &&
-                     path[component_start] == '.' &&
-                     path[component_start + 1] == '.')) {
+                if ((component_length == 1 && path[component_start] == '.') ||
+                    (component_length == 2 && path[component_start] == '.' && path[component_start + 1] == '.')) {
                     return (uint64_t)-1;
                 }
             }
 
-            char *arguments[] = {path};
-            uint32_t pid;
-            if (scheduler_spawn_elf(path, 1, arguments,
-                                    (uint32_t)workspace_id, &pid) != 0) {
+            uint64_t file_size = 0;
+            bool is_directory = false;
+            if (fs_get_info(path, &file_size, &is_directory) != 0 || is_directory || file_size == 0) {
                 return (uint64_t)-1;
             }
-            return pid;
+
+            uint64_t parent_cr3_ctx = 0;
+            __asm__ __volatile__("mov %%cr3, %0" : "=r"(parent_cr3_ctx));
+
+            uint64_t child_base_vaddr = 0x800000;
+            size_t program_pages = (file_size + PAGE_SIZE - 1) / PAGE_SIZE;
+            size_t stack_pages = 4;
+            size_t total_alloc_pages = program_pages + stack_pages;
+
+            for (size_t i = 0; i < total_alloc_pages; i++) {
+                uint64_t target_vaddr = child_base_vaddr + (i * PAGE_SIZE);
+                uint64_t physical_frame = pmm_alloc_zeroed_page();
+                if (physical_frame == 0) {
+                    return (uint64_t)-1;
+                }
+                map_user_page(target_vaddr, physical_frame);
+            }
+
+            uint64_t current_rsp;
+            uint64_t current_rflags;
+            __asm__ __volatile__("mov %%rsp, %0" : "=r"(current_rsp));
+            __asm__ __volatile__("pushfq; pop %0" : "=r"(current_rflags));
+
+            extern uint64_t kernel_program_launcher_rsp;
+            extern uint64_t kernel_program_launcher_rflags;
+            kernel_program_launcher_rsp = current_rsp;
+            kernel_program_launcher_rflags = current_rflags;
+
+            char *arguments[] = {path};
+            uint32_t pid;
+            
+            scheduler_spawn_elf(path, 1, arguments, (uint32_t)workspace_id, &pid);
+
+            __asm__ __volatile__("mov %0, %%cr3" :: "r"(parent_cr3_ctx) : "memory");
+
+            for (size_t i = 0; i < total_alloc_pages; i++) {
+                uint64_t target_vaddr = child_base_vaddr + (i * PAGE_SIZE);
+                unmap_user_page(target_vaddr);
+            }
+
+            return (uint64_t)pid;
         }
 
         case GET_UID:
