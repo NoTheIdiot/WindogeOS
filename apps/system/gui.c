@@ -33,7 +33,9 @@ void _start(void) {
     {
         uint16_t key = (uint16_t)get_key_delay(1);
         if (key == 0x18) {
-            break;
+            set_text_mode();
+            clear();
+            exit((uint64_t)0);
         }
 
         int32_t dx = 0, dy = 0;

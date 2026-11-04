@@ -332,12 +332,12 @@ failure:
 
 int system_run_elf_args_impl(char *filename, uint64_t size, int argc,
                              char **argv) {
-    cleanup_user_pages();
     uint64_t entry;
     uint64_t stack;
     uint64_t user_argv;
     uint64_t heap_base;
     bool linux_abi;
+    
     int result = system_load_elf_args(filename, size, argc, argv,
                                       &entry, &stack, &user_argv,
                                       &linux_abi, &heap_base);
@@ -345,15 +345,19 @@ int system_run_elf_args_impl(char *filename, uint64_t size, int argc,
         cleanup_user_pages();
         return result;
     }
+    
     syscall_set_linux_abi(linux_abi);
     if (linux_abi) {
         linux_syscall_set_heap_base(heap_base);
     }
+    
     to_userland_ring3_args(entry, stack, (uint64_t)argc, user_argv);
+    
     syscall_set_linux_abi(false);
-    cleanup_user_pages();
+    cleanup_user_pages(); 
     return 0;
 }
+
 
 int system_run_elf_impl(char *filename, uint64_t size) {
     return system_run_elf_args_impl(filename, size, 0, NULL);

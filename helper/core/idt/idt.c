@@ -262,6 +262,7 @@ interrupt_frame_t *isr_common_handler(interrupt_frame_t *frame) {
         }
 
         is_kernel_dead = false;
+        cleanup_user_pages();
         system_dogeshell();
 
         while (1) {

@@ -220,6 +220,8 @@ void start_shell(void) {
     if (default_shell_is_bash) {
         system_bash();
     } else {
-        system_dogeshell();
+        while (true) {
+            system_exec("/system/dogeshell.elf");
+        }
     }
 }

@@ -8,6 +8,14 @@
 #define MAX_ARGS 16
 #define ARG_SIZE 64
 
+static char command[512];
+static char current_directory[256];
+static char username[64];
+static char arguments[MAX_ARGS][ARG_SIZE];
+static char* argv_buffer[MAX_ARGS];
+static char files[64][256];
+static char get_cwd_str[64];
+
 void help_me(void) {
     char* help[] = {
         "WindogeOS DogeShell Experimental",
@@ -40,13 +48,16 @@ int execute(int argc, char** argv) {
         return 0;
     }
 
-    if (str_strcmp(argv[0], "dir") == 0) {
-        char get_cwd_str[64];
-        char files[64][256];
+    if (str_strcmp(argv[0], "sleep") == 0) {
+        process_stack("/system/sleep.elf", 0, NULL);
+        return 0;
+    }
 
+    if (str_strcmp(argv[0], "dir") == 0) {
         for (int i = 0; i < 64; i++) {
             files[i][0] = '\0';
         }
+        get_cwd_str[0] = '\0';
         
         get_cwd(get_cwd_str, 64);
         println("---------------------------------------------------------");
@@ -92,15 +103,10 @@ int execute(int argc, char** argv) {
         return 0;
     }
 
-    if (str_strcmp(argv[0], "") == 0) {
-
-    }
-
     if (str_strcmp(argv[0], "test-gui") == 0) {
-        process_stack("/system/dogeutil.elf", 0, NULL);
+        process_stack("/system/gui.elf", 0, NULL);
         return 0;
     }
-
 
     if (str_strcmp(argv[0], "ver") == 0) {
         println("Experimental DogeShell");
@@ -119,15 +125,15 @@ int execute(int argc, char** argv) {
     return -127;
 }
 
-int tokenize(char* command, int argc_max, char** argv_buf) {
+int tokenize(char* cmd_line, int argc_max, char** argv_buf) {
     int argc_count = 0;
     char* start = NULL;
     int len = 0;
 
-    for (int i = 0; command[i] != '\0'; i++) {
-        if (command[i] != ' ') {
+    for (int i = 0; cmd_line[i] != '\0'; i++) {
+        if (cmd_line[i] != ' ') {
             if (start == NULL) {
-                start = &command[i];
+                start = &cmd_line[i];
                 len = 0;
             }
             len++;
@@ -148,6 +154,9 @@ int tokenize(char* command, int argc_max, char** argv_buf) {
     }
 
     if (start != NULL && argc_count < argc_max) {
+        if (len >= ARG_SIZE) {
+            len = ARG_SIZE - 1;
+        }
         memcpy(argv_buf[argc_count], start, (size_t)len);
         argv_buf[argc_count][len] = '\0';
         argc_count++;
@@ -160,13 +169,6 @@ void _start(void) {
     println("Welcome to WindogeOS DogeShell experimental shell.");
     println("It's just so i can try and replace kernel space dogeshell, don't expect\
         \nit to be fully featured like the kernel space one (default).");
-
-    char command[512];
-    char current_directory[256];
-    char username[64];
-    
-    char arguments[MAX_ARGS][ARG_SIZE];
-    char* argv_buffer[MAX_ARGS];
     
     for (int i = 0; i < MAX_ARGS; i++) {
         argv_buffer[i] = arguments[i];
@@ -188,5 +190,6 @@ void _start(void) {
         
         execute(argc_actual, argv_buffer);
     }
+    
     exit((uint64_t)-1);
 }

@@ -2,15 +2,16 @@
 #include "../library/dogelib.h"
 #include "../library/stdint.h"
 #include "../library/stddef.h"
+#include "../library/string.h"
 #include "../library/bool.h"
 #include "../library/math.h"
 
-/*int search_text(char* path, char* text) {
+int search_text(char* path, char* text) {
     if (path == NULL || text == NULL) {
         return -1;
     }
 
-    char* files[256];
+    char files[256][256];
     list_dir(files, 256);
 
     int file_count = 0;
@@ -22,18 +23,17 @@
     }
 
     dogec_stat_t* thing[file_count];
-    char temp[512];
     int total_results = 0;
 
     for (int i = 0; i < file_count; i++) {
         stat(files[i], thing[i]);
-        char buffer[thing[i]->size];
+        char buffer[(int)thing[i]->size];
         read_file(files[i], (char*)buffer, thing[i]->size);
 
-        for (int j = 0; j < thing[i]->size; j++) {
+        for (int j = 0; j < (int)thing[i]->size; j++) {
             int found = 1;
             for (int k = 0; text[k] != '\0'; k++) {
-                if ((j + k) >= thing[i]->size || buffer[j + k] != text[k]) {
+                if ((j + k) >= (int)thing[i]->size || buffer[j + k] != text[k]) {
                     found = 0;
                     break;
                 }
@@ -45,13 +45,6 @@
     }
 
     return total_results;
-}
-
-int search_file(char* path, char* filename) {
-    if (path == NULL || filename == NULL) {
-        return -1;
-    }
-    return -1;
 }
 
 void sort(int* arr) {
@@ -113,9 +106,41 @@ int word_count(char* text) {
     }
 
     return count;
-}*/
+}
 
-void _start(void) {
+void _start(int argc, char** argv) {
+    if (argc == 0 || argv == NULL) {
+        exit((uint64_t)-1);
+    }
 
-    exit(0);
+    if (argc <= 1 && str_strcmp(argv[0], "search") == 0) {
+        if (argv[1] == NULL) {
+            exit((uint64_t)-2);
+        }
+
+        if (argv[2] == NULL) {
+            exit((uint64_t)-2);
+        }
+
+        if (argv[3] == NULL) {
+            exit((uint64_t)-2);
+        }
+
+
+        if (str_strcmp(argv[1], "text") == 0) {
+            if (!file_exists(argv[2])) {
+                exit((uint64_t)-3); 
+            }
+
+            int results = search_text(argv[2], argv[3]);
+            char results_str[16];
+            str_itoa(results, results_str);
+            print(argv[2]);
+            print(" found in ");
+            print(argv[3]);
+            print(" > ");
+            println(results_str);
+        }
+    }
+    exit((uint64_t)0);
 }

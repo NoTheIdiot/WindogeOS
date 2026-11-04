@@ -22,6 +22,7 @@ system_run_bin:
     cmp dword [rel syscall_context_depth], MAX_SYSCALL_CONTEXT_DEPTH
     jae .context_overflow
     inc dword [rel syscall_context_depth]
+    cli
     pushfq
     pop rax
     mov [rel kernel_program_launcher_rsp], rsp
@@ -32,6 +33,7 @@ system_run_bin:
     mov qword [rel kernel_program_launcher_rsp], 0
     mov qword [rel kernel_program_launcher_rflags], 0
     dec dword [rel syscall_context_depth]
+    sti
     ret
 .context_overflow:
     mov rax, -1
@@ -41,6 +43,7 @@ system_run_bin_args:
     cmp dword [rel syscall_context_depth], MAX_SYSCALL_CONTEXT_DEPTH
     jae .context_overflow
     inc dword [rel syscall_context_depth]
+    cli
     pushfq
     pop rax
     mov [rel kernel_program_launcher_rsp], rsp
@@ -51,6 +54,7 @@ system_run_bin_args:
     mov qword [rel kernel_program_launcher_rsp], 0
     mov qword [rel kernel_program_launcher_rflags], 0
     dec dword [rel syscall_context_depth]
+    sti
     ret
 .context_overflow:
     mov rax, -1
@@ -60,6 +64,7 @@ system_run_elf:
     cmp dword [rel syscall_context_depth], MAX_SYSCALL_CONTEXT_DEPTH
     jae .context_overflow
     inc dword [rel syscall_context_depth]
+    cli
     pushfq
     pop rax
     mov [rel kernel_program_launcher_rsp], rsp
@@ -70,6 +75,7 @@ system_run_elf:
     mov qword [rel kernel_program_launcher_rsp], 0
     mov qword [rel kernel_program_launcher_rflags], 0
     dec dword [rel syscall_context_depth]
+    sti
     ret
 .context_overflow:
     mov rax, -1
@@ -79,6 +85,7 @@ system_run_elf_args:
     cmp dword [rel syscall_context_depth], MAX_SYSCALL_CONTEXT_DEPTH
     jae .context_overflow
     inc dword [rel syscall_context_depth]
+    cli
     pushfq
     pop rax
     mov [rel kernel_program_launcher_rsp], rsp
@@ -89,17 +96,14 @@ system_run_elf_args:
     mov qword [rel kernel_program_launcher_rsp], 0
     mov qword [rel kernel_program_launcher_rflags], 0
     dec dword [rel syscall_context_depth]
+    sti
     ret
 .context_overflow:
     mov rax, -1
     ret
 
 syscall_exit_to_launcher:
-    mov r11, rdi
-    mov r8, [rel kernel_program_launcher_rsp]
-    mov r9, [rel kernel_program_launcher_rflags]
-    mov qword [rel kernel_program_launcher_rsp], 0
-    mov qword [rel kernel_program_launcher_rflags], 0
+    mov rax, rdi 
 
     mov ecx, [rel syscall_context_depth]
     dec ecx
@@ -117,8 +121,7 @@ syscall_exit_to_launcher:
     xor edx, edx
     wrmsr
 
-    mov rax, r11
-    mov rsp, r8
-    push r9
-    popfq
+    mov qword [rel kernel_program_launcher_rsp], 0
+    mov qword [rel kernel_program_launcher_rflags], 0
+    
     ret
