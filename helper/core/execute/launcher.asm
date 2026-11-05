@@ -84,11 +84,11 @@ system_run_elf_args:
     mov [rel kernel_program_launcher_rsp], rsp
     mov [rel kernel_program_launcher_rflags], rax
     sub rsp, 8
-                            ; ERROR FUCKING HERE
-                            ;        ▼
-    /* ERROR FUCKING HERE > */ call system_run_elf_args_impl ; < ERROR FUCKING HERE
-                            ;        ▲
-                            ; ERROR FUCKING HERE
+    ; ERROR FUCKING HERE
+    ;        ▼
+    call system_run_elf_args_impl ; < ERROR FUCKING HERE
+    ;        ▲
+    ; ERROR FUCKING HERE
     add rsp, 8
     mov qword [rel kernel_program_launcher_rsp], 0
     mov qword [rel kernel_program_launcher_rflags], 0
