@@ -204,9 +204,10 @@ int scheduler_spawn_elf(const char *path, int argc, char **argv,
     uint64_t user_argv;
     uint64_t heap_base;
     bool linux_abi;
+    program_memory_t program;
     int result = system_load_elf_args((char *)path, file_size, argc, argv,
                                       &entry, &user_stack, &user_argv,
-                                      &linux_abi, &heap_base);
+                                      &linux_abi, &heap_base, &program);
     switch_user_pml4(parent_cr3);
     if (result != 0) {
         destroy_user_pml4(pml4);

@@ -24,6 +24,44 @@ extern volatile struct limine_hhdm_request   hhdm_request;
 
 static uint64_t free_page_head;
 
+void cleanup_program_pages(const program_memory_t *program) {
+    if (program == NULL) {
+        return;
+    }
+
+    for (uint64_t region = 0;
+         region < program->region_count;
+         region++) {
+
+        uint64_t start =
+            program->regions[region].start;
+
+        uint64_t end =
+            program->regions[region].end;
+
+        for (uint64_t addr = start;
+             addr < end;
+             addr += PAGE_SIZE) {
+
+            if (user_page_mapped(addr)) {
+                unmap_user_page(addr);
+            }
+        }
+    }
+
+    for (uint64_t i = 0;
+         i < program->stack_pages;
+         i++) {
+
+        uint64_t addr =
+            program->stack_base + (i * PAGE_SIZE);
+
+        if (user_page_mapped(addr)) {
+            unmap_user_page(addr);
+        }
+    }
+}
+
 uint64_t pmm_alloc_zeroed_page(void) {
     static uint64_t alloc_index = 0;
     static uint64_t alloc_offset = 0;

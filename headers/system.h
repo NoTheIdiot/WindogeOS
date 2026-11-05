@@ -19,6 +19,21 @@ static inline int system(char* command) {
     return system_dogeshell_ex(command);
 }
 
+#define MAX_ELF_PROGRAM_HEADERS 256
+#define PAGE_SIZE 4096ULL
+typedef struct {
+    uint64_t start;
+    uint64_t end;
+} program_region_t;
+
+typedef struct {
+    program_region_t regions[MAX_ELF_PROGRAM_HEADERS];
+    uint64_t region_count;
+
+    uint64_t stack_base;
+    uint64_t stack_pages;
+} program_memory_t;
+
 typedef struct {
     const char *label;
     const char *value;
@@ -61,6 +76,7 @@ bool unmap_user_page(uint64_t virt_addr);
 bool suspend_user_pages(uint64_t *page_table_context);
 bool restore_user_pages(const uint64_t *page_table_context);
 uint64_t pmm_alloc_zeroed_page(void);
+void cleanup_program_pages(const program_memory_t *program);
 void cleanup_user_pages(void);
 uint64_t create_user_pml4(void);
 void switch_user_pml4(uint64_t pml4_phys);
@@ -357,10 +373,11 @@ void nvme_pci_callback(uint8_t b, uint8_t d, uint8_t f, uint16_t ven, uint16_t d
 // actual running
 int system_run_elf(char* filename, uint64_t size);
 int system_run_elf_args(char *filename, uint64_t size, int argc, char **argv);
-int system_load_elf_args(char *filename, uint64_t size, int argc, char **argv,
-                         uint64_t *entry, uint64_t *stack, uint64_t *user_argv,
-                         bool *linux_abi, uint64_t *heap_base);
-void system_run_bin(char *filename, int program_size);
+int system_load_elf_args(char *filename, uint64_t size, int argc,
+                         char **argv, uint64_t *entry, uint64_t *stack,
+                         uint64_t *out_user_argv,
+                         bool *out_linux_abi, uint64_t *heap_base,
+                         program_memory_t *program);
 void system_exec(char* path);
 void system_exec_args(char *path, int argc, char **argv);
 

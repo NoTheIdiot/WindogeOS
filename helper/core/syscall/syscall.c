@@ -30,7 +30,6 @@
 
 #define USER_CODE_BASE  0x0000000000400000ULL
 #define USER_STACK_BASE 0x00007FFFF0000000ULL
-#define PAGE_SIZE       4096
 #define USER_ADDRESS_LIMIT 0x0000800000000000ULL
 #define USER_STRING_LIMIT 4096
 #define USER_PATH_LIMIT 256
@@ -297,49 +296,6 @@ static void copy_uname_field(char destination[65], const char *source) {
         i++;
     }
     destination[i] = '\0';
-}
-
-static uint64_t run_flat_binary(char *filename) {
-    if (scheduler_current_pid() != 0) {
-        return (uint64_t)-1;
-    }
-    if (syscall_context_depth >= MAX_SYSCALL_CONTEXTS - 1) {
-        return (uint64_t)-1;
-    }
-
-    uint64_t parent_pages[256];
-    if (!suspend_user_pages(parent_pages)) {
-        return (uint64_t)-1;
-    }
-    launcher_context_t parent = save_launcher_context();
-    system_run_bin(filename, MAX_FLAT_BINARY_SIZE);
-    if (!restore_user_pages(parent_pages)) {
-        return (uint64_t)-1;
-    }
-    restore_launcher_context(parent);
-    return 1;
-}
-
-static uint64_t run_flat_binary_args(char *filename, int argc,
-                                     char **argv) {
-    if (scheduler_current_pid() != 0) {
-        return (uint64_t)-1;
-    }
-    if (syscall_context_depth >= MAX_SYSCALL_CONTEXTS - 1) {
-        return (uint64_t)-1;
-    }
-
-    uint64_t parent_pages[256];
-    if (!suspend_user_pages(parent_pages)) {
-        return (uint64_t)-1;
-    }
-    launcher_context_t parent = save_launcher_context();
-    system_run_bin_args(filename, MAX_FLAT_BINARY_SIZE, argc, argv);
-    if (!restore_user_pages(parent_pages)) {
-        return (uint64_t)-1;
-    }
-    restore_launcher_context(parent);
-    return 1;
 }
 
 static uint64_t run_elf_binary_args(char *filename, int argc, char **argv) {
@@ -956,7 +912,7 @@ uint64_t syscall_handler(syscall_registers_t *regs) {
                 arguments[i] = argument_storage[i];
             }
 
-            return run_flat_binary_args(filename, argc, arguments);
+            return (uint64_t)system_run_elf_args(filename, (uint64_t)32768, argc, arguments);
         }
 
         case EXEC_ELF: {
@@ -1163,7 +1119,7 @@ uint64_t syscall_handler(syscall_registers_t *regs) {
                 ret_val = (uint64_t)-1;
                 break;
             }
-            ret_val = run_flat_binary(filename);
+            ret_val = run_elf_binary(filename);
             break;
         }
 

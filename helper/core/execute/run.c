@@ -31,7 +31,5 @@ void system_exec_args(char *path, int argc, char **argv) {
     if (read_bytes == (int)sizeof(buffer) && buffer[0] == 0x7F &&
         buffer[1] == 'E' && buffer[2] == 'L' && buffer[3] == 'F') {
         system_run_elf_args(path, file_size, argc, argv);
-    } else {
-        system_run_bin_args(path, (int)file_size, argc, argv);
     }
 }

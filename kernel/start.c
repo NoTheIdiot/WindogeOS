@@ -221,6 +221,7 @@ void start_shell(void) {
         system_bash();
     } else {
         while (true) {
+            dogeio_println("Running Shell");
             system_exec("/system/dogeshell.elf");
         }
     }

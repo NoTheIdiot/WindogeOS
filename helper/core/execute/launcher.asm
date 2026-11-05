@@ -12,49 +12,10 @@ extern kernel_program_launcher_rsp
 extern kernel_program_launcher_rflags
 extern syscall_context_depth
 extern syscall_context_gs_bases
-extern system_run_bin_impl
-extern system_run_bin_args_impl
 extern system_run_elf_impl
 extern system_run_elf_args_impl
 
 section .text
-system_run_bin:
-    cmp dword [rel syscall_context_depth], MAX_SYSCALL_CONTEXT_DEPTH
-    jae .context_overflow
-    inc dword [rel syscall_context_depth]
-    pushfq
-    pop rax
-    mov [rel kernel_program_launcher_rsp], rsp
-    mov [rel kernel_program_launcher_rflags], rax
-    sub rsp, 8
-    call system_run_bin_impl
-    add rsp, 8
-    mov qword [rel kernel_program_launcher_rsp], 0
-    mov qword [rel kernel_program_launcher_rflags], 0
-    dec dword [rel syscall_context_depth]
-    ret
-.context_overflow:
-    mov rax, -1
-    ret
-
-system_run_bin_args:
-    cmp dword [rel syscall_context_depth], MAX_SYSCALL_CONTEXT_DEPTH
-    jae .context_overflow
-    inc dword [rel syscall_context_depth]
-    pushfq
-    pop rax
-    mov [rel kernel_program_launcher_rsp], rsp
-    mov [rel kernel_program_launcher_rflags], rax
-    sub rsp, 8
-    call system_run_bin_args_impl
-    add rsp, 8
-    mov qword [rel kernel_program_launcher_rsp], 0
-    mov qword [rel kernel_program_launcher_rflags], 0
-    dec dword [rel syscall_context_depth]
-    ret
-.context_overflow:
-    mov rax, -1
-    ret
 
 system_run_elf:
     cmp dword [rel syscall_context_depth], MAX_SYSCALL_CONTEXT_DEPTH

@@ -17,7 +17,6 @@
 #define PT_LOAD 1
 #define PT_NOTE 4
 #define PF_X 1
-#define PAGE_SIZE 4096ULL
 #define USER_ADDRESS_LIMIT 0x0000800000000000ULL
 #define USER_STACK_VADDR 0x00007FFFFFFFF000ULL
 #define USER_STACK_PAGE_COUNT 8
@@ -25,7 +24,6 @@
 #define USER_STACK_BASE (USER_STACK_VADDR + PAGE_SIZE - USER_STACK_SIZE)
 #define MAX_ELF_FILE_SIZE (16ULL * 1024 * 1024)
 #define MAX_ELF_MEMORY_SIZE (64ULL * 1024 * 1024)
-#define MAX_ELF_PROGRAM_HEADERS 64
 #define USER_ARGUMENT_AREA_SIZE (USER_STACK_SIZE / 2)
 
 typedef struct __attribute__((packed)) {
@@ -137,18 +135,20 @@ static bool elf_uses_linux_abi(char *filename, const elf64_ehdr *ehdr,
 int system_load_elf_args(char *filename, uint64_t size, int argc,
                          char **argv, uint64_t *entry, uint64_t *stack,
                          uint64_t *out_user_argv,
-                         bool *out_linux_abi, uint64_t *heap_base) {
+                         bool *out_linux_abi, uint64_t *heap_base,
+                         program_memory_t *program) {
     if (filename == NULL || filename[0] == '\0' ||
         size < sizeof(elf64_ehdr) || size > MAX_ELF_FILE_SIZE ||
         argc < 0 || argc > 32 || (argc > 0 && argv == NULL) ||
         entry == NULL || stack == NULL || out_user_argv == NULL ||
         out_linux_abi == NULL || heap_base == NULL) {
-        log("sys (elf): invalid name or file size");
+        log("sys (elf): invalid input arguments or file size constraint violated");
         return -1;
     }
+    dogeio_println("Starting Loading Program");
 
     if (!fs_exists(filename)) {
-        log("sys (elf): file does not exist");
+        log("sys (elf): file does not exist or paths are unmapped");
         return -1;
     }
 
@@ -157,14 +157,17 @@ int system_load_elf_args(char *filename, uint64_t size, int argc,
         return -2;
     }
 
+    dogeio_println("Loading File");
     int result = -3;
     elf64_ehdr ehdr;
     int read_bytes = fs_read_raw_at(filename, (uint8_t *)&ehdr, 0, sizeof(ehdr));
     if (read_bytes != (int)sizeof(ehdr)) {
+        log("sys (elf): failed to read full ELF header");
         result = -4;
         goto failure;
     }
 
+    dogeio_println("Checking Headers");
     if (ehdr.e_ident[0] != 0x7F || ehdr.e_ident[1] != 'E' ||
         ehdr.e_ident[2] != 'L' || ehdr.e_ident[3] != 'F' ||
         ehdr.e_ident[4] != ELF_CLASS_64 ||
@@ -176,12 +179,14 @@ int system_load_elf_args(char *filename, uint64_t size, int argc,
         ehdr.e_ehsize != sizeof(elf64_ehdr) ||
         ehdr.e_phentsize != sizeof(elf64_phdr) ||
         ehdr.e_phnum == 0 || ehdr.e_phnum > MAX_ELF_PROGRAM_HEADERS) {
+        log("sys (elf): ELF identity, machine target, type, or header count is invalid");
         result = -5;
         goto failure;
     }
-
+    
     uint64_t phdr_bytes = (uint64_t)ehdr.e_phnum * ehdr.e_phentsize;
     if (ehdr.e_phoff > size || phdr_bytes > size - ehdr.e_phoff) {
+        log("sys (elf): program header table offset out of file boundaries");
         result = -5;
         goto failure;
     }
@@ -192,11 +197,13 @@ int system_load_elf_args(char *filename, uint64_t size, int argc,
         read_bytes = fs_read_raw_at(filename, (uint8_t *)&phdrs[i],
                                     phdr_offset, sizeof(elf64_phdr));
         if (read_bytes != (int)sizeof(elf64_phdr)) {
+            log("sys (elf): failed to read program header entry");
             result = -5;
             goto failure;
         }
     }
 
+    dogeio_println("Mapping Pages");
     uint64_t total_pages = 0;
     uint64_t highest_load_address = 0;
     bool entry_is_executable = false;
@@ -213,6 +220,7 @@ int system_load_elf_args(char *filename, uint64_t size, int argc,
             phdr->p_vaddr < PAGE_SIZE ||
             phdr->p_vaddr >= USER_STACK_BASE ||
             phdr->p_memsz > USER_STACK_BASE - phdr->p_vaddr) {
+            log("sys (elf): segment size constraints or memory boundary checks failed");
             result = -5;
             goto failure;
         }
@@ -221,6 +229,7 @@ int system_load_elf_args(char *filename, uint64_t size, int argc,
             ((phdr->p_align & (phdr->p_align - 1)) != 0 ||
              (phdr->p_vaddr & (phdr->p_align - 1)) !=
              (phdr->p_offset & (phdr->p_align - 1)))) {
+            log("sys (elf): segment alignment criteria or offset alignment failed");
             result = -5;
             goto failure;
         }
@@ -231,9 +240,20 @@ int system_load_elf_args(char *filename, uint64_t size, int argc,
         }
         uint64_t page_start = align_down_page(phdr->p_vaddr);
         uint64_t page_end = align_up_page(seg_end);
-        uint64_t segment_pages = (page_end - page_start) / PAGE_SIZE;
 
+        if (program->region_count < MAX_ELF_PROGRAM_HEADERS) {
+            uint64_t region = program->region_count++;
+            program->regions[region].start = page_start;
+            program->regions[region].end = page_end;
+        } else {
+            log("sys (elf): maximum region count limit exceeded");
+            result = -5;
+            goto failure;
+        }
+
+        uint64_t segment_pages = (page_end - page_start) / PAGE_SIZE;
         if (segment_pages > MAX_ELF_MEMORY_SIZE / PAGE_SIZE - total_pages) {
+            log("sys (elf): binary total memory allocation size limit exceeded");
             result = -5;
             goto failure;
         }
@@ -253,6 +273,7 @@ int system_load_elf_args(char *filename, uint64_t size, int argc,
             uint64_t other_start = align_down_page(other->p_vaddr);
             uint64_t other_end = align_up_page(other->p_vaddr + other->p_memsz);
             if (page_start < other_end && other_start < page_end) {
+                log("sys (elf): detected overlapping memory segments in program table");
                 result = -5;
                 goto failure;
             }
@@ -262,6 +283,7 @@ int system_load_elf_args(char *filename, uint64_t size, int argc,
              page_vaddr += PAGE_SIZE) {
             uint64_t page_phys = pmm_alloc_zeroed_page();
             if (page_phys == 0) {
+                log("sys (elf): physical memory manager failed to allocate zeroed page");
                 result = -3;
                 goto failure;
             }
@@ -282,6 +304,7 @@ int system_load_elf_args(char *filename, uint64_t size, int argc,
                     file_offset,
                     copy_size);
                 if (read_bytes < 0 || (uint64_t)read_bytes != copy_size) {
+                    log("sys (elf): filesystem read mismatch while copying payload to memory");
                     result = -4;
                     goto failure;
                 }
@@ -289,8 +312,18 @@ int system_load_elf_args(char *filename, uint64_t size, int argc,
         }
     }
 
-    if (total_pages == 0 || !entry_is_executable ||
-        ehdr.e_entry >= USER_ADDRESS_LIMIT) {
+    if (total_pages == 0) {
+        log("sys (elf): parsing complete, but no allocation regions found");
+        result = -5;
+        goto failure;
+    }
+    if (!entry_is_executable) {
+        log("sys (elf): execution flag error; entry point sits outside executable segment");
+        result = -5;
+        goto failure;
+    }
+    if (ehdr.e_entry >= USER_ADDRESS_LIMIT) {
+        log("sys (elf): entry point address is beyond safe user-space boundaries");
         result = -5;
         goto failure;
     }
@@ -299,6 +332,7 @@ int system_load_elf_args(char *filename, uint64_t size, int argc,
     for (uint64_t i = 0; i < USER_STACK_PAGE_COUNT; i++) {
         uint64_t page_phys = pmm_alloc_zeroed_page();
         if (page_phys == 0) {
+            log("sys (elf): physical page allocation error for user stack framework");
             result = -3;
             goto failure;
         }
@@ -314,6 +348,7 @@ int system_load_elf_args(char *filename, uint64_t size, int argc,
     if (prepare_user_arguments(stack_memory, USER_STACK_BASE,
                                USER_ARGUMENT_AREA_SIZE, argc, argv,
                                &user_argv) != 0) {
+        log("sys (elf): environment stack argument initialization failed");
         result = -5;
         goto failure;
     }
@@ -324,12 +359,17 @@ int system_load_elf_args(char *filename, uint64_t size, int argc,
     *out_user_argv = user_argv;
     *out_linux_abi = linux_abi;
     *heap_base = align_up_page(highest_load_address);
+    
+    dogeio_println("Program Setup Completed Successfully");
     return 0;
 
 failure:
+    dogeio_println("Something went wrong during ELF load execution workflow");
     return result;
 }
 
+
+// yep, this one.
 int system_run_elf_args_impl(char *filename, uint64_t size, int argc,
                              char **argv) {
     uint64_t entry;
@@ -337,26 +377,45 @@ int system_run_elf_args_impl(char *filename, uint64_t size, int argc,
     uint64_t user_argv;
     uint64_t heap_base;
     bool linux_abi;
-    
-    int result = system_load_elf_args(filename, size, argc, argv,
-                                      &entry, &stack, &user_argv,
-                                      &linux_abi, &heap_base);
+
+    program_memory_t program;
+    memset(&program, 0, sizeof(program_memory_t));
+
+    int result = system_load_elf_args(
+        filename,
+        size,
+        argc,
+        argv,
+        &entry,
+        &stack,
+        &user_argv,
+        &linux_abi,
+        &heap_base,
+        &program);
+
     if (result != 0) {
-        cleanup_user_pages();
+        cleanup_program_pages(&program);
         return result;
     }
-    
+
     syscall_set_linux_abi(linux_abi);
+
     if (linux_abi) {
         linux_syscall_set_heap_base(heap_base);
     }
-    
-    to_userland_ring3_args(entry, stack, (uint64_t)argc, user_argv);
-    
+
+    to_userland_ring3_args(
+        entry,
+        stack,
+        (uint64_t)argc,
+        user_argv);
+
     syscall_set_linux_abi(false);
-    cleanup_user_pages(); 
+    cleanup_program_pages(&program);
+
     return 0;
 }
+// yep, this one.
 
 
 int system_run_elf_impl(char *filename, uint64_t size) {
