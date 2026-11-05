@@ -289,7 +289,7 @@ static inline uint64_t read_mouse(int32_t* delta_x, int32_t* delta_y, uint8_t* b
     return syscall_3(READ_MOUSE, (uint64_t)delta_x, (uint64_t)delta_y, (uint64_t)buttons);
 }
 
-void exit(int status) {
+void exit(uint64_t status) {
     __asm__ volatile (
         "syscall"
         :

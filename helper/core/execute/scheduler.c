@@ -308,24 +308,41 @@ void scheduler_set_shell_workspace(uint32_t workspace_id) {
 }
 
 void scheduler_exit_current(uint64_t status) {
-    (void)status;
-    if (current_task == 0 || !tasks[current_task].active) {
-        for (;;) {
-            asm volatile ("cli; hlt");
-        }
+    if (current_task == 0) {
+        syscall_exit_to_launcher(status);
+        while(1);
     }
+
     size_t exiting = current_task;
     scheduler_task_t *task = &tasks[exiting];
+    
     if (syscall_linux_abi_active()) {
         linux_syscall_context_save(&task->linux_context);
     }
+    
     scheduler_save_fs_context(task);
     sys_workspace_save(task->workspace_id);
     cleanup_program_pages(&task->program);
+    
     uint64_t pml4 = task->cr3;
     task->active = 0;
+    
     size_t next = scheduler_find_next(exiting);
-    scheduler_activate(next);
+    
+    uint64_t target_frame = (uint64_t)tasks[next].frame;
+    uint64_t target_cr3 = tasks[next].cr3;
+
     destroy_user_pml4(pml4);
-    isr_resume_frame(tasks[next].frame);
+
+    current_task = next;
+    switch_user_pml4(target_cr3);
+    
+    __asm__ volatile (
+        "call isr_resume_frame"
+        :
+        : "D"(target_frame)
+        : "memory"
+    );
+
+    while(1);
 }

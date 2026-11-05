@@ -424,14 +424,10 @@ uint64_t syscall_handler(syscall_registers_t *regs) {
 
     switch (sc_num) {
         case SYS_EXIT: {
-            if (scheduler_current_pid() != 0) {
-                scheduler_exit_current(regs->rdi);
-            }
-            if (kernel_program_launcher_rsp == 0) {
-                return (uint64_t)-1;
-            }
-            cleanup_user_pages();
-            syscall_exit_to_launcher(regs->rdi);
+            scheduler_exit_current(regs->rdi);
+            dogeio_println("Ahh shit, it didnt return.");
+            log("Ahh shit, it didnt return.");
+            while(1);
         }
 
         case READ_FILE: {
