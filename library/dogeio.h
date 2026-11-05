@@ -291,12 +291,10 @@ static inline uint64_t read_mouse(int32_t* delta_x, int32_t* delta_y, uint8_t* b
 
 void exit(int status) {
     __asm__ volatile (
-        "mov $60, %%rax\n"
-        "mov %0, %%rdi\n"
-        "syscall\n"
+        "syscall"
         :
-        : "r"(status)
-        : "rax", "rdi"
+        : "a"(60), "D"(status)
+        : "rcx", "r11", "memory"
     );
     while(1) {
         __asm__ volatile("ud2");
