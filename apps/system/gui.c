@@ -34,8 +34,10 @@ void _start(void) {
         uint16_t key = (uint16_t)get_key_delay(1);
         if (key == 0x18) {
             set_text_mode();
-            clear();
-            exit((uint64_t)0);
+            println("Exiting");
+            exit((uint64_t)16);
+            println("Wait it's not exiting");
+            break;
         }
 
         int32_t dx = 0, dy = 0;
@@ -106,5 +108,5 @@ void _start(void) {
 
     set_text_mode();
     clear();
-    exit(0);
+    exit((uint64_t)16);
 }

@@ -51,7 +51,7 @@ static uint8_t syscall_stack[MAX_SYSCALL_CONTEXTS][SYSCALL_STACK_SIZE]
     __attribute__((aligned(16)));
 static per_cpu_data_t syscall_cpu_data[MAX_SYSCALL_CONTEXTS];
 uint64_t syscall_context_gs_bases[MAX_SYSCALL_CONTEXTS];
-uint32_t syscall_context_depth;
+extern uint32_t syscall_context_depth;
 uint64_t kernel_program_launcher_rsp = 0;
 uint64_t kernel_program_launcher_rflags = 0;
 static bool linux_syscall_abi_active;

@@ -24,6 +24,7 @@ typedef struct {
     char cwd[260];
     interrupt_frame_t *frame;
     linux_task_context_t linux_context;
+    program_memory_t program;
     uint8_t fpu_state[512] __attribute__((aligned(16)));
     uint8_t kernel_stack[TASK_KERNEL_STACK_SIZE] __attribute__((aligned(16)));
 } scheduler_task_t;
@@ -204,10 +205,10 @@ int scheduler_spawn_elf(const char *path, int argc, char **argv,
     uint64_t user_argv;
     uint64_t heap_base;
     bool linux_abi;
-    program_memory_t program;
+    
     int result = system_load_elf_args((char *)path, file_size, argc, argv,
                                       &entry, &user_stack, &user_argv,
-                                      &linux_abi, &heap_base, &program);
+                                      &linux_abi, &heap_base, &task->program);
     switch_user_pml4(parent_cr3);
     if (result != 0) {
         destroy_user_pml4(pml4);
@@ -279,6 +280,7 @@ int scheduler_kill(uint32_t pid) {
         if (tasks[i].active && tasks[i].pid == pid) {
             uint64_t pml4 = tasks[i].cr3;
             tasks[i].active = 0;
+            cleanup_program_pages(&tasks[i].program);
             destroy_user_pml4(pml4);
             scheduler_restore_interrupts(flags);
             return 0;
@@ -309,11 +311,9 @@ void scheduler_exit_current(uint64_t status) {
     (void)status;
     if (current_task == 0 || !tasks[current_task].active) {
         for (;;) {
-            cli();
-            halt();
+            asm volatile ("cli; hlt");
         }
     }
-
     size_t exiting = current_task;
     scheduler_task_t *task = &tasks[exiting];
     if (syscall_linux_abi_active()) {
@@ -321,6 +321,7 @@ void scheduler_exit_current(uint64_t status) {
     }
     scheduler_save_fs_context(task);
     sys_workspace_save(task->workspace_id);
+    cleanup_program_pages(&task->program);
     uint64_t pml4 = task->cr3;
     task->active = 0;
     size_t next = scheduler_find_next(exiting);

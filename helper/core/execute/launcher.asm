@@ -1,88 +1,94 @@
 bits 64
 
-%define MAX_SYSCALL_CONTEXT_DEPTH 5
+%define MAX_SYSCALL_CONTEXT_DEPTH 64
 
-global system_run_bin
-global system_run_bin_args
 global system_run_elf
 global system_run_elf_args
 global syscall_exit_to_launcher
 
-extern kernel_program_launcher_rsp
-extern kernel_program_launcher_rflags
 extern syscall_context_depth
 extern syscall_context_gs_bases
 extern system_run_elf_impl
 extern system_run_elf_args_impl
+extern system_elf_post_cleanup
+
+section .data
+kernel_parent_rsps:    times 64 dq 0
+kernel_parent_rflags:  times 64 dq 0
 
 section .text
 
 system_run_elf:
-    cmp dword [rel syscall_context_depth], MAX_SYSCALL_CONTEXT_DEPTH
-    jae .context_overflow
-    inc dword [rel syscall_context_depth]
+    mov ecx, [rel syscall_context_depth]
+    cmp ecx, MAX_SYSCALL_CONTEXT_DEPTH
+    jae .elf_overflow
+
     pushfq
     pop rax
-    mov [rel kernel_program_launcher_rsp], rsp
-    mov [rel kernel_program_launcher_rflags], rax
+    
     sub rsp, 8
+    lea rdx, [rel kernel_parent_rsps]
+    mov [rdx + rcx * 8], rsp
+    
+    lea rdx, [rel kernel_parent_rflags]
+    mov [rdx + rcx * 8], rax
+
+    inc dword [rel syscall_context_depth]
     call system_run_elf_impl
+    
+.elf_return_track:
     add rsp, 8
-    mov qword [rel kernel_program_launcher_rsp], 0
-    mov qword [rel kernel_program_launcher_rflags], 0
-    dec dword [rel syscall_context_depth]
+    call system_elf_post_cleanup
+    xor rax, rax
     ret
-.context_overflow:
+
+.elf_overflow:
     mov rax, -1
     ret
 
 system_run_elf_args:
-    cmp dword [rel syscall_context_depth], MAX_SYSCALL_CONTEXT_DEPTH
-    jae .context_overflow
-    inc dword [rel syscall_context_depth]
+    mov ecx, [rel syscall_context_depth]
+    cmp ecx, MAX_SYSCALL_CONTEXT_DEPTH
+    jae .args_overflow
+
     pushfq
     pop rax
-    mov [rel kernel_program_launcher_rsp], rsp
-    mov [rel kernel_program_launcher_rflags], rax
+    
     sub rsp, 8
-    ; ERROR FUCKING HERE
-    ;        ▼
-    call system_run_elf_args_impl ; < ERROR FUCKING HERE
-    ;        ▲
-    ; ERROR FUCKING HERE
+    lea rdx, [rel kernel_parent_rsps]
+    mov [rdx + rcx * 8], rsp
+    
+    lea rdx, [rel kernel_parent_rflags]
+    mov [rdx + rcx * 8], rax
+
+    inc dword [rel syscall_context_depth]
+    call system_run_elf_args_impl
+    
+.args_return_track:
     add rsp, 8
-    mov qword [rel kernel_program_launcher_rsp], 0
-    mov qword [rel kernel_program_launcher_rflags], 0
-    dec dword [rel syscall_context_depth]
+    call system_elf_post_cleanup
+    xor rax, rax
     ret
-.context_overflow:
+
+.args_overflow:
     mov rax, -1
     ret
 
 syscall_exit_to_launcher:
-    mov r11, rdi
-    mov r8, [rel kernel_program_launcher_rsp]
-    mov r9, [rel kernel_program_launcher_rflags]
-    mov qword [rel kernel_program_launcher_rsp], 0
-    mov qword [rel kernel_program_launcher_rflags], 0
-
     mov ecx, [rel syscall_context_depth]
     dec ecx
-    lea rdx, [rel syscall_context_gs_bases]
-    mov r10, [rdx + rcx * 8]
+    mov [rel syscall_context_depth], ecx
 
-    mov ecx, 0xC0000101
-    mov eax, r10d
-    mov rdx, r10
-    shr rdx, 32
-    wrmsr
+    lea rdx, [rel kernel_parent_rsps]
+    mov r8, [rdx + rcx * 8]
+    mov qword [rdx + rcx * 8], 0
 
-    mov ecx, 0xC0000102
-    xor eax, eax
-    xor edx, edx
-    wrmsr
+    lea rdx, [rel kernel_parent_rflags]
+    mov r9, [rdx + rcx * 8]
+    mov qword [rdx + rcx * 8], 0
 
-    mov rax, r11
+    mov rdi, rcx 
+
     mov rsp, r8
     push r9
     popfq

@@ -20,11 +20,16 @@
 #define USER_ADDRESS_LIMIT 0x0000800000000000ULL
 #define USER_STACK_VADDR 0x00007FFFFFFFF000ULL
 #define USER_STACK_PAGE_COUNT 8
+#define MAX_SYSCALL_CONTEXT_DEPTH 64
 #define USER_STACK_SIZE (PAGE_SIZE * USER_STACK_PAGE_COUNT)
 #define USER_STACK_BASE (USER_STACK_VADDR + PAGE_SIZE - USER_STACK_SIZE)
 #define MAX_ELF_FILE_SIZE (16ULL * 1024 * 1024)
 #define MAX_ELF_MEMORY_SIZE (64ULL * 1024 * 1024)
 #define USER_ARGUMENT_AREA_SIZE (USER_STACK_SIZE / 2)
+
+uint32_t syscall_context_depth = 0;
+
+static program_memory_t active_programs[MAX_SYSCALL_CONTEXT_DEPTH];
 
 typedef struct __attribute__((packed)) {
     uint8_t  e_ident[16];
@@ -137,14 +142,25 @@ int system_load_elf_args(char *filename, uint64_t size, int argc,
                          uint64_t *out_user_argv,
                          bool *out_linux_abi, uint64_t *heap_base,
                          program_memory_t *program) {
+    
     if (filename == NULL || filename[0] == '\0' ||
         size < sizeof(elf64_ehdr) || size > MAX_ELF_FILE_SIZE ||
-        argc < 0 || argc > 32 || (argc > 0 && argv == NULL) ||
         entry == NULL || stack == NULL || out_user_argv == NULL ||
         out_linux_abi == NULL || heap_base == NULL) {
         log("sys (elf): invalid input arguments or file size constraint violated");
         return -1;
     }
+
+    if (argc < 0 || argc > 32) {
+        log("sys (elf): argc bounds validation failed");
+        return -1;
+    }
+
+    if (argc > 0 && argv == NULL) {
+        log("sys (elf): positive argc provided but argv array pointer is NULL");
+        return -1;
+    }
+
     dogeio_println("Starting Loading Program");
 
     if (!fs_exists(filename)) {
@@ -370,16 +386,27 @@ failure:
 
 
 // yep, this one.
-int system_run_elf_args_impl(char *filename, uint64_t size, int argc,
-                             char **argv) {
+int system_run_elf_args_impl(char *filename, uint64_t size, int argc, char **argv) {
+    uint32_t current_slot = syscall_context_depth - 1;
+
+    if (current_slot >= MAX_SYSCALL_CONTEXT_DEPTH) {
+        log("sys (elf): absolute maximum process stack depth exceeded");
+        return -1;
+    }
+
+    if (argc < 0 || argc > 32 || argv == NULL) {
+        log("sys (elf): bullshit arguments, defaulting.");
+        argc = 0;
+        argv = NULL;
+    }
+
     uint64_t entry;
     uint64_t stack;
     uint64_t user_argv;
     uint64_t heap_base;
     bool linux_abi;
 
-    program_memory_t program;
-    memset(&program, 0, sizeof(program_memory_t));
+    memset(&active_programs[current_slot], 0, sizeof(program_memory_t));
 
     int result = system_load_elf_args(
         filename,
@@ -391,10 +418,11 @@ int system_run_elf_args_impl(char *filename, uint64_t size, int argc,
         &user_argv,
         &linux_abi,
         &heap_base,
-        &program);
+        &active_programs[current_slot]
+    );
 
     if (result != 0) {
-        cleanup_program_pages(&program);
+        cleanup_program_pages(&active_programs[current_slot]);
         return result;
     }
 
@@ -408,12 +436,19 @@ int system_run_elf_args_impl(char *filename, uint64_t size, int argc,
         entry,
         stack,
         (uint64_t)argc,
-        user_argv);
+        user_argv
+    );
 
+    while(1);
+}
+
+void system_elf_post_cleanup(uint32_t finished_slot) {
     syscall_set_linux_abi(false);
-    cleanup_program_pages(&program);
-
-    return 0;
+    
+    if (finished_slot < MAX_SYSCALL_CONTEXT_DEPTH) {
+        cleanup_program_pages(&active_programs[finished_slot]);
+        memset(&active_programs[finished_slot], 0, sizeof(program_memory_t));
+    }
 }
 // yep, this one.
 

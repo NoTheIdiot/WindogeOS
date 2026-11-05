@@ -21,6 +21,7 @@ void _start(void) {
         }
     }
     enable_bar();
-    println("");
+    println("Exiting");
     exit(0);
+    println("Wait What");
 }
