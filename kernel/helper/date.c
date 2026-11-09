@@ -1,0 +1,118 @@
+#include <string.h>
+#include <system.h>
+
+struct {
+    uint8_t second;
+    uint8_t minute;
+    uint8_t hour;
+    uint8_t day;
+    uint8_t month;
+    uint32_t year;
+} time;
+
+static inline uint8_t read_rtc(uint8_t reg) {
+    outb(0x70, reg);
+    return inb(0x71);
+}
+
+void init_rtc_time(void) {
+    __asm__ volatile("cli");
+    
+    outb(0x70, 0x8A);
+    uint8_t prev = inb(0x71);
+    outb(0x70, 0x8A);
+    outb(0x71, (uint8_t)((prev & 0xF0) | 0x0F)); 
+
+    __asm__ volatile("sti");
+}
+
+void update_time(void) {
+    while (read_rtc(0x0A) & 0x80);
+
+    time.second = read_rtc(0x00);
+    time.minute = read_rtc(0x02);
+    time.hour   = read_rtc(0x04);
+    time.day    = read_rtc(0x07);
+    time.month  = read_rtc(0x08);
+    time.year   = read_rtc(0x09);
+
+    uint8_t status_b = read_rtc(0x0B);
+
+    if (!(status_b & 0x04)) {
+        time.second = (uint8_t)((time.second & 0x0F) + ((time.second / 16) * 10));
+        time.minute = (uint8_t)((time.minute & 0x0F) + ((time.minute / 16) * 10));
+        time.hour   = (uint8_t)(((time.hour & 0x0F) + (((time.hour & 0x70) / 16) * 10)) | (time.hour & 0x80));
+        time.day    = (uint8_t)((time.day & 0x0F) + ((time.day / 16) * 10));
+        time.month  = (uint8_t)((time.month & 0x0F) + ((time.month / 16) * 10));
+        time.year   = (uint32_t)((time.year & 0x0F) + ((time.year / 16) * 10));
+    }
+
+    time.year += 2000;
+
+    if (!(status_b & 0x02)) {
+        uint8_t is_pm = time.hour & 0x80;
+        time.hour &= 0x7F;
+        if (is_pm && time.hour != 12) {
+            time.hour += 12;
+        } else if (!is_pm && time.hour == 12) {
+            time.hour = 0;
+        }
+    }
+}
+
+uint64_t get_epoch_seconds(void) {
+    update_time();
+
+    uint64_t seconds = (uint64_t)time.second;
+    seconds += (uint64_t)time.minute * 60ULL;
+    seconds += (uint64_t)time.hour * 3600ULL;
+    seconds += ((uint64_t)time.day - 1ULL) * 86400ULL;
+    seconds += ((uint64_t)time.month - 1ULL) * 2629800ULL;
+    seconds += ((uint64_t)time.year - 1970ULL) * 31557600ULL;
+    return seconds;
+}
+
+char* get_time(void) {
+    update_time();
+
+    static char raw_buffer[16];
+    int i = 0;
+
+    raw_buffer[i++] = (char)((time.hour / 10) + '0');
+    raw_buffer[i++] = (char)((time.hour % 10) + '0');
+    raw_buffer[i++] = ':';
+
+    raw_buffer[i++] = (char)((time.minute / 10) + '0');
+    raw_buffer[i++] = (char)((time.minute % 10) + '0');
+    raw_buffer[i++] = ':';
+
+    raw_buffer[i++] = (char)((time.second / 10) + '0');
+    raw_buffer[i++] = (char)((time.second % 10) + '0');
+    raw_buffer[i++] = '\0';
+
+    return raw_buffer;
+}
+
+char* get_date(void) {
+    update_time();
+
+    static char date_buffer[16];
+    int i = 0;
+
+    date_buffer[i++] = (char)((time.day / 10) + '0');
+    date_buffer[i++] = (char)((time.day % 10) + '0');
+    date_buffer[i++] = '/';
+
+    date_buffer[i++] = (char)((time.month / 10) + '0');
+    date_buffer[i++] = (char)((time.month % 10) + '0');
+    date_buffer[i++] = '/';
+
+    uint32_t full_year = time.year;
+    date_buffer[i++] = (char)((full_year / 1000) + '0');
+    date_buffer[i++] = (char)(((full_year % 1000) / 100) + '0');
+    date_buffer[i++] = (char)(((full_year % 100) / 10) + '0');
+    date_buffer[i++] = (char)((full_year % 10) + '0');
+    date_buffer[i++] = '\0';
+
+    return date_buffer;
+}

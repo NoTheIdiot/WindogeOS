@@ -115,7 +115,6 @@ def analyze_exceptions(filename="qemu.log"):
                 sentence = f"triggered hardware vector fault execution index code 0x{e_val:X}."
 
         elif match_switch:
-            # Traps context switch debug strings if your OS prints them
             sentence = f"kernel logging thread context transition state or descriptor pointer alteration near reference 0x{match_switch.group(1)}."
             print(f"Line {idx + 1} | Scheduler Tracking Event")
             print(f"  -> {clean_line}")
