@@ -130,6 +130,24 @@ struct __attribute__((packed)) ext2_superblock {
     uint16_t s_max_mnt_count;
     uint16_t s_magic;
     uint16_t s_state;
+    uint16_t s_errors;
+    uint16_t s_minor_rev_level;
+    uint32_t s_lastcheck;
+    uint32_t s_checkinterval;
+    uint32_t s_creator_os;
+    uint32_t s_rev_level;         // <-- Added (Required for revision checks)
+    uint16_t s_def_resuid;
+    uint16_t s_def_resgid;
+    uint32_t s_first_ino;
+    uint16_t s_inode_size;        // <-- Added (Critical for modern 256-byte inodes)
+    uint16_t s_block_group_nr;
+    uint32_t s_feature_compat;
+    uint32_t s_feature_incompat;
+    uint32_t s_feature_ro_compat;
+    uint8_t  s_uuid[16];
+    char     s_volume_name[16];
+    char     s_last_mounted[64];
+    uint32_t s_algorithm_usage_bitmap;
 };
 
 struct __attribute__((packed)) ext2_bgd {
@@ -169,7 +187,7 @@ struct __attribute__((packed)) ext2_dir_entry {
     uint16_t rec_len;
     uint8_t  name_len;
     uint8_t  file_type;
-    char     name[];
+    char     name[1];
 };
 
 int ahci_exec_cmd(uint32_t port_num, uint64_t lba, uint32_t count, uint8_t write, uintptr_t buf_phys);
