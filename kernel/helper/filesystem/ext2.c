@@ -187,7 +187,7 @@ static uint32_t ext2_alloc_inode(void)
             ata_write_sector(g_ext2_drive, PARTITION_START_LBA + 2, sb_buf);
             ata_write_sector(g_ext2_drive, PARTITION_START_LBA + 3, sb_buf + 512);
 
-            // Read BGD
+            // read bgd
             uint32_t bgd_block = (g_block_size == 1024) ? 2 : 1;
             uint8_t bgd_buf[4096];
             ext2_read_blocks(bgd_block, 1, bgd_buf);
@@ -283,6 +283,57 @@ static uint32_t ext2_alloc_block(void)
         }
     }
     return 0;
+}
+
+// robust multi-block file reader supporting direct and singly indirect blocks
+int ext2_read_file(struct ext2_inode *inode, uint8_t *buffer, uint32_t max_size) {
+    uint32_t file_size = inode->i_size;
+    if (file_size > max_size) {
+        file_size = max_size;
+    }
+
+    uint32_t bytes_read = 0;
+    uint32_t block_size = g_block_size;
+    uint32_t pointers_per_block = block_size / sizeof(uint32_t);
+
+    for (uint32_t i = 0; bytes_read < file_size; i++) {
+        uint32_t block_num = 0;
+
+        if (i < 12) {
+            block_num = inode->i_block[i];
+        } else if (i < 12 + pointers_per_block) {
+            // handle singly indirect block
+            uint32_t indirect_block_idx = inode->i_block[12];
+            if (indirect_block_idx == 0) break;
+
+            static uint8_t indirect_buf[4096];
+            if (ext2_read_blocks(indirect_block_idx, 1, indirect_buf) != 0) {
+                break;
+            }
+            uint32_t *pointers = (uint32_t *)indirect_buf;
+            block_num = pointers[i - 12];
+        } else {
+            // doubly/triply indirect blocks can be added here if files exceed indirect range
+            break;
+        }
+
+        if (block_num == 0) {
+            // sparse block or end of file
+            memset(buffer + bytes_read, 0, block_size);
+        } else {
+            static uint8_t temp_block_buf[4096];
+            if (ext2_read_blocks(block_num, 1, temp_block_buf) != 0) {
+                return -1;
+            }
+            uint32_t chunk = file_size - bytes_read;
+            if (chunk > block_size) {
+                chunk = block_size;
+            }
+            memcpy(buffer + bytes_read, temp_block_buf, chunk);
+        }
+        bytes_read += block_size;
+    }
+    return (int)file_size;
 }
 
 int ext2_create_file(const char *filename, uint16_t mode) {
