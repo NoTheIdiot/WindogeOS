@@ -234,4 +234,8 @@ void uhci_keyboard_interrupt_handler(void);
 // apic
 void apic_eoi(void);
 
+// power state functions
+void reboot(void);
+void shutdown(void);
+
 #endif

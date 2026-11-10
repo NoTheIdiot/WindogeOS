@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <system.h>
 #include <bool.h>
 #include <syscalls.h>
 
@@ -90,6 +91,16 @@ int execute(int argc, char** argv) {
         for (int i = 0; i < count; i++) {
             println(files[i].name);
         }
+        return 0;
+    }
+
+    if (strcmp(argv[0], "reboot") == 0) {
+        reboot();
+        return 0;
+    }
+
+    if (strcmp(argv[0], "shutdown") == 0) {
+        shutdown();
         return 0;
     }
 

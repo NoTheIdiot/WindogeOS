@@ -113,10 +113,6 @@ void windoge_os(void) {
         fs_read("THING", buffer, 16);
         println(buffer);
     }
-    println("[\033[96mDoge\033[0m]    Testing keyboard");
-    char buffer[16];
-    input("> ", buffer);
-    println(buffer);
     
     println("\n[\033[96mDoge\033[0m]    Programs");
     if (!fs_exists("test")) {
@@ -126,7 +122,8 @@ void windoge_os(void) {
         println("[\033[32mWow\033[0m]     WHAT IT WORKS???");
     }
 
-    println("\n\033[96mWindogeOS Booted!\033[0m");
+    clear();
+    println("\033[96mWindogeOS Booted!\033[0m");
     println("\033[96mThere is literally nothing else mate... other than a \ntesting shell (like kdb)\033[0m");
     backup_shell();
     halt();
