@@ -121,7 +121,7 @@ void windoge_os(void) {
         run_elf("test", 4096);
         println("[\033[32mWow\033[0m]     WHAT IT WORKS???");
     }
-
+    halt();
     clear();
     println("\033[96mWindogeOS Booted!\033[0m");
     println("\033[96mThere is literally nothing else mate... other than a \ntesting shell (like kdb)\033[0m");

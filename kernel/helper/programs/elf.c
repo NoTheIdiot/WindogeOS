@@ -100,24 +100,33 @@ int run_elf(char *filename, uint64_t size)
     print(" 0x");
     uint64_to_str(ehdr.e_ident[3], hex_buf); println(hex_buf);
 
+    sprintln("[ELF] checking if the headers are empty");
+    uint8_t buffer[4];
+    int read = fs_read_raw(filename, buffer, 4);
+    if (read <= 0) {
+        sprintln("[ELF] WAIT FILE IS EMPTY??!?!????");
+    } else {
+        sprintln("[ELF] file aint empty");
+    }
+
     sprintln("[ELF] Checking ELF magic and header fields one by one...");
 
-    if (ehdr.e_ident[0] != 0x7F) {
+    if (buffer[0] != 0x7F) {
         sprintln("[ELF] FAIL: e_ident[0] != 0x7F");
         return -3;
     }
 
-    if (ehdr.e_ident[1] != 'E') {
+    if (buffer[1] != 'E') {
         sprintln("[ELF] FAIL: e_ident[1] != 'E'");
         return -3;
     }
 
-    if (ehdr.e_ident[2] != 'L') {
+    if (buffer[2] != 'L') {
         sprintln("[ELF] FAIL: e_ident[2] != 'L'");
         return -3;
     }
 
-    if (ehdr.e_ident[3] != 'F') {
+    if (buffer[3] != 'F') {
         sprintln("[ELF] FAIL: e_ident[3] != 'F'");
         return -3;
     }
