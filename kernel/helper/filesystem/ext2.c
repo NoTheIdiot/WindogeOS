@@ -16,21 +16,30 @@ static uint32_t g_inodes_count = 0;
 static uint32_t g_blocks_count = 0;
 static uint8_t g_ext2_drive = 0;
 
-// Static scratch buffers to prevent stack exhaustion and page faults
+// static scratch buffers to prevent stack exhaustion and page faults
 static uint8_t g_scratch_block_1[4096];
 static uint8_t g_scratch_block_2[4096];
 static uint8_t g_scratch_block_3[4096];
 
-static int ext2_read_blocks(uint32_t block_num, uint32_t count, uint8_t *buf) {
+static int ext2_read_blocks(uint32_t block_num, uint32_t count, uint8_t *buf)
+{
     uint32_t sectors_per_block = g_block_size / 512;
-    uint64_t lba = PARTITION_START_LBA + ((uint64_t)block_num * sectors_per_block);
-    uint32_t total_sectors = count * sectors_per_block;
-    
-    for (uint32_t i = 0; i < total_sectors; i++) {
-        if (ata_read_sector(g_ext2_drive, lba + i, buf + (i * 512)) != 0) {
+
+    /* EXT2 block 0 starts at partition start */
+    uint64_t lba =
+        PARTITION_START_LBA +
+        ((uint64_t)block_num * sectors_per_block);
+
+    for (uint32_t i = 0; i < count * sectors_per_block; i++) {
+        if (ata_read_sector(
+                g_ext2_drive,
+                lba + i,
+                buf + (i * 512)) != 0)
+        {
             return -1;
         }
     }
+
     return 0;
 }
 
@@ -84,75 +93,94 @@ static void ext2_reset_cache_state(void) {
     g_blocks_count = 0;
 }
 
-int ext2_mount(uint8_t drive) {
+int ext2_mount(uint8_t drive)
+{
     ext2_reset_cache_state();
     g_ext2_drive = drive;
+
     uint8_t sb_buf[1024];
 
-    uint64_t sb_lba_1 = PARTITION_START_LBA + 2;
-    uint64_t sb_lba_2 = PARTITION_START_LBA + 3;
+    if (ata_read_sector(drive, PARTITION_START_LBA + 2, sb_buf) != 0)
+        return -1;
 
-    sprintln("[Ext2 Debug] Reading superblock from LBA 4098 & 4099...");
+    if (ata_read_sector(drive, PARTITION_START_LBA + 3, sb_buf + 512) != 0)
+        return -1;
 
-    if (ata_read_sector(drive, sb_lba_1, sb_buf) != 0) {
-        sprintln("[Ext2 Error] Mount failed to read SB LBA 1");
+    struct ext2_superblock *sb =
+        (struct ext2_superblock *)sb_buf;
+
+    if (sb->s_magic != 0xEF53) {
+        sprintln("[EXT2] Bad magic");
         return -1;
     }
-    if (ata_read_sector(drive, sb_lba_2, sb_buf + 512) != 0) {
-        sprintln("[Ext2 Error] Mount failed to read SB LBA 2");
-        return -1;
-    }
-
-    uint8_t m1 = sb_buf[56];
-    uint8_t m2 = sb_buf[57];
-    sprintln("[Ext2 Debug] Raw bytes read at superblock magic offset (56-57):");
-    if (m1 == 0x53 && m2 == 0xef) {
-        sprintln("[Ext2 Debug] Magic bytes MATCH 0x53EF in memory for god sake");
-    } else {
-        sprintln("[Ext2 Error] Magic bytes do NOT match fuck Read different bytes.");
-    }
-
-    struct ext2_superblock *sb = (struct ext2_superblock *)sb_buf;
 
     g_block_size = 1024U << sb->s_log_block_size;
     g_inodes_count = sb->s_inodes_count;
     g_blocks_count = sb->s_blocks_count;
 
-    uint32_t bgd_block = (g_block_size == 1024) ? 2 : 1;
-    uint8_t bgd_buf[1024];
-    if (ext2_read_blocks(bgd_block, 1, bgd_buf) != 0) {
-        sprintln("[Ext2 Error] Mount failed to read BGD block");
+    char num[32];
+
+    sprint("[EXT2] block size=");
+    uint64_to_str(g_block_size, num);
+    sprintln(num);
+
+    uint32_t bgd_block =
+        (g_block_size == 1024) ? 2 : 1;
+
+    if (ext2_read_blocks(
+            bgd_block,
+            1,
+            g_scratch_block_1) != 0)
+    {
+        sprintln("[EXT2] BGD read failed");
         return -1;
     }
 
-    char num_buf[32];
-    sprintln("[Ext2 Debug] BGD block first 16 bytes:");
-    for (int i = 0; i < 16; i++) {
-        uint64_to_str(bgd_buf[i], num_buf);
-        sprint(num_buf);
-        sprint(" ");
-    }
-    sprintln("");
+    struct ext2_bgd *bgd =
+        (struct ext2_bgd *)g_scratch_block_1;
 
-    struct ext2_bgd *bgd = (struct ext2_bgd *)bgd_buf;
-    g_inode_bitmap_block = bgd->bg_inode_bitmap;
+    sprintln("[EXT2] BGD VALUES");
+
+    sprint("block bitmap=");
+    uint64_to_str(bgd->bg_block_bitmap, num);
+    sprintln(num);
+
+    sprint("inode bitmap=");
+    uint64_to_str(bgd->bg_inode_bitmap, num);
+    sprintln(num);
+
+    sprint("inode table=");
+    uint64_to_str(bgd->bg_inode_table, num);
+    sprintln(num);
+
     g_block_bitmap_block = bgd->bg_block_bitmap;
-    g_inode_table_block = bgd->bg_inode_table;
+    g_inode_bitmap_block = bgd->bg_inode_bitmap;
+    g_inode_table_block  = bgd->bg_inode_table;
 
-    sprint("[Ext2 Debug] Inode Bitmap Block: ");
-    uint64_to_str(g_inode_bitmap_block, num_buf);
-    sprintln(num_buf);
+    struct ext2_inode root;
 
-    sprint("[Ext2 Debug] Block Bitmap Block: ");
-    uint64_to_str(g_block_bitmap_block, num_buf);
-    sprintln(num_buf);
+    if (ext2_read_inode(2, &root) != 0) {
+        sprintln("[EXT2] Root inode read failed");
+        return -1;
+    }
 
-    sprint("[Ext2 Debug] Inode Table Block: ");
-    uint64_to_str(g_inode_table_block, num_buf);
-    sprintln(num_buf);
+    sprintln("[EXT2] ROOT INODE");
 
-    sprintln("[Ext2 Debug] Mount successful. Bitmaps and tables fully loaded.");
-    return 1;
+    sprint("size=");
+    uint64_to_str(root.i_size, num);
+    sprintln(num);
+
+    sprint("blocks=");
+    uint64_to_str(root.i_blocks, num);
+    sprintln(num);
+
+    for (int i = 0; i < 12; i++) {
+        sprint("direct=");
+        uint64_to_str(root.i_block[i], num);
+        sprintln(num);
+    }
+
+    return 0;
 }
 
 static uint32_t ext2_alloc_inode(void) {
@@ -188,32 +216,40 @@ static uint32_t ext2_alloc_inode(void) {
     return 0;
 }
 
-int ext2_read_inode(uint32_t inode_num, struct ext2_inode *out_inode) {
-    uint32_t inodes_per_block = g_block_size / sizeof(struct ext2_inode);
-    uint32_t block_offset = (inode_num - 1) / inodes_per_block;
-    uint32_t index_in_block = (inode_num - 1) % inodes_per_block;
+int ext2_read_inode(
+    uint32_t inode_num,
+    struct ext2_inode *out_inode)
+{
+    if (inode_num < 1)
+        return -1;
 
-    uint32_t target_block = g_inode_table_block + block_offset;
+    uint32_t inode_size = sizeof(struct ext2_inode);
 
-    if (ext2_read_blocks(target_block, 1, g_scratch_block_2) != 0) {
+    uint32_t inodes_per_block =
+        g_block_size / inode_size;
+
+    uint32_t block =
+        g_inode_table_block +
+        ((inode_num - 1) / inodes_per_block);
+
+    uint32_t index =
+        (inode_num - 1) % inodes_per_block;
+
+    if (ext2_read_blocks(
+            block,
+            1,
+            g_scratch_block_2) != 0)
+    {
         return -1;
     }
 
-    struct ext2_inode *inodes = (struct ext2_inode *)g_scratch_block_2;
-    *out_inode = inodes[index_in_block];
+    struct ext2_inode *table =
+        (struct ext2_inode *)g_scratch_block_2;
 
-    if (inode_num == EXT2_ROOT_INODE) {
-        char num_buf[32];
-        sprintln("[Ext2 Debug] Root Inode loaded:");
-        
-        sprint("  i_size: ");
-        uint64_to_str(out_inode->i_size, num_buf);
-        sprintln(num_buf);
-
-        sprint("  i_block[0]: ");
-        uint64_to_str(out_inode->i_block[0], num_buf);
-        sprintln(num_buf);
-    }
+    memcpy(
+        out_inode,
+        &table[index],
+        sizeof(struct ext2_inode));
 
     return 0;
 }

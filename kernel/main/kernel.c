@@ -70,7 +70,7 @@ void windoge_os(void) {
     println("[\033[32mWow\033[0m]     AHCI SATA probed");
 
     println("[\033[32mDogeing\033[0m] Mounting ext2 filesystem...");
-    if (!fs_mount(ata_current_drive())) {
+    if (fs_mount(ata_current_drive())) {
         println("[\033[91mNot Wow\033[0m] didn't mount.");
         halt();
     }
