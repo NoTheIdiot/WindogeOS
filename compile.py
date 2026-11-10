@@ -261,7 +261,6 @@ def compile_userland_programs():
 
     clang_path = find_clang()
     clangxx_path = shutil.which("clang++") or "clang++"
-    lld_path = shutil.which("ld.lld") or "ld.lld"
 
     target_triples = {
         "x86_64": "x86_64-elf",
@@ -287,7 +286,10 @@ def compile_userland_programs():
             obj_path = os.path.join(out_dir, f"{prog_name}.o")
             elf_path = os.path.join(out_dir, prog_name)
 
-            if item.endswith((".cpp", ".cc")):
+            is_cpp = item.endswith((".cpp", ".cc"))
+            compiler_driver = clangxx_path if is_cpp else clang_path
+
+            if is_cpp:
                 compile_cmd = [
                     clangxx_path, f"--target={target_triple}",
                     "-ffreestanding", "-fno-pie", "-fno-stack-protector",
@@ -305,10 +307,17 @@ def compile_userland_programs():
             run_command(compile_cmd)
 
             link_cmd = [
-                lld_path, "-nostdlib", "-static",
+                compiler_driver,
+                f"--target={target_triple}",
+                "-nostdlib",
+                "-static",
                 "-T", linker_script,
-                "-o", elf_path, obj_path
+                "-o", elf_path,
+                obj_path
             ]
+            if architecture == "x86_64":
+                link_cmd.append("-m64")
+
             run_command(link_cmd)
             binaries.append(elf_path)
             print(f"[SUCCESS] Compiled userland program: {prog_name}")
@@ -325,12 +334,14 @@ def compile_userland_programs():
                 continue
 
             obj_files = []
+            has_cpp_files = False
             for src in sub_sources:
                 rel = os.path.relpath(src, item_path)
                 obj_p = os.path.join(out_dir, prog_name, rel.replace(os.path.sep, "_") + ".o")
                 os.makedirs(os.path.dirname(obj_p), exist_ok=True)
 
                 if src.endswith((".cpp", ".cc")):
+                    has_cpp_files = True
                     c_cmd = [
                         clangxx_path, f"--target={target_triple}",
                         f"-I{item_path}", "-ffreestanding", "-fno-pie", "-fno-stack-protector",
@@ -348,11 +359,19 @@ def compile_userland_programs():
                 obj_files.append(obj_p)
 
             elf_path = os.path.join(out_dir, prog_name)
+            package_driver = clangxx_path if has_cpp_files else clang_path
+
             link_cmd = [
-                lld_path, "-nostdlib", "-static",
+                package_driver,
+                f"--target={target_triple}",
+                "-nostdlib",
+                "-static",
                 "-T", linker_script,
                 "-o", elf_path
             ] + obj_files
+            if architecture == "x86_64":
+                link_cmd.append("-m64")
+
             run_command(link_cmd)
             binaries.append(elf_path)
             print(f"[SUCCESS] Compiled userland program package: {prog_name}")

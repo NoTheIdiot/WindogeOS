@@ -9,7 +9,7 @@ uint64_t test(void) {
 }
 
 void exit(void) {
-    asm volatile ("sysretq");
+    syscall_0(Process_Exit);
 }
 
 #endif
