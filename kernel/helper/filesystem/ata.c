@@ -120,67 +120,87 @@ static int ahci_rw_sector(uint8_t port_num, uint64_t lba, uint8_t write) {
 
     ahci_port_t *port = &g_hba->ports[port_num];
     ahci_cmd_header_t *hdr = g_cmd_header_virt[port_num];
-    ahci_cmd_table_t *tbl = g_cmd_table_virt[port_num];
+    
+    // use command slot 0
+    int slot = 0;
+    ahci_cmd_table_t *tbl = (ahci_cmd_table_t *)((uintptr_t)g_cmd_table_virt[port_num] + (slot * sizeof(ahci_cmd_table_t)));
 
+    // clear interrupt and error status registers before issuing
     mmio_write32((uintptr_t)&port->is, 0xFFFFFFFFU);
     mmio_write32((uintptr_t)&port->serr, 0xFFFFFFFFU);
 
-    hdr[0].cfl = sizeof(fis_reg_h2d_t) / sizeof(uint32_t);
-    hdr[0].w = write ? 1 : 0;
-    hdr[0].prdtl = 1;
-    hdr[0].prdbc = 0;
+    // configure command header for slot 0
+    hdr[slot].cfl = sizeof(fis_reg_h2d_t) / sizeof(uint32_t);
+    hdr[slot].w = write ? 1 : 0;
+    hdr[slot].prdtl = 1;
+    hdr[slot].prdbc = 0;
+    
+    // link command table physical address to header
+    uintptr_t tbl_phys = (uintptr_t)g_cmd_phys[port_num] + PAGE_SIZE + (slot * sizeof(ahci_cmd_table_t));
+    hdr[slot].ctba = (uint32_t)tbl_phys;
+    hdr[slot].ctbau = (uint32_t)(tbl_phys >> 32);
 
+    // zero out the entire command table structure to avoid garbage bytes
     uint8_t *raw_tbl = (uint8_t *)tbl;
     for (size_t i = 0; i < sizeof(ahci_cmd_table_t); i++) {
         raw_tbl[i] = 0;
     }
 
+    // configure prdt for 512 bytes (zero-based dbc = 511)
     tbl->prdt.dba = (uint32_t)g_dma_bounce_phys;
     tbl->prdt.dbau = (uint32_t)(g_dma_bounce_phys >> 32);
-    tbl->prdt.dbc = 511;
+    tbl->prdt.dbc = 511; 
     tbl->prdt.i = 1;
 
+    // populate host-to-device register fis with zero-initialization
     fis_reg_h2d_t *fis = (fis_reg_h2d_t *)(&tbl->cfis[0]);
+    memset(fis, 0, sizeof(fis_reg_h2d_t));
+
     fis->fis_type = AHCI_FIS_TYPE_REG_H2D;
-    fis->c = 1; 
-    fis->command = write ? 0x35 : 0x25;
+    fis->c = 1; // command fis
+    fis->command = write ? 0x35 : 0x25; // 0x35 = write sectors ext, 0x25 = read sectors ext
     
+    // lba48 addressing fields
     fis->lba0 = (uint8_t)(lba & 0xFF);
     fis->lba1 = (uint8_t)((lba >> 8) & 0xFF);
     fis->lba2 = (uint8_t)((lba >> 16) & 0xFF);
-    fis->device = 1 << 6;
+    fis->device = 1 << 6; // lba mode bit
     fis->lba3 = (uint8_t)((lba >> 24) & 0xFF);
     fis->lba4 = (uint8_t)((lba >> 32) & 0xFF);
     fis->lba5 = (uint8_t)((lba >> 40) & 0xFF);
     
+    // sector count (1 sector = 512 bytes)
     fis->countl = 1; 
     fis->counth = 0;
 
+    // wait for port to be ready (clear bs and drq bits)
     uint32_t spin = 0;
     while ((mmio_read32((uintptr_t)&port->tfd) & (0x80U | 0x08U)) && spin < 1000000U) {
         spin++;
     }
     if (spin == 1000000U) {
-        sprintln("[AHCI Debug] R/W timeout: Drive busy before command issue.");
+        sprintln("[AHCI Debug] r/w timeout: drive busy before command issue.");
         return -1;
     }
 
-    mmio_write32((uintptr_t)&port->ci, 1U);
+    // issue command by setting bit in command issue (ci)
+    mmio_write32((uintptr_t)&port->ci, 1U << slot);
 
+    // wait for completion
     uint32_t timeout = 10000000U;
     while (timeout--) {
-        if ((mmio_read32((uintptr_t)&port->ci) & 1U) == 0) {
+        if ((mmio_read32((uintptr_t)&port->ci) & (1U << slot)) == 0) {
             break;
         }
         if (mmio_read32((uintptr_t)&port->is) & (1U << 30)) {
             mmio_write32((uintptr_t)&port->is, 1U << 30);
-            sprintln("[AHCI Debug] R/W failed: Task File Error Status (TFES).");
+            sprintln("[AHCI Debug] r/w failed: task file error status (tfes).");
             return -1;
         }
     }
 
     if (timeout == 0) {
-        sprintln("[AHCI Debug] R/W failed: Controller timed out waiting for completion.");
+        sprintln("[AHCI Debug] r/w failed: controller timed out waiting for completion.");
         return -1;
     }
 

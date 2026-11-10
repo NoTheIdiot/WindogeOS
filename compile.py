@@ -391,8 +391,8 @@ def generate_hdd_image():
     
     if os.path.exists(img_target): 
         os.remove(img_target)
-    
-    subprocess.run(["dd", "if=/dev/zero", f"bs=1M", f"count={hdd_size_mib}", f"of={img_target}"], stdout=subprocess.DEVNULL, check=True)
+
+    subprocess.run(["dd", "if=/dev/zero", "bs=1M", f"count={hdd_size_mib}", f"of={img_target}"], stdout=subprocess.DEVNULL, check=True)
         
     system_environment = os.environ.copy()
     system_environment["PATH"] = system_environment["PATH"] + ":/usr/sbin:/sbin"
@@ -411,14 +411,13 @@ def generate_hdd_image():
         "-t", "2:8300"
     ]
     if firmware_mode == "BIOS":
-        sgdisk_command.append("-m")
-        sgdisk_command.append("1")
+        sgdisk_command.extend(["-m", "1"])
 
     subprocess.run(sgdisk_command, env=system_environment, check=True)
     
     if firmware_mode == "BIOS" and architecture == "x86_64" and os.path.exists(LIMINE):
         subprocess.run([LIMINE, "bios-install", img_target], stdout=subprocess.DEVNULL, check=True)
-        
+
     boot_offset = 1048576
     esp_image = None
     if firmware_mode == "UEFI":
@@ -460,41 +459,29 @@ def generate_hdd_image():
         if esp_image is not None and os.path.exists(esp_image):
             os.remove(esp_image)
 
-    part2_img = "part2_ext2.img"
-    p2_sectors = p2_end - p2_start + 1
-    subprocess.run(["dd", "if=/dev/zero", f"of={part2_img}", "bs=512", f"count={p2_sectors}"], stdout=subprocess.DEVNULL, check=True)
-    
-    subprocess.run(["mkfs.ext2", "-F", "-b", "1024", "-O", "^dir_index,^filetype", "-L", "WINDOGEOS", part2_img], check=True)
-
-    with open(part2_img, "r+b") as f:
-        f.seek(1024 + 56)
-        magic = f.read(2)
-        print(f"[Build Check] Read Ext2 magic from part2_ext2.img: {magic.hex()}")
-        if magic != b'\x53\xef':
-            print("[Build Warning] Magic number missing! Force-injecting 0xEF53...")
-            f.seek(1024 + 56)
-            f.write(bytes([0x53, 0xef]))
-            f.seek(1024 + 0)
-            f.write((p2_sectors // 2).to_bytes(4, 'little'))
-            f.seek(1024 + 4)
-            f.write((p2_sectors // 2).to_bytes(4, 'little'))
-            f.seek(1024 + 24)
-            f.write((0).to_bytes(4, 'little'))
+    p2_offset_bytes = p2_start * 512
+    p2_bytes_count = (p2_end - p2_start + 1) * 512
 
     mnt_dir = "/tmp/windoge_p2_mnt"
     os.makedirs(mnt_dir, exist_ok=True)
 
     injected_programs = []
     
-    loop_dev = subprocess.check_output(f"sudo losetup -f --show {part2_img}", shell=True).decode().strip()
-    subprocess.run(f"sudo mount {loop_dev} {mnt_dir}", shell=True, check=True)
+    loop_dev = subprocess.check_output(
+        f"sudo losetup -f --show -o {p2_offset_bytes} --sizelimit {p2_bytes_count} {img_target}", 
+        shell=True
+    ).decode().strip()
 
     try:
+        subprocess.run(["sudo", "mkfs.ext2", "-F", "-b", "1024", "-O", "^dir_index,^filetype", "-L", "WINDOGEOS", loop_dev], check=True)
+        subprocess.run(f"sudo mount {loop_dev} {mnt_dir}", shell=True, check=True)
+
         for bin_path in userland_binaries:
             if os.path.exists(bin_path):
                 prog_basename = os.path.basename(bin_path)
                 subprocess.run(["sudo", "cp", bin_path, f"{mnt_dir}/"], check=True)
                 injected_programs.append(prog_basename)
+                
         print("[Partition 2 Contents]:")
         subprocess.run(["sudo", "ls", "-la", mnt_dir], check=True)
         subprocess.run("sudo sync", shell=True, check=True)
@@ -508,12 +495,7 @@ def generate_hdd_image():
         except OSError:
             pass
 
-    subprocess.run(["dd", f"if={part2_img}", f"of={img_target}", "bs=512", f"seek={p2_start}", "conv=notrunc"], stdout=subprocess.DEVNULL, check=True)
-    if os.path.exists(part2_img):
-        os.remove(part2_img)
-
     shutil.rmtree(obj_dir, ignore_errors=True)
-    shutil.rmtree(os.path.abspath(f"programs/bin-{architecture}"), ignore_errors=True)
 
     cmd = "objdump -d kernel.elf | grep -C 5 \"7bb1\""
     subprocess.run(cmd, shell=True)

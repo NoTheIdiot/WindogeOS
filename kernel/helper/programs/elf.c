@@ -1,3 +1,4 @@
+#include <string.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
@@ -102,11 +103,14 @@ int run_elf(char *filename, uint64_t size)
 
     sprintln("[ELF] checking if the headers are empty");
     uint8_t buffer[4];
+    char num_buffer[8];
     int read = fs_read_raw(filename, buffer, 4);
     if (read <= 0) {
         sprintln("[ELF] WAIT FILE IS EMPTY??!?!????");
     } else {
-        sprintln("[ELF] file aint empty");
+        sprint("[ELF] file aint empty, size: ");
+        itoa(read, num_buffer);
+        sprintln(num_buffer);
     }
 
     sprintln("[ELF] Checking ELF magic and header fields one by one...");
