@@ -18,7 +18,7 @@ int fs_create(char* filename) {
     return create_file(&exfat_vol, filename);
 }
 
-int fs_write(char* filename, char* data, uint64_t size) {
+int fs_write_force(char* filename, char* data, uint64_t size) {
     return write_file(&exfat_vol, filename, (void*)data, size);
 }
 
@@ -31,4 +31,18 @@ int fs_read(char* filename, char* data, uint64_t size) {
 bool fs_exists(char *filename) {
     char dummy;
     return fs_read(filename, &dummy, 0) == 0;
+}
+
+int fs_write(char* filename, char* data, uint64_t size) {
+    while (size > 0 && data[size - 1] == '\0') {
+        size--;
+    }
+
+    int status = append_file(&exfat_vol, filename, (void*)data, size);
+    if (status != 0) {
+        return status;
+    }
+
+    char nl = '\n';
+    return append_file(&exfat_vol, filename, &nl, 1);
 }

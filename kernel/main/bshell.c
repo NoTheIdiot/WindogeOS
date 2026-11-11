@@ -6,6 +6,10 @@
 #include <bool.h>
 #include <syscalls.h>
 
+#define READ_BUF_SIZE 8192
+#define CMD_BUF_SIZE  256
+#define MAX_ARGS      16
+
 int shell_tokenize(char *line, char **argv, int argc) {
     int count = 0;
     char *p = line;
@@ -14,7 +18,6 @@ int shell_tokenize(char *line, char **argv, int argc) {
         return 0;
     }
 
-    // split from spaces
     while (*p != '\0' && count < argc - 1) {
         while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') {
             p++;
@@ -55,16 +58,10 @@ int shell_tokenize(char *line, char **argv, int argc) {
 }
 
 int execute(int argc, char** argv) {
-    // check for NULL because otherwise whole system crashes
-    if (argc <= 0) {
+    if (argc <= 0 || argv == NULL) {
         return -1;
     }
 
-    if (argv == NULL) {
-        return -1;
-    }
-
-    // actual commands
     if (strcmp(argv[0], "print") == 0) {
         if (argc == 1) {
             println("");
@@ -79,21 +76,6 @@ int execute(int argc, char** argv) {
         return 0;
     }
 
-    /*if (strcmp(argv[0], "dir") == 0) {
-        fs_t files[256];
-        int count = fs_list(files, 256);
-        
-        if (count < 0) {
-            println("Filesystem error or not mounted.");
-            return -1;
-        }
-
-        for (int i = 0; i < count; i++) {
-            println(files[i].name);
-        }
-        return 0;
-    }*/
-
     if (strcmp(argv[0], "reboot") == 0) {
         reboot();
         return 0;
@@ -104,6 +86,22 @@ int execute(int argc, char** argv) {
         return 0;
     }
 
+        if (strcmp(argv[0], "create") == 0) {
+            if (argv[1] == NULL) {
+                println("Need a filename.");
+                return -1;
+            }
+            if (fs_exists(argv[1])) {
+                println("File already exists.");
+                return -1;
+            }
+            if (fs_create(argv[1]) != 0) {
+                println("Failed to create file.");
+                return -1;
+            }
+            return 0;
+        }
+
     if (strcmp(argv[0], "read") == 0) {
         if (argv[1] == NULL) {
             println("Need one argument.");
@@ -113,30 +111,37 @@ int execute(int argc, char** argv) {
             println("File doesn't exist.");
             return -1;
         }
-        char buffer[8192];
-        fs_read(argv[1], buffer, 8192);
-        println(buffer);
+        static char buffer[READ_BUF_SIZE];
+        memset(buffer, 0, sizeof(buffer));
+        int bytes = fs_read(argv[1], buffer, sizeof(buffer) - 1);
+        if (bytes >= 0) {
+            buffer[bytes] = '\0';
+            println(buffer);
+        } else {
+            println("Failed to read file.");
+            return -1;
+        }
         return 0;
     }
 
     if (strcmp(argv[0], "write") == 0) {
-        if (argv[1] == NULL) {
-            println("Need one argument.");
+        if (argv[1] == NULL || argv[2] == NULL) {
+            println("Need two arguments.");
             return -1;
         }
         if (!fs_exists(argv[1])) {
             println("File doesn't exist.");
             return -1;
         }
-        char buffer[8192];
-        fs_write(argv[1], buffer, 8192);
-        println(buffer);
+        if (fs_write(argv[1], argv[2], strlen(argv[2])) != 0) {
+            println("Failed to write file.");
+            return -1;
+        }
         return 0;
     }
 
     if (strcmp(argv[0], "exit") == 0 ||
         strcmp(argv[0], "kys")  == 0) {
-        
         println("Returning back, will halt phooking forever.");
         return 500;
     }
@@ -147,12 +152,12 @@ int execute(int argc, char** argv) {
 }
 
 void backup_shell(void) {
-    char command[256];
-    char *argv[16];
+    char command[CMD_BUF_SIZE];
+    char *argv[MAX_ARGS];
     int argc;
     while (true) {
         input("root> ", command);
-        argc = shell_tokenize(command, argv, 16);
+        argc = shell_tokenize(command, argv, MAX_ARGS);
         int result = execute(argc, argv);
 
         if (result == 500) {

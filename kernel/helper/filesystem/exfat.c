@@ -508,3 +508,139 @@ int read_file(mount_t *vol, const char *name, void *out_buf, uint64_t max_size, 
 
     return -2;
 }
+
+int append_file(mount_t *vol, const char *name, const void *data, uint64_t size) {
+    if (size == 0) return 0;
+
+    size_t name_len = strlen(name);
+    if (name_len == 0 || name_len > 255) return -1;
+
+    uint8_t window[WINDOW_SIZE];
+    uint8_t sec_buf[SECTOR_SIZE];
+    uint8_t fat_buf[SECTOR_SIZE];
+
+    uint64_t root_sector  = cluster_to_sectors(vol, vol->root_cluster);
+    uint32_t root_sectors = vol->bytes_per_cluster / SECTOR_SIZE;
+
+    for (uint32_t sec = 0; sec < root_sectors; sec++) {
+        if (read_offset(vol, root_sector + sec, window, 1) != 0) return -1;
+        if (sec + 1 < root_sectors) {
+            if (read_offset(vol, root_sector + sec + 1, window + SECTOR_SIZE, 1) != 0) return -1;
+        } else {
+            memset(window + SECTOR_SIZE, 0, SECTOR_SIZE);
+        }
+
+        for (uint32_t slot = 0; slot < 16; slot++) {
+            uint8_t *ptr = &window[slot * 32];
+            if (*ptr == 0x00) return -2;
+            if (*ptr != 0x85) continue;
+
+            file_entry   *fe = (file_entry *)ptr;
+            stream_entry *se = (stream_entry *)(ptr + 32);
+            if (se->entry_type != 0xC0 || se->name_length != name_len) continue;
+
+            uint8_t match = 1;
+            for (size_t i = 0; i < name_len; i++) {
+                file_name_entry *fn = (file_name_entry *)(ptr + (2 + (i / 15)) * 32);
+                uint16_t *utf16 = (uint16_t *)fn->filename;
+                if (utf16[i % 15] != (uint8_t)name[i]) {
+                    match = 0;
+                    break;
+                }
+            }
+
+            if (!match) continue;
+
+            uint64_t old_size      = se->valid_data_length;
+            uint32_t first_cluster = se->first_cluster;
+            uint8_t  no_fat_chain  = (se->secondary_flags & 0x02) ? 1 : 0;
+            uint32_t last_cluster  = 0;
+            uint64_t bytes_written = 0;
+
+            if (first_cluster >= 2 && old_size > 0) {
+                uint32_t num_clusters = (old_size + vol->bytes_per_cluster - 1) / vol->bytes_per_cluster;
+
+                if (no_fat_chain) {
+                    last_cluster = first_cluster + num_clusters - 1;
+                } else {
+                    last_cluster = first_cluster;
+                    for (uint32_t c = 1; c < num_clusters; c++) {
+                        uint32_t next = next_cluster(vol, last_cluster, fat_buf);
+                        if (next < 2 || next >= 0xFFFFFFF8) break;
+                        last_cluster = next;
+                    }
+                }
+
+                uint32_t offset_in_cluster = old_size % vol->bytes_per_cluster;
+                if (offset_in_cluster > 0) {
+                    uint64_t data_sec      = cluster_to_sectors(vol, last_cluster);
+                    uint32_t start_sec     = offset_in_cluster / SECTOR_SIZE;
+                    uint32_t offset_in_sec = offset_in_cluster % SECTOR_SIZE;
+
+                    for (uint32_t s = start_sec; s < vol->sectors_per_cluster && bytes_written < size; s++) {
+                        if (read_offset(vol, data_sec + s, sec_buf, 1) != 0) return -3;
+
+                        uint32_t space = SECTOR_SIZE - offset_in_sec;
+                        uint64_t rem   = size - bytes_written;
+                        uint32_t chunk = (rem < space) ? (uint32_t)rem : space;
+
+                        memcpy(sec_buf + offset_in_sec, (const uint8_t *)data + bytes_written, chunk);
+                        if (write_offset(vol, data_sec + s, sec_buf, 1) != 0) return -4;
+
+                        bytes_written += chunk;
+                        offset_in_sec = 0;
+                    }
+                }
+            }
+
+            while (bytes_written < size) {
+                uint32_t curr_cluster = alloc_cluster_near(vol, last_cluster + 1);
+                if (curr_cluster < 2) return -3;
+
+                if (first_cluster == 0) {
+                    first_cluster = curr_cluster;
+                    no_fat_chain  = 1;
+                } else if (no_fat_chain) {
+                    if (curr_cluster != last_cluster + 1) {
+                        no_fat_chain = 0;
+                        for (uint32_t c = first_cluster; c < last_cluster; c++) {
+                            set_fat_entry(vol, c, c + 1);
+                        }
+                        set_fat_entry(vol, last_cluster, curr_cluster);
+                        set_fat_entry(vol, curr_cluster, 0xFFFFFFFF);
+                    }
+                } else {
+                    set_fat_entry(vol, last_cluster, curr_cluster);
+                    set_fat_entry(vol, curr_cluster, 0xFFFFFFFF);
+                }
+
+                uint64_t data_sec = cluster_to_sectors(vol, curr_cluster);
+                for (uint32_t s = 0; s < vol->sectors_per_cluster && bytes_written < size; s++) {
+                    memset(sec_buf, 0, SECTOR_SIZE);
+                    uint64_t rem   = size - bytes_written;
+                    uint32_t chunk = (rem > SECTOR_SIZE) ? SECTOR_SIZE : (uint32_t)rem;
+
+                    memcpy(sec_buf, (const uint8_t *)data + bytes_written, chunk);
+                    if (write_offset(vol, data_sec + s, sec_buf, 1) != 0) return -4;
+                    bytes_written += chunk;
+                }
+
+                last_cluster = curr_cluster;
+            }
+
+            se->first_cluster     = first_cluster;
+            se->valid_data_length = old_size + size;
+            se->data_length       = old_size + size;
+            se->secondary_flags   = 0x01 | (no_fat_chain ? 0x02 : 0x00);
+            fe->checksum          = calc_set_checksum(ptr, 1 + fe->scount);
+
+            if (write_offset(vol, root_sector + sec, window, 1) != 0) return -4;
+            if (sec + 1 < root_sectors) {
+                if (write_offset(vol, root_sector + sec + 1, window + SECTOR_SIZE, 1) != 0) return -4;
+            }
+            return 0;
+        }
+    }
+
+    return -2;
+}

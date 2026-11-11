@@ -228,6 +228,7 @@ int mount(mount_t *vol, uint8_t *cluster_buf);
 int create_file(mount_t *vol, const char *name);
 int write_file(mount_t *vol, const char *name, const void *data, uint64_t size);
 int read_file(mount_t *vol, const char *name, void *out_buf, uint64_t max_size, uint64_t *bytes_read_out);
+int append_file(mount_t *vol, const char *name, const void *data, uint64_t size);
 
 // register typedef
 typedef struct regstate {

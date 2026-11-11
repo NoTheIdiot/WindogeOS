@@ -82,6 +82,7 @@ int fs_create(char* filename);
 int fs_read(char* filename, char* data, uint64_t size);
 int fs_write(char* filename, char* data, uint64_t size);
 bool fs_exists(char *filename);
+int fs_write_force(char* filename, char* data, uint64_t size);
 
 void update_time(void);
 uint64_t get_epoch_seconds(void);
