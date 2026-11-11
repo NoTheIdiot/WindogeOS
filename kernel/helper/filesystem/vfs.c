@@ -20,3 +20,9 @@ int fs_create(char* filename) {
 int fs_write(char* filename, char* data, uint64_t size) {
     return write_file(&exfat_vol, filename, (void*)data, size);
 }
+
+int fs_read(char* filename, char* data, uint64_t size) {
+    uint64_t buffer;
+    read_file(&exfat_vol, filename, (void*)data, size, &buffer);
+    return buffer;
+}

@@ -437,7 +437,7 @@ int write_file(mount_t *vol, const char *name, const void *data, uint64_t size) 
     return -2;
 }
 
-int exfat_read_file(mount_t *vol, const char *name, void *out_buf, uint64_t max_size, uint64_t *bytes_read_out) {
+int read_file(mount_t *vol, const char *name, void *out_buf, uint64_t max_size, uint64_t *bytes_read_out) {
     size_t name_len = strlen(name);
     if (name_len == 0 || name_len > 255) return -1;
 

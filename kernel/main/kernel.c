@@ -105,6 +105,13 @@ void windoge_os(void) {
     } else {
         println("[\033[91mNot Wow\033[0m] File creation failed");
     }
+
+    println("[\033[96mDoge\033[0m]    Testing WRITE");
+    fs_write("TEST", "WINDOGEOS BEST", 15);
+    println("[\033[96mDoge\033[0m]    Testing READ");
+    char buffer[16];
+    fs_read("TEST", buffer, 16);
+    println(buffer);
     
     clear();
     println("\033[96mWindogeOS Booted!\033[0m");
