@@ -46,3 +46,7 @@ int fs_write(char* filename, char* data, uint64_t size) {
     char nl = '\n';
     return append_file(&exfat_vol, filename, &nl, 1);
 }
+
+int fs_list(fs_t* out, int max_entries) {
+    return list_dir(&exfat_vol, out, max_entries);
+}

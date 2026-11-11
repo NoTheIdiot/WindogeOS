@@ -644,3 +644,60 @@ int append_file(mount_t *vol, const char *name, const void *data, uint64_t size)
 
     return -2;
 }
+
+int list_dir(mount_t *vol, fs_t *out_files, int max_files) {
+    if (!vol || !out_files || max_files <= 0) return -1;
+
+    uint8_t window[WINDOW_SIZE];
+    uint8_t fat_buf[SECTOR_SIZE];
+    int count = 0;
+
+    uint32_t curr_cluster = vol->root_cluster;
+
+    while (curr_cluster >= 2 && curr_cluster < 0xFFFFFFF8) {
+        uint64_t dir_sector  = cluster_to_sectors(vol, curr_cluster);
+        uint32_t dir_sectors = vol->bytes_per_cluster / SECTOR_SIZE;
+
+        for (uint32_t sec = 0; sec < dir_sectors; sec++) {
+            if (read_offset(vol, dir_sector + sec, window, 1) != 0) return -1;
+            if (sec + 1 < dir_sectors) {
+                if (read_offset(vol, dir_sector + sec + 1, window + SECTOR_SIZE, 1) != 0) return -1;
+            } else {
+                memset(window + SECTOR_SIZE, 0, SECTOR_SIZE);
+            }
+
+            for (uint32_t slot = 0; slot < 16; slot++) {
+                uint8_t *ptr = window + (slot * 32);
+                if (*ptr == 0x00) return count;
+                if (*ptr != 0x85) continue;
+
+                file_entry   *fe = (file_entry *)ptr;
+                stream_entry *se = (stream_entry *)(ptr + 32);
+                if (se->entry_type != 0xC0) continue;
+
+                fs_t *item = out_files + count;
+                memset(item, 0, sizeof(fs_t));
+
+                item->is_dir = (fe->attribute & 0x0010) ? true : false;
+                item->size   = (uint32_t)se->valid_data_length;
+
+                size_t len = se->name_length;
+                if (len > 255) len = 255;
+
+                for (size_t i = 0; i < len; i++) {
+                    file_name_entry *fn = (file_name_entry *)(ptr + (2 + (i / 15)) * 32);
+                    uint16_t *utf16 = (uint16_t *)fn->filename;
+                    *(item->name + i) = (char)(*(utf16 + (i % 15)) & 0xFF);
+                }
+                *(item->name + len) = '\0';
+
+                count++;
+                if (count >= max_files) return count;
+            }
+        }
+
+        curr_cluster = next_cluster(vol, curr_cluster, fat_buf);
+    }
+
+    return count;
+}
