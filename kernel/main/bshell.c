@@ -37,48 +37,70 @@ static void uint32_to_str(uint32_t val, char *buf) {
     *(buf + j) = '\0';
 }
 
-
 int shell_tokenize(char *line, char **argv, int argc) {
     int count = 0;
-    char *p = line;
+    char *src = line;
 
     if (!line || !argv || argc <= 0) {
         return 0;
     }
 
-    while (*p != '\0' && count < argc - 1) {
-        while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') {
-            p++;
+    while (*src != '\0' && count < argc - 1) {
+        while (*src == ' ' || *src == '\t' || *src == '\r' || *src == '\n') {
+            src++;
         }
 
-        if (*p == '\0') {
+        if (*src == '\0') {
             break;
         }
 
-        if (*p == '"') {
-            p++;
-            argv[count++] = p;
+        char *dst = src;
+        argv[count++] = dst;
+        char quote = '\0';
 
-            while (*p != '\0' && *p != '"') {
-                p++;
-            }
-
-            if (*p == '"') {
-                *p = '\0';
-                p++;
-            }
-        } else {
-            argv[count++] = p;
-
-            while (*p != '\0' && *p != ' ' && *p != '\t' && *p != '\r' && *p != '\n') {
-                p++;
-            }
-
-            if (*p != '\0') {
-                *p = '\0';
-                p++;
+        while (*src != '\0') {
+            if (quote == '\0') {
+                if (*src == ' ' || *src == '\t' || *src == '\r' || *src == '\n') {
+                    src++;
+                    break;
+                }
+                if (*src == '"' || *src == '\'') {
+                    quote = *src++;
+                    continue;
+                }
+                if (*src == '\\' && *(src + 1) != '\0') {
+                    src++;
+                    *dst++ = *src++;
+                    continue;
+                }
+                *dst++ = *src++;
+            } else {
+                if (*src == quote) {
+                    quote = '\0';
+                    src++;
+                    continue;
+                }
+                if (quote == '"' && *src == '\\' && *(src + 1) != '\0') {
+                    src++;
+                    if (*src == 'n') {
+                        *dst++ = '\n';
+                    } else if (*src == 't') {
+                        *dst++ = '\t';
+                    } else {
+                        *dst++ = *src;
+                    }
+                    src++;
+                    continue;
+                }
+                *dst++ = *src++;
             }
         }
+
+        if (quote != '\0') {
+            return -1;
+        }
+
+        *dst = '\0';
     }
 
     argv[count] = NULL;
@@ -94,7 +116,13 @@ int execute(int argc, char** argv) {
         if (argc == 1) {
             println("");
         } else {
-            println(argv[1]);
+            for (int i = 1; i < argc; i++) {
+                print(argv[i]);
+                if (i + 1 < argc) {
+                    print(" ");
+                }
+            }
+            println("");
         }
         return 0;
     }
@@ -114,21 +142,21 @@ int execute(int argc, char** argv) {
         return 0;
     }
 
-        if (strcmp(argv[0], "create") == 0) {
-            if (argv[1] == NULL) {
-                println("Need a filename.");
-                return -1;
-            }
-            if (fs_exists(argv[1])) {
-                println("File already exists.");
-                return -1;
-            }
-            if (fs_create(argv[1]) != 0) {
-                println("Failed to create file.");
-                return -1;
-            }
-            return 0;
+    if (strcmp(argv[0], "create") == 0) {
+        if (argv[1] == NULL) {
+            println("Need a filename.");
+            return -1;
         }
+        if (fs_exists(argv[1])) {
+            println("File already exists.");
+            return -1;
+        }
+        if (fs_create(argv[1]) != 0) {
+            println("Failed to create file.");
+            return -1;
+        }
+        return 0;
+    }
 
     if (strcmp(argv[0], "read") == 0) {
         if (argv[1] == NULL) {
@@ -217,6 +245,10 @@ void backup_shell(void) {
     while (true) {
         input("root> ", command);
         argc = shell_tokenize(command, argv, MAX_ARGS);
+        if (argc < 0) {
+            println("Syntax error: unclosed quote.");
+            continue;
+        }
         int result = execute(argc, argv);
 
         if (result == 500) {
