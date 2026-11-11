@@ -98,29 +98,14 @@ void windoge_os(void) {
     init_syscalls();
     println("[\033[32mWow\033[0m]     Init system calls done");
 
-    /*println("\n[\033[96mDoge\033[0m]    Start to test drivers");
-    test_ata_persistence();
-    if (!fs_exists("THING")) {
-        println("[\033[96mDoge\033[0m]    File \"THING\" not found. Creating it");
-        fs_create("THING", false);
-        println("[\033[96mDoge\033[0m]    Reboot please!");
+    println("\n[\033[96mDoge\033[0m]    Start to test drivers");
+    println("[\033[96mDoge\033[0m]    Testing exFAT");
+    if (fs_create("TEST") == 0) {
+        println("[\033[32mWow\033[0m]     File creation works");
     } else {
-        println("[\033[32mWow\033[0m]     File \"THING\" found, ext2 works.");
-        println("[\033[96mDoge\033[0m]    File \"THING\" write test");
-        fs_write("THING",  "WINDOGE", 8);
-        println("[\033[96mDoge\033[0m]    File \"THING\" read test");
-        char buffer[16];
-        fs_read("THING", buffer, 16);
-        println(buffer);
+        println("[\033[91mNot Wow\033[0m] File creation failed");
     }
     
-    println("\n[\033[96mDoge\033[0m]    Programs");
-    if (!fs_exists("test")) {
-        println("[\033[91mNot Wow\033[0m] Uh the file doesn't exist");
-    } else {
-        run_elf("test", 4096);
-        println("[\033[32mWow\033[0m]     WHAT IT WORKS???");
-    }*/
     clear();
     println("\033[96mWindogeOS Booted!\033[0m");
     println("\033[96mThere is literally nothing else mate... other than a \ntesting shell (like kdb)\033[0m");

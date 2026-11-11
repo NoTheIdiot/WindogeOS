@@ -71,6 +71,116 @@ static uint16_t calc_set_checksum(const uint8_t *entries, size_t total_entries) 
     return checksum;
 }
 
+static uint32_t alloc_one_cluster(mount_t *vol) {
+    uint8_t sec_buf[512];
+    uint64_t bm_start_sector  = cluster_to_sectors(vol, vol->bitmap_cluster);
+    uint32_t total_bm_sectors = (vol->bitmap_size + 511) / 512;
+
+    for (uint32_t sec = 0; sec < total_bm_sectors; sec++) {
+        if (read_offset(vol, bm_start_sector + sec, sec_buf, 1) != 0) {
+            return 0;
+        }
+
+        for (uint32_t i = 0; i < 512; i++) {
+            if (sec_buf[i] == 0xFF) continue;
+
+            for (uint8_t b = 0; b < 8; b++) {
+                if ((sec_buf[i] & (1 << b)) == 0) {
+                    uint32_t bit_index = (sec * 4096) + (i * 8) + b;
+                    uint32_t cluster   = bit_index + 2;
+
+                    if (cluster >= vol->cluster_count + 2) return 0;
+
+                    sec_buf[i] |= (1 << b);
+                    if (write_offset(vol, bm_start_sector + sec, sec_buf, 1) != 0) {
+                        return 0;
+                    }
+
+                    return cluster;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+static int set_fat_entry(mount_t *vol, uint32_t cluster, uint32_t value) {
+    uint8_t sec_buf[512];
+    uint64_t fat_byte_offset = (uint64_t)cluster * 4;
+    uint64_t fat_sector      = vol->offset_bytes + (fat_byte_offset / 512);
+    uint32_t entry_offset    = fat_byte_offset % 512;
+
+    if (read_offset(vol, fat_sector, sec_buf, 1) != 0) return -1;
+    *(uint32_t *)&sec_buf[entry_offset] = value;
+    return write_offset(vol, fat_sector, sec_buf, 1);
+}
+
+static int set_bitmap_bit(mount_t *vol, uint32_t cluster, uint8_t used) {
+    if (cluster < 2 || cluster >= vol->cluster_count + 2) return -1;
+
+    uint8_t sec_buf[512];
+    uint32_t bit_index = cluster - 2;
+    uint32_t sec_idx   = bit_index / 4096;
+    uint32_t byte_idx  = (bit_index % 4096) / 8;
+    uint8_t  bit_mask  = 1 << (bit_index % 8);
+
+    uint64_t bm_sector = cluster_to_sectors(vol, vol->bitmap_cluster) + sec_idx;
+    if (read_offset(vol, bm_sector, sec_buf, 1) != 0) return -1;
+
+    if (used) sec_buf[byte_idx] |= bit_mask;
+    else      sec_buf[byte_idx] &= ~bit_mask;
+
+    return write_offset(vol, bm_sector, sec_buf, 1);
+}
+
+static void free_cluster_chain(mount_t *vol, uint32_t first_cluster, uint64_t data_length, uint8_t no_fat_chain) {
+    if (first_cluster < 2 || data_length == 0) return;
+
+    if (no_fat_chain) {
+        uint32_t count = (data_length + vol->bytes_per_cluster - 1) / vol->bytes_per_cluster;
+        for (uint32_t i = 0; i < count; i++) {
+            set_bitmap_bit(vol, first_cluster + i, 0);
+        }
+    } else {
+        uint8_t fat_buf[512];
+        uint32_t curr = first_cluster;
+        while (curr >= 2 && curr < 0xFFFFFFF8) {
+            uint32_t next = next_cluster(vol, curr, fat_buf);
+            set_bitmap_bit(vol, curr, 0);
+            set_fat_entry(vol, curr, 0x00000000);
+            curr = next;
+        }
+    }
+}
+
+static uint32_t alloc_cluster_near(mount_t *vol, uint32_t hint) {
+    uint8_t sec_buf[512];
+    uint64_t bm_base = cluster_to_sectors(vol, vol->bitmap_cluster);
+    uint32_t total_bm_secs = (vol->bitmap_size + 511) / 512;
+    uint32_t start_sec = (hint >= 2) ? ((hint - 2) / 4096) : 0;
+
+    for (uint32_t pass = 0; pass < total_bm_secs; pass++) {
+        uint32_t sec = (start_sec + pass) % total_bm_secs;
+        if (read_offset(vol, bm_base + sec, sec_buf, 1) != 0) return 0;
+
+        for (uint32_t i = 0; i < 512; i++) {
+            if (sec_buf[i] == 0xFF) continue;
+            for (uint8_t b = 0; b < 8; b++) {
+                if ((sec_buf[i] & (1 << b)) == 0) {
+                    uint32_t cluster = (sec * 4096) + (i * 8) + b + 2;
+                    if (cluster >= vol->cluster_count + 2) continue;
+
+                    sec_buf[i] |= (1 << b);
+                    if (write_offset(vol, bm_base + sec, sec_buf, 1) != 0) return 0;
+                    return cluster;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+
 // mount a damn drive.
 int mount(mount_t *vol, uint8_t *cluster_buf) {
     exfat_start_sector boot;
@@ -227,4 +337,100 @@ found:
     }
 
     return 0;
+}
+
+int write_file(mount_t *vol, const char *name, const void *data, uint64_t size) {
+    size_t name_len = strlen(name);
+    if (name_len == 0 || name_len > 255) return -1;
+
+    uint8_t window[1024];
+    uint64_t root_sector  = cluster_to_sectors(vol, vol->root_cluster);
+    uint32_t root_sectors = vol->bytes_per_cluster / 512;
+
+    for (uint32_t sec = 0; sec < root_sectors; sec++) {
+        if (read_offset(vol, root_sector + sec, &window[0], 1) != 0) return -1;
+        if (sec + 1 < root_sectors) {
+            if (read_offset(vol, root_sector + sec + 1, &window[512], 1) != 0) return -1;
+        } else {
+            memset(&window[512], 0, 512);
+        }
+
+        for (uint32_t slot = 0; slot < 16; slot++) {
+            uint8_t *ptr = &window[slot * 32];
+            if (ptr[0] == 0x00) return -2;
+            if (ptr[0] != 0x85) continue;
+
+            file_entry   *fe = (file_entry *)ptr;
+            stream_entry *se = (stream_entry *)(ptr + 32);
+            if (se->entry_type != 0xC0 || se->name_length != name_len) continue;
+
+            uint8_t match = 1;
+            for (size_t i = 0; i < name_len; i++) {
+                file_name_entry *fn = (file_name_entry *)(ptr + (2 + (i / 15)) * 32);
+                uint16_t *utf16 = (uint16_t *)fn->filename;
+                if (utf16[i % 15] != (uint8_t)name[i]) {
+                    match = 0;
+                    break;
+                }
+            }
+
+            if (!match) continue;
+
+            free_cluster_chain(vol, se->first_cluster, se->data_length, se->secondary_flags & 0x02);
+
+            uint32_t first_cluster = 0;
+            uint32_t prev_cluster  = 0;
+            uint8_t  no_fat_chain  = 0;
+            uint64_t bytes_written = 0;
+
+            while (bytes_written < size) {
+                uint32_t curr_cluster = alloc_cluster_near(vol, prev_cluster + 1);
+                if (curr_cluster < 2) return -3;
+
+                if (first_cluster == 0) {
+                    first_cluster = curr_cluster;
+                    no_fat_chain  = 1;
+                } else if (no_fat_chain) {
+                    if (curr_cluster != prev_cluster + 1) {
+                        no_fat_chain = 0;
+                        for (uint32_t c = first_cluster; c < prev_cluster; c++) {
+                            set_fat_entry(vol, c, c + 1);
+                        }
+                        set_fat_entry(vol, prev_cluster, curr_cluster);
+                        set_fat_entry(vol, curr_cluster, 0xFFFFFFFF);
+                    }
+                } else {
+                    set_fat_entry(vol, prev_cluster, curr_cluster);
+                    set_fat_entry(vol, curr_cluster, 0xFFFFFFFF);
+                }
+
+                uint64_t data_sec = cluster_to_sectors(vol, curr_cluster);
+                for (uint32_t s = 0; s < vol->sectors_per_cluster && bytes_written < size; s++) {
+                    uint8_t data_pad[512] = {0};
+                    uint64_t rem = size - bytes_written;
+                    uint32_t chunk = (rem > 512) ? 512 : (uint32_t)rem;
+
+                    memcpy(data_pad, (const uint8_t *)data + bytes_written, chunk);
+                    if (write_offset(vol, data_sec + s, data_pad, 1) != 0) return -4;
+                    bytes_written += chunk;
+                }
+
+                prev_cluster = curr_cluster;
+            }
+
+            se->first_cluster     = first_cluster;
+            se->valid_data_length = size;
+            se->data_length       = size;
+            se->secondary_flags   = 0x01 | (no_fat_chain ? 0x02 : 0x00);
+            fe->checksum          = calc_set_checksum(ptr, 1 + fe->scount);
+
+            if (write_offset(vol, root_sector + sec, &window[0], 1) != 0) return -4;
+            if (sec + 1 < root_sectors) {
+                if (write_offset(vol, root_sector + sec + 1, &window[512], 1) != 0) return -4;
+            }
+            return 0;
+        }
+    }
+
+    return -2;
 }

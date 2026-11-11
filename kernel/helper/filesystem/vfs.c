@@ -16,3 +16,7 @@ int fs_mount(void) {
 int fs_create(char* filename) {
     return create_file(&exfat_vol, filename);
 }
+
+int fs_write(char* filename, char* data, uint64_t size) {
+    return write_file(&exfat_vol, filename, (void*)data, size);
+}

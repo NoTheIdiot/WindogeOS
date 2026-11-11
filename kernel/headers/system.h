@@ -114,7 +114,6 @@ void setup_ring3_memory(uint64_t user_code_virt, uint64_t user_stack_virt, const
 
 int ahci_exec_cmd(uint32_t port_num, uint64_t lba, uint32_t count, uint8_t write, uintptr_t buf_phys);
 void ahci_sata_init(uintptr_t ecam_base_addr);
-void test_ata_persistence(void);
 uint8_t ata_current_drive(void);
 void ata_probe_devices(void);
 int ata_drive_present(uint8_t drive);
@@ -227,6 +226,7 @@ typedef struct __attribute__((packed)) {
 
 int mount(mount_t *vol, uint8_t *cluster_buf);
 int create_file(mount_t *vol, const char *name);
+int write_file(mount_t *vol, const char *name, const void *data, uint64_t size);
 
 // register typedef
 typedef struct regstate {

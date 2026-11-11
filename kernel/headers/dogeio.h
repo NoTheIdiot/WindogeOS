@@ -78,6 +78,8 @@ void sprint(const char *str);
 void sprintln(const char *str);
 
 int fs_mount(void);
+int fs_create(char* filename);
+int fs_write(char* filename, char* data, uint64_t size);
 
 void update_time(void);
 uint64_t get_epoch_seconds(void);
