@@ -98,38 +98,6 @@ void windoge_os(void) {
     init_syscalls();
     println("[\033[32mWow\033[0m]     Init system calls done");
 
-        println("\n[\033[96mDoge\033[0m]    Start to test drivers");
-    println("[\033[96mDoge\033[0m]    Testing exFAT");
-
-    char test_file[] = "TEST";
-
-    if (fs_create(test_file) == 0) {
-        println("[\033[32mWow\033[0m]     File creation works");
-    } else {
-        println("[\033[91mNot Wow\033[0m] File creation failed");
-    }
-
-    println("[\033[96mDoge\033[0m]    Testing WRITE");
-    char msg1[] = "WINDOGEOS BEST";
-    if (fs_write(test_file, msg1, sizeof(msg1)) == 0) {
-        println("[\033[32mWow\033[0m]     Write works");
-    } else {
-        println("[\033[91mNot Wow\033[0m] Write failed");
-    }
-
-    println("[\033[96mDoge\033[0m]    Testing READ");
-    char buffer[64];
-    fs_read(test_file, buffer, 64);
-    println(buffer);
-
-    println("[\033[96mDoge\033[0m]    Testing OVERWRITE");
-    char msg2[] = "I PHOOKING HATE BAD DOCS\nSlaughterhouse geomtry dah :P";
-    fs_write_force(test_file, msg2, 55);
-
-    memset(buffer, 0, sizeof(buffer));
-    fs_read(test_file, buffer, 64);
-    println(buffer);
-
     clear();
     println("\033[96mWindogeOS Booted!\033[0m");
     println("\033[96mThere is literally nothing else mate... other than a \ntesting shell (like kdb)\033[0m");
