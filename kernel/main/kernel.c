@@ -123,8 +123,8 @@ void windoge_os(void) {
     println(buffer);
 
     println("[\033[96mDoge\033[0m]    Testing OVERWRITE");
-    char msg2[] = "I HATE BAD DOCS";
-    fs_write(test_file, msg2, 16);
+    char msg2[] = "I PHOOKING HATE BAD DOCS\nSlaughterhouse geomtry dah :P";
+    fs_write_force(test_file, msg2, 55);
 
     memset(buffer, 0, sizeof(buffer));
     fs_read(test_file, buffer, 64);

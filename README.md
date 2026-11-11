@@ -1,4 +1,6 @@
 ## About WindogeOS
+not unix
+
 * Doge filled OS that fits in just 4 floppies
 * Free and lightweight operating system
 * Easy to use on the command line

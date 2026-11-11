@@ -10,6 +10,34 @@
 #define CMD_BUF_SIZE  256
 #define MAX_ARGS      16
 
+#define MAX_DIR_ENTRIES 128
+#define NUM_BUF_SIZE    16
+
+static void uint32_to_str(uint32_t val, char *buf) {
+    if (val == 0) {
+        *(buf + 0) = '0';
+        *(buf + 1) = '\0';
+        return;
+    }
+
+    char temp[NUM_BUF_SIZE];
+    int i = 0;
+    while (val > 0) {
+        *(temp + i) = (char)('0' + (val % 10));
+        i++;
+        val /= 10;
+    }
+
+    int j = 0;
+    while (i > 0) {
+        i--;
+        *(buf + j) = *(temp + i);
+        j++;
+    }
+    *(buf + j) = '\0';
+}
+
+
 int shell_tokenize(char *line, char **argv, int argc) {
     int count = 0;
     char *p = line;
@@ -120,6 +148,37 @@ int execute(int argc, char** argv) {
         } else {
             println("Failed to read file.");
             return -1;
+        }
+        return 0;
+    }
+
+    if (strcmp(argv[0], "dir") == 0) {
+        static fs_t files[MAX_DIR_ENTRIES];
+        int count = fs_list(files, MAX_DIR_ENTRIES);
+
+        if (count < 0) {
+            println("Filesystem error or not mounted.");
+            return -1;
+        }
+
+        if (count == 0) {
+            println("Directory is empty.");
+            return 0;
+        }
+
+        char size_str[NUM_BUF_SIZE];
+        for (int i = 0; i < count; i++) {
+            if (files[i].is_dir) {
+                print("[DIR]  ");
+            } else {
+                print("[FILE] ");
+            }
+
+            print(files[i].name);
+            print("  (");
+            uint32_to_str(files[i].size, size_str);
+            print(size_str);
+            println(" bytes)");
         }
         return 0;
     }
