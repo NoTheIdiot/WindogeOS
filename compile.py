@@ -16,7 +16,7 @@ LIMINE_BIOS_SYS = os.path.join(BIN_DIR, "limine-bios.sys")
 LIMINE_BIOS_CD = os.path.join(BIN_DIR, "limine-bios-cd.bin")
 LIMINE_UEFI_CD = os.path.join(BIN_DIR, "limine-uefi-cd.bin")
 
-hdd_size_mib = 32
+hdd_size_mib = 6
 BOOT_PARTITION_SIZE_MIB = 1
 
 qemu_config = {

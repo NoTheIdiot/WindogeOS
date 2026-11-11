@@ -10,7 +10,7 @@ not unix
 Most x86_64 CPUs will work. Intel Atoms, early Pentiums (2000-2010), and Core 2 Duos are well tested
 and very compatible.
 
-Literally just 2MB of SSD and 2MB of RAM
+Literally just 6MB of SSD and 2MB of RAM
 
 ## Updates
 To see updates, read commits and release descriptions.
