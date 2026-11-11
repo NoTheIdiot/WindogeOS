@@ -526,6 +526,7 @@ def execute_qemu_hdd():
         
     qemu_arguments = [
         f"qemu-system-{architecture}",
+        "-m", "2M",
         "-M", "q35",
         "-device", "ahci,id=ahci",
         "-drive", f"id=disk,file={img_target},format=raw,if=none",
@@ -537,6 +538,7 @@ def execute_qemu_hdd():
         "-device", "piix3-usb-uhci,id=uhci",
         "-device", "usb-kbd,bus=uhci.0"
     ]
+
     
     if qemu_config.get("cpu"):
         qemu_arguments += qemu_config["cpu"]
