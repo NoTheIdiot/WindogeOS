@@ -12,3 +12,7 @@ int fs_mount(void) {
     }
     return status;
 }
+
+int fs_create(char* filename) {
+    return create_file(&exfat_vol, filename);
+}

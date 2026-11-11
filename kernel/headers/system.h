@@ -226,6 +226,7 @@ typedef struct __attribute__((packed)) {
 } upcase;
 
 int mount(mount_t *vol, uint8_t *cluster_buf);
+int create_file(mount_t *vol, const char *name);
 
 // register typedef
 typedef struct regstate {

@@ -73,7 +73,7 @@ bool uhci_init_keyboard_endpoint(uint8_t device_address, uint8_t endpoint_num) {
 
     g_kbd_td->control |= (1 << 23);
 
-    sprintln("[UHCI] Keyboard tether established. The silicon hums.");
+    sprintln("[UHCI] Holy shit the keyboard is no longer in a coma");
     return true;
 }
 
