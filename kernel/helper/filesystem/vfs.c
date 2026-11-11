@@ -1,6 +1,7 @@
 #include <dogeio.h>
 #include <system.h>
 #include <string.h>
+#include <bool.h>
 
 mount_t exfat_vol;
 
@@ -25,4 +26,9 @@ int fs_read(char* filename, char* data, uint64_t size) {
     uint64_t buffer;
     read_file(&exfat_vol, filename, (void*)data, size, &buffer);
     return buffer;
+}
+
+bool fs_exists(char *filename) {
+    char dummy;
+    return fs_read(filename, &dummy, 0) == 0;
 }

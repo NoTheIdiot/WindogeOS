@@ -104,7 +104,7 @@ int execute(int argc, char** argv) {
         return 0;
     }
 
-    /*if (strcmp(argv[0], "read") == 0) {
+    if (strcmp(argv[0], "read") == 0) {
         if (argv[1] == NULL) {
             println("Need one argument.");
             return -1;
@@ -117,7 +117,22 @@ int execute(int argc, char** argv) {
         fs_read(argv[1], buffer, 8192);
         println(buffer);
         return 0;
-    }*/
+    }
+
+    if (strcmp(argv[0], "write") == 0) {
+        if (argv[1] == NULL) {
+            println("Need one argument.");
+            return -1;
+        }
+        if (!fs_exists(argv[1])) {
+            println("File doesn't exist.");
+            return -1;
+        }
+        char buffer[8192];
+        fs_write(argv[1], buffer, 8192);
+        println(buffer);
+        return 0;
+    }
 
     if (strcmp(argv[0], "exit") == 0 ||
         strcmp(argv[0], "kys")  == 0) {

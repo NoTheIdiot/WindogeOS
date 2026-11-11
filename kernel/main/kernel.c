@@ -130,7 +130,6 @@ void windoge_os(void) {
     fs_read(test_file, buffer, 64);
     println(buffer);
 
-    halt();
     clear();
     println("\033[96mWindogeOS Booted!\033[0m");
     println("\033[96mThere is literally nothing else mate... other than a \ntesting shell (like kdb)\033[0m");
