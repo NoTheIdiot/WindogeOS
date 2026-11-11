@@ -4,6 +4,8 @@
 #include <string.h>
 
 #define PARTITION_OFFSET 4096
+#define SECTOR_SIZE 512
+#define WINDOW_SIZE 1024
 
 // isn't it obvious what this does?
 static inline uint64_t cluster_to_sectors(const mount_t *vol, uint32_t cluster) {
@@ -428,6 +430,78 @@ int write_file(mount_t *vol, const char *name, const void *data, uint64_t size) 
             if (sec + 1 < root_sectors) {
                 if (write_offset(vol, root_sector + sec + 1, &window[512], 1) != 0) return -4;
             }
+            return 0;
+        }
+    }
+
+    return -2;
+}
+
+int exfat_read_file(mount_t *vol, const char *name, void *out_buf, uint64_t max_size, uint64_t *bytes_read_out) {
+    size_t name_len = strlen(name);
+    if (name_len == 0 || name_len > 255) return -1;
+
+    uint8_t window[WINDOW_SIZE];
+    uint8_t sec_buf[SECTOR_SIZE];
+    uint8_t fat_buf[SECTOR_SIZE];
+
+    uint64_t root_sector  = cluster_to_sectors(vol, vol->root_cluster);
+    uint32_t root_sectors = vol->bytes_per_cluster / SECTOR_SIZE;
+
+    for (uint32_t sec = 0; sec < root_sectors; sec++) {
+        if (read_offset(vol, root_sector + sec, window, 1) != 0) return -1;
+        if (sec + 1 < root_sectors) {
+            if (read_offset(vol, root_sector + sec + 1, window + SECTOR_SIZE, 1) != 0) return -1;
+        } else {
+            memset(window + SECTOR_SIZE, 0, SECTOR_SIZE);
+        }
+
+        for (uint32_t slot = 0; slot < 16; slot++) {
+            uint8_t *ptr = &window[slot * 32];
+            if (*ptr == 0x00) return -2;
+            if (*ptr != 0x85) continue;
+
+            stream_entry *se = (stream_entry *)(ptr + 32);
+            if (se->entry_type != 0xC0 || se->name_length != name_len) continue;
+
+            uint8_t match = 1;
+            for (size_t i = 0; i < name_len; i++) {
+                file_name_entry *fn = (file_name_entry *)(ptr + (2 + (i / 15)) * 32);
+                uint16_t *utf16 = (uint16_t *)fn->filename;
+                if (utf16[i % 15] != (uint8_t)name[i]) {
+                    match = 0;
+                    break;
+                }
+            }
+
+            if (!match) continue;
+
+            uint64_t to_read = (se->valid_data_length < max_size) ? se->valid_data_length : max_size;
+            uint64_t bytes_read = 0;
+            uint32_t curr_cluster = se->first_cluster;
+            uint8_t  no_fat_chain = se->secondary_flags & 0x02;
+
+            while (bytes_read < to_read && curr_cluster >= 2 && curr_cluster < 0xFFFFFFF8) {
+                uint64_t data_sec = cluster_to_sectors(vol, curr_cluster);
+
+                for (uint32_t s = 0; s < vol->sectors_per_cluster && bytes_read < to_read; s++) {
+                    if (read_offset(vol, data_sec + s, sec_buf, 1) != 0) return -3;
+
+                    uint64_t rem = to_read - bytes_read;
+                    uint32_t chunk = (rem > SECTOR_SIZE) ? SECTOR_SIZE : (uint32_t)rem;
+
+                    memcpy((uint8_t *)out_buf + bytes_read, sec_buf, chunk);
+                    bytes_read += chunk;
+                }
+
+                if (no_fat_chain) {
+                    curr_cluster++;
+                } else {
+                    curr_cluster = next_cluster(vol, curr_cluster, fat_buf);
+                }
+            }
+
+            if (bytes_read_out) *bytes_read_out = bytes_read;
             return 0;
         }
     }
