@@ -77,17 +77,7 @@ void input(char* prompt, char* buffer);
 void sprint(const char *str);
 void sprintln(const char *str);
 
-int fs_mount(uint8_t drive);
-int fs_read(const char *filename, char *text, uint32_t max_len);
-int fs_write(const char *filename, const char *text, uint32_t len);
-int fs_read_raw(const char *filename, uint8_t *buf, uint32_t max_len);
-int fs_write_raw(const char *filename, const uint8_t *buf, uint32_t len);
-int fs_read_raw_at(const char *filename, uint8_t *buf, uint32_t offset, uint32_t len);
-int fs_write_raw_at(const char *filename, const uint8_t *buf, uint32_t offset, uint32_t len);
-int fs_list_root_dir(void);
-int fs_create(const char *filename, bool is_directory);
-bool fs_exists(const char *filename);
-int fs_list(fs_t *out_list, int max_entries);
+int fs_mount(void);
 
 void update_time(void);
 uint64_t get_epoch_seconds(void);

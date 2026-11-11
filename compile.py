@@ -473,7 +473,16 @@ def generate_hdd_image():
     ).decode().strip()
 
     try:
-        subprocess.run(["sudo", "mkfs.ext2", "-F", "-b", "1024", "-O", "^dir_index,^filetype", "-L", "WINDOGEOS", loop_dev], check=True)
+        subprocess.run(
+            [
+                "sudo",
+                "mkfs.exfat",
+                "-L",
+                "WINDOGEOS",
+                loop_dev
+            ],
+            check=True
+        )
         subprocess.run(f"sudo mount {loop_dev} {mnt_dir}", shell=True, check=True)
 
         for bin_path in userland_binaries:

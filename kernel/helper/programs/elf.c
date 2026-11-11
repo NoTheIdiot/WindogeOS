@@ -1,4 +1,4 @@
-#include <string.h>
+/*#include <string.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
@@ -234,11 +234,11 @@ int run_elf(char *filename, uint64_t size)
         ehdr.e_entry,
         stack_top,
         0,  /* argc */
-        0   /* argv */
-    );
+    //    0   /* argv */
+    //);
 
-    for (;;)
+    /*for (;;)
         __asm__ volatile ("hlt");
 
-    return 0;
-}
+  //  return 0;
+//}*/

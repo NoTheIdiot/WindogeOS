@@ -1,34 +1,116 @@
 #include <dogeio.h>
 #include <system.h>
 #include <stdint.h>
+#include <string.h>
 
-typedef struct __attribute__((packed)) {
-    uint8_t jump[3];        // 0xEB, 0x76, and 0x90
-    char fs_name[8];        // is "EXFAT   "
-    uint8_t zeros[53];      // /dev/zero that shi
-    uint64_t offset;        // offset
-    uint64_t volume;        // volume length
-    uint32_t foffset;       // fat offset, from FAT origin
-    uint32_t flength;       // fat length, size of a FAT in unit of 
-                            // sector
-    uint32_t choffset;      // cluster heap offset origin from the top 
-                            // of the volume.
-    uint32_t ccount;        // cluster count, about of clusters on drive.
-    uint32_t fcord;         // first cluster at root
-    uint32_t serial;        // volume serial number
-    uint16_t fs_revision;   // file system revision
-    uint16_t volume_flags;  // bit 0 is active FAT, bit 1 is volume dirty,
-                            // bit 2 is failure, rest are zeros
-    uint8_t sector_shift;   // shifting up
-    uint8_t sectors_pch;    // sectirs per cluster shift
-    uint8_t fat_num;        // number of fat
-    uint8_t drive;          // yo what drive are we
-    uint8_t percent_used;   // percnt of drive used, 0xFF is invalid (-1)
-    uint8_t reserved[7];    // guess what, more zeros.
-    uint8_t code[390];      // thats alot of empty space
-    uint16_t sig;           // signature
-} exfat_start_sector;
+#define PARTITION_OFFSET 4096
 
-typedef struct __attribute__((packed)) {
-    
-} file_entry;
+// isn't it obvious what this does?
+static inline uint64_t cluster_to_sectors(const mount_t *vol, uint32_t cluster) {
+    return vol->heap_offset_bytes + ((uint64_t)(cluster - 2) * vol->sectors_per_cluster);
+}
+
+static inline int read_offset(mount_t* vol, uint64_t rel_sector, void* buf, size_t sector_count) {
+    uint8_t *byte_buf = (uint8_t *)buf;
+    uint8_t drive = ata_current_drive();
+
+    for (size_t i = 0; i < sector_count; i++) {
+        uint64_t lba = vol->poffset_bytes + PARTITION_OFFSET + rel_sector + i;
+        if (ata_read_sector(drive, lba, byte_buf + (i * 512)) != 0) {
+            return -1;
+        }
+    }
+    return 0;
+}
+
+
+uint32_t next_cluster(mount_t *vol, uint32_t current_cluster, uint8_t *sector_buf) {
+    uint64_t fat_byte_offset = (uint64_t)current_cluster * 4;
+    uint64_t fat_sector      = vol->offset_bytes + (fat_byte_offset / vol->bytes_per_sector);
+    uint32_t entry_offset    = fat_byte_offset % vol->bytes_per_sector;
+
+    if (read_offset(vol, fat_sector, sector_buf, 1) != 0) {
+        return 0xFFFFFFFF;
+    }
+    return *(uint32_t *)&sector_buf[entry_offset];
+}
+
+// mount a damn drive.
+int mount(mount_t *vol, uint8_t *cluster_buf) {
+    exfat_start_sector boot;
+    vol->poffset_bytes = 0;
+
+    if (read_offset(vol, 0, &boot, 1) != 0) {
+        sprintln("[BAD] disk read failure, SATA driver bad.");
+        return -256;
+    }
+
+    sprintln("[HDD] verifying boot magic and exfat magic");
+    if (boot.sig != 0xAA55) {
+        sprintln("[HDD] uh, invalid VBR. (0xAA55)");
+        return -128;
+    }
+
+    sprintln("[HDD] VBR valid");
+    sprintln("[HDD] checking exFAT magic");
+    const char* magic = "EXFAT   ";
+    for (int i = 0; i < 8; i++) {
+        if (boot.fs_name[i] != magic[i]) {
+            sprintln("[HDD] uh sir, this is not exFAT");
+            return -128;
+        }
+    }
+
+    vol->bytes_per_sector    = 1U << boot.sector_shift;
+    vol->sectors_per_cluster = 1U << boot.sectors_pch;
+    vol->bytes_per_cluster   = vol->bytes_per_sector * vol->sectors_per_cluster;
+
+    uint32_t active_fat    = (boot.volume_flags & 0x01) ? 1 : 0;
+    vol->offset_bytes      = (uint64_t)boot.foffset + ((uint64_t)active_fat * boot.flength);
+    vol->heap_offset_bytes = (uint64_t)boot.choffset;
+    vol->root_cluster      = boot.fcord;
+    vol->cluster_count     = boot.ccount;
+
+    vol->bitmap_cluster = 0;
+    vol->upcase_cluster = 0;
+
+    uint32_t curr = vol->root_cluster;
+    while (curr >= 2 && curr < 0xFFFFFFF8) {
+        uint64_t dir_sector = cluster_to_sectors(vol, curr);
+        if (read_offset(vol, dir_sector, cluster_buf, vol->sectors_per_cluster) != 0) {
+            sprintln("[BAD] disk read failure, SATA driver bad.");
+            return -256;
+        }
+
+        for (uint32_t offset = 0; offset < vol->bytes_per_cluster; offset += 32) {
+            uint8_t type = cluster_buf[offset];
+
+            if (type == 0x00) {
+                goto done;
+            }
+
+            if (type == 0x81) {
+                bitmap *bm = (bitmap *)&cluster_buf[offset];
+                if ((bm->flags & 0x01) == active_fat) {
+                    vol->bitmap_cluster = bm->first_cluster;
+                    vol->bitmap_size    = bm->data_length;
+                }
+            } else if (type == 0x82) {
+                upcase *uc = (upcase *)&cluster_buf[offset];
+                vol->upcase_cluster = uc->first_cluster;
+                vol->upcase_size    = uc->size;
+            }
+        }
+
+        curr = next_cluster(vol, curr, cluster_buf);
+    }
+
+done:
+    if (vol->bitmap_cluster < 2 || vol->upcase_cluster < 2) {
+        sprintln("[HDD] missing bitmap or upcase table");
+        return -128;
+    }
+
+    sprintln("[HDD] exFAT mounted");
+    return 0;
+}

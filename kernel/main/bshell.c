@@ -79,7 +79,7 @@ int execute(int argc, char** argv) {
         return 0;
     }
 
-    if (strcmp(argv[0], "dir") == 0) {
+    /*if (strcmp(argv[0], "dir") == 0) {
         fs_t files[256];
         int count = fs_list(files, 256);
         
@@ -92,7 +92,7 @@ int execute(int argc, char** argv) {
             println(files[i].name);
         }
         return 0;
-    }
+    }*/
 
     if (strcmp(argv[0], "reboot") == 0) {
         reboot();
@@ -104,7 +104,7 @@ int execute(int argc, char** argv) {
         return 0;
     }
 
-    if (strcmp(argv[0], "read") == 0) {
+    /*if (strcmp(argv[0], "read") == 0) {
         if (argv[1] == NULL) {
             println("Need one argument.");
             return -1;
@@ -117,7 +117,7 @@ int execute(int argc, char** argv) {
         fs_read(argv[1], buffer, 8192);
         println(buffer);
         return 0;
-    }
+    }*/
 
     if (strcmp(argv[0], "exit") == 0 ||
         strcmp(argv[0], "kys")  == 0) {

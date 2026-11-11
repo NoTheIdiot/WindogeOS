@@ -2,12 +2,15 @@
 #include <string.h>
 #include <stddef.h>
 #include <system.h>
+#include <limine.h>
 #include <dogeio.h>
 
 #define AHCI_MAX_PORTS        32
 #define AHCI_FIS_TYPE_REG_H2D 0x27
 #define AHCI_GHC_AE           (1U << 31)
 #define AHCI_GHC_HR           (1U << 0)
+
+extern volatile struct limine_hhdm_request hhdm_request;
 
 typedef struct {
     uint8_t  fis_type;
@@ -106,6 +109,7 @@ static uint8_t g_current_drive = 0;
 static uint8_t g_drive_present[AHCI_MAX_PORTS];
 static uint64_t g_drive_sector_counts[AHCI_MAX_PORTS];
 
+static uintptr_t g_cmd_table_phys[AHCI_MAX_PORTS][32];
 static uintptr_t g_cmd_phys[AHCI_MAX_PORTS];
 static ahci_cmd_header_t *g_cmd_header_virt[AHCI_MAX_PORTS];
 static ahci_cmd_table_t *g_cmd_table_virt[AHCI_MAX_PORTS];
@@ -123,7 +127,15 @@ static int ahci_rw_sector(uint8_t port_num, uint64_t lba, uint8_t write) {
     
     // use command slot 0
     int slot = 0;
-    ahci_cmd_table_t *tbl = (ahci_cmd_table_t *)((uintptr_t)g_cmd_table_virt[port_num] + (slot * sizeof(ahci_cmd_table_t)));
+    
+    // Derive the correct virtual address from g_cmd_table_virt
+    uintptr_t tbl_virt;
+    if (slot < 16) {
+        tbl_virt = (uintptr_t)g_cmd_table_virt[port_num] + (slot * 256);
+    } else {
+        tbl_virt = (uintptr_t)g_cmd_table_virt[port_num] + PAGE_SIZE + ((slot - 16) * 256);
+    }
+    ahci_cmd_table_t *tbl = (ahci_cmd_table_t *)tbl_virt;
 
     // clear interrupt and error status registers before issuing
     mmio_write32((uintptr_t)&port->is, 0xFFFFFFFFU);
@@ -136,7 +148,7 @@ static int ahci_rw_sector(uint8_t port_num, uint64_t lba, uint8_t write) {
     hdr[slot].prdbc = 0;
     
     // link command table physical address to header
-    uintptr_t tbl_phys = (uintptr_t)g_cmd_phys[port_num] + PAGE_SIZE + (slot * sizeof(ahci_cmd_table_t));
+    uintptr_t tbl_phys = g_cmd_table_phys[port_num][slot];
     hdr[slot].ctba = (uint32_t)tbl_phys;
     hdr[slot].ctbau = (uint32_t)(tbl_phys >> 32);
 
@@ -207,6 +219,7 @@ static int ahci_rw_sector(uint8_t port_num, uint64_t lba, uint8_t write) {
     return 0;
 }
 
+// select a drive, 0 for boot, 1 for other.
 int ata_select_drive(uint8_t drive) {
     if (drive >= AHCI_MAX_PORTS || !g_drive_present[drive]) {
         return -1;
@@ -228,6 +241,14 @@ uint64_t ata_drive_sector_count(uint8_t drive) {
 }
 
 int ata_read_sector(uint8_t drive, uint64_t lba, uint8_t *buffer) {
+    char dbg[32];
+    sprint("[AHCI Debug] ata_read_sector drive=");
+    itoa(drive, dbg);
+    sprint(dbg);
+    sprint(" buffer=");
+    kutoa((uintptr_t)buffer, dbg);
+    sprintln(dbg);
+
     if (buffer == NULL || !ata_drive_present(drive)) {
         sprintln("[AHCI Debug] Read rejected: invalid buffer or missing drive.");
         return -1;
@@ -364,18 +385,28 @@ void ata_probe_devices(void) {
         mmio_write32((uintptr_t)&port->fbu, (uint32_t)(fis_phys >> 32));
 
         for (int j = 0; j < 32; j++) {
-            g_cmd_header_virt[i][j].prdtl = 8;
-            uintptr_t tbl_phys = (j < 16) ? (page_tables_1 + (j * 256)) : (page_tables_2 + ((j - 16) * 256));
-            g_cmd_header_virt[i][j].ctba = (uint32_t)tbl_phys;
-            g_cmd_header_virt[i][j].ctbau = (uint32_t)(tbl_phys >> 32);
+            uintptr_t tbl_phys;
+
+            if (j < 16) {
+                tbl_phys = page_tables_1 + (j * 256);
+            } else {
+                tbl_phys = page_tables_2 + ((j - 16) * 256);
+            }
+
+            g_cmd_table_phys[i][j] = tbl_phys;
+
+            g_cmd_header_virt[i][j].prdtl = 1;
+
+            g_cmd_header_virt[i][j].ctba =
+                (uint32_t)tbl_phys;
+
+            g_cmd_header_virt[i][j].ctbau =
+                (uint32_t)(tbl_phys >> 32);
         }
 
-        cmd = mmio_read32((uintptr_t)&port->cmd);
-        cmd |= (1U << 4);
-        mmio_write32((uintptr_t)&port->cmd, cmd);
-
-        cmd |= (1U << 0);
-        mmio_write32((uintptr_t)&port->cmd, cmd);
+        uint32_t port_cmd = mmio_read32((uintptr_t)&port->cmd);
+        port_cmd |= (1U << 4) | (1U << 0); // FRE (bit 4) and ST (bit 0)
+        mmio_write32((uintptr_t)&port->cmd, port_cmd);
 
         timeout = 1000000;
         while (timeout--) {
@@ -393,10 +424,6 @@ void ata_probe_devices(void) {
         sprint(num);
         sprint(" SIG=0x");
         sprintln(hex);
-
-        if (sig != 0x00000101U) {
-            continue; 
-        }
 
         g_drive_present[i] = 1;
         g_drive_sector_counts[i] = 20971520ULL; 

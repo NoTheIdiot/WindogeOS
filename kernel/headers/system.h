@@ -111,84 +111,6 @@ bool user_page_mapped(uint64_t virt_addr);
 bool unmap_user_page(uint64_t virt_addr);
 void setup_ring3_memory(uint64_t user_code_virt, uint64_t user_stack_virt, const uint8_t *user_code, size_t code_size);
 
-// ata
-struct __attribute__((packed)) ext2_superblock {
-    uint32_t s_inodes_count;
-    uint32_t s_blocks_count;
-    uint32_t s_r_blocks_count;
-    uint32_t s_free_blocks_count;
-    uint32_t s_free_inodes_count;
-    uint32_t s_first_data_block;
-    uint32_t s_log_block_size;
-    uint32_t s_log_frag_size;
-    uint32_t s_blocks_per_group;
-    uint32_t s_frags_per_group;
-    uint32_t s_inodes_per_group;
-    uint32_t s_mtime;
-    uint32_t s_wtime;
-    uint16_t s_mnt_count;
-    uint16_t s_max_mnt_count;
-    uint16_t s_magic;
-    uint16_t s_state;
-    uint16_t s_errors;
-    uint16_t s_minor_rev_level;
-    uint32_t s_lastcheck;
-    uint32_t s_checkinterval;
-    uint32_t s_creator_os;
-    uint32_t s_rev_level;         // <-- Added (Required for revision checks)
-    uint16_t s_def_resuid;
-    uint16_t s_def_resgid;
-    uint32_t s_first_ino;
-    uint16_t s_inode_size;        // <-- Added (Critical for modern 256-byte inodes)
-    uint16_t s_block_group_nr;
-    uint32_t s_feature_compat;
-    uint32_t s_feature_incompat;
-    uint32_t s_feature_ro_compat;
-    uint8_t  s_uuid[16];
-    char     s_volume_name[16];
-    char     s_last_mounted[64];
-    uint32_t s_algorithm_usage_bitmap;
-};
-
-struct __attribute__((packed)) ext2_bgd {
-    uint32_t bg_block_bitmap;
-    uint32_t bg_inode_bitmap;
-    uint32_t bg_inode_table;
-    uint16_t bg_free_blocks_count;
-    uint16_t bg_free_inodes_count;
-    uint16_t bg_used_dirs_count;
-    uint16_t bg_pad;
-    uint8_t  bg_reserved[12];
-};
-
-struct __attribute__((packed)) ext2_inode {
-    uint16_t i_mode;
-    uint16_t i_uid;
-    uint32_t i_size;
-    uint32_t i_atime;
-    uint32_t i_ctime;
-    uint32_t i_mtime;
-    uint32_t i_dtime;
-    uint16_t i_gid;
-    uint16_t i_links_count;
-    uint32_t i_blocks;
-    uint32_t i_flags;
-    uint32_t i_osd1;
-    uint32_t i_block[15];
-    uint32_t i_generation;
-    uint32_t i_file_acl;
-    uint32_t i_dir_acl;
-    uint32_t i_faddr;
-    uint8_t  i_osd2[12];
-};
-
-struct __attribute__((packed)) ext2_dir_entry {
-    uint32_t inode;
-    uint16_t rec_len;
-    uint8_t  name_len;
-    uint8_t  file_type;
-    char     name[1];
-};
 
 int ahci_exec_cmd(uint32_t port_num, uint64_t lba, uint32_t count, uint8_t write, uintptr_t buf_phys);
 void ahci_sata_init(uintptr_t ecam_base_addr);
@@ -200,17 +122,110 @@ uint64_t ata_drive_sector_count(uint8_t drive);
 int ata_read_sector(uint8_t drive, uint64_t lba, uint8_t *buffer);
 int ata_write_sector(uint8_t drive, uint64_t lba, const uint8_t *buffer);
 
-// raw exfat functions
-#define EXT2_SUPER_MAGIC 0xEF53
-#define EXT2_ROOT_INODE 2
+typedef struct __attribute__((packed)) {
+    uint8_t jump[3];        // 0xEB, 0x76, and 0x90
+    char fs_name[8];        // is "EXFAT   "
+    uint8_t zeros[53];      // /dev/zero that shi
+    uint64_t offset;        // offset
+    uint64_t volume;        // volume length
+    uint32_t foffset;       // fat offset, from FAT origin
+    uint32_t flength;       // fat length, size of a FAT in unit of 
+                            // sector
+    uint32_t choffset;      // cluster heap offset origin from the top 
+                            // of the volume.
+    uint32_t ccount;        // cluster count, about of clusters on drive.
+    uint32_t fcord;         // first cluster at root
+    uint32_t serial;        // volume serial number
+    uint16_t fs_revision;   // file system revision
+    uint16_t volume_flags;  // bit 0 is active FAT, bit 1 is volume dirty,
+                            // bit 2 is failure, rest are zeros
+    uint8_t sector_shift;   // shifting up
+    uint8_t sectors_pch;    // sectirs per cluster shift
+    uint8_t fat_num;        // number of fat
+    uint8_t drive;          // yo what drive are we
+    uint8_t percent_used;   // percnt of drive used, 0xFF is invalid (-1)
+    uint8_t reserved[7];    // guess what, more zeros.
+    uint8_t code[390];      // thats alot of empty space
+    uint16_t sig;           // signature
+} exfat_start_sector;
 
-int ext2_mount(uint8_t drive);
-int ext2_read_inode(uint32_t inode_num, struct ext2_inode *out_inode);
-int ext2_list_root_dir(void);
-int ext2_write_inode(uint32_t inode_num, const struct ext2_inode *in_inode);
-uint32_t ext2_lookup(const char *filename);
-int ext2_create_file(const char *filename, uint16_t mode);
-int ext2_list(fs_t *out_list, int max_entries);
+typedef struct __attribute__((packed)) {
+    uint8_t entry_type; 
+    uint8_t scount;
+    uint16_t checksum;
+    uint16_t attribute;
+    uint16_t reserved1;
+    uint32_t time_stamp;
+    uint32_t last_modified;
+    uint32_t last_accessed;
+    uint8_t increment;
+    uint8_t last_modified_increment;
+    uint8_t TZoffset;
+    uint8_t last_modified_TZoffset;
+    uint8_t last_accessed_TZoffset;
+    uint8_t reserved2[7];
+} file_entry;
+
+typedef struct __attribute__((packed)) {
+    uint8_t entry_type;
+    uint8_t secondary_flags;
+    uint8_t reserved1;
+    uint8_t name_length;
+    uint16_t name_hash;
+    uint16_t reserved2;
+    uint64_t valid_data_length;
+    uint32_t reserved3;
+    uint32_t first_cluster;
+    uint64_t data_length;
+} stream_entry;
+
+typedef struct __attribute__((packed)) {
+    uint8_t entry_type;
+    uint8_t secondary_flags;
+    char filename[30];
+} file_name_entry;
+
+typedef struct {
+    uint64_t poffset_bytes;
+
+    uint32_t bytes_per_sector;      // guess what idiots, it's 512bytes.
+    uint32_t sectors_per_cluster;   // how many sectors are in a single cluster
+    uint32_t bytes_per_cluster;     // how about bytes are in a cluster?
+
+    uint64_t offset_bytes;          // the offset from each fat (bad name microsoft)
+    uint64_t heap_offset_bytes;
+    uint32_t root_cluster;          // the cluster at root
+    uint32_t cluster_count;         // mate, how many clusters are there?
+
+    // second stage, where you get your hopes up then fall 
+    // into depression, Also known has bitmaps and upcases.
+    uint32_t bitmap_cluster;
+    uint64_t bitmap_size;
+    uint32_t upcase_cluster;
+    uint64_t upcase_size;
+} mount_t;
+
+// idk what are bitmaps
+typedef struct __attribute__((packed)) {
+    uint8_t entry_type;
+    uint8_t flags;
+    uint8_t reserved[18];           // thought mainstream operating systems aren't bloated
+                                    // enough? MORE RESERVED ZEROS :D
+    uint32_t first_cluster;         // first cluster in a bitmap
+    uint64_t data_length;           // size of bitmap in bytes
+} bitmap;
+
+// upcases
+typedef struct __attribute__((packed)) {
+    uint8_t entry_type;             // is 0x82
+    uint8_t reserved1;              // guess what, more zeros.
+    uint32_t checksum;              // checksum, idk the magic.
+    uint8_t reserved[12];           // OH GOD MORE ZEROS HELP ME
+    uint32_t first_cluster;         // first cluster of the upcase table
+    uint64_t size;                  // size of table;
+} upcase;
+
+int mount(mount_t *vol, uint8_t *cluster_buf);
 
 // register typedef
 typedef struct regstate {

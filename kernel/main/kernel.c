@@ -69,9 +69,9 @@ void windoge_os(void) {
     ata_probe_devices();
     println("[\033[32mWow\033[0m]     AHCI SATA probed");
 
-    println("[\033[32mDogeing\033[0m] Mounting ext2 filesystem...");
-    if (fs_mount(ata_current_drive())) {
-        println("[\033[91mNot Wow\033[0m] didn't mount.");
+    println("[\033[32mDogeing\033[0m] Mounting exFAT filesystem...");
+    if (fs_mount()) {
+        println("[\033[91mNot Wow\033[0m] didn't mount, god damn it.");
         halt();
     }
     println("[\033[32mWow\033[0m]     Mounted filesystem");
@@ -98,7 +98,7 @@ void windoge_os(void) {
     init_syscalls();
     println("[\033[32mWow\033[0m]     Init system calls done");
 
-    println("\n[\033[96mDoge\033[0m]    Start to test drivers");
+    /*println("\n[\033[96mDoge\033[0m]    Start to test drivers");
     test_ata_persistence();
     if (!fs_exists("THING")) {
         println("[\033[96mDoge\033[0m]    File \"THING\" not found. Creating it");
@@ -120,7 +120,7 @@ void windoge_os(void) {
     } else {
         run_elf("test", 4096);
         println("[\033[32mWow\033[0m]     WHAT IT WORKS???");
-    }
+    }*/
     clear();
     println("\033[96mWindogeOS Booted!\033[0m");
     println("\033[96mThere is literally nothing else mate... other than a \ntesting shell (like kdb)\033[0m");
