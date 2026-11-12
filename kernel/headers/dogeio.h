@@ -85,6 +85,9 @@ bool fs_exists(char *filename);
 int fs_write_force(char* filename, char* data, uint64_t size);
 int fs_list(fs_t* out, int max_entries);
 int fs_delete(char* filename);
+int fs_read_raw(char *filename, uint8_t *buffer, uint64_t size);
+int fs_write_raw(char* filename, uint8_t* buffer, uint64_t size);
+int fs_read_raw_at(char *filename, uint8_t *buffer, uint64_t offset, uint64_t size);
 
 void update_time(void);
 uint64_t get_epoch_seconds(void);

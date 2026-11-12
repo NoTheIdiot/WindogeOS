@@ -12,7 +12,7 @@ static inline uint64_t cluster_to_sectors(const mount_t *vol, uint32_t cluster) 
     return vol->heap_offset_bytes + ((uint64_t)(cluster - 2) * vol->sectors_per_cluster);
 }
 
-static inline int read_offset(mount_t* vol, uint64_t rel_sector, void* buf, size_t sector_count) {
+static inline int read_offset(mount_t* vol, uint64_t rel_sector, uint8_t* buf, size_t sector_count) {
     uint8_t *byte_buf = (uint8_t *)buf;
     uint8_t drive = ata_current_drive();
 
@@ -25,7 +25,7 @@ static inline int read_offset(mount_t* vol, uint64_t rel_sector, void* buf, size
     return 0;
 }
 
-static inline int write_offset(mount_t* vol, uint64_t rel_sector, void* buf, size_t sector_count) {
+static inline int write_offset(mount_t* vol, uint64_t rel_sector, uint8_t* buf, size_t sector_count) {
     uint8_t *byte_buf = (uint8_t *)buf;
     uint8_t drive = ata_current_drive();
 
@@ -341,7 +341,7 @@ found:
     return 0;
 }
 
-int write_file(mount_t *vol, const char *name, const void *data, uint64_t size) {
+int write_file(mount_t *vol, const char *name, const uint8_t* data, uint64_t size) {
     size_t name_len = strlen(name);
     if (name_len == 0 || name_len > 255) return -1;
 
@@ -437,7 +437,7 @@ int write_file(mount_t *vol, const char *name, const void *data, uint64_t size) 
     return -2;
 }
 
-int read_file(mount_t *vol, const char *name, void *out_buf, uint64_t max_size, uint64_t *bytes_read_out) {
+int read_file(mount_t *vol, const char *name, uint8_t* out_buf, uint64_t max_size, uint64_t *bytes_read_out) {
     size_t name_len = strlen(name);
     if (name_len == 0 || name_len > 255) return -1;
 
@@ -509,7 +509,7 @@ int read_file(mount_t *vol, const char *name, void *out_buf, uint64_t max_size, 
     return -2;
 }
 
-int append_file(mount_t *vol, const char *name, const void *data, uint64_t size) {
+int append_file(mount_t *vol, const char *name, const uint8_t* data, uint64_t size) {
     if (size == 0) return 0;
 
     size_t name_len = strlen(name);
