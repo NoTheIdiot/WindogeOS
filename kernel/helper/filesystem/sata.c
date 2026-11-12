@@ -334,26 +334,30 @@ void ata_probe_devices(void) {
 
         ahci_port_t *port = &g_hba->ports[i];
 
+        uint32_t ssts = mmio_read32((uintptr_t)&port->ssts);
+        if ((ssts & 0x0F) == 0) {
+            continue;
+        }
+
         uint32_t cmd = mmio_read32((uintptr_t)&port->cmd);
-        cmd &= ~(1U << 0); 
-        cmd &= ~(1U << 4); 
+        cmd &= ~(1U << 0);
+        cmd &= ~(1U << 4);
         mmio_write32((uintptr_t)&port->cmd, cmd);
 
-        int timeout = 100000;
+        int timeout = 1000;
         while ((mmio_read32((uintptr_t)&port->cmd) & ((1U << 14) | (1U << 15))) && timeout--);
 
         uint32_t sctl = mmio_read32((uintptr_t)&port->sctl);
         sctl = (sctl & ~0x0F) | 0x01;
         mmio_write32((uintptr_t)&port->sctl, sctl);
-        
-        for (volatile int d = 0; d < 10000; d++);
+
+        for (volatile int d = 0; d < 100; d++);
 
         sctl = mmio_read32((uintptr_t)&port->sctl);
         sctl &= ~0x0F;
         mmio_write32((uintptr_t)&port->sctl, sctl);
 
-        timeout = 1000000;
-        uint32_t ssts = 0;
+        timeout = 1000;
         while (timeout--) {
             ssts = mmio_read32((uintptr_t)&port->ssts);
             if ((ssts & 0x0F) == 3) break;
@@ -367,7 +371,7 @@ void ata_probe_devices(void) {
 
         uintptr_t page_cl_fis = pmm_alloc_zeroed_page();
         uintptr_t page_tables_1 = pmm_alloc_zeroed_page();
-        uintptr_t page_tables_2 = pmm_alloc_zeroed_page(); 
+        uintptr_t page_tables_2 = pmm_alloc_zeroed_page();
         uintptr_t port_virt_base = 0x7FFFF0001000ULL + ((uintptr_t)i * (3 * PAGE_SIZE));
         map_kernel_mmio_page(port_virt_base, page_cl_fis);
         map_kernel_mmio_page(port_virt_base + PAGE_SIZE, page_tables_1);
@@ -394,21 +398,16 @@ void ata_probe_devices(void) {
             }
 
             g_cmd_table_phys[i][j] = tbl_phys;
-
             g_cmd_header_virt[i][j].prdtl = 1;
-
-            g_cmd_header_virt[i][j].ctba =
-                (uint32_t)tbl_phys;
-
-            g_cmd_header_virt[i][j].ctbau =
-                (uint32_t)(tbl_phys >> 32);
+            g_cmd_header_virt[i][j].ctba = (uint32_t)tbl_phys;
+            g_cmd_header_virt[i][j].ctbau = (uint32_t)(tbl_phys >> 32);
         }
 
         uint32_t port_cmd = mmio_read32((uintptr_t)&port->cmd);
-        port_cmd |= (1U << 4) | (1U << 0); // FRE (bit 4) and ST (bit 0)
+        port_cmd |= (1U << 4) | (1U << 0);
         mmio_write32((uintptr_t)&port->cmd, port_cmd);
 
-        timeout = 1000000;
+        timeout = 1000;
         while (timeout--) {
             uint32_t tfd = mmio_read32((uintptr_t)&port->tfd);
             if (!(tfd & (0x80U | 0x08U))) break;
@@ -426,7 +425,7 @@ void ata_probe_devices(void) {
         sprintln(hex);
 
         g_drive_present[i] = 1;
-        g_drive_sector_counts[i] = 20971520ULL; 
+        g_drive_sector_counts[i] = 20971520ULL;
         if (first_drive == -1) {
             first_drive = i;
         }
