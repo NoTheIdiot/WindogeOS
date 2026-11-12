@@ -147,7 +147,7 @@ int execute(int argc, char** argv) {
             println("Need a filename.");
             return -1;
         }
-        if (fs_exists(argv[1])) {
+        if (!fs_exists(argv[1])) {
             println("File already exists.");
             return -1;
         }
@@ -190,9 +190,9 @@ int execute(int argc, char** argv) {
             println("File doesn't exist");
             return -1;
         }
+        fs_delete(argv[1]);
         return 0;
     }
-    
 
     if (strcmp(argv[0], "dir") == 0) {
         static fs_t files[MAX_DIR_ENTRIES];
