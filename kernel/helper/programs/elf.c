@@ -19,6 +19,15 @@
 #define USER_STACK_SIZE       (PAGE_SIZE * USER_STACK_PAGE_COUNT)
 #define USER_STACK_BASE       (USER_STACK_TOP - USER_STACK_SIZE)
 
+// Per-CPU structure for handling syscall stack swapping via GS MSRs
+typedef struct __attribute__((packed)) {
+    uint64_t kernel_stack;       // Offset 0: Kernel RSP loaded on syscall
+    uint64_t user_stack_scratch; // Offset 8: Temporary storage for user RSP
+} cpu_gs_t;
+
+// Static allocation for bootstrap CPU (or replace with your kernel's per-CPU block)
+static cpu_gs_t bootstrap_cpu_gs;
+
 typedef struct __attribute__((packed)) {
     uint8_t  e_ident[16];
     uint16_t e_type;
@@ -68,177 +77,246 @@ static uint64_t align_up_page(uint64_t value)
 
 int run_elf(char *filename, uint64_t size)
 {
-    sprintln("[ELF] Starting running programs...");
-    if (!filename || size < sizeof(elf64_ehdr)) {
-        sprintln("[ELF] Error: Invalid filename or file size too small for ELF header");
+    sprintln("[ELF] Starting program loader");
+
+    if (!filename) {
+        sprintln("[ELF] Invalid filename");
+        return -1;
+    }
+
+    if (!hhdm_request.response) {
+        sprintln("[ELF] No HHDM response");
         return -1;
     }
 
     elf64_ehdr ehdr;
-    memset(&ehdr, 0, sizeof(ehdr));
 
-    sprintln("[ELF] Attempting to read ELF header...");
-    int bytes_read = fs_read_raw_at(filename, (uint8_t *)&ehdr, 0, sizeof(ehdr));
-    
-    char num_buf[32];
-    print("[ELF] bytes_read: ");
-    uint64_to_str((uint64_t)bytes_read, num_buf);
-    println(num_buf);
-
-    if (bytes_read != (int)sizeof(ehdr))
+    if (fs_read_raw_at(
+            filename,
+            (uint8_t *)&ehdr,
+            0,
+            sizeof(ehdr))
+        != (int)sizeof(ehdr))
     {
-        sprintln("[ELF] Error: Failed to read complete ELF header from filesystem");
+        sprintln("[ELF] Failed to read ELF header");
         return -2;
     }
 
-    print("[ELF] e_ident[0..3] hex: 0x");
-    char hex_buf[16];
-    uint64_to_str(ehdr.e_ident[0], hex_buf); print(hex_buf);
-    print(" 0x");
-    uint64_to_str(ehdr.e_ident[1], hex_buf); print(hex_buf);
-    print(" 0x");
-    uint64_to_str(ehdr.e_ident[2], hex_buf); print(hex_buf);
-    print(" 0x");
-    uint64_to_str(ehdr.e_ident[3], hex_buf); println(hex_buf);
-
-    sprintln("[ELF] checking if the headers are empty");
-    uint8_t buffer[4];
-    char num_buffer[8];
-    int read = fs_read_raw(filename, buffer, 4);
-    if (read <= 0) {
-        sprintln("[ELF] WAIT FILE IS EMPTY??!?!????");
-    } else {
-        sprint("[ELF] file aint empty, size: ");
-        itoa(read, num_buffer);
-        sprintln(num_buffer);
-    }
-
-    sprintln("[ELF] Checking ELF magic and header fields one by one...");
-
-    if (buffer[0] != 0x7F) {
-        sprintln("[ELF] FAIL: e_ident[0] != 0x7F");
-        return -3;
-    }
-
-    if (buffer[1] != 'E') {
-        sprintln("[ELF] FAIL: e_ident[1] != 'E'");
-        return -3;
-    }
-
-    if (buffer[2] != 'L') {
-        sprintln("[ELF] FAIL: e_ident[2] != 'L'");
-        return -3;
-    }
-
-    if (buffer[3] != 'F') {
-        sprintln("[ELF] FAIL: e_ident[3] != 'F'");
+    if (ehdr.e_ident[0] != 0x7F ||
+        ehdr.e_ident[1] != 'E'  ||
+        ehdr.e_ident[2] != 'L'  ||
+        ehdr.e_ident[3] != 'F')
+    {
+        sprintln("[ELF] Invalid ELF magic");
         return -3;
     }
 
     if (ehdr.e_ident[4] != ELF_CLASS_64) {
-        sprintln("[ELF] FAIL: e_ident[4] != ELF_CLASS_64");
+        sprintln("[ELF] Not ELF64");
         return -3;
     }
 
     if (ehdr.e_ident[5] != ELF_DATA_LSB) {
-        sprintln("[ELF] FAIL: e_ident[5] != ELF_DATA_LSB");
+        sprintln("[ELF] Unsupported endian");
+        return -3;
+    }
+
+    if (ehdr.e_version != ELF_VERSION_CURRENT) {
+        sprintln("[ELF] Unsupported ELF version");
         return -3;
     }
 
     if (ehdr.e_type != ELF_TYPE_EXEC) {
-        sprintln("[ELF] FAIL: e_type != ELF_TYPE_EXEC");
+        sprintln("[ELF] Not executable");
         return -3;
     }
 
     if (ehdr.e_machine != ELF_MACHINE_X86_64) {
-        sprintln("[ELF] FAIL: e_machine != ELF_MACHINE_X86_64");
+        sprintln("[ELF] Not x86_64");
         return -3;
     }
 
-    sprintln("[ELF] Magic and header checks passed successfully!");
+    if (ehdr.e_phentsize != sizeof(elf64_phdr)) {
+        sprintln("[ELF] Invalid PHDR size");
+        return -3;
+    }
 
-    sprintln("[ELF] Loop through program headers");
-    for (uint16_t i = 0; i < ehdr.e_phnum; i++) {
+    if (ehdr.e_phnum == 0) {
+        sprintln("[ELF] No program headers");
+        return -3;
+    }
+
+    sprintln("[ELF] Mapping PT_LOAD segments");
+
+    for (uint16_t i = 0; i < ehdr.e_phnum; i++)
+    {
         elf64_phdr phdr;
 
-        uint64_t phdr_offset = ehdr.e_phoff + ((uint64_t)i * ehdr.e_phentsize);
+        uint64_t phdr_offset =
+            ehdr.e_phoff +
+            ((uint64_t)i * ehdr.e_phentsize);
 
-        if (fs_read_raw_at(filename, (uint8_t *)&phdr, phdr_offset, sizeof(phdr)) != (int)sizeof(phdr))
+        if (fs_read_raw_at(
+                filename,
+                (uint8_t *)&phdr,
+                phdr_offset,
+                sizeof(phdr))
+            != (int)sizeof(phdr))
         {
-            sprintln("[ELF] Error: Failed to read program header index");
+            sprintln("[ELF] Failed to read PHDR");
             return -4;
         }
 
-        if (phdr.p_type != PT_LOAD || phdr.p_memsz == 0)
+        if (phdr.p_type != PT_LOAD)
             continue;
 
-        uint64_t page_start = align_down_page(phdr.p_vaddr);
-        uint64_t page_end = align_up_page(phdr.p_vaddr + phdr.p_memsz);
+        if (phdr.p_memsz == 0)
+            continue;
 
-        for (uint64_t page_vaddr = page_start; page_vaddr < page_end; page_vaddr += PAGE_SIZE)
+        if (phdr.p_memsz < phdr.p_filesz) {
+            sprintln("[ELF] Corrupt segment");
+            return -4;
+        }
+
+        if (phdr.p_memsz > UINT64_MAX - phdr.p_vaddr) {
+            sprintln("[ELF] Segment overflow");
+            return -4;
+        }
+
+        if (phdr.p_vaddr >= USER_STACK_BASE) {
+            sprintln("[ELF] Segment overlaps stack");
+            return -4;
+        }
+
+        uint64_t page_start =
+            align_down_page(phdr.p_vaddr);
+
+        uint64_t page_end =
+            align_up_page(
+                phdr.p_vaddr +
+                phdr.p_memsz);
+
+        for (uint64_t page_vaddr = page_start;
+             page_vaddr < page_end;
+             page_vaddr += PAGE_SIZE)
         {
-            uint64_t page_phys = pmm_alloc_zeroed_page();
+            uint64_t page_phys =
+                pmm_alloc_zeroed_page();
+
             if (!page_phys) {
-                sprintln("[ELF] Error: PMM allocation failed for user page");
+                sprintln("[ELF] Out of physical pages");
                 return -5;
             }
 
-            map_user_page(page_vaddr, page_phys);
+            map_user_page(
+                page_vaddr,
+                page_phys);
 
-            uint64_t file_segment_start = phdr.p_vaddr;
-            uint64_t file_segment_end = phdr.p_vaddr + phdr.p_filesz;
+            uint64_t file_start =
+                phdr.p_vaddr;
 
-            uint64_t page_limit = page_vaddr + PAGE_SIZE;
-            uint64_t copy_start = (page_vaddr > file_segment_start) ? page_vaddr : file_segment_start;
-            uint64_t copy_end = (page_limit < file_segment_end) ? page_limit : file_segment_end;
+            uint64_t file_end =
+                phdr.p_vaddr +
+                phdr.p_filesz;
 
-            if (copy_start < copy_end) {
-                uint64_t file_offset = phdr.p_offset + (copy_start - file_segment_start);
-                uint64_t copy_size = copy_end - copy_start;
+            uint64_t page_limit =
+                page_vaddr +
+                PAGE_SIZE;
 
-                uint8_t *dest = (uint8_t *)(page_phys + hhdm_request.response->offset + (copy_start - page_vaddr));
+            uint64_t copy_start =
+                (page_vaddr > file_start)
+                    ? page_vaddr
+                    : file_start;
 
-                if (fs_read_raw_at(filename, dest, file_offset, copy_size) != (int)copy_size)
+            uint64_t copy_end =
+                (page_limit < file_end)
+                    ? page_limit
+                    : file_end;
+
+            if (copy_start < copy_end)
+            {
+                uint64_t file_offset =
+                    phdr.p_offset +
+                    (copy_start - file_start);
+
+                uint64_t copy_size =
+                    copy_end - copy_start;
+
+                uint8_t *dest =
+                    (uint8_t *)(
+                        page_phys +
+                        hhdm_request.response->offset +
+                        (copy_start - page_vaddr));
+
+                if (fs_read_raw_at(
+                        filename,
+                        dest,
+                        file_offset,
+                        copy_size)
+                    != (int)copy_size)
                 {
-                    sprintln("[ELF] Error: Failed to copy segment data into user page");
+                    sprintln("[ELF] Segment read failed");
                     return -6;
                 }
             }
         }
     }
 
-    for (uint64_t i = 0; i < USER_STACK_PAGE_COUNT; i++)
+    sprintln("[ELF] Allocating stack");
+
+    for (uint64_t i = 0;
+         i < USER_STACK_PAGE_COUNT;
+         i++)
     {
-        uint64_t page_phys = pmm_alloc_zeroed_page();
+        uint64_t page_phys =
+            pmm_alloc_zeroed_page();
+
         if (!page_phys) {
-            sprintln("[ELF] Error: PMM allocation failed for stack page");
+            sprintln("[ELF] Stack allocation failed");
             return -7;
         }
 
-        map_user_page(USER_STACK_BASE + (i * PAGE_SIZE), page_phys);
+        map_user_page(
+            USER_STACK_BASE +
+            (i * PAGE_SIZE),
+            page_phys);
     }
 
-    uint64_t stack_top = USER_STACK_TOP & ~0xFULL;
+    uint64_t stack_top =
+        USER_STACK_TOP - 16;
 
-    println("[ELF] Loading userland program...");
-    
-    print("      Entry: ");
-    uint64_to_str(ehdr.e_entry, num_buf);
-    println(num_buf);
-    
-    print("      Stack: ");
-    uint64_to_str(stack_top, num_buf);
-    println(num_buf);
+    char buf[32];
+
+    sprint("[ELF] Entry = ");
+    uint64_to_str(ehdr.e_entry, buf);
+    sprintln(buf);
+
+    sprint("[ELF] Stack = ");
+    uint64_to_str(stack_top, buf);
+    sprintln(buf);
+
+    sprintln("[ELF] Jumping to ring 3");
+
+    // initialize IA32_KERNEL_GS_BASE (MSR 0xC0000102) so that 
+    // syscall entry won't fault when swapping gs and writing to [gs:8].
+    // (Ensure bootstrap_cpu_gs.kernel_stack points to your actual kernel stack top)
+    uint64_t gs_base = (uint64_t)&bootstrap_cpu_gs;
+    __asm__ volatile (
+        "wrmsr"
+        :
+        : "c" (0xC0000102),
+          "a" ((uint32_t)(gs_base & 0xFFFFFFFF)),
+          "d" ((uint32_t)(gs_base >> 32))
+    );
 
     to_userland_ring3_args(
         ehdr.e_entry,
         stack_top,
-        0,  /* argc */
-        0   /* argv */
-    );
+        0,
+        0);
+
+    sprintln("[ELF] Returned from userland unexpectedly");
 
     for (;;)
-        __asm__ volatile ("hlt");
-
-    return 0;
+        __asm__ volatile("hlt");
 }

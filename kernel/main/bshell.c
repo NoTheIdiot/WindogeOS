@@ -257,6 +257,11 @@ int execute(int argc, char** argv) {
         return 0;
     }
 
+    if (strcmp(argv[0], "test") == 0) {
+        run_elf("program", 8192);
+        return 0;
+    }
+
     if (strcmp(argv[0], "exit") == 0 ||
         strcmp(argv[0], "kys")  == 0) {
         println("Returning back, will halt phooking forever.");

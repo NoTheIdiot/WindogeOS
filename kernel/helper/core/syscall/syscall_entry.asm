@@ -5,39 +5,42 @@ extern syscall_handler
 
 section .text
 syscall_entry:
-    swapgs                              
+    swapgs                                    
 
-    mov qword [gs:8], rsp               
-    mov rsp, qword [gs:0]               
+    ; save user RSP into [gs:8] and load kernel RSP from [gs:0]
+    ; IA32_KERNEL_GS_BASE must be initialized to a valid per-CPU structure 
+    ; pointer before userland runs, ensuring [gs:8] doesn't resolve to NULL (0x8).
+    mov qword [gs:8], rsp                     
+    mov rsp, qword [gs:0]                     
 
-    push qword [gs:8]                   
+    push qword [gs:8]                         
     push r15
     push r14
     push r13
     push r12
-    push r11                            
-    push r10                            
+    push r11                                  
+    push r10                                  
     push r9
     push r8
     push rbp
     push rdi
     push rsi
     push rdx
-    push rcx                            
+    push rcx                                  
     push rbx
     push rax            
 
-    mov rcx, r10                        
+    mov rcx, r10                              
 
-    mov rdi, rsp                        
+    mov rdi, rsp                              
     
     call syscall_handler
     
     mov [rsp], rax        
     
-    pop rax                             
+    pop rax                                   
     pop rbx
-    pop rcx                             
+    pop rcx                                   
     pop rdx
     pop rsi
     pop rdi
@@ -45,15 +48,15 @@ syscall_entry:
     pop r8
     pop r9
     pop r10
-    pop r11                             
+    pop r11                                   
     pop r12
     pop r13
     pop r14
     pop r15
     
-    pop qword [gs:8]                    
+    pop qword [gs:8]                          
     
-    mov rsp, qword [gs:8]               
-    swapgs                              
+    mov rsp, qword [gs:8]                     
+    swapgs                                    
 
     o64 sysret

@@ -39,13 +39,35 @@ volatile uint64_t limine_request_end_marker[] = LIMINE_REQUESTS_END_MARKER;
 
 extern void backup_shell(void);
 
+// Ensure cpu_gs_t is defined (either here or via a header)
+typedef struct __attribute__((packed)) {
+    uint64_t kernel_stack;
+    uint64_t user_stack_scratch;
+} cpu_gs_t;
+
+static cpu_gs_t bootstrap_cpu_gs;
+
+void init_cpu_gs(uint64_t kernel_stack_top) {
+    bootstrap_cpu_gs.kernel_stack = kernel_stack_top;
+    bootstrap_cpu_gs.user_stack_scratch = 0;
+
+    uint64_t gs_base = (uint64_t)&bootstrap_cpu_gs;
+    __asm__ volatile (
+        "wrmsr"
+        :
+        : "c" (0xC0000102), // IA32_KERNEL_GS_BASE
+          "a" ((uint32_t)(gs_base & 0xFFFFFFFF)),
+          "d" ((uint32_t)(gs_base >> 32))
+    );
+}
+
 void windoge_os(void) {
     if (LIMINE_BASE_REVISION_SUPPORTED(limine_base_revision) == false) {
         halt();
     }
     cursor_show();
     clear();
-    println("[\033[32mDoge\033[0m]    WindogeOS started booting");
+    println("[\033[32mDoge\033[0m]     WindogeOS started booting");
     println("[\033[32mDogeing\033[0m] Init GDT and TSS...");
     init_gdt_tss();
     println("[\033[32mWow\033[0m]     Init GDT and TSS sucessful");
@@ -60,6 +82,14 @@ void windoge_os(void) {
     init_apic();
     println("[\033[32mWow\033[0m]     Init APIC sucessful");
     init_vmm();
+
+    println("[\033[32mDogeing\033[0m] Init CPU GS");
+    
+    uint64_t current_rsp;
+    __asm__ volatile ("movq %%rsp, %0" : "=r"(current_rsp));
+    init_cpu_gs(current_rsp);
+    
+    println("[\033[32mWow\033[0m]     Init CPU GS sucessful");
 
     println("[\033[32mDogeing\033[0m] Init PCIE...");
     init_pcie();
@@ -89,9 +119,9 @@ void windoge_os(void) {
     update_time();
     println("[\033[32mWow\033[0m]     Updated RTC time");
 
-    print("[\033[32mDoge\033[0m]    Current Date: ");
+    print("[\033[32mDoge\033[0m]     Current Date: ");
     println(get_date());
-    print("[\033[32mDoge\033[0m]    Current Time: ");
+    print("[\033[32mDoge\033[0m]     Current Time: ");
     println(get_time());
 
     println("[\033[32mDogeing\033[0m] Init system calls...");
