@@ -180,6 +180,20 @@ int execute(int argc, char** argv) {
         return 0;
     }
 
+    if (strcmp(argv[0], "del") == 0) {
+        if (argv[1] == NULL) {
+            println("Need one argument.");
+            return -1;
+        }
+
+        if (!fs_exists(argv[1])) {
+            println("File doesn't exist");
+            return -1;
+        }
+        return 0;
+    }
+    
+
     if (strcmp(argv[0], "dir") == 0) {
         static fs_t files[MAX_DIR_ENTRIES];
         int count = fs_list(files, MAX_DIR_ENTRIES);
@@ -207,6 +221,22 @@ int execute(int argc, char** argv) {
             uint32_to_str(files[i].size, size_str);
             print(size_str);
             println(" bytes)");
+        }
+        return 0;
+    }
+
+    if (strcmp(argv[0], "overwrite") == 0) {
+        if (argv[1] == NULL || argv[2] == NULL) {
+            println("Need two arguments.");
+            return -1;
+        }
+        if (!fs_exists(argv[1])) {
+            println("File doesn't exist.");
+            return -1;
+        }
+        if (fs_write_force(argv[1], argv[2], strlen(argv[2])) != 0) {
+            println("Failed to write file.");
+            return -1;
         }
         return 0;
     }

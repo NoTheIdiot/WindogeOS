@@ -701,3 +701,71 @@ int list_dir(mount_t *vol, fs_t *out_files, int max_files) {
 
     return count;
 }
+
+int delete_file(mount_t *vol, const char *name) {
+    size_t name_len = strlen(name);
+    if (name_len == 0 || name_len > 255) return -1;
+
+    uint8_t window[WINDOW_SIZE];
+    uint8_t fat_buf[SECTOR_SIZE];
+
+    uint64_t root_sector  = cluster_to_sectors(vol, vol->root_cluster);
+    uint32_t root_sectors = vol->bytes_per_cluster / SECTOR_SIZE;
+
+    for (uint32_t sec = 0; sec < root_sectors; sec++) {
+        uint64_t current_sec_lba = root_sector + sec;
+        if (read_offset(vol, current_sec_lba, window, 1) != 0) return -1;
+        
+        if (sec + 1 < root_sectors) {
+            if (read_offset(vol, root_sector + sec + 1, window + SECTOR_SIZE, 1) != 0) return -1;
+        } else {
+            memset(window + SECTOR_SIZE, 0, SECTOR_SIZE);
+        }
+
+        for (uint32_t slot = 0; slot < 16; slot++) {
+            uint8_t *ptr = &window[slot * 32];
+            if (*ptr == 0x00) return -2;
+            if (*ptr != 0x85) continue;  // not a fine
+            file_entry   *fe = (file_entry *)ptr;
+            stream_entry *se = (stream_entry *)(ptr + 32);
+            if (se->entry_type != 0xC0 || se->name_length != name_len) continue;
+
+            // verify if the filenames match
+            uint8_t match = 1;
+            for (size_t i = 0; i < name_len; i++) {
+                file_name_entry *fn = (file_name_entry *)(ptr + (2 + (i / 15)) * 32);
+                uint16_t *utf16 = (uint16_t *)fn->filename;
+                if (utf16[i % 15] != (uint8_t)name[i]) {
+                    match = 0;
+                    break;
+                }
+            }
+
+            if (!match) continue;
+
+            uint8_t total_entries = 1 + fe->scount;
+            free_cluster_chain(vol, se->first_cluster, se->data_length, se->secondary_flags & 0x02);
+
+           
+            for (uint8_t e = 0; e < total_entries; e++) {
+                uint32_t target_slot = slot + e;
+                if (target_slot < 16) {
+                    window[target_slot * 32] &= ~0x80; 
+                } else {
+                    window[target_slot * 32] &= ~0x80;
+                }
+            }
+
+            // write updated sectors
+            if (write_offset(vol, current_sec_lba, window, 1) != 0) return -4;
+            
+            if ((slot + total_entries > 16) && (sec + 1 < root_sectors)) {
+                if (write_offset(vol, root_sector + sec + 1, window + SECTOR_SIZE, 1) != 0) return -4;
+            }
+
+            return 0; // Successfully deleted
+        }
+    }
+
+    return -2; // File not found
+}

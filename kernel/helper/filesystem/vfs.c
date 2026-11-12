@@ -50,3 +50,7 @@ int fs_write(char* filename, char* data, uint64_t size) {
 int fs_list(fs_t* out, int max_entries) {
     return list_dir(&exfat_vol, out, max_entries);
 }
+
+int fs_delete(char* filename) {
+    return delete_file(&exfat_vol, filename);
+}

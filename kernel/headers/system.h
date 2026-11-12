@@ -230,6 +230,7 @@ int write_file(mount_t *vol, const char *name, const void *data, uint64_t size);
 int read_file(mount_t *vol, const char *name, void *out_buf, uint64_t max_size, uint64_t *bytes_read_out);
 int append_file(mount_t *vol, const char *name, const void *data, uint64_t size);
 int list_dir(mount_t *vol, fs_t *out_files, int max_files);
+int delete_file(mount_t *vol, const char *name);
 
 // register typedef
 typedef struct regstate {
