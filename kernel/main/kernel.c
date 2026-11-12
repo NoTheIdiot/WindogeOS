@@ -67,7 +67,7 @@ void windoge_os(void) {
     }
     cursor_show();
     clear();
-    println("[\033[32mDoge\033[0m]     WindogeOS started booting");
+    println("[\033[32mDoge\033[0m]    WindogeOS started booting");
     println("[\033[32mDogeing\033[0m] Init GDT and TSS...");
     init_gdt_tss();
     println("[\033[32mWow\033[0m]     Init GDT and TSS sucessful");
@@ -122,9 +122,9 @@ void windoge_os(void) {
     update_time();
     println("[\033[32mWow\033[0m]     Updated RTC time");
 
-    print("[\033[32mDoge\033[0m]     Current Date: ");
+    print("[\033[32mDoge\033[0m]    Current Date: ");
     println(get_date());
-    print("[\033[32mDoge\033[0m]     Current Time: ");
+    print("[\033[32mDoge\033[0m]    Current Time: ");
     println(get_time());
 
     println("[\033[32mDogeing\033[0m] Init system calls...");
