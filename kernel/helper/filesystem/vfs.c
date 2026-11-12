@@ -23,7 +23,7 @@ int fs_write_force(char* filename, char* data, uint64_t size) {
 }
 
 int fs_read(char* filename, char* data, uint64_t size) {
-    uint64_t buffer;
+    uint64_t buffer = 0;
     read_file(&exfat_vol, filename, (uint8_t*)data, size, &buffer);
     return buffer;
 }
@@ -70,11 +70,26 @@ int fs_write_raw(char* filename, uint8_t* buffer, uint64_t size) {
 }
 
 int fs_read_raw_at(char *filename, uint8_t *buffer, uint64_t offset, uint64_t size) {
-    static uint8_t temp[16 * 1024 * 1024];
+    if (size == 0) {
+        return 0;
+    }
+
+    if (offset == 0) {
+        uint64_t bytes_read = 0;
+        if (read_file(&exfat_vol, filename, buffer, size, &bytes_read) != 0) {
+            return -1;
+        }
+        return (int)bytes_read;
+    }
+
+    static uint8_t temp[65536];
+    uint64_t total_needed = offset + size;
+    if (total_needed > sizeof(temp)) {
+        return -1;
+    }
 
     uint64_t bytes_read = 0;
-
-    if (read_file(&exfat_vol, filename, temp, sizeof(temp), &bytes_read) != 0){
+    if (read_file(&exfat_vol, filename, temp, total_needed, &bytes_read) != 0) {
         return -1;
     }
 

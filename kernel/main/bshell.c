@@ -257,8 +257,13 @@ int execute(int argc, char** argv) {
         return 0;
     }
 
-    if (strcmp(argv[0], "test") == 0) {
+    if (strcmp(argv[0], "test1") == 0) {
         run_elf("program", 8192);
+        return 0;
+    }
+
+    if (strcmp(argv[0], "test2") == 0) {
+        speaker_beep(500, 500);
         return 0;
     }
 

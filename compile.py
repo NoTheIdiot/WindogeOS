@@ -20,7 +20,7 @@ hdd_size_mib = 6
 BOOT_PARTITION_SIZE_MIB = 1
 
 qemu_config = {
-    "memory": "64M",
+    "memory": "3M",
     "machine": [],
     "cpu": [],
     "devices": [
@@ -526,8 +526,8 @@ def execute_qemu_hdd():
         
     qemu_arguments = [
         f"qemu-system-{architecture}",
-        "-m", "2M",
-        "-M", "q35",
+        "-audiodev", "pa,id=snd0",
+        "-M", "q35,pcspk-audiodev=snd0",
         "-device", "ahci,id=ahci",
         "-drive", f"id=disk,file={img_target},format=raw,if=none",
         "-device", "ide-hd,drive=disk,bus=ahci.0",
@@ -538,6 +538,7 @@ def execute_qemu_hdd():
         "-device", "piix3-usb-uhci,id=uhci",
         "-device", "usb-kbd,bus=uhci.0"
     ]
+
 
     
     if qemu_config.get("cpu"):

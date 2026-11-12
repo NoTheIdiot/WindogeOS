@@ -39,13 +39,13 @@ volatile uint64_t limine_request_end_marker[] = LIMINE_REQUESTS_END_MARKER;
 
 extern void backup_shell(void);
 
-// Ensure cpu_gs_t is defined (either here or via a header)
 typedef struct __attribute__((packed)) {
     uint64_t kernel_stack;
     uint64_t user_stack_scratch;
 } cpu_gs_t;
 
 static cpu_gs_t bootstrap_cpu_gs;
+volatile uint32_t ticks;
 
 void init_cpu_gs(uint64_t kernel_stack_top) {
     bootstrap_cpu_gs.kernel_stack = kernel_stack_top;
@@ -78,8 +78,11 @@ void windoge_os(void) {
     serial_init();
     println("[\033[32mWow\033[0m]     Init serial sucess");
     sprintln("Testing serial");
-    println("[\033[32mDogeing\033[0m] Init APIC...");
+    println("[\033[32mDogeing\033[0m] Init APIC... (and timer)");
     init_apic();
+    init_apic_timer(0x20, 1000);
+    ticks = 1000;
+    sti();
     println("[\033[32mWow\033[0m]     Init APIC sucessful");
     init_vmm();
 

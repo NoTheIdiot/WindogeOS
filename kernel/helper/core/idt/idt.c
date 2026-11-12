@@ -40,6 +40,8 @@ static idtr_t      idtr;
 
 extern uint64_t isr_stub_table[49];
 extern void idt_load(idtr_t *idtr_ptr);
+extern volatile uint32_t ticks;
+extern void apic_eoi(void);
 
 static inline uint64_t read_cr2(void) {
     uint64_t val;
@@ -76,6 +78,12 @@ void idt_set_gate(uint8_t vector, uint64_t handler, uint8_t ist, uint8_t flags) 
 
 interrupt_frame_t *isr_common_handler(interrupt_frame_t *frame) {
     if (frame->vector == 255) {
+        return frame;
+    }
+
+    if (frame->vector == 32) {
+        ticks++;
+        apic_eoi();
         return frame;
     }
 

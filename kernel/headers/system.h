@@ -271,9 +271,15 @@ void uhci_keyboard_interrupt_handler(void);
 
 // apic
 void apic_eoi(void);
+void init_apic_timer(uint8_t vector, uint32_t initial_count);
 
 // power state functions
 void reboot(void);
 void shutdown(void);
+
+// pc speaker
+void sleep_ms(uint32_t ms);
+void speaker_stop(void);
+void speaker_beep(uint32_t hz, uint32_t duration_ms);
 
 #endif

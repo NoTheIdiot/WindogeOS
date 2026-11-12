@@ -5,6 +5,8 @@
 #include <limine.h>
 #include <dogeio.h>
 
+extern volatile uint32_t ticks;
+
 extern volatile struct limine_hhdm_request hhdm_request;
 extern volatile struct limine_memmap_request memmap_request;
 static uintptr_t lapic_base;
@@ -32,6 +34,11 @@ static uintptr_t lapic_base;
 #define APIC_REG_LVT_LINT1   0x0360U
 #define APIC_REG_LVT_ERR     0x0370U
 #define APIC_SVR_SOFTWARE_ENABLE 0x100U
+
+#define APIC_REG_TIMER_INITCNT 0x0380U
+#define APIC_REG_TIMER_CURRCNT 0x0390U
+#define APIC_REG_TIMER_DIV     0x03E0U
+#define APIC_TIMER_PERIODIC    (1U << 17)
 
 void cpu_set_apic_base(uintptr_t apic) {
     uint64_t msr_val = rdmsr(IA32_APIC_BASE_MSR);
@@ -124,3 +131,21 @@ void apic_eoi(void) {
         write_reg(APIC_REG_EOI, 0);
     }
 }
+
+void init_apic_timer(uint8_t vector, uint32_t initial_count) {
+    if (lapic_base == 0) return;
+
+    write_reg(APIC_REG_TIMER_DIV, 0x3);
+    write_reg(APIC_REG_LVT_TIMER, (uint32_t)vector | APIC_TIMER_PERIODIC);
+    write_reg(APIC_REG_TIMER_INITCNT, initial_count);
+}
+
+
+// the other stuff, like sleep.
+void sleep_ms(uint32_t ms) {
+    uint32_t start = ticks;
+    while ((uint32_t)(ticks - start) < ms) {
+        __asm__ volatile("hlt");
+    }
+}
+
