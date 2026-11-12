@@ -18,7 +18,12 @@ uint64_t syscall_handler_switch(registers_t regs, uint64_t sc_num) {
         }
 
         default:
-            println("[\033[91mNot Wow\033[0m] Unknown system call tried to execute, but doesn't have id.");
+            print("[\033[91mNot Wow\033[0m] Unknown system call tried to execute, but doesn't have id. ");
+            sprint("Unknown system call tried to execute, but doesn't have id. ");
+            char buffer[4];
+            itoa((int)sc_num, buffer);
+            println(buffer);
+            sprintln(buffer);
             break;
     }
 }

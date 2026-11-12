@@ -416,7 +416,7 @@ void init_syscalls(void) {
     wrmsr(MSR_IA32_EFER, rdmsr(MSR_IA32_EFER) | (1ULL << 0));
 
     uint64_t kernel_cs = 0x08; 
-    uint64_t user_base = 0x13;
+    uint64_t user_base = 0x10;
     
     uint64_t star = (kernel_cs << 32) | (user_base << 48);
     wrmsr(MSR_IA32_STAR, star);
