@@ -12,10 +12,17 @@ section .text
 
 system_run_elf:
     mov [rel saved_rsp], rsp
-   call run_elf
+    call run_elf
     ret
 
 syscall_exit_to_launcher:
+    cli
     mov rsp, [rel saved_rsp]
+    mov ax, 0x10
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+    sti
     xor eax, eax
     ret
