@@ -26,4 +26,5 @@ uint64_t syscall_handler_switch(registers_t regs, uint64_t sc_num) {
             sprintln(buffer);
             break;
     }
+    return 0;
 }

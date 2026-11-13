@@ -261,6 +261,7 @@ def compile_userland_programs():
 
     clang_path = find_clang()
     clangxx_path = shutil.which("clang++") or "clang++"
+    nasm_path = shutil.which("nasm") or "nasm"
 
     target_triples = {
         "x86_64": "x86_64-elf",
@@ -281,42 +282,66 @@ def compile_userland_programs():
         if item.startswith("bin-"):
             continue
 
-        if os.path.isfile(item_path) and item.endswith((".c", ".cpp", ".cc", ".s", ".S")):
+        if os.path.isfile(item_path) and item.endswith((".c", ".cpp", ".cc", ".s", ".S", ".asm")):
             prog_name = os.path.splitext(item)[0]
             obj_path = os.path.join(out_dir, f"{prog_name}.o")
             elf_path = os.path.join(out_dir, prog_name)
 
             is_cpp = item.endswith((".cpp", ".cc"))
+            is_asm = item.endswith(".asm")
             compiler_driver = clangxx_path if is_cpp else clang_path
 
-            if is_cpp:
+            if is_asm:
+                if architecture != "x86_64":
+                    print(f"Error: .asm userland programs require x86_64 architecture for NASM.")
+                    sys.exit(1)
                 compile_cmd = [
-                    clangxx_path, f"--target={target_triple}",
-                    "-ffreestanding", "-fno-pie", "-fno-stack-protector",
-                    "-c", item_path, "-o", obj_path
+                    nasm_path,
+                    "-felf64",
+                    item_path,
+                    "-o", obj_path
                 ]
+                run_command(compile_cmd)
+
+                link_cmd = [
+                    clang_path,
+                    "-nostdlib",
+                    "-static",
+                    "-T", linker_script,
+                    "-o", elf_path,
+                    obj_path
+                ]
+                if architecture == "x86_64":
+                    link_cmd.append("-m64")
             else:
-                compile_cmd = [
-                    clang_path, f"--target={target_triple}",
-                    "-ffreestanding", "-fno-pie", "-fno-stack-protector",
-                    "-c", item_path, "-o", obj_path
+                if is_cpp:
+                    compile_cmd = [
+                        clangxx_path, f"--target={target_triple}",
+                        "-ffreestanding", "-fno-pie", "-fno-stack-protector",
+                        "-c", item_path, "-o", obj_path
+                    ]
+                else:
+                    compile_cmd = [
+                        clang_path, f"--target={target_triple}",
+                        "-ffreestanding", "-fno-pie", "-fno-stack-protector",
+                        "-c", item_path, "-o", obj_path
+                    ]
+                if architecture == "x86_64":
+                    compile_cmd.extend(["-mno-red-zone", "-m64"])
+
+                run_command(compile_cmd)
+
+                link_cmd = [
+                    compiler_driver,
+                    f"--target={target_triple}",
+                    "-nostdlib",
+                    "-static",
+                    "-T", linker_script,
+                    "-o", elf_path,
+                    obj_path
                 ]
-            if architecture == "x86_64":
-                compile_cmd.extend(["-mno-red-zone", "-m64"])
-
-            run_command(compile_cmd)
-
-            link_cmd = [
-                compiler_driver,
-                f"--target={target_triple}",
-                "-nostdlib",
-                "-static",
-                "-T", linker_script,
-                "-o", elf_path,
-                obj_path
-            ]
-            if architecture == "x86_64":
-                link_cmd.append("-m64")
+                if architecture == "x86_64":
+                    link_cmd.append("-m64")
 
             run_command(link_cmd)
             binaries.append(elf_path)
@@ -327,7 +352,7 @@ def compile_userland_programs():
             sub_sources = []
             for root, dirs, files in os.walk(item_path):
                 for f in files:
-                    if f.endswith((".c", ".cpp", ".cc", ".s", ".S")):
+                    if f.endswith((".c", ".cpp", ".cc", ".s", ".S", ".asm")):
                         sub_sources.append(os.path.join(root, f))
 
             if not sub_sources:
@@ -340,21 +365,34 @@ def compile_userland_programs():
                 obj_p = os.path.join(out_dir, prog_name, rel.replace(os.path.sep, "_") + ".o")
                 os.makedirs(os.path.dirname(obj_p), exist_ok=True)
 
-                if src.endswith((".cpp", ".cc")):
+                if src.endswith(".asm"):
+                    if architecture != "x86_64":
+                        print(f"Error: .asm userland packages require x86_64 architecture for NASM.")
+                        sys.exit(1)
+                    c_cmd = [
+                        nasm_path,
+                        "-felf64",
+                        src,
+                        "-o", obj_p
+                    ]
+                elif src.endswith((".cpp", ".cc")):
                     has_cpp_files = True
                     c_cmd = [
                         clangxx_path, f"--target={target_triple}",
                         f"-I{item_path}", "-ffreestanding", "-fno-pie", "-fno-stack-protector",
                         "-c", src, "-o", obj_p
                     ]
+                    if architecture == "x86_64":
+                        c_cmd.extend(["-mno-red-zone", "-m64"])
                 else:
                     c_cmd = [
                         clang_path, f"--target={target_triple}",
                         f"-I{item_path}", "-ffreestanding", "-fno-pie", "-fno-stack-protector",
                         "-c", src, "-o", obj_p
                     ]
-                if architecture == "x86_64":
-                    c_cmd.extend(["-mno-red-zone", "-m64"])
+                    if architecture == "x86_64":
+                        c_cmd.extend(["-mno-red-zone", "-m64"])
+
                 run_command(c_cmd)
                 obj_files.append(obj_p)
 
@@ -363,7 +401,6 @@ def compile_userland_programs():
 
             link_cmd = [
                 package_driver,
-                f"--target={target_triple}",
                 "-nostdlib",
                 "-static",
                 "-T", linker_script,
@@ -539,8 +576,6 @@ def execute_qemu_hdd():
         "-device", "usb-kbd,bus=uhci.0"
     ]
 
-
-    
     if qemu_config.get("cpu"):
         qemu_arguments += qemu_config["cpu"]
         

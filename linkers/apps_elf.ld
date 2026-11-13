@@ -4,14 +4,13 @@ ENTRY(_start)
 
 PHDRS
 {
-    headers PT_PHDR PHDRS;
-    text    PT_LOAD FILEHDR PHDRS FLAGS((1 << 0) | (1 << 2)); /* Read + Execute */
-    data    PT_LOAD FLAGS((1 << 1) | (1 << 0));             /* Read + Write */
+    text PT_LOAD FLAGS((1 << 0) | (1 << 2)); /* Read + Execute */
+    data PT_LOAD FLAGS((1 << 1) | (1 << 0)); /* Read + Write */
 }
 
 SECTIONS
 {
-    . = 0x400000 + SIZEOF_HEADERS;
+    . = 0x400000;
 
     .text : ALIGN(0x1000) {
         *(.text._start)
@@ -35,8 +34,6 @@ SECTIONS
         *(.bss*)
         *(.lbss*)
     } :data
-
-    _kernel_end = ALIGN(0x1000);
 
     /DISCARD/ : {
         *(.eh_frame)

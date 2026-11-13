@@ -258,7 +258,7 @@ int execute(int argc, char** argv) {
     }
 
     if (strcmp(argv[0], "test1") == 0) {
-        run_elf("program", 8192);
+        run_elf("asm", 8192);
         return 0;
     }
 
