@@ -136,6 +136,7 @@ static void pmm_free_page(uint64_t phys_addr, uint64_t hhdm_offset) {
     free_page_head = phys_addr;
 }
 
+// right here
 static void free_user_table(uint64_t phys_addr,
                             unsigned int level,
                             uint64_t hhdm_offset) {
@@ -315,7 +316,7 @@ bool restore_user_pages(const uint64_t *page_table_context) {
     return true;
 }
 
-static inline uint64_t* get_or_alloc_table(uint64_t* table, size_t index, uint64_t hhdm_offset) {
+static uint64_t* get_or_alloc_table(uint64_t* table, size_t index, uint64_t hhdm_offset) {
     if (!(table[index] & PAGE_PRESENT)) {
         table[index] = pmm_alloc_zeroed_page() | PAGE_USER_FLAGS;
     } else {
