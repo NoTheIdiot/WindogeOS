@@ -24,8 +24,9 @@ system_run_elf:
     mov [rel saved_r14], r14
     mov [rel saved_r15], r15
     mov [rel saved_rsp], rsp
-
+    sub rsp, 8
     call run_elf
+    add rsp, 8
     ret
 
 syscall_exit_to_launcher:
@@ -33,8 +34,7 @@ syscall_exit_to_launcher:
     mov ax, 0x10
     mov ds, ax
     mov es, ax
-    mov fs, ax
-    mov gs, ax
+    mov ss, ax
 
     mov rsp, [rel saved_rsp]
     mov rbx, [rel saved_rbx]
