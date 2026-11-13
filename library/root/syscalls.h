@@ -4,72 +4,66 @@
 #include "stdint.h"
 
 static inline uint64_t syscall_0(uint64_t num) {
-    uint64_t ret;
     __asm__ volatile (
         "syscall"
-        : "=a"(ret)
-        : "0"(num)
+        : "+a"(num)
+        : 
         : "rcx", "r11", "memory"
     );
-    return ret;
+    return num;
 }
 
 static inline uint64_t syscall_1(uint64_t num, uint64_t arg1) {
-    uint64_t ret;
     __asm__ volatile (
         "syscall"
-        : "=a"(ret)
-        : "0"(num), "D"(arg1)
+        : "+a"(num)
+        : "D"(arg1)
         : "rcx", "r11", "memory"
     );
-    return ret;
+    return num;
 }
 
 static inline uint64_t syscall_2(uint64_t num, uint64_t arg1, uint64_t arg2) {
-    uint64_t ret;
     __asm__ volatile (
         "syscall"
-        : "=a"(ret)
-        : "0"(num), "D"(arg1), "S"(arg2)
+        : "+a"(num)
+        : "D"(arg1), "S"(arg2)
         : "rcx", "r11", "memory"
     );
-    return ret;
+    return num;
 }
 
-static inline uint64_t syscall_3(uint64_t num, uint64_t arg1, uint64_t arg2,
-                                 uint64_t arg3) {
-    uint64_t ret;
+static inline uint64_t syscall_3(uint64_t num, uint64_t arg1, uint64_t arg2, uint64_t arg3) {
     __asm__ volatile (
         "syscall"
-        : "=a"(ret)
-        : "0"(num), "D"(arg1), "S"(arg2), "d"(arg3)
+        : "+a"(num)
+        : "D"(arg1), "S"(arg2), "d"(arg3)
         : "rcx", "r11", "memory"
     );
-    return ret;
+    return num;
 }
 
-static inline uint64_t syscall_4(uint64_t num, uint64_t arg1, uint64_t arg2,
-                                 uint64_t arg3, uint64_t arg4) {
-    uint64_t ret;
+static inline uint64_t syscall_4(uint64_t num, uint64_t arg1, uint64_t arg2, uint64_t arg3, uint64_t arg4) {
+    register uint64_t r10 __asm__("r10") = arg4;
     __asm__ volatile (
         "syscall"
-        : "=a"(ret)
-        : "0"(num), "D"(arg1), "S"(arg2), "d"(arg3), "r"(arg4)
+        : "+a"(num)
+        : "D"(arg1), "S"(arg2), "d"(arg3), "r"(r10)
         : "rcx", "r11", "memory"
     );
-    return ret;
+    return num;
 }
 
-static inline uint64_t syscall_5(uint64_t num, uint64_t arg1, uint64_t arg2,
-                               uint64_t arg3, uint64_t arg4, uint64_t arg5) {
-    uint64_t ret;
+static inline uint64_t syscall_5(uint64_t num, uint64_t arg1, uint64_t arg2, uint64_t arg3, uint64_t arg4, uint64_t arg5) {
+    register uint64_t r10 __asm__("r10") = arg4;
+    register uint64_t r8  __asm__("r8")  = arg5;
     __asm__ volatile (
         "syscall"
-        : "=a"(ret)
-        : "0"(num), "D"(arg1), "S"(arg2), "d"(arg3), "r"(arg4), "r"(arg5)
+        : "+a"(num)
+        : "D"(arg1), "S"(arg2), "d"(arg3), "r"(r10), "r"(r8)
         : "rcx", "r11", "memory"
     );
-    return ret;
+    return num;
 }
 
 #define Process_Exit 0

@@ -1,6 +1,6 @@
 #include "../library/dogeio.h"
 
-void _start(void) {
+__attribute__((noreturn)) void _start(void) {
     test();
     exit();
 }
