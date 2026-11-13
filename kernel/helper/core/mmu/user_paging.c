@@ -124,35 +124,89 @@ size_t pmm_get_free_page_count(void) {
 }
 
 static void pmm_free_page(uint64_t phys_addr, uint64_t hhdm_offset) {
-    if (phys_addr == 0 || (phys_addr & 0xFFFULL) != 0) {
-        return;
-    }
+    char buf[32];
+
+    kutoa(phys_addr, buf);
+    sprint("FREEING PAGE: ");
+    sprintln(buf);
 
     uint64_t *page = (uint64_t *)(phys_addr + hhdm_offset);
+
     *page = free_page_head;
     free_page_head = phys_addr;
 }
 
-static void free_user_table(uint64_t phys_addr, unsigned int level, uint64_t hhdm_offset) {
+static void free_user_table(uint64_t phys_addr,
+                            unsigned int level,
+                            uint64_t hhdm_offset) {
+    if (phys_addr == 0) {
+        return;
+    }
+
+    uint64_t child_phys;
     uint64_t *table = (uint64_t *)(phys_addr + hhdm_offset);
 
     for (size_t i = 0; i < 512; i++) {
         uint64_t entry = table[i];
-        if ((entry & PAGE_USER) == 0) {
+
+        if (!(entry & PAGE_PRESENT)) {
+            continue;
+        }
+
+        child_phys = entry & PAGE_ADDRESS_MASK;
+
+        if (child_phys == 0) {
+            continue;
+        }
+
+        if (level == 1) {
+            if (entry & PAGE_USER) {
+                pmm_free_page(child_phys, hhdm_offset);
+            }
+        } else {
+            free_user_table(child_phys, level - 1, hhdm_offset);
+        }
+    }
+
+    char buf[32];
+
+    kutoa(level, buf);
+    sprint("LEVEL=");
+    sprintln(buf);
+
+    kutoa(child_phys, buf);
+    sprint("CHILD=");
+    sprintln(buf);
+    pmm_free_page(phys_addr, hhdm_offset);
+}
+
+void destroy_user_pml4(uint64_t pml4_phys) {
+    if (!pml4_phys || !hhdm_request.response) {
+        return;
+    }
+
+    uint64_t hhdm_offset = hhdm_request.response->offset;
+
+    uint64_t *pml4 =
+        (uint64_t *)((pml4_phys & PAGE_ADDRESS_MASK) + hhdm_offset);
+
+    for (size_t i = 0; i < 256; i++) {
+        uint64_t entry = pml4[i];
+
+        if (!(entry & PAGE_PRESENT)) {
             continue;
         }
 
         uint64_t child_phys = entry & PAGE_ADDRESS_MASK;
-        if (level == 1) {
-            if (child_phys != 0) {
-                pmm_free_page(child_phys, hhdm_offset);
-            }
-        } else if ((entry & PAGE_PRESENT) != 0) {
-            free_user_table(child_phys, level - 1U, hhdm_offset);
+
+        if (child_phys) {
+            free_user_table(child_phys, 3, hhdm_offset);
         }
+
+        pml4[i] = 0;
     }
 
-    pmm_free_page(phys_addr, hhdm_offset);
+    pmm_free_page(pml4_phys & PAGE_ADDRESS_MASK, hhdm_offset);
 }
 
 void cleanup_pages(void) {
@@ -207,49 +261,57 @@ void switch_user_pml4(uint64_t pml4_phys) {
     }
 }
 
-void destroy_user_pml4(uint64_t pml4_phys) {
-    if (pml4_phys == 0 || hhdm_request.response == NULL) {
-        return;
-    }
-    uint64_t current_cr3 = read_cr3() & PAGE_ADDRESS_MASK;
-    uint64_t target_cr3 = pml4_phys & PAGE_ADDRESS_MASK;
-    if (current_cr3 != target_cr3) {
-        write_cr3(target_cr3);
-    }
-    cleanup_pages();
-    if (current_cr3 != target_cr3) {
-        write_cr3(current_cr3);
-    }
-    pmm_free_page(target_cr3, hhdm_request.response->offset);
-}
-
 bool suspend_user_pages(uint64_t *page_table_context) {
-    if (page_table_context == NULL || hhdm_request.response == NULL) {
+    if (page_table_context == NULL ||
+        hhdm_request.response == NULL) {
+        return false;
+    }
+
+    uint64_t cr3 = read_cr3() & PAGE_ADDRESS_MASK;
+    if (cr3 == 0) {
         return false;
     }
 
     uint64_t hhdm_offset = hhdm_request.response->offset;
-    uint64_t *pml4 = (uint64_t *)((read_cr3() & PAGE_ADDRESS_MASK) + hhdm_offset);
+
+    uint64_t *pml4 =
+        (uint64_t *)(cr3 + hhdm_offset);
+
     for (size_t i = 0; i < 256; i++) {
         page_table_context[i] = pml4[i];
+    }
+
+    for (size_t i = 0; i < 256; i++) {
         pml4[i] = 0;
     }
-    write_cr3(read_cr3());
+
+    write_cr3(cr3);
+
     return true;
 }
 
 bool restore_user_pages(const uint64_t *page_table_context) {
-    if (page_table_context == NULL || hhdm_request.response == NULL) {
+    if (page_table_context == NULL ||
+        hhdm_request.response == NULL) {
         return false;
     }
 
-    cleanup_pages();
+    uint64_t cr3 = read_cr3() & PAGE_ADDRESS_MASK;
+    if (cr3 == 0) {
+        return false;
+    }
+
     uint64_t hhdm_offset = hhdm_request.response->offset;
-    uint64_t *pml4 = (uint64_t *)((read_cr3() & PAGE_ADDRESS_MASK) + hhdm_offset);
+
+    uint64_t *pml4 =
+        (uint64_t *)(cr3 + hhdm_offset);
+
     for (size_t i = 0; i < 256; i++) {
         pml4[i] = page_table_context[i];
     }
-    write_cr3(read_cr3());
+
+    write_cr3(cr3);
+
     return true;
 }
 
