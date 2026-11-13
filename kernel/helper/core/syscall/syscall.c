@@ -56,11 +56,13 @@ uint64_t syscall_handler(registers_t *regs) {
             cleanup_pages();
             syscall_exit_to_launcher();
             ret_val = 0;
+            break;
         }
 
         case Print: {
             print("Programs work\n");
             ret_val = 0;
+            break;
         }
 
         default:

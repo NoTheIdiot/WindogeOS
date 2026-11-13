@@ -2,9 +2,6 @@ bits 64
 
 global to_userland_ring3
 global to_userland_ring3_args
-global syscall_exit_to_launcher
-
-extern kernel_program_launcher_rsp
 
 section .text
 to_userland_ring3:
@@ -12,10 +9,11 @@ to_userland_ring3:
     xor ecx, ecx
 
 to_userland_ring3_args:
+    mov r8, rdi
+    mov r9, rsi
+    mov r10, rdx
+    mov r11, rcx
     cli
-
-    push rdi
-    push rsi
 
     mov ax, 0x1b
     mov ds, ax
@@ -23,20 +21,21 @@ to_userland_ring3_args:
     mov fs, ax
     mov gs, ax
 
-    pop rsi
-    pop rdi
-
     push qword 0x1b
-    push rsi
+    push r9
     push qword 0x202
     push qword 0x23
-    push rdi
+    push r8
 
-    mov rdi, rdx
-    mov rsi, rcx
-
+    mov rdi, r10
+    mov rsi, r11
+    xor rax, rax
     xor rbx, rbx
+    xor rcx, rcx
+    xor rdx, rdx
     xor rbp, rbp
+    xor r8, r8
+    xor r9, r9
     xor r10, r10
     xor r11, r11
     xor r12, r12
@@ -45,22 +44,3 @@ to_userland_ring3_args:
     xor r15, r15
 
     iretq
-
-syscall_exit_to_launcher:
-    cli
-    mov rax, rdi
-    mov rsp, [rel kernel_program_launcher_rsp]
-    mov qword [rel kernel_program_launcher_rsp], 0
-
-    mov dx, 0x10
-    mov ds, dx
-    mov es, dx
-
-    popfq
-    pop r15
-    pop r14
-    pop r13
-    pop r12
-    pop rbp
-    pop rbx
-    ret
