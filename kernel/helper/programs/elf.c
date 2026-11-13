@@ -28,6 +28,7 @@ typedef struct __attribute__((packed)) {
 
 // Static allocation for bootstrap CPU (or replace with your kernel's per-CPU block)
 static cpu_gs_t bootstrap_cpu_gs;
+__attribute__((noreturn)) extern void syscall_exit_to_launcher(void);
 
 // Allocate a dedicated static backing buffer for the bootstrap kernel stack
 static uint8_t bootstrap_kernel_stack_space[KERNEL_STACK_SIZE];

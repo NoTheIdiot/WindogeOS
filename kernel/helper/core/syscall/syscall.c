@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <bool.h>
+#include <syscalls.h>
 #include <limine.h>
 
 #define MSR_IA32_EFER            0xC0000080
@@ -43,15 +44,34 @@ uint64_t kernel_program_launcher_rflags = 0;
 static bool cpu_supports_nx;
 static bool cpu_supports_rdrand;
 
-extern uint64_t syscall_handler_switch(registers_t* regs, uint64_t sc_num);
-
+__attribute__((noreturn)) extern void syscall_exit_to_launcher(void);
 
 uint64_t syscall_handler(registers_t *regs) {
 
     uint64_t sc_num = regs->rax;
     uint64_t ret_val = 0;
 
-    syscall_handler_switch(regs, sc_num);
+    switch (sc_num) {
+        case Process_Exit: {
+            cleanup_pages();
+            syscall_exit_to_launcher();
+            ret_val = 0;
+        }
+
+        case Print: {
+            print("Programs work\n");
+            ret_val = 0;
+        }
+
+        default:
+            print("[\033[91mNot Wow\033[0m] Unknown system call tried to execute, but doesn't have id. ");
+            sprint("Unknown system call tried to execute, but doesn't have id. ");
+            char buffer[4];
+            itoa((int)sc_num, buffer);
+            println(buffer);
+            sprintln(buffer);
+            break;
+    }
 
     return ret_val;
 }
