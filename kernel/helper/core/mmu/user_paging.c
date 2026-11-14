@@ -239,6 +239,59 @@ void cleanup_pages(void) {
     }
 }
 
+// i hate paging i hate paging i hate paging i hate paging
+__attribute__((aligned(4096)))
+static uint64_t master_kernel_pml4[512];
+static uint64_t kernel_pml4_phys = 0;
+
+static uint64_t virt_to_phys_via_cr3(uint64_t virt, uint64_t cr3_phys, uint64_t hhdm) {
+    uint64_t *pml4 = (uint64_t *)(cr3_phys + hhdm);
+    uint64_t pml4e = pml4[(virt >> 39) & 0x1FF];
+    if (!(pml4e & 1)) return 0;
+
+    uint64_t *pdpt = (uint64_t *)((pml4e & PAGE_ADDRESS_MASK) + hhdm);
+    uint64_t pdpte = pdpt[(virt >> 30) & 0x1FF];
+    if (!(pdpte & 1)) return 0;
+    if (pdpte & (1ULL << 7)) {
+        return (pdpte & 0xFFFFC0000000ULL) + (virt & 0x3FFFFFFFULL);
+    }
+
+    uint64_t *pd = (uint64_t *)((pdpte & PAGE_ADDRESS_MASK) + hhdm);
+    uint64_t pde = pd[(virt >> 21) & 0x1FF];
+    if (!(pde & 1)) return 0;
+    if (pde & (1ULL << 7)) {
+        return (pde & 0xFFFFFFFFFFE00000ULL) + (virt & 0x1FFFFFULL);
+    }
+
+    uint64_t *pt = (uint64_t *)((pde & PAGE_ADDRESS_MASK) + hhdm);
+    uint64_t pte = pt[(virt >> 12) & 0x1FF];
+    if (!(pte & 1)) return 0;
+
+    return (pte & PAGE_ADDRESS_MASK) + (virt & 0xFFFULL);
+}
+
+void init_kernel_pml4(void) {
+    if (hhdm_request.response == NULL) return;
+
+    uint64_t hhdm = hhdm_request.response->offset;
+    uint64_t old_cr3 = read_cr3() & PAGE_ADDRESS_MASK;
+    uint64_t *old_pml4 = (uint64_t *)(old_cr3 + hhdm);
+
+    for (size_t i = 0; i < 256; i++) {
+        master_kernel_pml4[i] = 0;
+    }
+
+    for (size_t i = 256; i < 512; i++) {
+        master_kernel_pml4[i] = old_pml4[i];
+    }
+
+    kernel_pml4_phys = virt_to_phys_via_cr3((uint64_t)&master_kernel_pml4[0], old_cr3, hhdm);
+    if (kernel_pml4_phys != 0) {
+        write_cr3(kernel_pml4_phys);
+    }
+}
+
+
 uint64_t create_user_pml4(void) {
     if (hhdm_request.response == NULL) {
         return 0;

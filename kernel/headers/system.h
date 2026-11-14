@@ -280,4 +280,7 @@ void speaker_beep(uint32_t hz, uint32_t duration_ms);
 // nvme
 bool nvme_init(void);
 
+// im lazy so put anything you dont know where does it go here
+void init_kernel_pml4(void);
+
 #endif

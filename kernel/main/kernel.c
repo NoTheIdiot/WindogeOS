@@ -85,6 +85,7 @@ void windoge_os(void) {
     sti();
     println("[\033[32mWow\033[0m]     Init APIC sucessful");
     init_vmm();
+    init_kernel_pml4();
 
     println("[\033[32mDogeing\033[0m] Init CPU GS");
     
