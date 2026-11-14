@@ -277,4 +277,7 @@ void sleep_ms(uint32_t ms);
 void speaker_stop(void);
 void speaker_beep(uint32_t hz, uint32_t duration_ms);
 
+// nvme
+bool nvme_init(void);
+
 #endif

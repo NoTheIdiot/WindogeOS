@@ -98,9 +98,16 @@ void windoge_os(void) {
     init_pcie();
     println("[\033[32mWow\033[0m]     Init PCIE done (still didnt crash nice)");
 
-    println("[\033[32mDogeing\033[0m] Probing AHCI SATA...");
+    println("[\033[32mDogeing\033[0m] Probing AHCI SATA... (if have)");
     ata_probe_devices();
     println("[\033[32mWow\033[0m]     AHCI SATA probed");
+
+    println("[\033[32mDogeing\033[0m] Checking NVME and INIT if have");
+    if (nvme_init()) {
+        println("[\033[32mWow\033[0m]     Nvme init");
+    } else {
+        println("[\033[32midk\033[0m]     No NVME found or error.");
+    }
 
     println("[\033[32mDogeing\033[0m] Mounting exFAT filesystem...");
     if (fs_mount()) {
@@ -131,6 +138,7 @@ void windoge_os(void) {
     init_syscalls();
     println("[\033[32mWow\033[0m]     Init system calls done");
 
+    halt();
     clear();
     println("\033[96mWindogeOS Booted!\033[0m");
     println("\033[96mThere is literally nothing else mate... other than a \ntesting shell (like kdb)\033[0m");
