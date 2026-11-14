@@ -13,16 +13,21 @@ static uint64_t free_page_head = 0;
 bool user_page_mapped(uint64_t virt_addr);
 bool unmap_user_page(uint64_t virt_addr);
 
+void init_pmm(void) {
+    println("\033[36m[PMM]\033[0m    Initializing Physical Memory Manager...");
+    free_page_head = 0;
+    println("\033[32m[PMM]\033[0m    Physical Memory Manager initialized successfully.");
+}
+
 void init_vmm(void) {
-    println("\033[36m[VMM]\033[0m     Initializing Virtual Memory Manager...");
+    println("\033[36m[VMM]\033[0m    Initializing Virtual Memory Manager...");
     
     uint64_t efer = rdmsr(MSR_IA32_EFER);
     if ((efer & EFER_NXE) == 0) {
         wrmsr(MSR_IA32_EFER, efer | EFER_NXE);
     }
     
-    free_page_head = 0;
-    println("\033[32m[VMM]\033[0m     Virtual Memory Manager initialized successfully.");
+    println("\033[32m[VMM]\033[0m    Virtual Memory Manager initialized successfully.");
 }
 
 void cleanup_program_pages(const program_memory_t *program) {
@@ -136,7 +141,6 @@ static void pmm_free_page(uint64_t phys_addr, uint64_t hhdm_offset) {
     free_page_head = phys_addr;
 }
 
-// right here
 static void free_user_table(uint64_t phys_addr,
                             unsigned int level,
                             uint64_t hhdm_offset) {
@@ -144,7 +148,7 @@ static void free_user_table(uint64_t phys_addr,
         return;
     }
 
-    uint64_t child_phys;
+    uint64_t child_phys = 0;
     uint64_t *table = (uint64_t *)(phys_addr + hhdm_offset);
 
     for (size_t i = 0; i < 512; i++) {

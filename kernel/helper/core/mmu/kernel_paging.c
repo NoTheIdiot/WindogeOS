@@ -9,15 +9,39 @@ extern volatile struct limine_memmap_request memmap_request;
 
 static uint64_t free_page_head;
 
+#define PAGE_MASK       0xFFFULL
+#define FREE_PAGE_MAGIC 0xF00DF00DDEADFACEULL
+
 static void pmm_free_page(uint64_t phys_addr, uint64_t hhdm_offset) {
-    if (phys_addr == 0 || (phys_addr & 0xFFFULL) != 0) {
-        return;
+    if (phys_addr == 0 || (phys_addr & PAGE_MASK) != 0) {
+        __asm__ volatile ("cli; hlt");
+        for (;;);
+    }
+
+    static volatile int lock = 0;
+    uint64_t rflags;
+    __asm__ volatile ("pushfq; popq %0; cli" : "=r"(rflags) :: "memory");
+    while (__sync_lock_test_and_set(&lock, 1)) {
+        __builtin_ia32_pause();
     }
 
     uint64_t *page = (uint64_t *)(phys_addr + hhdm_offset);
-    *page = free_page_head;
+
+    if (page[1] == FREE_PAGE_MAGIC) {
+        __asm__ volatile ("cli; hlt");
+        for (;;);
+    }
+
+    page[0] = free_page_head;
+    page[1] = FREE_PAGE_MAGIC;
     free_page_head = phys_addr;
+
+    __sync_lock_release(&lock);
+    if (rflags & (1ULL << 9)) {
+        __asm__ volatile ("sti" ::: "memory");
+    }
 }
+
 
 static void free_user_table(uint64_t phys_addr, unsigned int level,
                             uint64_t hhdm_offset) {
@@ -41,32 +65,6 @@ static void free_user_table(uint64_t phys_addr, unsigned int level,
     }
 
     pmm_free_page(phys_addr, hhdm_offset);
-}
-
-void clean_pages(void) {
-    if (hhdm_request.response == NULL) {
-        return;
-    }
-
-    uint64_t hhdm_offset = hhdm_request.response->offset;
-    uint64_t *pml4 = (uint64_t *)((read_cr3() & ~0xFFFULL) + hhdm_offset);
-    uint64_t user_tables[256] = {0};
-
-    for (size_t i = 0; i < 256; i++) {
-        if ((pml4[i] & (PAGE_PRESENT | PAGE_USER)) ==
-            (PAGE_PRESENT | PAGE_USER)) {
-            user_tables[i] = pml4[i] & ~0xFFFULL;
-            pml4[i] = 0;
-        }
-    }
-
-    write_cr3(read_cr3());
-
-    for (size_t i = 0; i < 256; i++) {
-        if (user_tables[i] != 0) {
-            free_user_table(user_tables[i], 3, hhdm_offset);
-        }
-    }
 }
 
 uintptr_t map_kernel_mmio_page(uintptr_t virt_addr, uint64_t phys_addr) {
