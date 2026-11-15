@@ -110,6 +110,24 @@ uint64_t syscall_handler(registers_t *regs) {
             break;
         }
 
+        case WriteFile: {
+            const char *path = (const char *)regs->rdi;
+            char *buf        = (char *)regs->rsi;
+            size_t len       = (size_t)regs->rdx;
+
+            if (!user_ok(path, 1) || !user_ok(buf, len)) {
+                ret_val = (uint64_t)-1;
+                break;
+            }
+
+            char name[64];
+            strncpy(name, path, sizeof(name) - 1);
+            name[sizeof(name) - 1] = '\0';
+
+            ret_val = (uint64_t)fs_write(name, buf, len);
+            break;
+        }
+
         default:
             print("[\033[91mNot Wow\033[0m] Unknown system call tried to execute, but doesn't have id. ");
             sprint("Unknown system call tried to execute, but doesn't have id. ");
