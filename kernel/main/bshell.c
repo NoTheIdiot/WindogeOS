@@ -198,7 +198,7 @@ int execute(int argc, char** argv) {
         static fs_t files[MAX_DIR_ENTRIES];
         memset(files, 0, sizeof(files));
 
-        int count = fs_list(files, MAX_DIR_ENTRIES);
+        int count = fs_list("/", files, MAX_DIR_ENTRIES);
 
         if (count < 0) {
             println("Filesystem error or not mounted.");
@@ -269,6 +269,33 @@ int execute(int argc, char** argv) {
 
     if (strcmp(argv[0], "test-audio") == 0) {
         speaker_beep(500, 500);
+        return 0;
+    }
+
+    if (strcmp(argv[0], "test-fs") == 0) {
+        println("Testing file system");
+        println("Creating TEST file");
+        fs_create("TEST.TEST");
+        println("WRITE test");
+        fs_write("TEST.TEST", "WINDOGE", 8);
+        println("READ TEST");
+        char buffer[8];
+        fs_read("TEST.TEST", buffer, 8);
+        print("OUTPUT: ");
+        println(buffer);
+        println("DELETE TEST");
+        fs_delete("TEST.TEST");
+        println("DIRECTORY TEST");
+        fs_mkdir("TEST.DIR");
+        if (fs_exists("TEST.DIR")) {
+            println("SUCESS");
+            fs_delete("TEST.DIR");
+        }
+        return 0 ;
+    }
+
+    if (strcmp(argv[0], "start-shell") == 0) {
+        run_elf("dogeshell", 16384);
         return 0;
     }
 

@@ -47,8 +47,12 @@ int fs_write(char* filename, char* data, uint64_t size) {
     return append_file(&exfat_vol, filename, (uint8_t*)&nl, 1);
 }
 
-int fs_list(fs_t* out, int max_entries) {
-    return list_dir(&exfat_vol, out, max_entries);
+int fs_mkdir(char* path) {
+    return create_dir(&exfat_vol, path);
+}
+
+int fs_list(char* path, fs_t* out, int max_entries) {
+    return list_dir(&exfat_vol, path, out, max_entries);
 }
 
 int fs_delete(char* filename) {
