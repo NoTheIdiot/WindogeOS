@@ -26,6 +26,36 @@
 #define USER_IO_LIMIT 65536
 #define USER_STRING_LIMIT 4096
 #define USER_PATH_LIMIT 256
+
+#define USER_LIMIT 0x0000800000000000ULL
+
+static bool is_valid_user_ptr(const void *ptr, size_t len) {
+    uintptr_t addr = (uintptr_t)ptr;
+    return addr != 0 && addr < USER_LIMIT && len <= (USER_LIMIT - addr);
+}
+
+static bool copy_str_from_user(char *dst, const char *user_src, size_t max_len) {
+    if (!is_valid_user_ptr(user_src, 1) || max_len == 0) return false;
+    for (size_t i = 0; i < max_len; i++) {
+        if (!is_valid_user_ptr(&user_src[i], 1)) return false;
+        dst[i] = user_src[i];
+        if (dst[i] == '\0') return true;
+    }
+    return false;
+}
+
+static bool copy_to_user(void *user_dst, const void *src, size_t len) {
+    if (!is_valid_user_ptr(user_dst, len)) return false;
+    memcpy(user_dst, src, len);
+    return true;
+}
+
+static inline bool user_ok(const void *ptr, size_t len) {
+    uintptr_t a = (uintptr_t)ptr;
+    return a && a < 0x800000000000ULL && len <= (0x800000000000ULL - a);
+}
+
+
 #define USER_INPUT_LIMIT 256
 
 extern void syscall_entry(void);
@@ -51,7 +81,6 @@ uint64_t syscall_handler(registers_t *regs) {
 
     switch (sc_num) {
         case Process_Exit: {
-            // issue right here
             sprintln("[SYSCALL] hey. program is exiting.");
             cleanup_pages();
             if (kernel_program_launcher_rsp == 0) {
@@ -63,9 +92,21 @@ uint64_t syscall_handler(registers_t *regs) {
             break;
         }
 
-        case Print: {
-            print("Programs work\n");
-            ret_val = 0;
+        case ReadFile: {
+            const char *path = (const char *)regs->rdi;
+            char *buf        = (char *)regs->rsi;
+            size_t len       = (size_t)regs->rdx;
+
+            if (!user_ok(path, 1) || !user_ok(buf, len)) {
+                ret_val = (uint64_t)-1;
+                break;
+            }
+
+            char name[64];
+            strncpy(name, path, sizeof(name) - 1);
+            name[sizeof(name) - 1] = '\0';
+
+            ret_val = (uint64_t)fs_read(name, buf, len);
             break;
         }
 

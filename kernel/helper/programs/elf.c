@@ -354,6 +354,7 @@ int run_elf(char *filename, uint64_t size)
     sprintln("[ELF] IA32_KERNEL_GS_BASE MSR initialized successfully.");
     sprintln("[ELF] Jumping to ring 3 via to_userland_ring3_args...");
     to_userland_ring3_args(ehdr.e_entry, stack_top, 0, 0);
-    sprintln("[ELF] ERROR: Returned from userland unexpectedly");
-    for (;;) asm volatile("hlt");
+    sprintln("[ELF] returned");
+    sti();
+    return 0;
 }

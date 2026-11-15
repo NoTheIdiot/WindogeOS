@@ -36,18 +36,3 @@ system_run_elf:
     add rsp, 8
 
     ret
-
-syscall_exit_to_launcher:
-    mov rbx, [rel saved_rbx]
-    mov rbp, [rel saved_rbp]
-    mov r12, [rel saved_r12]
-    mov r13, [rel saved_r13]
-    mov r14, [rel saved_r14]
-    mov r15, [rel saved_r15]
-
-    mov rsp, [rel saved_rsp]
-
-    xor eax, eax
-
-    mov rax, [rel saved_ret]
-    jmp rax

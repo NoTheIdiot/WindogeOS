@@ -44,29 +44,38 @@ static inline uint64_t syscall_3(uint64_t num, uint64_t arg1, uint64_t arg2, uin
 }
 
 static inline uint64_t syscall_4(uint64_t num, uint64_t arg1, uint64_t arg2, uint64_t arg3, uint64_t arg4) {
-    register uint64_t r10 __asm__("r10") = arg4;
     __asm__ volatile (
+        "mov %[a4], %%r10\n\t"
         "syscall"
         : "+a"(num)
-        : "D"(arg1), "S"(arg2), "d"(arg3), "r"(r10)
-        : "rcx", "r11", "memory"
+        : "D"(arg1), "S"(arg2), "d"(arg3), [a4] "r"(arg4)
+        : "rcx", "r10", "r11", "memory"
     );
     return num;
 }
 
 static inline uint64_t syscall_5(uint64_t num, uint64_t arg1, uint64_t arg2, uint64_t arg3, uint64_t arg4, uint64_t arg5) {
-    register uint64_t r10 __asm__("r10") = arg4;
-    register uint64_t r8  __asm__("r8")  = arg5;
     __asm__ volatile (
+        "mov %[a4], %%r10\n\t"
+        "mov %[a5], %%r8\n\t"
         "syscall"
         : "+a"(num)
-        : "D"(arg1), "S"(arg2), "d"(arg3), "r"(r10), "r"(r8)
-        : "rcx", "r11", "memory"
+        : "D"(arg1), "S"(arg2), "d"(arg3), [a4] "r"(arg4), [a5] "r"(arg5)
+        : "rcx", "r8", "r10", "r11", "memory"
     );
     return num;
 }
 
+// process management
 #define Process_Exit 0
-#define Print 1
+
+// file system operations
+#define WriteFile  11
+#define ReadFile   12
+#define CreateFile 13
+
+// user input and output
+#define Print 20
+#define Input 21
 
 #endif
