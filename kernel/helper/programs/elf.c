@@ -79,9 +79,128 @@ static uint64_t align_up_page(uint64_t value)
     return (value + PAGE_SIZE - 1ULL) & ~(PAGE_SIZE - 1ULL);
 }
 
+#define MAX_VMAS 16
+
+struct vma_region {
+    bool active;
+    char filename[128];
+    uint64_t p_vaddr;
+    uint64_t p_memsz;
+    uint64_t p_offset;
+    uint64_t p_filesz;
+    uint64_t pte_flags;
+};
+
+static struct vma_region current_vmas[MAX_VMAS];
+
+static void clear_vmas(void) {
+    for (int i = 0; i < MAX_VMAS; i++) {
+        current_vmas[i].active = false;
+    }
+}
+
+static bool add_vma(const char *filename, uint64_t vaddr, uint64_t memsz,
+                    uint64_t offset, uint64_t filesz, uint64_t flags)
+{
+    for (int i = 0; i < MAX_VMAS; i++) {
+        if (!current_vmas[i].active) {
+            current_vmas[i].active = true;
+
+            int j = 0;
+            for (; j < 127 && filename[j]; j++) {
+                current_vmas[i].filename[j] = filename[j];
+            }
+            current_vmas[i].filename[j] = '\0';
+
+            current_vmas[i].p_vaddr   = vaddr;
+            current_vmas[i].p_memsz   = memsz;
+            current_vmas[i].p_offset  = offset;
+            current_vmas[i].p_filesz  = filesz;
+            current_vmas[i].pte_flags = flags;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool try_demand_page(uint64_t fault_addr, uint64_t err_code)
+{
+    struct vma_region *vma = NULL;
+    for (int i = 0; i < MAX_VMAS; i++) {
+        if (current_vmas[i].active &&
+            fault_addr >= align_down_page(current_vmas[i].p_vaddr) &&
+            fault_addr <  align_up_page(current_vmas[i].p_vaddr + current_vmas[i].p_memsz))
+        {
+            vma = &current_vmas[i];
+            break;
+        }
+    }
+
+    if (!vma) {
+        return false;
+    }
+
+    if ((err_code & (1ULL << 1)) && !(vma->pte_flags & PTE_WRITABLE)) {
+        return false;
+    }
+
+    uint64_t page_vaddr = align_down_page(fault_addr);
+    uintptr_t page_phys = alloc_page();
+    if (!page_phys) {
+        return false;
+    }
+
+    memset((void *)(page_phys + hhdm_offset), 0, PAGE_SIZE);
+
+    uint64_t file_start = vma->p_vaddr;
+    uint64_t file_end   = vma->p_vaddr + vma->p_filesz;
+    uint64_t page_limit = page_vaddr + PAGE_SIZE;
+
+    uint64_t copy_start = (page_vaddr > file_start) ? page_vaddr : file_start;
+    uint64_t copy_end   = (page_limit < file_end)   ? page_limit : file_end;
+
+    if (copy_start < copy_end) {
+        uint64_t file_offset = vma->p_offset + (copy_start - file_start);
+        uint64_t copy_size   = copy_end - copy_start;
+        uint8_t *dest        = (uint8_t *)(page_phys + hhdm_offset + (copy_start - page_vaddr));
+
+        __asm__ volatile ("sti");
+        int bytes_read = fs_read_raw_at(vma->filename, dest, file_offset, copy_size);
+        __asm__ volatile ("cli");
+
+        if (bytes_read != (int)copy_size) {
+            free_page(page_phys);
+            return false;
+        }
+    }
+
+    if (!map_page(page_vaddr, page_phys, vma->pte_flags)) {
+        free_page(page_phys);
+        return false;
+    }
+
+    uint64_t cr3;
+    __asm__ volatile ("mov %%cr3, %0" : "=r"(cr3));
+    uint64_t *pml4 = (uint64_t *)((cr3 & ~0xFFFULL) + hhdm_offset);
+
+    size_t pml4_i = (page_vaddr >> 39) & 0x1FF;
+    size_t pdpt_i = (page_vaddr >> 30) & 0x1FF;
+    size_t pd_i   = (page_vaddr >> 21) & 0x1FF;
+
+    pml4[pml4_i] |= (PTE_USER | PTE_WRITABLE);
+    uint64_t *pdpt = (uint64_t *)((pml4[pml4_i] & 0x000FFFFFFFFFF000ULL) + hhdm_offset);
+    pdpt[pdpt_i] |= (PTE_USER | PTE_WRITABLE);
+    uint64_t *pd = (uint64_t *)((pdpt[pdpt_i] & 0x000FFFFFFFFFF000ULL) + hhdm_offset);
+    pd[pd_i] |= (PTE_USER | PTE_WRITABLE);
+
+    __asm__ volatile ("invlpg (%0)" :: "r"(page_vaddr) : "memory");
+    return true;
+}
+
 int run_elf(char *filename, uint64_t size)
 {
     (void)size;
+    char buf[64];
 
     sprintln("[ELF] === START RUN_ELF ===");
     sprintln("[ELF] Starting program loader");
@@ -101,19 +220,12 @@ int run_elf(char *filename, uint64_t size)
     elf64_ehdr ehdr;
     sprintln("[ELF] Reading ELF header from disk/filesystem...");
 
-    if (fs_read_raw_at(
-            filename,
-            (uint8_t *)&ehdr,
-            0,
-            sizeof(ehdr))
-        != (int)sizeof(ehdr))
-    {
+    if (fs_read_raw_at(filename, (uint8_t *)&ehdr, 0, sizeof(ehdr)) != (int)sizeof(ehdr)) {
         sprintln("[ELF] ERROR: Failed to read ELF header");
         return -2;
     }
     sprintln("[ELF] ELF header read successfully.");
 
-    sprintln("[ELF] Verifying ELF magic bytes...");
     if (ehdr.e_ident[0] != 0x7F ||
         ehdr.e_ident[1] != 'E'  ||
         ehdr.e_ident[2] != 'L'  ||
@@ -122,19 +234,16 @@ int run_elf(char *filename, uint64_t size)
         sprintln("[ELF] ERROR: Invalid ELF magic");
         return -3;
     }
-    sprintln("[ELF] ELF magic matches 0x7F 'E' 'L' 'F'.");
 
     if (ehdr.e_ident[4] != ELF_CLASS_64) {
         sprintln("[ELF] ERROR: Not ELF64");
         return -3;
     }
-    sprintln("[ELF] Verified class: ELF64.");
 
     if (ehdr.e_ident[5] != ELF_DATA_LSB) {
         sprintln("[ELF] ERROR: Unsupported endian");
         return -3;
     }
-    sprintln("[ELF] Verified endian: Little-Endian.");
 
     if (ehdr.e_version != ELF_VERSION_CURRENT) {
         sprintln("[ELF] ERROR: Unsupported ELF version");
@@ -145,53 +254,32 @@ int run_elf(char *filename, uint64_t size)
         sprintln("[ELF] ERROR: Not executable");
         return -3;
     }
-    sprintln("[ELF] Verified type: Executable binary.");
 
     if (ehdr.e_machine != ELF_MACHINE_X86_64) {
         sprintln("[ELF] ERROR: Not x86_64");
         return -3;
     }
-    sprintln("[ELF] Verified architecture: x86_64.");
 
-    if (ehdr.e_phentsize != sizeof(elf64_phdr)) {
-        sprintln("[ELF] ERROR: Invalid PHDR size");
+    if (ehdr.e_phentsize != sizeof(elf64_phdr) || ehdr.e_phnum == 0) {
+        sprintln("[ELF] ERROR: Invalid PHDR size or count");
         return -3;
     }
 
-    if (ehdr.e_phnum == 0) {
-        sprintln("[ELF] ERROR: No program headers");
-        return -3;
-    }
+    clear_vmas();
 
-    sprintln("[ELF] Mapping PT_LOAD segments...");
+    sprintln("[ELF] Registering PT_LOAD segments for demand paging...");
 
     for (uint16_t i = 0; i < ehdr.e_phnum; i++)
     {
         elf64_phdr phdr;
+        uint64_t phdr_offset = ehdr.e_phoff + ((uint64_t)i * ehdr.e_phentsize);
 
-        uint64_t phdr_offset =
-            ehdr.e_phoff +
-            ((uint64_t)i * ehdr.e_phentsize);
-
-        sprintln("[ELF] Reading program header entry...");
-        if (fs_read_raw_at(
-                filename,
-                (uint8_t *)&phdr,
-                phdr_offset,
-                sizeof(phdr))
-            != (int)sizeof(phdr))
-        {
+        if (fs_read_raw_at(filename, (uint8_t *)&phdr, phdr_offset, sizeof(phdr)) != (int)sizeof(phdr)) {
             sprintln("[ELF] ERROR: Failed to read PHDR");
             return -4;
         }
 
-        if (phdr.p_type != PT_LOAD) {
-            sprintln("[ELF] Skipping non-PT_LOAD program header.");
-            continue;
-        }
-
-        if (phdr.p_memsz == 0) {
-            sprintln("[ELF] Skipping segment with zero memory size.");
+        if (phdr.p_type != PT_LOAD || phdr.p_memsz == 0) {
             continue;
         }
 
@@ -205,8 +293,7 @@ int run_elf(char *filename, uint64_t size)
             return -4;
         }
 
-        if (phdr.p_vaddr >= USER_STACK_BASE ||
-            (phdr.p_vaddr + phdr.p_memsz) > USER_STACK_BASE) {
+        if (phdr.p_vaddr >= USER_STACK_BASE || (phdr.p_vaddr + phdr.p_memsz) > USER_STACK_BASE) {
             sprintln("[ELF] ERROR: Segment overlaps stack base");
             return -4;
         }
@@ -215,84 +302,14 @@ int run_elf(char *filename, uint64_t size)
         if (phdr.p_flags & PF_W)    pte_flags |= PTE_WRITABLE;
         if (!(phdr.p_flags & PF_X)) pte_flags |= PTE_NX;
 
-        uint64_t page_start =
-            align_down_page(phdr.p_vaddr);
-
-        uint64_t page_end =
-            align_up_page(
-                phdr.p_vaddr +
-                phdr.p_memsz);
-
-        sprintln("[ELF] Processing pages for PT_LOAD segment...");
-        for (uint64_t page_vaddr = page_start;
-             page_vaddr < page_end;
-             page_vaddr += PAGE_SIZE)
+        if (!add_vma(filename, phdr.p_vaddr, phdr.p_memsz,
+                     phdr.p_offset, phdr.p_filesz, pte_flags))
         {
-            uintptr_t page_phys = alloc_page();
-
-            if (!page_phys) {
-                sprintln("[ELF] ERROR: Out of physical pages during segment map");
-                return -5;
-            }
-
-            memset((void *)(page_phys + hhdm_offset), 0, PAGE_SIZE);
-
-            if (!map_page(page_vaddr, page_phys, pte_flags)) {
-                free_page(page_phys);
-                sprintln("[ELF] ERROR: Failed to map segment page");
-                return -5;
-            }
-
-            uint64_t file_start =
-                phdr.p_vaddr;
-
-            uint64_t file_end =
-                phdr.p_vaddr +
-                phdr.p_filesz;
-
-            uint64_t page_limit =
-                page_vaddr +
-                PAGE_SIZE;
-
-            uint64_t copy_start =
-                (page_vaddr > file_start)
-                    ? page_vaddr
-                    : file_start;
-
-            uint64_t copy_end =
-                (page_limit < file_end)
-                    ? page_limit
-                    : file_end;
-
-            if (copy_start < copy_end)
-            {
-                uint64_t file_offset =
-                    phdr.p_offset +
-                    (copy_start - file_start);
-
-                uint64_t copy_size =
-                    copy_end - copy_start;
-
-                uint8_t *dest =
-                    (uint8_t *)(
-                        page_phys +
-                        hhdm_offset +
-                        (copy_start - page_vaddr));
-
-                if (fs_read_raw_at(
-                        filename,
-                        dest,
-                        file_offset,
-                        copy_size)
-                    != (int)copy_size)
-                {
-                    sprintln("[ELF] ERROR: Segment read/copy failed");
-                    return -6;
-                }
-            }
+            sprintln("[ELF] ERROR: Too many PT_LOAD segments");
+            return -5;
         }
     }
-    sprintln("[ELF] All PT_LOAD segments successfully mapped.");
+    sprintln("[ELF] All PT_LOAD segments registered for demand paging.");
 
     sprintln("[ELF] Allocating user stack space...");
 
@@ -300,9 +317,7 @@ int run_elf(char *filename, uint64_t size)
     __asm__ volatile ("mov %%cr3, %0" : "=r"(cr3));
     uint64_t *pml4 = (uint64_t *)((cr3 & ~0xFFFULL) + hhdm_offset);
 
-    for (uint64_t i = 0;
-         i < USER_STACK_PAGE_COUNT;
-         i++)
+    for (uint64_t i = 0; i < USER_STACK_PAGE_COUNT; i++)
     {
         uint64_t vaddr = USER_STACK_BASE + (i * PAGE_SIZE);
         uintptr_t page_phys = alloc_page();
@@ -314,11 +329,7 @@ int run_elf(char *filename, uint64_t size)
 
         memset((void *)(page_phys + hhdm_offset), 0, PAGE_SIZE);
 
-        if (!map_page(
-                vaddr,
-                page_phys,
-                PTE_USER | PTE_WRITABLE | PTE_NX))
-        {
+        if (!map_page(vaddr, page_phys, PTE_USER | PTE_WRITABLE | PTE_NX)) {
             free_page(page_phys);
             sprintln("[ELF] ERROR: Stack page mapping failed");
             return -7;
@@ -341,22 +352,6 @@ int run_elf(char *filename, uint64_t size)
     }
     sprintln("[ELF] User stack allocated and mapped successfully.");
 
-    uint64_t stack_top =
-        USER_STACK_TOP - 16;
-
-    char buf[32];
-
-    sprintln("[ELF] Printing ELF Execution Parameters:");
-    sprint("[ELF] Entry = ");
-    uint64_to_str(ehdr.e_entry, buf);
-    sprintln(buf);
-
-    sprint("[ELF] Stack = ");
-    uint64_to_str(stack_top, buf);
-    sprintln(buf);
-
-    sprintln("[ELF] Preparing kernel stack and CPU GS base for safe syscall handling...");
-    
     bootstrap_cpu_gs.kernel_stack = (uint64_t)(bootstrap_kernel_stack_space + KERNEL_STACK_SIZE);
 
     sprint("[ELF] Bootstrap Kernel Stack Top assigned at: ");
@@ -368,12 +363,12 @@ int run_elf(char *filename, uint64_t size)
         "wrmsr"
         :
         : "c" (0xC0000102),
-        "a" ((uint32_t)(gs_base & 0xFFFFFFFF)),
-        "d" ((uint32_t)(gs_base >> 32))
+          "a" ((uint32_t)(gs_base & 0xFFFFFFFF)),
+          "d" ((uint32_t)(gs_base >> 32))
     );
     sprintln("[ELF] IA32_KERNEL_GS_BASE MSR initialized successfully.");
     sprintln("[ELF] Jumping to ring 3 via to_userland_ring3_args...");
-    to_userland_ring3_args(ehdr.e_entry, stack_top, 0, 0);
+    to_userland_ring3_args(ehdr.e_entry, USER_STACK_TOP, 0, 0);
     sprintln("[ELF] returned");
     sti();
     return 0;

@@ -1,7 +1,7 @@
 #include <stdint.h>
+#include <stdbool.h>
 #include <dogeio.h>
 #include <system.h>
-#include <bool.h>
 
 typedef struct __attribute__((packed)) {
     uint16_t offset_low;      
@@ -42,6 +42,9 @@ extern uint64_t isr_stub_table[49];
 extern void idt_load(idtr_t *idtr_ptr);
 extern volatile uint32_t ticks;
 extern void apic_eoi(void);
+
+// Declare the demand paging entry point from your loader module
+extern bool try_demand_page(uint64_t fault_addr, uint64_t err_code);
 
 static inline uint64_t read_cr2(void) {
     uint64_t val;
@@ -87,14 +90,25 @@ interrupt_frame_t *isr_common_handler(interrupt_frame_t *frame) {
         return frame;
     }
 
-    switch (frame->vector) {
-        case 0:  sprintln("[Not Wow] Divide-by-Zero (Vector 0)"); break;
-        case 6:  sprintln("[Not Wow] Invalid Opcode (Vector 6)"); break;
-        case 13: sprintln("[Not Wow] General Protection Fault (Vector 13)"); break;
-        case 14: sprintln("[Not Wow] Page Fault (Vector 14)"); break;
-        default: sprintln("[Not Wow] Unhandled Interrupt / Fault"); break;
+    // Handle Page Fault (Vector 14) via Demand Paging
+    if (frame->vector == 14) {
+        uint64_t fault_addr = read_cr2();
+        if (try_demand_page(fault_addr, frame->error_code)) {
+            // Successfully handled by demand paging, resume user code execution!
+            return frame;
+        }
+        // If try_demand_page returns false, it's a true violation (e.g. invalid access / segfault)
+        sprintln("[Not Wow] Fatal Page Fault (Vector 14)");
+    } else {
+        switch (frame->vector) {
+            case 0:  sprintln("[Not Wow] Divide-by-Zero (Vector 0)"); break;
+            case 6:  sprintln("[Not Wow] Invalid Opcode (Vector 6)"); break;
+            case 13: sprintln("[Not Wow] General Protection Fault (Vector 13)"); break;
+            default: sprintln("[Not Wow] Unhandled Interrupt / Fault"); break;
+        }
     }
 
+    // Diagnostic Register Dump for unhandled faults
     char buf[64];
     int idx;
     char hex_str[19];

@@ -80,7 +80,7 @@ uint64_t syscall_handler(registers_t *regs) {
 
     switch (sc_num) {
         case Process_Exit: {
-            sprintln("[SYSCALL] hey. program is exiting.");
+            sprintln("[SYSCALL] Peter. The horse doesn't have to be here.");
             cleanup_pages();
             if (kernel_program_launcher_rsp == 0) {
                 sprintln("[SYSCALL] ERROR: kernel_program_launcher_rsp is NULL again...");
