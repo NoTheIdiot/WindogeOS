@@ -1,10 +1,11 @@
 #include <system.h>
 #include <dogeio.h>
-#include <limine.h>
 #include <bool.h>
 
 #define USB_PID_IN 0x69
 #define HID_REPORT_SIZE 8
+
+extern uintptr_t hhdm_offset;
 
 typedef struct uhci_td {
     uint32_t link_pointer;
@@ -35,23 +36,35 @@ static uint8_t g_last_key = 0;
 static bool g_caps_lock = false;
 static bool g_caps_pressed = false;
 
-extern volatile struct limine_hhdm_request hhdm_request;
-
 bool uhci_init_keyboard_endpoint(uint8_t device_address, uint8_t endpoint_num) {
-    uint64_t hhdm_offset = hhdm_request.response->offset;
-
-    uint64_t buf_phys = pmm_alloc_zeroed_page();
-    if (buf_phys > 0xFFFFFFFF) {
+   // replacment
+    uintptr_t buf_phys = alloc_page();
+    if (!buf_phys || buf_phys > 0xFFFFFFFF) {
+        if (buf_phys) free_page(buf_phys);
         return false;
     }
+
+    uintptr_t qh_phys = alloc_page();
+    if (!qh_phys || qh_phys > 0xFFFFFFFF) {
+        if (qh_phys) free_page(qh_phys);
+        free_page(buf_phys);
+        return false;
+    }
+
+    uintptr_t td_phys = alloc_page();
+    if (!td_phys || td_phys > 0xFFFFFFFF) {
+        if (td_phys) free_page(td_phys);
+        free_page(qh_phys);
+        free_page(buf_phys);
+        return false;
+    }
+
     g_kbd_buffer_phys = (uint32_t)buf_phys;
     g_kbd_buffer = (volatile uint8_t *)(buf_phys + hhdm_offset);
 
-    uint64_t qh_phys = pmm_alloc_zeroed_page();
     g_kbd_qh_phys = (uint32_t)qh_phys;
     g_kbd_qh = (uhci_qh_t *)(qh_phys + hhdm_offset);
 
-    uint64_t td_phys = pmm_alloc_zeroed_page();
     g_kbd_td_phys = (uint32_t)td_phys;
     g_kbd_td = (uhci_td_t *)(td_phys + hhdm_offset);
 

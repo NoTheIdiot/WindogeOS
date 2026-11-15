@@ -1,5 +1,6 @@
 #include <system.h>
-#include <limine.h>
+#include <stdint.h>
+#include <stddef.h>
 
 #define UHCI_USBCMD      0x00
 #define UHCI_USBSTS      0x02
@@ -9,6 +10,8 @@
 #define UHCI_SOF         0x0C
 #define UHCI_PORTSC1     0x10
 #define UHCI_PORTSC2     0x12
+
+extern uintptr_t hhdm_offset;
 
 typedef struct uhci_td {
     uint32_t link_pointer;
@@ -35,8 +38,6 @@ uint32_t *g_frame_list_virt = NULL;
 static uint32_t g_frame_list_phys = 0;
 static uint8_t g_assigned_kbd_addr = 1;
 
-extern volatile struct limine_hhdm_request hhdm_request;
-
 bool uhci_find_controller(uint8_t *out_bus, uint8_t *out_slot, uint8_t *out_func, uint16_t *out_bar4) {
     for (uint16_t bus = 0; bus < 256; bus++) {
         for (uint8_t slot = 0; slot < 32; slot++) {
@@ -62,9 +63,23 @@ bool uhci_find_controller(uint8_t *out_bus, uint8_t *out_slot, uint8_t *out_func
 }
 
 bool uhci_send_control(uint8_t dev_addr, uint8_t req_type, uint8_t request, uint16_t value, uint16_t index, uint16_t length) {
-    uint64_t hhdm_offset = hhdm_request.response->offset;
+    uintptr_t setup_phys = alloc_page();
+    uintptr_t td1_phys   = alloc_page();
+    uintptr_t td2_phys   = alloc_page();
+    uintptr_t qh_phys    = alloc_page();
 
-    uint64_t setup_phys = pmm_alloc_zeroed_page();
+    if (!setup_phys || setup_phys > 0xFFFFFFFF ||
+        !td1_phys   || td1_phys   > 0xFFFFFFFF ||
+        !td2_phys   || td2_phys   > 0xFFFFFFFF ||
+        !qh_phys    || qh_phys    > 0xFFFFFFFF)
+    {
+        if (setup_phys) free_page(setup_phys);
+        if (td1_phys)   free_page(td1_phys);
+        if (td2_phys)   free_page(td2_phys);
+        if (qh_phys)    free_page(qh_phys);
+        return false;
+    }
+
     volatile usb_setup_packet_t *setup = (volatile usb_setup_packet_t *)(setup_phys + hhdm_offset);
     setup->bmRequestType = req_type;
     setup->bRequest = request;
@@ -72,12 +87,10 @@ bool uhci_send_control(uint8_t dev_addr, uint8_t req_type, uint8_t request, uint
     setup->wIndex = index;
     setup->wLength = length;
 
-    uint64_t td1_phys = pmm_alloc_zeroed_page();
-    uint64_t td2_phys = pmm_alloc_zeroed_page();
     uhci_td_t *td1 = (uhci_td_t *)(td1_phys + hhdm_offset);
     uhci_td_t *td2 = (uhci_td_t *)(td2_phys + hhdm_offset);
 
-    td1->link_pointer = td2_phys;
+    td1->link_pointer = (uint32_t)td2_phys;
     td1->control = (1 << 26) | (3 << 27); 
     td1->token = ((sizeof(usb_setup_packet_t) - 1) << 21) | (0 << 19) | (0 << 15) | ((dev_addr & 0x7F) << 8) | 0x2D;
     td1->buffer_pointer = (uint32_t)setup_phys;
@@ -90,14 +103,13 @@ bool uhci_send_control(uint8_t dev_addr, uint8_t req_type, uint8_t request, uint
     td1->control |= (1 << 23);
     td2->control |= (1 << 23);
 
-    uint64_t qh_phys = pmm_alloc_zeroed_page();
     uhci_qh_t *qh = (uhci_qh_t *)(qh_phys + hhdm_offset);
     qh->horizontal_link = 0x00000001;
-    qh->element_link = td1_phys;
+    qh->element_link = (uint32_t)td1_phys;
 
     if (g_frame_list_virt) {
         for (int i = 0; i < 1024; i++) {
-            g_frame_list_virt[i] = qh_phys | 0x2;
+            g_frame_list_virt[i] = (uint32_t)qh_phys | 0x2;
         }
     }
 
@@ -106,7 +118,22 @@ bool uhci_send_control(uint8_t dev_addr, uint8_t req_type, uint8_t request, uint
         timeout--;
     }
 
-    return (timeout > 0 && !(td2->control & 0x7B0000));
+    bool success = (timeout > 0 && !(td2->control & 0x7B0000));
+
+    // Unlink the temporary QH from the frame list before freeing its physical page
+    if (g_frame_list_virt) {
+        for (int i = 0; i < 1024; i++) {
+            g_frame_list_virt[i] = 0x00000001;
+        }
+    }
+
+    // Reclaim the 4 temporary pages used for this control transfer
+    free_page(qh_phys);
+    free_page(td2_phys);
+    free_page(td1_phys);
+    free_page(setup_phys);
+
+    return success;
 }
 
 void uhci_init_driver(void) {
@@ -114,6 +141,12 @@ void uhci_init_driver(void) {
     uint16_t io_base;
 
     if (!uhci_find_controller(&bus, &slot, &func, &io_base)) {
+        return;
+    }
+
+    uintptr_t frame_phys = alloc_page();
+    if (!frame_phys || frame_phys > 0xFFFFFFFF) {
+        if (frame_phys) free_page(frame_phys);
         return;
     }
 
@@ -125,9 +158,8 @@ void uhci_init_driver(void) {
     uint32_t pci_cmd = pcie_read32(bus, slot, func, 0x04);
     pcie_write32(bus, slot, func, 0x04, pci_cmd | 0x05);
 
-    uint64_t frame_phys = pmm_alloc_zeroed_page();
     g_frame_list_phys = (uint32_t)frame_phys;
-    g_frame_list_virt = (uint32_t *)(frame_phys + hhdm_request.response->offset);
+    g_frame_list_virt = (uint32_t *)(frame_phys + hhdm_offset);
 
     for (int i = 0; i < 1024; i++) {
         g_frame_list_virt[i] = 0x00000001;

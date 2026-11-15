@@ -206,8 +206,8 @@ static bool nvme_alloc_admin_queues(void)
 {
     uint64_t hhdm = hhdm_request.response->offset;
 
-    nvme.admin_sq_phys = pmm_alloc_zeroed_page();
-    nvme.admin_cq_phys = pmm_alloc_zeroed_page();
+    nvme.admin_sq_phys = alloc_page();
+    nvme.admin_cq_phys = alloc_page();
 
     if (!nvme.admin_sq_phys || !nvme.admin_cq_phys)
         return false;
@@ -273,7 +273,7 @@ static int nvme_submit_admin(nvme_cmd_t *cmd)
 }
 
 static int nvme_identify_controller(void) {
-    uint64_t identify_phys = pmm_alloc_zeroed_page();
+    uint64_t identify_phys = alloc_page();
 
     if (!identify_phys)
         return -1;
@@ -290,7 +290,7 @@ static int nvme_identify_controller(void) {
 
 static int nvme_identify_namespace(void)
 {
-    uint64_t identify_phys = pmm_alloc_zeroed_page();
+    uint64_t identify_phys = alloc_page();
 
     if (!identify_phys)
         return -1;
@@ -385,7 +385,7 @@ static int nvme_create_io_cq(void)
 {
     uint64_t hhdm = hhdm_request.response->offset;
 
-    nvme.io_cq_phys = pmm_alloc_zeroed_page();
+    nvme.io_cq_phys = alloc_page();
 
     if (!nvme.io_cq_phys)
         return -1;
@@ -410,7 +410,7 @@ static int nvme_create_io_sq(void)
 {
     uint64_t hhdm = hhdm_request.response->offset;
 
-    nvme.io_sq_phys = pmm_alloc_zeroed_page();
+    nvme.io_sq_phys = alloc_page();
 
     if (!nvme.io_sq_phys)
         return -1;

@@ -105,7 +105,7 @@ static uint32_t active_port = 0xFFFFFFFF;
 void ahci_sata_init(uintptr_t ecam_base_addr) {
     hba = (ahci_hba_t *)ecam_base_addr;
     
-    cmd_base_phys = pmm_alloc_zeroed_page();
+    cmd_base_phys = alloc_page();
     
     uintptr_t tracking_page_virtual = 0x7FFFF0000000ULL;
     map_kernel_mmio_page(tracking_page_virtual, cmd_base_phys);

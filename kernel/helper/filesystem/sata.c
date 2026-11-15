@@ -321,7 +321,7 @@ void ata_probe_devices(void) {
     ghc |= AHCI_GHC_AE;
     mmio_write32((uintptr_t)&g_hba->ghc, ghc);
 
-    g_dma_bounce_phys = pmm_alloc_zeroed_page();
+    g_dma_bounce_phys = alloc_page();
     uintptr_t bounce_virt = 0x7FFFF0000000ULL;
     map_kernel_mmio_page(bounce_virt, g_dma_bounce_phys);
     g_dma_bounce_virt = (uint8_t *)bounce_virt;
@@ -369,9 +369,9 @@ void ata_probe_devices(void) {
 
         mmio_write32((uintptr_t)&port->serr, 0xFFFFFFFF);
 
-        uintptr_t page_cl_fis = pmm_alloc_zeroed_page();
-        uintptr_t page_tables_1 = pmm_alloc_zeroed_page();
-        uintptr_t page_tables_2 = pmm_alloc_zeroed_page();
+        uintptr_t page_cl_fis = alloc_page();
+        uintptr_t page_tables_1 = alloc_page();
+        uintptr_t page_tables_2 = alloc_page();
         uintptr_t port_virt_base = 0x7FFFF0001000ULL + ((uintptr_t)i * (3 * PAGE_SIZE));
         map_kernel_mmio_page(port_virt_base, page_cl_fis);
         map_kernel_mmio_page(port_virt_base + PAGE_SIZE, page_tables_1);

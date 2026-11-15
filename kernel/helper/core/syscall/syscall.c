@@ -4,7 +4,6 @@
 #include <stdint.h>
 #include <bool.h>
 #include <syscalls.h>
-#include <limine.h>
 
 #define MSR_IA32_EFER            0xC0000080
 #define MSR_IA32_STAR            0xC0000081
@@ -30,7 +29,6 @@
 #define USER_INPUT_LIMIT 256
 
 extern void syscall_entry(void);
-extern volatile struct limine_hhdm_request hhdm_request;
 
 typedef struct {
     uint64_t kernel_rsp;
@@ -53,7 +51,13 @@ uint64_t syscall_handler(registers_t *regs) {
 
     switch (sc_num) {
         case Process_Exit: {
+            // issue right here
+            sprintln("[SYSCALL] hey. program is exiting.");
             cleanup_pages();
+            if (kernel_program_launcher_rsp == 0) {
+                sprintln("[SYSCALL] ERROR: kernel_program_launcher_rsp is NULL again...");
+                halt();
+            }
             syscall_exit_to_launcher();
             ret_val = 0;
             break;

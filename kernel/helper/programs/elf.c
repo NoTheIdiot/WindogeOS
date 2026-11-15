@@ -3,7 +3,8 @@
 #include <stddef.h>
 #include <dogeio.h>
 #include <system.h>
-#include <limine.h>
+
+extern uintptr_t hhdm_offset;
 
 #define ELF_CLASS_64        2
 #define ELF_DATA_LSB        1
@@ -12,6 +13,9 @@
 #define ELF_MACHINE_X86_64  62
 
 #define PT_LOAD             1
+#define PF_X                0x1
+#define PF_W                0x2
+#define PF_R                0x4
 
 #define USER_STACK_TOP        0x00007FFFFFFFF000ULL
 #define USER_STACK_PAGE_COUNT 4
@@ -20,17 +24,14 @@
 
 #define KERNEL_STACK_SIZE     (PAGE_SIZE * 4)
 
-// Per-CPU structure for handling syscall stack swapping via GS MSRs
 typedef struct __attribute__((packed)) {
-    uint64_t kernel_stack;       // Offset 0: Kernel RSP loaded on syscall
-    uint64_t user_stack_scratch; // Offset 8: Temporary storage for user RSP
+    uint64_t kernel_stack;
+    uint64_t user_stack_scratch;
 } cpu_gs_t;
 
-// Static allocation for bootstrap CPU (or replace with your kernel's per-CPU block)
 static cpu_gs_t bootstrap_cpu_gs;
 __attribute__((noreturn)) extern void syscall_exit_to_launcher(void);
 
-// Allocate a dedicated static backing buffer for the bootstrap kernel stack
 static uint8_t bootstrap_kernel_stack_space[KERNEL_STACK_SIZE];
 
 typedef struct __attribute__((packed)) {
@@ -61,8 +62,6 @@ typedef struct __attribute__((packed)) {
     uint64_t p_align;
 } elf64_phdr;
 
-extern volatile struct limine_hhdm_request hhdm_request;
-
 extern void to_userland_ring3_args(
     uint64_t entry,
     uint64_t stack,
@@ -72,16 +71,18 @@ extern void to_userland_ring3_args(
 
 static uint64_t align_down_page(uint64_t value)
 {
-    return value & ~(PAGE_SIZE - 1);
+    return value & ~(PAGE_SIZE - 1ULL);
 }
 
 static uint64_t align_up_page(uint64_t value)
 {
-    return (value + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+    return (value + PAGE_SIZE - 1ULL) & ~(PAGE_SIZE - 1ULL);
 }
 
 int run_elf(char *filename, uint64_t size)
 {
+    (void)size;
+
     sprintln("[ELF] === START RUN_ELF ===");
     sprintln("[ELF] Starting program loader");
 
@@ -90,12 +91,12 @@ int run_elf(char *filename, uint64_t size)
         return -1;
     }
 
-    sprintln("[ELF] Checking HHDM response...");
-    if (!hhdm_request.response) {
-        sprintln("[ELF] ERROR: No HHDM response");
+    sprintln("[ELF] Checking HHDM offset...");
+    if (!hhdm_offset) {
+        sprintln("[ELF] ERROR: No HHDM offset");
         return -1;
     }
-    sprintln("[ELF] HHDM response validated successfully.");
+    sprintln("[ELF] HHDM offset validated successfully.");
 
     elf64_ehdr ehdr;
     sprintln("[ELF] Reading ELF header from disk/filesystem...");
@@ -204,10 +205,15 @@ int run_elf(char *filename, uint64_t size)
             return -4;
         }
 
-        if (phdr.p_vaddr >= USER_STACK_BASE) {
+        if (phdr.p_vaddr >= USER_STACK_BASE ||
+            (phdr.p_vaddr + phdr.p_memsz) > USER_STACK_BASE) {
             sprintln("[ELF] ERROR: Segment overlaps stack base");
             return -4;
         }
+
+        uint64_t pte_flags = PTE_USER;
+        if (phdr.p_flags & PF_W)    pte_flags |= PTE_WRITABLE;
+        if (!(phdr.p_flags & PF_X)) pte_flags |= PTE_NX;
 
         uint64_t page_start =
             align_down_page(phdr.p_vaddr);
@@ -222,17 +228,18 @@ int run_elf(char *filename, uint64_t size)
              page_vaddr < page_end;
              page_vaddr += PAGE_SIZE)
         {
-            uint64_t page_phys =
-                pmm_alloc_zeroed_page();
+            uintptr_t page_phys = alloc_page();
 
             if (!page_phys) {
                 sprintln("[ELF] ERROR: Out of physical pages during segment map");
                 return -5;
             }
 
-            map_user_page(
-                page_vaddr,
-                page_phys);
+            if (!map_page(page_vaddr, page_phys, pte_flags)) {
+                free_page(page_phys);
+                sprintln("[ELF] ERROR: Failed to map segment page");
+                return -5;
+            }
 
             uint64_t file_start =
                 phdr.p_vaddr;
@@ -267,7 +274,7 @@ int run_elf(char *filename, uint64_t size)
                 uint8_t *dest =
                     (uint8_t *)(
                         page_phys +
-                        hhdm_request.response->offset +
+                        hhdm_offset +
                         (copy_start - page_vaddr));
 
                 if (fs_read_raw_at(
@@ -291,18 +298,22 @@ int run_elf(char *filename, uint64_t size)
          i < USER_STACK_PAGE_COUNT;
          i++)
     {
-        uint64_t page_phys =
-            pmm_alloc_zeroed_page();
+        uintptr_t page_phys = alloc_page();
 
         if (!page_phys) {
             sprintln("[ELF] ERROR: Stack allocation failed");
             return -7;
         }
 
-        map_user_page(
-            USER_STACK_BASE +
-            (i * PAGE_SIZE),
-            page_phys);
+        if (!map_page(
+                USER_STACK_BASE + (i * PAGE_SIZE),
+                page_phys,
+                PTE_USER | PTE_WRITABLE | PTE_NX))
+        {
+            free_page(page_phys);
+            sprintln("[ELF] ERROR: Stack page mapping failed");
+            return -7;
+        }
     }
     sprintln("[ELF] User stack allocated and mapped successfully.");
 
@@ -322,7 +333,7 @@ int run_elf(char *filename, uint64_t size)
 
     sprintln("[ELF] Preparing kernel stack and CPU GS base for safe syscall handling...");
     
-    // Set kernel_stack to point to the top of our allocated kernel stack buffer (grows downwards)
+    // set kernel_stack to point to the top of our allocated kernel stack buffer (grows downwards)
     bootstrap_cpu_gs.kernel_stack = (uint64_t)(bootstrap_kernel_stack_space + KERNEL_STACK_SIZE);
 
     sprint("[ELF] Bootstrap Kernel Stack Top assigned at: ");
@@ -337,20 +348,12 @@ int run_elf(char *filename, uint64_t size)
         "wrmsr"
         :
         : "c" (0xC0000102),
-          "a" ((uint32_t)(gs_base & 0xFFFFFFFF)),
-          "d" ((uint32_t)(gs_base >> 32))
+        "a" ((uint32_t)(gs_base & 0xFFFFFFFF)),
+        "d" ((uint32_t)(gs_base >> 32))
     );
     sprintln("[ELF] IA32_KERNEL_GS_BASE MSR initialized successfully.");
-
     sprintln("[ELF] Jumping to ring 3 via to_userland_ring3_args...");
-    to_userland_ring3_args(
-        ehdr.e_entry,
-        stack_top,
-        0,
-        0);
-
+    to_userland_ring3_args(ehdr.e_entry, stack_top, 0, 0);
     sprintln("[ELF] ERROR: Returned from userland unexpectedly");
-
-    for (;;)
-        __asm__ volatile("hlt");
+    for (;;) asm volatile("hlt");
 }

@@ -78,14 +78,15 @@ void windoge_os(void) {
     serial_init();
     println("[\033[32mWow\033[0m]     Init serial sucess");
     sprintln("Testing serial");
+    println("[\033[32mDogeing\033[0m] Init memory paging...");
+    init_memory();
+    println("[\033[32mWow\033[0m]     Init memory paging sucessful");
     println("[\033[32mDogeing\033[0m] Init APIC... (and timer)");
     init_apic();
     init_apic_timer(0x20, 1000);
     ticks = 1000;
     sti();
     println("[\033[32mWow\033[0m]     Init APIC sucessful");
-    init_vmm();
-    init_kernel_pml4();
 
     println("[\033[32mDogeing\033[0m] Init CPU GS");
     

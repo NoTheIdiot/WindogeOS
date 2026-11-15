@@ -67,15 +67,13 @@ void init_usb_keyboard(uint8_t device_address);
 bool pci_find_ahci(uint8_t *out_bus, uint8_t *out_slot, uint8_t *out_func, uint64_t *out_bar5_phys);
 
 // paging
-#define PAGE_SIZE           4096ULL
-#define PAGE_PRESENT        (1ULL << 0)
-#define PAGE_WRITABLE       (1ULL << 1)
-#define PAGE_USER           (1ULL << 2)
-#define PAGE_WRITE_THROUGH  (1ULL << 3)
-#define PAGE_CACHE_DISABLE  (1ULL << 4)
-#define PAGE_LARGE          (1ULL << 7)
-#define PAGE_NO_EXECUTE     (1ULL << 63)
-#define PAGE_ADDRESS_MASK   0x000FFFFFFFFFF000ULL
+#define PAGE_SIZE     4096
+#define PTE_PRESENT   (1ULL << 0)
+#define PTE_WRITABLE  (1ULL << 1)
+#define PTE_USER      (1ULL << 2)
+#define PTE_HUGE      (1ULL << 7)
+#define PTE_NX        (1ULL << 63)
+#define PTE_ADDR_MASK 0x000FFFFFFFFFF000ULL
 
 #define MSR_IA32_EFER       0xC0000080
 #define EFER_NXE            (1ULL << 11)
@@ -94,23 +92,15 @@ typedef struct {
     uint64_t stack_pages;
 } program_memory_t;
 
-void init_vmm(void);
-void cleanup_program_pages(const program_memory_t *program);
-uint64_t pmm_alloc_zeroed_page(void);
-size_t pmm_get_free_page_count(void);
-void cleanup_pages(void);
-uint64_t create_user_pml4(void);
-void switch_user_pml4(uint64_t pml4_phys);
-void destroy_user_pml4(uint64_t pml4_phys);
-bool suspend_user_pages(uint64_t *page_table_context);
-bool restore_user_pages(const uint64_t *page_table_context);
-uintptr_t map_kernel_mmio_page(uintptr_t virt_addr, uint64_t phys_addr);
-void map_user_page(uint64_t virt_addr, uint64_t phys_addr);
-bool protect_user_page(uint64_t virt_addr, bool present, bool write_access, bool execute_access);
-bool user_page_mapped(uint64_t virt_addr);
-bool unmap_user_page(uint64_t virt_addr);
-void setup_ring3_memory(uint64_t user_code_virt, uint64_t user_stack_virt, const uint8_t *user_code, size_t code_size);
-
+uintptr_t map_kernel_mmio_page(uintptr_t virt_addr, uintptr_t phys_addr);
+void      cleanup_pages(void);
+void      init_memory(void);
+void      init_vmm(void);
+uintptr_t alloc_page(void);
+void      free_page(uintptr_t phys_addr);
+bool      map_page(uintptr_t virt_addr, uintptr_t phys_addr, uint64_t flags);
+uintptr_t unmap_page(uintptr_t virt_addr);
+void      setup_ring3_memory(uint64_t user_code_virt, uint64_t user_stack_virt, const uint8_t *user_code, size_t code_size);
 
 int ahci_exec_cmd(uint32_t port_num, uint64_t lba, uint32_t count, uint8_t write, uintptr_t buf_phys);
 void ahci_sata_init(uintptr_t ecam_base_addr);
