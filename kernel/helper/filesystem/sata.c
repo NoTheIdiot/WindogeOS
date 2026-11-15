@@ -240,6 +240,7 @@ uint64_t ata_drive_sector_count(uint8_t drive) {
     return ata_drive_present(drive) ? g_drive_sector_counts[drive] : 0;
 }
 
+extern uintptr_t hhdm_offset;
 int ata_read_sector(uint8_t drive, uint64_t lba, uint8_t *buffer) {
     char dbg[32];
     sprint("[AHCI Debug] ata_read_sector drive=");
@@ -247,7 +248,17 @@ int ata_read_sector(uint8_t drive, uint64_t lba, uint8_t *buffer) {
     sprint(dbg);
     sprint(" buffer=");
     kutoa((uintptr_t)buffer, dbg);
+    sprint(dbg);
+    sprint(" bounce=");
+    kutoa((uintptr_t)g_dma_bounce_virt, dbg);
     sprintln(dbg);
+
+    if ((uintptr_t)g_dma_bounce_virt < hhdm_offset) {
+        sprintln("[AHCI PANIC] g_dma_bounce_virt is in lower-half! Set it to g_dma_bounce_phys + hhdm_offset in ata_probe_devices().");
+        char *hex = uint64_to_str((uintptr_t)g_dma_bounce_virt, dbg);
+        sprintln(hex);
+        halt();
+    }
 
     if (buffer == NULL || !ata_drive_present(drive)) {
         sprintln("[AHCI Debug] Read rejected: invalid buffer or missing drive.");
@@ -265,6 +276,7 @@ int ata_read_sector(uint8_t drive, uint64_t lba, uint8_t *buffer) {
     }
     return 0;
 }
+
 
 int ata_write_sector(uint8_t drive, uint64_t lba, const uint8_t *buffer) {
     if (buffer == NULL || !ata_drive_present(drive)) {
@@ -299,7 +311,7 @@ void ata_probe_devices(void) {
     kutoa(bar5_phys, tmp);
     sprintln(tmp);
 
-    uintptr_t ahci_virt_base = 0x5FFFF0000000ULL;
+    uintptr_t ahci_virt_base = bar5_phys + hhdm_offset;
     map_kernel_mmio_page(ahci_virt_base, bar5_phys);
     map_kernel_mmio_page(ahci_virt_base + PAGE_SIZE, bar5_phys + PAGE_SIZE);
     g_hba = (ahci_hba_t *)ahci_virt_base;
@@ -322,7 +334,7 @@ void ata_probe_devices(void) {
     mmio_write32((uintptr_t)&g_hba->ghc, ghc);
 
     g_dma_bounce_phys = alloc_page();
-    uintptr_t bounce_virt = 0x7FFFF0000000ULL;
+    uintptr_t bounce_virt = g_dma_bounce_phys + hhdm_offset;
     map_kernel_mmio_page(bounce_virt, g_dma_bounce_phys);
     g_dma_bounce_virt = (uint8_t *)bounce_virt;
 
@@ -372,14 +384,18 @@ void ata_probe_devices(void) {
         uintptr_t page_cl_fis = alloc_page();
         uintptr_t page_tables_1 = alloc_page();
         uintptr_t page_tables_2 = alloc_page();
-        uintptr_t port_virt_base = 0x7FFFF0001000ULL + ((uintptr_t)i * (3 * PAGE_SIZE));
-        map_kernel_mmio_page(port_virt_base, page_cl_fis);
-        map_kernel_mmio_page(port_virt_base + PAGE_SIZE, page_tables_1);
-        map_kernel_mmio_page(port_virt_base + (2 * PAGE_SIZE), page_tables_2);
+
+        uintptr_t cl_fis_virt = page_cl_fis + hhdm_offset;
+        uintptr_t tables_1_virt = page_tables_1 + hhdm_offset;
+        uintptr_t tables_2_virt = page_tables_2 + hhdm_offset;
+
+        map_kernel_mmio_page(cl_fis_virt, page_cl_fis);
+        map_kernel_mmio_page(tables_1_virt, page_tables_1);
+        map_kernel_mmio_page(tables_2_virt, page_tables_2);
 
         g_cmd_phys[i] = page_cl_fis;
-        g_cmd_header_virt[i] = (ahci_cmd_header_t *)port_virt_base;
-        g_cmd_table_virt[i] = (ahci_cmd_table_t *)(port_virt_base + PAGE_SIZE);
+        g_cmd_header_virt[i] = (ahci_cmd_header_t *)cl_fis_virt;
+        g_cmd_table_virt[i] = (ahci_cmd_table_t *)tables_1_virt;
 
         mmio_write32((uintptr_t)&port->clb, (uint32_t)page_cl_fis);
         mmio_write32((uintptr_t)&port->clbu, (uint32_t)(page_cl_fis >> 32));

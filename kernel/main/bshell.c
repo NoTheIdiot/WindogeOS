@@ -196,6 +196,8 @@ int execute(int argc, char** argv) {
 
     if (strcmp(argv[0], "dir") == 0) {
         static fs_t files[MAX_DIR_ENTRIES];
+        memset(files, 0, sizeof(files));
+
         int count = fs_list(files, MAX_DIR_ENTRIES);
 
         if (count < 0) {
@@ -208,8 +210,16 @@ int execute(int argc, char** argv) {
             return 0;
         }
 
+        if (count > MAX_DIR_ENTRIES) {
+            count = MAX_DIR_ENTRIES;
+        }
+
         char size_str[NUM_BUF_SIZE];
         for (int i = 0; i < count; i++) {
+            if (files[i].name[0] == '\0') {
+                continue;
+            }
+
             if (files[i].is_dir) {
                 print("[DIR]  ");
             } else {
@@ -257,12 +267,7 @@ int execute(int argc, char** argv) {
         return 0;
     }
 
-    if (strcmp(argv[0], "test1") == 0) {
-        run_elf("asm", 8192);
-        return 0;
-    }
-
-    if (strcmp(argv[0], "test2") == 0) {
+    if (strcmp(argv[0], "test-audio") == 0) {
         speaker_beep(500, 500);
         return 0;
     }

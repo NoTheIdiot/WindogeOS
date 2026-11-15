@@ -30,8 +30,8 @@ static inline int println(const char *str) {
     return print("\n");
 }
 
-static inline int clear(void) {
-    return (int)syscall_0(Clear);
+static inline void clear(void) {
+    print("\033[2J\033[H");
 }
 
 static inline int input(const char *prompt, char *buf, size_t size) {

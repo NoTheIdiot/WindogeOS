@@ -220,12 +220,6 @@ uint64_t syscall_handler(registers_t *regs) {
             break;
         }
 
-        case Clear: {
-            clear();
-            ret_val = 0;
-            break;
-        }
-
         default: {
             print("[\033[91mNot Wow\033[0m] Unknown system call tried to execute, but doesn't have id. ");
             sprint("Unknown system call tried to execute, but doesn't have id. ");
