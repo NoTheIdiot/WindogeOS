@@ -12,4 +12,6 @@
 // user input and output
 #define Print 20
 #define Input 21
+#define Clear 22
+
 #endif

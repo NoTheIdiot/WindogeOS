@@ -235,6 +235,8 @@ int run_elf(char *filename, uint64_t size)
                 return -5;
             }
 
+            memset((void *)(page_phys + hhdm_offset), 0, PAGE_SIZE);
+
             if (!map_page(page_vaddr, page_phys, pte_flags)) {
                 free_page(page_phys);
                 sprintln("[ELF] ERROR: Failed to map segment page");
@@ -294,10 +296,15 @@ int run_elf(char *filename, uint64_t size)
 
     sprintln("[ELF] Allocating user stack space...");
 
+    uint64_t cr3;
+    __asm__ volatile ("mov %%cr3, %0" : "=r"(cr3));
+    uint64_t *pml4 = (uint64_t *)((cr3 & ~0xFFFULL) + hhdm_offset);
+
     for (uint64_t i = 0;
          i < USER_STACK_PAGE_COUNT;
          i++)
     {
+        uint64_t vaddr = USER_STACK_BASE + (i * PAGE_SIZE);
         uintptr_t page_phys = alloc_page();
 
         if (!page_phys) {
@@ -305,8 +312,10 @@ int run_elf(char *filename, uint64_t size)
             return -7;
         }
 
+        memset((void *)(page_phys + hhdm_offset), 0, PAGE_SIZE);
+
         if (!map_page(
-                USER_STACK_BASE + (i * PAGE_SIZE),
+                vaddr,
                 page_phys,
                 PTE_USER | PTE_WRITABLE | PTE_NX))
         {
@@ -314,6 +323,21 @@ int run_elf(char *filename, uint64_t size)
             sprintln("[ELF] ERROR: Stack page mapping failed");
             return -7;
         }
+
+        size_t pml4_i = (vaddr >> 39) & 0x1FF;
+        size_t pdpt_i = (vaddr >> 30) & 0x1FF;
+        size_t pd_i   = (vaddr >> 21) & 0x1FF;
+        size_t pt_i   = (vaddr >> 12) & 0x1FF;
+
+        pml4[pml4_i] |= (PTE_USER | PTE_WRITABLE);
+        uint64_t *pdpt = (uint64_t *)((pml4[pml4_i] & 0x000FFFFFFFFFF000ULL) + hhdm_offset);
+        pdpt[pdpt_i] |= (PTE_USER | PTE_WRITABLE);
+        uint64_t *pd = (uint64_t *)((pdpt[pdpt_i] & 0x000FFFFFFFFFF000ULL) + hhdm_offset);
+        pd[pd_i] |= (PTE_USER | PTE_WRITABLE);
+        uint64_t *pt = (uint64_t *)((pd[pd_i] & 0x000FFFFFFFFFF000ULL) + hhdm_offset);
+        pt[pt_i] |= (PTE_USER | PTE_WRITABLE);
+
+        __asm__ volatile ("invlpg (%0)" :: "r"(vaddr) : "memory");
     }
     sprintln("[ELF] User stack allocated and mapped successfully.");
 
@@ -333,16 +357,12 @@ int run_elf(char *filename, uint64_t size)
 
     sprintln("[ELF] Preparing kernel stack and CPU GS base for safe syscall handling...");
     
-    // set kernel_stack to point to the top of our allocated kernel stack buffer (grows downwards)
     bootstrap_cpu_gs.kernel_stack = (uint64_t)(bootstrap_kernel_stack_space + KERNEL_STACK_SIZE);
 
     sprint("[ELF] Bootstrap Kernel Stack Top assigned at: ");
     uint64_to_str(bootstrap_cpu_gs.kernel_stack, buf);
     sprintln(buf);
 
-    // initialize IA32_KERNEL_GS_BASE (MSR 0xC0000102) so that 
-    // syscall entry won't fault when swapping gs and writing to [gs:8].
-    // (Ensure bootstrap_cpu_gs.kernel_stack points to your actual kernel stack top)
     uint64_t gs_base = (uint64_t)&bootstrap_cpu_gs;
     __asm__ volatile (
         "wrmsr"

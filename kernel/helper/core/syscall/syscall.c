@@ -20,14 +20,15 @@
 
 #define SYS_EXIT                 60
 
-#define USER_CODE_BASE  0x0000000000400000ULL
-#define USER_STACK_BASE 0x00007FFFF0000000ULL
-#define USER_ADDRESS_LIMIT 0x0000800000000000ULL
-#define USER_IO_LIMIT 65536
-#define USER_STRING_LIMIT 4096
-#define USER_PATH_LIMIT 256
+#define USER_CODE_BASE           0x0000000000400000ULL
+#define USER_STACK_BASE          0x00007FFFF0000000ULL
+#define USER_ADDRESS_LIMIT       0x0000800000000000ULL
+#define USER_LIMIT               0x0000800000000000ULL
 
-#define USER_LIMIT 0x0000800000000000ULL
+#define USER_IO_LIMIT            65536
+#define USER_STRING_LIMIT        4096
+#define USER_PATH_LIMIT          256
+#define USER_INPUT_LIMIT         256
 
 static bool is_valid_user_ptr(const void *ptr, size_t len) {
     uintptr_t addr = (uintptr_t)ptr;
@@ -41,7 +42,14 @@ static bool copy_str_from_user(char *dst, const char *user_src, size_t max_len) 
         dst[i] = user_src[i];
         if (dst[i] == '\0') return true;
     }
+    dst[max_len - 1] = '\0';
     return false;
+}
+
+static bool copy_from_user(void *dst, const void *user_src, size_t len) {
+    if (!is_valid_user_ptr(user_src, len)) return false;
+    memcpy(dst, user_src, len);
+    return true;
 }
 
 static bool copy_to_user(void *user_dst, const void *src, size_t len) {
@@ -49,14 +57,6 @@ static bool copy_to_user(void *user_dst, const void *src, size_t len) {
     memcpy(user_dst, src, len);
     return true;
 }
-
-static inline bool user_ok(const void *ptr, size_t len) {
-    uintptr_t a = (uintptr_t)ptr;
-    return a && a < 0x800000000000ULL && len <= (0x800000000000ULL - a);
-}
-
-
-#define USER_INPUT_LIMIT 256
 
 extern void syscall_entry(void);
 
@@ -75,7 +75,6 @@ static bool cpu_supports_rdrand;
 __attribute__((noreturn)) extern void syscall_exit_to_launcher(void);
 
 uint64_t syscall_handler(registers_t *regs) {
-
     uint64_t sc_num = regs->rax;
     uint64_t ret_val = 0;
 
@@ -93,49 +92,150 @@ uint64_t syscall_handler(registers_t *regs) {
         }
 
         case ReadFile: {
-            const char *path = (const char *)regs->rdi;
-            char *buf        = (char *)regs->rsi;
-            size_t len       = (size_t)regs->rdx;
+            const char *user_path = (const char *)regs->rdi;
+            char *user_buf        = (char *)regs->rsi;
+            size_t len            = (size_t)regs->rdx;
 
-            if (!user_ok(path, 1) || !user_ok(buf, len)) {
+            if (len == 0 || len > USER_IO_LIMIT || !is_valid_user_ptr(user_buf, len)) {
                 ret_val = (uint64_t)-1;
                 break;
             }
 
-            char name[64];
-            strncpy(name, path, sizeof(name) - 1);
-            name[sizeof(name) - 1] = '\0';
+            char kpath[USER_PATH_LIMIT];
+            if (!copy_str_from_user(kpath, user_path, sizeof(kpath))) {
+                ret_val = (uint64_t)-1;
+                break;
+            }
 
-            ret_val = (uint64_t)fs_read(name, buf, len);
+            static uint8_t io_bounce[USER_IO_LIMIT];
+            memset(io_bounce, 0, len);
+
+            int bytes_read = fs_read(kpath, (char *)io_bounce, len);
+            if (bytes_read < 0) {
+                ret_val = (uint64_t)-1;
+                break;
+            }
+
+            size_t copy_len = (size_t)bytes_read;
+            if (copy_len > len) copy_len = len;
+
+            if (!copy_to_user(user_buf, io_bounce, copy_len)) {
+                ret_val = (uint64_t)-1;
+                break;
+            }
+
+            ret_val = (uint64_t)bytes_read;
             break;
         }
 
         case WriteFile: {
-            const char *path = (const char *)regs->rdi;
-            char *buf        = (char *)regs->rsi;
-            size_t len       = (size_t)regs->rdx;
+            const char *user_path = (const char *)regs->rdi;
+            const char *user_buf  = (const char *)regs->rsi;
+            size_t len            = (size_t)regs->rdx;
 
-            if (!user_ok(path, 1) || !user_ok(buf, len)) {
+            if (len == 0 || len > USER_IO_LIMIT || !is_valid_user_ptr(user_buf, len)) {
                 ret_val = (uint64_t)-1;
                 break;
             }
 
-            char name[64];
-            strncpy(name, path, sizeof(name) - 1);
-            name[sizeof(name) - 1] = '\0';
+            char kpath[USER_PATH_LIMIT];
+            if (!copy_str_from_user(kpath, user_path, sizeof(kpath))) {
+                ret_val = (uint64_t)-1;
+                break;
+            }
 
-            ret_val = (uint64_t)fs_write(name, buf, len);
+            static uint8_t io_bounce[USER_IO_LIMIT];
+            if (!copy_from_user(io_bounce, user_buf, len)) {
+                ret_val = (uint64_t)-1;
+                break;
+            }
+
+            ret_val = (uint64_t)fs_write(kpath, (char *)io_bounce, len);
             break;
         }
 
-        default:
+        case CreateFile: {
+            const char *user_path = (const char *)regs->rdi;
+            char kpath[USER_PATH_LIMIT];
+
+            if (!copy_str_from_user(kpath, user_path, sizeof(kpath))) {
+                ret_val = (uint64_t)-1;
+                break;
+            }
+
+            ret_val = (uint64_t)fs_create(kpath);
+            break;
+        }
+
+        case Print: {
+            const char *user_str = (const char *)regs->rdi;
+            char kbuf[USER_STRING_LIMIT];
+
+            if (!copy_str_from_user(kbuf, user_str, sizeof(kbuf))) {
+                ret_val = (uint64_t)-1;
+                break;
+            }
+
+            print(kbuf);
+            ret_val = 0;
+            break;
+        }
+
+        case Input: {
+            const char *user_prompt = (const char *)regs->rdi;
+            char *user_buf          = (char *)regs->rsi;
+            int size                = (int)regs->rdx;
+
+            if (size <= 0 || size > USER_INPUT_LIMIT || !is_valid_user_ptr(user_buf, (size_t)size)) {
+                ret_val = (uint64_t)-1;
+                break;
+            }
+
+            char kprompt[USER_INPUT_LIMIT];
+            kprompt[0] = '\0';
+
+            if (user_prompt != NULL) {
+                if (!copy_str_from_user(kprompt, user_prompt, sizeof(kprompt))) {
+                    ret_val = (uint64_t)-1;
+                    break;
+                }
+            }
+
+
+            static char kinput[1024];
+            memset(kinput, 0, sizeof(kinput));
+
+            input(kprompt, kinput);
+            kinput[size - 1] = '\0';
+
+            size_t out_len = strlen(kinput) + 1;
+            if (out_len > (size_t)size) out_len = (size_t)size;
+
+            if (!copy_to_user(user_buf, kinput, out_len)) {
+                ret_val = (uint64_t)-1;
+                break;
+            }
+
+            ret_val = (uint64_t)(out_len - 1);
+            break;
+        }
+
+        case Clear: {
+            clear();
+            ret_val = 0;
+            break;
+        }
+
+        default: {
             print("[\033[91mNot Wow\033[0m] Unknown system call tried to execute, but doesn't have id. ");
             sprint("Unknown system call tried to execute, but doesn't have id. ");
-            char buffer[4];
+            char buffer[24];
             itoa((int)sc_num, buffer);
             println(buffer);
             sprintln(buffer);
+            ret_val = (uint64_t)-1;
             break;
+        }
     }
 
     return ret_val;
@@ -162,6 +262,7 @@ void init_syscalls(void) {
               "=c"(cpuid_ecx), "=d"(cpuid_edx)
             : "a"(1), "c"(0)
         );
+        (void)basic_features;
         cpu_supports_rdrand = (cpuid_ecx & (1U << 30)) != 0;
     }
 

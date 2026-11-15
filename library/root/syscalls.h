@@ -77,5 +77,6 @@ static inline uint64_t syscall_5(uint64_t num, uint64_t arg1, uint64_t arg2, uin
 // user input and output
 #define Print 20
 #define Input 21
+#define Clear 22
 
 #endif
