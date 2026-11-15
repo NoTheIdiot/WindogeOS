@@ -2,9 +2,11 @@
 #include "../library/stdint.h"
 #include "../library/dogeio.h"
 #include "../library/string.h"
+#include "../library/bool.h"
 
 #define CMD_BUF_SIZE 256
 #define MAX_ARGS     16
+#define READ_BUF_SIZE 8192
 
 int shell_tokenize(char *line, char **argv, int argc) {
     int count = 0;
@@ -98,6 +100,58 @@ int execute(int argc, char **argv) {
 
     if (strcmp(argv[0], "clear") == 0) {
         clear();
+        return 0;
+    }
+
+    if (strcmp(argv[0], "create") == 0) {
+        if (argv[1] == NULL) {
+            println("Need a filename.");
+            return -1;
+        }
+        if ((bool)fs_exists(argv[1])) {
+            println("File already exists.");
+            return -1;
+        }
+        if (fs_create(argv[1]) != 0) {
+            println("Failed to create file.");
+            return -1;
+        }
+        return 0;
+    }
+
+    if (strcmp(argv[0], "del") == 0) {
+        if (argv[1] == NULL) {
+            println("Need one argument.");
+            return -1;
+        }
+
+        if (fs_exists(argv[1])) {
+            println("File doesn't exist");
+            return -1;
+        }
+        fs_delete(argv[1]);
+        return 0;
+    }
+
+    if (strcmp(argv[0], "read") == 0) {
+        if (argv[1] == NULL) {
+            println("Need one argument.");
+            return -1;
+        }
+        if (!fs_exists(argv[1])) {
+            println("File doesn't exist.");
+            return -1;
+        }
+        static char buffer[READ_BUF_SIZE];
+        memset(buffer, 0, sizeof(buffer));
+        int bytes = fs_read(argv[1], buffer, sizeof(buffer) - 1);
+        if (bytes >= 0) {
+            buffer[bytes] = '\0';
+            println(buffer);
+        } else {
+            println("Failed to read file.");
+            return -1;
+        }
         return 0;
     }
 

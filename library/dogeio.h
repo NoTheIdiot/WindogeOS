@@ -9,16 +9,28 @@ static inline void exit(void) {
     syscall_0(Process_Exit);
 }
 
-static inline int read_file(const char *path, char *buf, size_t len) {
+static inline int fs_read(const char *path, char *buf, size_t len) {
     return (int)syscall_3(ReadFile, (uint64_t)path, (uint64_t)buf, (uint64_t)len);
 }
 
-static inline int write_file(const char *path, const char *buf, size_t len) {
+static inline int fs_write(const char *path, const char *buf, size_t len) {
     return (int)syscall_3(WriteFile, (uint64_t)path, (uint64_t)buf, (uint64_t)len);
 }
 
-static inline int create_file(const char *path) {
+static inline int fs_create(const char *path) {
     return (int)syscall_1(CreateFile, (uint64_t)path);
+}
+
+static inline int fs_mkdir(const char* path) {
+    return (int)syscall_1(CreateDir, (uint64_t)path);
+}
+
+static inline int fs_delete(const char* path) {
+    return (int)syscall_1(DeleteThing, (uint64_t)path);
+}
+
+static inline int fs_exists(const char* path) {
+    return (int)syscall_1(Exists, (uint64_t)path);
 }
 
 static inline int print(const char *str) {

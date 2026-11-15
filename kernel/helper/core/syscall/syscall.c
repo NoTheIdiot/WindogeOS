@@ -167,6 +167,43 @@ uint64_t syscall_handler(registers_t *regs) {
             break;
         }
 
+        case CreateDir: {
+            const char *user_path = (const char *)regs->rdi;
+            char kpath[USER_PATH_LIMIT];
+
+            if (!copy_str_from_user(kpath, user_path, sizeof(kpath))) {
+                ret_val = (uint64_t)-1;
+                break;
+            }
+
+            ret_val = (uint64_t)fs_mkdir(kpath);
+            break;
+        }
+
+        case DeleteThing: {
+            const char *user_path = (const char *)regs->rdi;
+            char kpath[USER_PATH_LIMIT];
+
+            if (!copy_str_from_user(kpath, user_path, sizeof(kpath))) {
+                ret_val = (uint64_t)-1;
+                break;
+            }
+            ret_val = (uint64_t)fs_delete(kpath);
+            break;
+        }
+
+        case Exists: {
+            const char *user_path = (const char *)regs->rdi;
+            char kpath[USER_PATH_LIMIT];
+
+            if (!copy_str_from_user(kpath, user_path, sizeof(kpath))) {
+                ret_val = (uint64_t)-1;
+                break;
+            }
+            ret_val = (uint64_t)fs_exists(kpath);
+            break;
+        }
+
         case Print: {
             const char *user_str = (const char *)regs->rdi;
             char kbuf[USER_STRING_LIMIT];
