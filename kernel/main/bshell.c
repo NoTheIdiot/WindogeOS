@@ -197,8 +197,10 @@ int execute(int argc, char** argv) {
     if (strcmp(argv[0], "dir") == 0) {
         static fs_t files[MAX_DIR_ENTRIES];
         memset(files, 0, sizeof(files));
+        char buffer[64];
+        fs_get_dir(buffer, 64);
 
-        int count = fs_list("/", files, MAX_DIR_ENTRIES);
+        int count = fs_list(buffer, files, MAX_DIR_ENTRIES);
 
         if (count < 0) {
             println("Filesystem error or not mounted.");
@@ -228,7 +230,7 @@ int execute(int argc, char** argv) {
 
             print(files[i].name);
             print("  (");
-            uint32_to_str(files[i].size, size_str);
+            itoa((int)files[i].size, size_str);
             print(size_str);
             println(" bytes)");
         }
@@ -264,6 +266,29 @@ int execute(int argc, char** argv) {
             println("Failed to write file.");
             return -1;
         }
+        return 0;
+    }
+
+    if (strcmp(argv[0], "cd") == 0) {
+        if (argv[1] == NULL) {
+            println("cd: cd <path>");
+            return -1;
+        }
+        fs_chdir(argv[1]);
+        return 0;
+    }
+
+    if (strcmp(argv[0], "run") == 0) {
+        if (argv[1] == NULL) {
+            println("run: run <path>");
+            return -1;
+        }
+        if (!fs_exists(argv[1])) {
+            println("Program/file doesn't exist.");
+            return -1;
+        }
+
+        run_elf(argv[1], 16384);
         return 0;
     }
 
@@ -313,18 +338,25 @@ int execute(int argc, char** argv) {
 void backup_shell(void) {
     char command[CMD_BUF_SIZE];
     char *argv[MAX_ARGS];
-    int argc;
-    while (true) {
-        input("root> ", command);
-        argc = shell_tokenize(command, argv, MAX_ARGS);
+    char buffer[64];
+
+    while (1) {
+        print("admin ");
+        fs_get_dir(buffer, 64);
+        print(buffer);
+        input("> ", command);
+
+        clean_input_string(command);
+        if (command[0] == '\0') {
+            continue;
+        }
+
+        int argc = shell_tokenize(command, argv, MAX_ARGS);
         if (argc < 0) {
             println("Syntax error: unclosed quote.");
             continue;
         }
-        int result = execute(argc, argv);
 
-        if (result == 500) {
-            return;
-        }
+        execute(argc, argv);
     }
 }

@@ -1253,6 +1253,6 @@ int change_dir(mount_t *vol, const char *path) {
     return 0;
 }
 
-const char *get_cwd(void) {
-    return g_cwd;
+void get_cwd(char* buffer, int size) {
+    strncpy(buffer, g_cwd, size);
 }

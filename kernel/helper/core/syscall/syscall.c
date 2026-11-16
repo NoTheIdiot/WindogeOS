@@ -268,7 +268,8 @@ uint64_t syscall_handler(registers_t *regs) {
                 break;
             }
 
-            const char *cwd = fs_get_dir();
+            char cwd[len];
+            fs_get_dir(cwd, len);
             if (!cwd) {
                 ret_val = (uint64_t)-1;
                 break;

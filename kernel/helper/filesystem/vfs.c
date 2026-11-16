@@ -114,6 +114,6 @@ int fs_chdir(char* path) {
     return change_dir(&exfat_vol, path);
 }
 
-char* fs_get_dir(void) {
-    return get_cwd();
+void fs_get_dir(char* buffer, int size) {
+    get_cwd(buffer, size);
 }

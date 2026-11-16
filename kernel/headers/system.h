@@ -223,7 +223,7 @@ int list_dir(mount_t *vol, const char* path, fs_t *out_files, int max_files);
 int create_dir(mount_t *vol, const char *path);
 int delete_file(mount_t *vol, const char *name);
 int change_dir(mount_t *vol, const char *path);
-const char *get_cwd(void);
+void get_cwd(char* buffer, int size);
 
 // register typedef
 typedef struct {
