@@ -1,9 +1,9 @@
-#include "../library/stddef.h"
-#include "../library/stdint.h"
-#include "../library/dogeio.h"
-#include "../library/dogelib.h"
-#include "../library/string.h"
-#include "../library/bool.h"
+#include "../../library/stddef.h"
+#include "../../library/stdint.h"
+#include "../../library/dogeio.h"
+#include "../../library/dogelib.h"
+#include "../../library/string.h"
+#include "../../library/bool.h"
 
 #define CMD_BUF_SIZE 256
 #define MAX_ARGS     16

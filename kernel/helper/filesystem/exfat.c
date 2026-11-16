@@ -22,6 +22,27 @@ static const char *strrchr(const char *s, int c) {
     return last;
 }
 
+static char g_cwd[256] = "/";
+
+static void build_path(const char *path, char *out) {
+    if (!path || !out)
+        return;
+
+    if (path[0] == '/') {
+        strcpy(out, path);
+        return;
+    }
+
+    if (strcmp(g_cwd, "/") == 0) {
+        strcpy(out, "/");
+        strcat(out, path);
+    } else {
+        strcpy(out, g_cwd);
+        strcat(out, "/");
+        strcat(out, path);
+    }
+}
+
 static inline uint64_t cluster_to_sectors(const mount_t *vol, uint32_t cluster) {
     return vol->heap_offset_bytes + ((uint64_t)(cluster - 2) * vol->sectors_per_cluster);
 }
@@ -999,4 +1020,28 @@ int delete_file(mount_t *vol, const char *path) {
     }
 
     return -2; // File not found
+}
+
+int change_dir(mount_t *vol, const char *path) {
+    char full[256];
+
+    build_path(path, full);
+
+    uint32_t cluster = resolve_path(vol, full);
+    if (cluster == 0)
+        return -1;
+
+    strcpy(g_cwd, full);
+
+    size_t len = strlen(g_cwd);
+    while (len > 1 && g_cwd[len - 1] == '/') {
+        g_cwd[len - 1] = '\0';
+        len--;
+    }
+
+    return 0;
+}
+
+const char *get_cwd(void) {
+    return g_cwd;
 }

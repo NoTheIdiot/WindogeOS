@@ -109,3 +109,11 @@ int fs_read_raw_at(char *filename, uint8_t *buffer, uint64_t offset, uint64_t si
 
     return (int)size;
 }
+
+int fs_chdir(char* path) {
+    return change_dir(&exfat_vol, path);
+}
+
+char* fs_get_dir(void) {
+    return get_cwd();
+}

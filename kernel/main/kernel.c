@@ -143,7 +143,7 @@ void windoge_os(void) {
     clear();
     println("\033[96mWindogeOS Booted!\033[0m");
     println("\033[96mUh, there is no longer nothing. There is an actual shell.\033[0m");
-    run_elf("dogeshell", 16384);
+    run_elf("system/dogeshell", 16384);
     backup_shell();
     halt();
 }

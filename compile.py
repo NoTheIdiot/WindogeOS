@@ -252,7 +252,7 @@ def compile_userland_programs():
     programs_dir = os.path.abspath("programs")
     if not os.path.exists(programs_dir):
         print("[Build Info] 'programs/' directory not found. Skipping userland compilation.")
-        return []
+        return [], []
 
     linker_script = os.path.abspath("linkers/apps_elf.ld")
     if not os.path.isfile(linker_script):
@@ -271,149 +271,116 @@ def compile_userland_programs():
     }
     target_triple = target_triples.get(architecture, f"{architecture}-elf")
 
-    binaries = []
+    user_binaries = []
+    system_binaries = []
+
     out_dir = os.path.abspath(f"programs/bin-{architecture}")
+    sys_out_dir = os.path.join(out_dir, "system")
     os.makedirs(out_dir, exist_ok=True)
+    os.makedirs(sys_out_dir, exist_ok=True)
 
-    print(f"[BUILD] Compiling userland programs in 'programs/' using linker {linker_script}...")
+    print(f"[BUILD] Compiling userland and system programs using linker {linker_script}...")
 
-    for item in os.listdir(programs_dir):
-        item_path = os.path.join(programs_dir, item)
-        if item.startswith("bin-"):
-            continue
-
-        if os.path.isfile(item_path) and item.endswith((".c", ".cpp", ".cc", ".s", ".S", ".asm")):
-            prog_name = os.path.splitext(item)[0]
-            obj_path = os.path.join(out_dir, f"{prog_name}.o")
-            elf_path = os.path.join(out_dir, prog_name)
-
-            is_cpp = item.endswith((".cpp", ".cc"))
-            is_asm = item.endswith(".asm")
-            compiler_driver = clangxx_path if is_cpp else clang_path
-
-            if is_asm:
-                if architecture != "x86_64":
-                    print(f"Error: .asm userland programs require x86_64 architecture for NASM.")
-                    sys.exit(1)
-                compile_cmd = [
-                    nasm_path,
-                    "-felf64",
-                    item_path,
-                    "-o", obj_path
-                ]
-                run_command(compile_cmd)
-
-                link_cmd = [
-                    clang_path,
-                    "-nostdlib",
-                    "-static",
-                    "-T", linker_script,
-                    "-o", elf_path,
-                    obj_path
-                ]
-                if architecture == "x86_64":
-                    link_cmd.append("-m64")
-            else:
-                if is_cpp:
-                    compile_cmd = [
-                        clangxx_path, f"--target={target_triple}",
-                        "-ffreestanding", "-fno-pie", "-fno-stack-protector",
-                        "-c", item_path, "-o", obj_path
-                    ]
-                else:
-                    compile_cmd = [
-                        clang_path, f"--target={target_triple}",
-                        "-ffreestanding", "-fno-pie", "-fno-stack-protector",
-                        "-c", item_path, "-o", obj_path
-                    ]
-                if architecture == "x86_64":
-                    compile_cmd.extend(["-mno-red-zone", "-m64"])
-
-                run_command(compile_cmd)
-
-                link_cmd = [
-                    compiler_driver,
-                    f"--target={target_triple}",
-                    "-nostdlib",
-                    "-static",
-                    "-T", linker_script,
-                    "-o", elf_path,
-                    obj_path
-                ]
-                if architecture == "x86_64":
-                    link_cmd.append("-m64")
-
-            run_command(link_cmd)
-            binaries.append(elf_path)
-            print(f"[SUCCESS] Compiled userland program: {prog_name}")
-
-        elif os.path.isdir(item_path):
-            prog_name = item
-            sub_sources = []
-            for root, dirs, files in os.walk(item_path):
-                for f in files:
-                    if f.endswith((".c", ".cpp", ".cc", ".s", ".S", ".asm")):
-                        sub_sources.append(os.path.join(root, f))
-
-            if not sub_sources:
+    def compile_items_in(source_base, destination_dir, target_list, is_system_folder=False):
+        if not os.path.exists(source_base):
+            return
+        for item in os.listdir(source_base):
+            item_path = os.path.join(source_base, item)
+            if item.startswith("bin-") or (not is_system_folder and item == "system"):
                 continue
 
-            obj_files = []
-            has_cpp_files = False
-            for src in sub_sources:
-                rel = os.path.relpath(src, item_path)
-                obj_p = os.path.join(out_dir, prog_name, rel.replace(os.path.sep, "_") + ".o")
-                os.makedirs(os.path.dirname(obj_p), exist_ok=True)
+            if os.path.isfile(item_path) and item.endswith((".c", ".cpp", ".cc", ".s", ".S", ".asm")):
+                prog_name = os.path.splitext(item)[0]
+                obj_path = os.path.join(destination_dir, f"{prog_name}.o")
+                elf_path = os.path.join(destination_dir, prog_name)
 
-                if src.endswith(".asm"):
+                is_cpp = item.endswith((".cpp", ".cc"))
+                is_asm = item.endswith(".asm")
+                compiler_driver = clangxx_path if is_cpp else clang_path
+
+                if is_asm:
                     if architecture != "x86_64":
-                        print(f"Error: .asm userland packages require x86_64 architecture for NASM.")
+                        print(f"Error: .asm programs require x86_64 architecture for NASM.")
                         sys.exit(1)
-                    c_cmd = [
-                        nasm_path,
-                        "-felf64",
-                        src,
-                        "-o", obj_p
-                    ]
-                elif src.endswith((".cpp", ".cc")):
-                    has_cpp_files = True
-                    c_cmd = [
-                        clangxx_path, f"--target={target_triple}",
-                        f"-I{item_path}", "-ffreestanding", "-fno-pie", "-fno-stack-protector",
-                        "-c", src, "-o", obj_p
-                    ]
+                    run_command([nasm_path, "-felf64", item_path, "-o", obj_path])
+                    link_cmd = [clang_path, "-nostdlib", "-static", "-T", linker_script, "-o", elf_path, obj_path]
                     if architecture == "x86_64":
-                        c_cmd.extend(["-mno-red-zone", "-m64"])
+                        link_cmd.append("-m64")
                 else:
-                    c_cmd = [
-                        clang_path, f"--target={target_triple}",
-                        f"-I{item_path}", "-ffreestanding", "-fno-pie", "-fno-stack-protector",
-                        "-c", src, "-o", obj_p
-                    ]
+                    if is_cpp:
+                        compile_cmd = [clangxx_path, f"--target={target_triple}", "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-c", item_path, "-o", obj_path]
+                    else:
+                        compile_cmd = [clang_path, f"--target={target_triple}", "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-c", item_path, "-o", obj_path]
                     if architecture == "x86_64":
-                        c_cmd.extend(["-mno-red-zone", "-m64"])
+                        compile_cmd.extend(["-mno-red-zone", "-m64"])
+                    run_command(compile_cmd)
 
-                run_command(c_cmd)
-                obj_files.append(obj_p)
+                    link_cmd = [compiler_driver, f"--target={target_triple}", "-nostdlib", "-static", "-T", linker_script, "-o", elf_path, obj_path]
+                    if architecture == "x86_64":
+                        link_cmd.append("-m64")
 
-            elf_path = os.path.join(out_dir, prog_name)
-            package_driver = clangxx_path if has_cpp_files else clang_path
+                run_command(link_cmd)
+                target_list.append(elf_path)
+                print(f"[SUCCESS] Compiled program: {prog_name}")
 
-            link_cmd = [
-                package_driver,
-                "-nostdlib",
-                "-static",
-                "-T", linker_script,
-                "-o", elf_path
-            ] + obj_files
-            if architecture == "x86_64":
-                link_cmd.append("-m64")
+            elif os.path.isdir(item_path):
+                prog_name = item
+                sub_sources = []
+                for root, dirs, files in os.walk(item_path):
+                    for f in files:
+                        if f.endswith((".c", ".cpp", ".cc", ".s", ".S", ".asm")):
+                            sub_sources.append(os.path.join(root, f))
 
-            run_command(link_cmd)
-            binaries.append(elf_path)
-            print(f"[SUCCESS] Compiled userland program package: {prog_name}")
+                if not sub_sources:
+                    continue
 
-    return binaries
+                obj_files = []
+                has_cpp_files = False
+                sub_out_dir = os.path.join(destination_dir, prog_name)
+                os.makedirs(sub_out_dir, exist_ok=True)
+
+                for src in sub_sources:
+                    rel = os.path.relpath(src, item_path)
+                    obj_p = os.path.join(sub_out_dir, rel.replace(os.path.sep, "_") + ".o")
+                    os.makedirs(os.path.dirname(obj_p), exist_ok=True)
+
+                    if src.endswith(".asm"):
+                        if architecture != "x86_64":
+                            print(f"Error: .asm packages require x86_64 architecture for NASM.")
+                            sys.exit(1)
+                        c_cmd = [nasm_path, "-felf64", src, "-o", obj_p]
+                    elif src.endswith((".cpp", ".cc")):
+                        has_cpp_files = True
+                        c_cmd = [clangxx_path, f"--target={target_triple}", f"-I{item_path}", "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-c", src, "-o", obj_p]
+                        if architecture == "x86_64":
+                            c_cmd.extend(["-mno-red-zone", "-m64"])
+                    else:
+                        c_cmd = [clang_path, f"--target={target_triple}", f"-I{item_path}", "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-c", src, "-o", obj_p]
+                        if architecture == "x86_64":
+                            c_cmd.extend(["-mno-red-zone", "-m64"])
+
+                    run_command(c_cmd)
+                    obj_files.append(obj_p)
+
+                elf_path = os.path.join(destination_dir, prog_name)
+                package_driver = clangxx_path if has_cpp_files else clang_path
+
+                link_cmd = [package_driver, "-nostdlib", "-static", "-T", linker_script, "-o", elf_path] + obj_files
+                if architecture == "x86_64":
+                    link_cmd.append("-m64")
+
+                run_command(link_cmd)
+                target_list.append(elf_path)
+                print(f"[SUCCESS] Compiled package: {prog_name}")
+
+    # Compile regular programs
+    compile_items_in(programs_dir, out_dir, user_binaries, is_system_folder=False)
+
+    # Compile system programs from programs/system/
+    sys_dir = os.path.join(programs_dir, "system")
+    compile_items_in(sys_dir, sys_out_dir, system_binaries, is_system_folder=True)
+
+    return user_binaries, system_binaries
 
 def cleanup_kernel_elf():
     if os.path.exists("kernel.elf"):
@@ -421,7 +388,7 @@ def cleanup_kernel_elf():
 
 def generate_hdd_image():
     obj_dir = compile_kernel_binary()
-    userland_binaries = compile_userland_programs()
+    user_binaries, system_binaries = compile_userland_programs()
     
     img_target = f"{boot_image_config['name']}.img"
     print(f"Compiling structured dual-partition disk ({firmware_mode} mode): {img_target}")
@@ -503,6 +470,7 @@ def generate_hdd_image():
     os.makedirs(mnt_dir, exist_ok=True)
 
     injected_programs = []
+    injected_systems = []
     
     loop_dev = subprocess.check_output(
         f"sudo losetup -f --show -o {p2_offset_bytes} --sizelimit {p2_bytes_count} {img_target}", 
@@ -522,14 +490,26 @@ def generate_hdd_image():
         )
         subprocess.run(f"sudo mount {loop_dev} {mnt_dir}", shell=True, check=True)
 
-        for bin_path in userland_binaries:
+        subprocess.run(["sudo", "mkdir", "-p", f"{mnt_dir}/programs"], check=True)
+        subprocess.run(["sudo", "mkdir", "-p", f"{mnt_dir}/system"], check=True)
+
+        for bin_path in user_binaries:
             if os.path.exists(bin_path):
                 prog_basename = os.path.basename(bin_path)
-                subprocess.run(["sudo", "cp", bin_path, f"{mnt_dir}/"], check=True)
+                subprocess.run(["sudo", "cp", bin_path, f"{mnt_dir}/programs/"], check=True)
                 injected_programs.append(prog_basename)
+
+        for bin_path in system_binaries:
+            if os.path.exists(bin_path):
+                sys_basename = os.path.basename(bin_path)
+                subprocess.run(["sudo", "cp", bin_path, f"{mnt_dir}/system/"], check=True)
+                injected_systems.append(sys_basename)
                 
-        print("[Partition 2 Contents]:")
-        subprocess.run(["sudo", "ls", "-la", mnt_dir], check=True)
+        print("[Partition 2 /programs Contents]:")
+        subprocess.run(["sudo", "ls", "-la", f"{mnt_dir}/programs"], check=True)
+        print("[Partition 2 /system Contents]:")
+        subprocess.run(["sudo", "ls", "-la", f"{mnt_dir}/system"], check=True)
+
         subprocess.run("sudo sync", shell=True, check=True)
     finally:
         subprocess.run(f"sudo umount {mnt_dir}", shell=True, check=True)
@@ -546,12 +526,19 @@ def generate_hdd_image():
     cmd = "objdump -d kernel.elf | grep -C 5 \"7bb1\""
     subprocess.run(cmd, shell=True)
 
-    print("Things injected to /:")
+    print("Things injected to /programs:")
     if injected_programs:
         for prog in injected_programs:
             print(f"PROGRAM > {prog}")
     else:
         print("  (No userland programs found/injected)")
+
+    print("Things injected to /system:")
+    if injected_systems:
+        for sys_item in injected_systems:
+            print(f"SYSTEM > {sys_item}")
+    else:
+        print("  (No system programs found/injected)")
 
     print(f"[SUCCESS] Disk image generated successfully: {img_target}")
 

@@ -85,6 +85,8 @@ bool fs_exists(char *filename);
 int fs_write_force(char* filename, char* data, uint64_t size);
 int fs_list(char* path, fs_t* out, int max_entries);
 int fs_mkdir(char* path);
+int fs_chdir(char* path);
+char* fs_get_dir(void);
 int fs_delete(char* filename);
 int fs_read_raw(char *filename, uint8_t *buffer, uint64_t size);
 int fs_write_raw(char* filename, uint8_t* buffer, uint64_t size);
