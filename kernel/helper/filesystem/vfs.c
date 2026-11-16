@@ -15,14 +15,17 @@ int fs_mount(void) {
 }
 
 int fs_create(char* filename) {
+    if (!check_permission(filename)) return -1;
     return create_file(&exfat_vol, filename);
 }
 
 int fs_write_force(char* filename, char* data, uint64_t size) {
+    if (!check_permission(filename)) return -1;
     return write_file(&exfat_vol, filename, (uint8_t*)data, size);
 }
 
 int fs_read(char* filename, char* data, uint64_t size) {
+    if (!check_permission(filename)) return -1;
     uint64_t buffer = 0;
     read_file(&exfat_vol, filename, (uint8_t*)data, size, &buffer);
     return buffer;
@@ -34,6 +37,7 @@ bool fs_exists(char *filename) {
 }
 
 int fs_write(char* filename, char* data, uint64_t size) {
+    if (!check_permission(filename)) return -1;
     while (size > 0 && data[size - 1] == '\0') {
         size--;
     }
@@ -48,18 +52,22 @@ int fs_write(char* filename, char* data, uint64_t size) {
 }
 
 int fs_mkdir(char* path) {
+    if (check_permission(path) == 0) return -1;
     return create_dir(&exfat_vol, path);
 }
 
 int fs_list(char* path, fs_t* out, int max_entries) {
+    if (check_permission(path) == 0) return -1;
     return list_dir(&exfat_vol, path, out, max_entries);
 }
 
 int fs_delete(char* filename) {
+    if (!check_permission(filename)) return -1;
     return delete_file(&exfat_vol, filename);
 }
 
 int fs_read_raw(char *filename, uint8_t *buffer, uint64_t size) {
+    if (!check_permission(filename)) return -1;
     uint64_t bytes_read = 0;
 
     if (read_file(&exfat_vol, filename, buffer, size, &bytes_read) != 0) {
@@ -70,10 +78,12 @@ int fs_read_raw(char *filename, uint8_t *buffer, uint64_t size) {
 }
 
 int fs_write_raw(char* filename, uint8_t* buffer, uint64_t size) {
+    if (!check_permission(filename)) return -1;
     return write_file(&exfat_vol, filename, buffer, size);
 }
 
 int fs_read_raw_at(char *filename, uint8_t *buffer, uint64_t offset, uint64_t size) {
+    if (!check_permission(filename)) return -1;
     if (size == 0) {
         return 0;
     }
@@ -111,6 +121,7 @@ int fs_read_raw_at(char *filename, uint8_t *buffer, uint64_t offset, uint64_t si
 }
 
 int fs_chdir(char* path) {
+    if (check_permission(path) == 0) return -1;
     return change_dir(&exfat_vol, path);
 }
 

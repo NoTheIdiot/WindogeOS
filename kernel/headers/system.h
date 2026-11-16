@@ -274,6 +274,17 @@ void speaker_beep(uint32_t hz, uint32_t duration_ms);
 bool nvme_init(void);
 
 // im lazy so put anything you dont know where does it go here
+#define READ_WRITE 1
+#define HELL_NO    0
+
+int current_permission(void);
+int switch_permission(int switched);
+int check_permission(char* path);
+
 bool try_demand_page(uint64_t fault_addr, uint64_t err_code);
+void pbkdf2_sha256(const uint8_t *password, size_t pass_len,
+                   const uint8_t *salt, size_t salt_len,
+                   uint32_t iterations, uint8_t out_hash[32]);
+int verify_hash_const_time(const uint8_t a[32], const uint8_t b[32]);
 
 #endif

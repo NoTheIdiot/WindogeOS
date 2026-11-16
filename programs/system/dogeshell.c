@@ -222,7 +222,9 @@ int execute(int argc, char **argv) {
             println("cd: cd <path>");
             return -1;
         }
-        fs_chdir(argv[1]);
+        if (fs_chdir(argv[1]) == -1) {
+            println("Not Wow: Permission denied :(");
+        }
         return 0;
     }
 

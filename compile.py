@@ -492,6 +492,7 @@ def generate_hdd_image():
 
         subprocess.run(["sudo", "mkdir", "-p", f"{mnt_dir}/programs"], check=True)
         subprocess.run(["sudo", "mkdir", "-p", f"{mnt_dir}/system"], check=True)
+        subprocess.run(["sudo", "mkdir", "-p", f"{mnt_dir}/users"], check=True)
 
         for bin_path in user_binaries:
             if os.path.exists(bin_path):
