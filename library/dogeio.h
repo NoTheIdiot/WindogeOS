@@ -45,6 +45,14 @@ static inline int fs_list(char* path, fs_t* buffer, int max) {
     return (int)syscall_3(ListDirectory, (uint64_t)path, (uint64_t)buffer, (uint64_t)max);
 }
 
+static inline int fs_chdir(char* path) {
+    return (int)syscall_1(ChangeDirectory, (uint64_t)path);
+}
+
+static inline int fs_get_cwd(char *buf, size_t len) {
+    return (int)syscall_2(CurrentDirectory, (uint64_t)buf, (uint64_t)len);
+}
+
 static inline int print(const char *str) {
     return (int)syscall_1(Print, (uint64_t)str);
 }

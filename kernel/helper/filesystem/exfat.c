@@ -24,23 +24,75 @@ static const char *strrchr(const char *s, int c) {
 
 static char g_cwd[256] = "/";
 
-static void build_path(const char *path, char *out) {
+static void build_path(const char *path, char *out)
+{
     if (!path || !out)
         return;
 
     if (path[0] == '/') {
         strcpy(out, path);
-        return;
+    } else {
+        if (strcmp(g_cwd, "/") == 0) {
+            strcpy(out, "/");
+            strcat(out, path);
+        } else {
+            strcpy(out, g_cwd);
+            strcat(out, "/");
+            strcat(out, path);
+        }
     }
 
-    if (strcmp(g_cwd, "/") == 0) {
-        strcpy(out, "/");
-        strcat(out, path);
-    } else {
-        strcpy(out, g_cwd);
-        strcat(out, "/");
-        strcat(out, path);
+    char normalized[256];
+    char *parts[32];
+    int count = 0;
+
+    strcpy(normalized, out);
+
+    char *p = normalized;
+
+    while (*p) {
+
+        while (*p == '/')
+            p++;
+
+        if (!*p)
+            break;
+
+        char *start = p;
+
+        while (*p && *p != '/')
+            p++;
+
+        if (*p) {
+            *p = '\0';
+            p++;
+        }
+
+        if (strcmp(start, ".") == 0) {
+            continue;
+        }
+
+        if (strcmp(start, "..") == 0) {
+            if (count > 0)
+                count--;
+            continue;
+        }
+
+        parts[count++] = start;
     }
+
+    strcpy(out, "/");
+
+    for (int i = 0; i < count; i++) {
+
+        strcat(out, parts[i]);
+
+        if (i != count - 1)
+            strcat(out, "/");
+    }
+
+    if (count == 0)
+        strcpy(out, "/");
 }
 
 static inline uint64_t cluster_to_sectors(const mount_t *vol, uint32_t cluster) {
@@ -550,47 +602,96 @@ uint32_t resolve_path(mount_t *vol, const char *path) {
     return current_cluster;
 }
 
-int create_dir(mount_t *vol, const char *path) {
+int create_dir(mount_t *vol, const char *path)
+{
+    char full[256];
+    build_path(path, full);
+
     char parent_path[256];
     char dir_name[256];
-    split_path(path, parent_path, dir_name);
+
+    split_path(full, parent_path, dir_name);
 
     uint32_t parent_cluster = resolve_path(vol, parent_path);
-    if (parent_cluster == 0) return -2;
+    if (parent_cluster == 0)
+        return -2;
+
+    if (find_entry_in_dir(vol,
+                          parent_cluster,
+                          dir_name,
+                          NULL,
+                          NULL,
+                          NULL,
+                          NULL) == 0)
+    {
+        return -4; // already exists
+    }
 
     size_t name_len = strlen(dir_name);
-    if (name_len == 0 || name_len > 255) return -1;
+
+    if (name_len == 0 || name_len > 255)
+        return -1;
 
     uint8_t name_entries = (name_len + 14) / 15;
     uint8_t needed_slots = 2 + name_entries;
-    uint8_t entry_set[19 * 32];
-    memset(entry_set, 0, needed_slots * 32);
 
-    uint32_t dir_cluster = alloc_cluster_near(vol, vol->root_cluster);
-    if (dir_cluster < 2) return -3;
+    uint8_t entry_set[19 * 32];
+    memset(entry_set, 0, sizeof(entry_set));
+
+    uint32_t dir_cluster =
+        alloc_cluster_near(vol, parent_cluster);
+
+    if (dir_cluster < 2)
+        return -3;
+
     set_fat_entry(vol, dir_cluster, 0xFFFFFFFF);
 
+    uint8_t zero[512];
+    memset(zero, 0, sizeof(zero));
+
+    uint64_t dir_sector =
+        cluster_to_sectors(vol, dir_cluster);
+
+    for (uint32_t s = 0; s < vol->sectors_per_cluster; s++) {
+        if (write_offset(vol, dir_sector + s, zero, 1) != 0)
+            return -4;
+    }
+
     file_entry *fe = (file_entry *)entry_set;
+
     fe->entry_type = 0x85;
-    fe->scount = 1 + name_entries;
-    fe->attribute = 0x0010; // Directory attribute
+    fe->scount     = 1 + name_entries;
+    fe->attribute  = 0x0010;
 
     stream_entry *se = (stream_entry *)(entry_set + 32);
-    se->entry_type = 0xC0;
-    se->secondary_flags = 0x01;
-    se->name_length = (uint8_t)name_len;
-    se->name_hash = calc_name_hash(dir_name, name_len);
-    se->first_cluster = dir_cluster;
-    se->valid_data_length = vol->bytes_per_cluster;
-    se->data_length = vol->bytes_per_cluster;
+
+    se->entry_type         = 0xC0;
+    se->secondary_flags    = 0x03;
+    se->name_length        = (uint8_t)name_len;
+    se->name_hash          = calc_name_hash(dir_name, name_len);
+    se->first_cluster      = dir_cluster;
+    se->valid_data_length  = vol->bytes_per_cluster;
+    se->data_length        = vol->bytes_per_cluster;
 
     for (uint8_t i = 0; i < name_entries; i++) {
-        file_name_entry *fn = (file_name_entry *)(entry_set + (2 + i) * 32);
+
+        file_name_entry *fn =
+            (file_name_entry *)(entry_set + ((uint32_t)i + 2) * 32);
+
         fn->entry_type = 0xC1;
-        uint16_t *utf16 = (uint16_t *)fn->filename;
-        for (size_t j = 0; j < 15; j++) {
-            size_t idx = (i * 15) + j;
-            utf16[j] = (idx < name_len) ? (uint8_t)dir_name[idx] : 0x0000;
+
+        uint16_t *utf16 =
+            (uint16_t *)fn->filename;
+
+        for (uint32_t j = 0; j < 15; j++) {
+
+            uint32_t idx =
+                (i * 15) + j;
+
+            utf16[j] =
+                (idx < name_len)
+                ? (uint8_t)dir_name[idx]
+                : 0;
         }
     }
 
@@ -599,57 +700,8 @@ int create_dir(mount_t *vol, const char *path) {
     uint32_t target_cluster;
     uint32_t target_slot;
 
-    int rc =find_free_dir_slots(vol, parent_cluster, needed_slots, &target_cluster, &target_slot);
-
-    if (rc != 0)
-        return rc;
-
-    return write_entry_set( vol, target_cluster, target_slot, entry_set, needed_slots);
-}
-
-int create_file(mount_t *vol, const char *path) {
-    char parent_path[256];
-    char file_name[256];
-    split_path(path, parent_path, file_name);
-
-    uint32_t parent_cluster = resolve_path(vol, parent_path);
-    if (parent_cluster == 0) return -2;
-
-    size_t name_len = strlen(file_name);
-    if (name_len == 0 || name_len > 255) return -1;
-
-    uint8_t name_entries = (name_len + 14) / 15;
-    uint8_t needed_slots = 2 + name_entries;
-    uint8_t entry_set[19 * 32];
-    memset(entry_set, 0, needed_slots * 32);
-
-    file_entry *fe = (file_entry *)entry_set;
-    fe->entry_type = 0x85;
-    fe->scount = 1 + name_entries;
-    fe->attribute = 0x0020; // Archive
-
-    stream_entry *se = (stream_entry *)(entry_set + 32);
-    se->entry_type = 0xC0;
-    se->secondary_flags = 0x03;
-    se->name_length = (uint8_t)name_len;
-    se->name_hash = calc_name_hash(file_name, name_len);
-
-    for (uint8_t i = 0; i < name_entries; i++) {
-        file_name_entry *fn = (file_name_entry *)(entry_set + (2 + i) * 32);
-        fn->entry_type = 0xC1;
-        uint16_t *utf16 = (uint16_t *)fn->filename;
-        for (size_t j = 0; j < 15; j++) {
-            size_t idx = (i * 15) + j;
-            utf16[j] = (idx < name_len) ? (uint8_t)file_name[idx] : 0x0000;
-        }
-    }
-
-    fe->checksum = calc_set_checksum(entry_set, needed_slots);
-
-    uint32_t target_cluster;
-    uint32_t target_slot;
-
-    int rc = find_free_dir_slots(vol, parent_cluster, needed_slots, &target_cluster, &target_slot);
+    int rc =
+        find_free_dir_slots(vol, parent_cluster, needed_slots, &target_cluster, &target_slot);
 
     if (rc != 0)
         return rc;
@@ -657,10 +709,99 @@ int create_file(mount_t *vol, const char *path) {
     return write_entry_set(vol, target_cluster, target_slot, entry_set, needed_slots);
 }
 
-int write_file(mount_t *vol, const char *path, const uint8_t* data, uint64_t size) {
+int create_file(mount_t *vol, const char *path)
+{
+    char full[256];
+    build_path(path, full);
+
     char parent_path[256];
     char file_name[256];
-    split_path(path, parent_path, file_name);
+
+    split_path(full, parent_path, file_name);
+
+    uint32_t parent_cluster = resolve_path(vol, parent_path);
+    if (parent_cluster == 0)
+        return -2;
+
+    if (find_entry_in_dir(vol,
+                          parent_cluster,
+                          file_name,
+                          NULL,
+                          NULL,
+                          NULL,
+                          NULL) == 0)
+    {
+        return -4; // already exists
+    }
+
+    size_t name_len = strlen(file_name);
+
+    if (name_len == 0 || name_len > 255)
+        return -1;
+
+    uint8_t name_entries = (name_len + 14) / 15;
+    uint8_t needed_slots = 2 + name_entries;
+
+    uint8_t entry_set[19 * 32];
+    memset(entry_set, 0, sizeof(entry_set));
+
+    file_entry *fe = (file_entry *)entry_set;
+
+    fe->entry_type = 0x85;
+    fe->scount     = 1 + name_entries;
+    fe->attribute  = 0x0020;
+
+    stream_entry *se = (stream_entry *)(entry_set + 32);
+
+    se->entry_type      = 0xC0;
+    se->secondary_flags = 0x01;
+    se->name_length     = (uint8_t)name_len;
+    se->name_hash       = calc_name_hash(file_name, name_len);
+
+    for (uint8_t i = 0; i < name_entries; i++) {
+
+        file_name_entry *fn =
+            (file_name_entry *)(entry_set + ((uint32_t)i + 2) * 32);
+
+        fn->entry_type = 0xC1;
+
+        uint16_t *utf16 = (uint16_t *)fn->filename;
+
+        for (uint32_t j = 0; j < 15; j++) {
+
+            uint32_t idx = (i * 15) + j;
+
+            utf16[j] =
+                (idx < name_len)
+                    ? (uint8_t)file_name[idx]
+                    : 0;
+        }
+    }
+
+    fe->checksum =
+        calc_set_checksum(entry_set, needed_slots);
+
+    uint32_t target_cluster;
+    uint32_t target_slot;
+
+    int rc = find_free_dir_slots(vol, parent_cluster, needed_slots, &target_cluster,  &target_slot);
+
+    if (rc != 0)
+        return rc;
+
+    return write_entry_set(vol, target_cluster, target_slot, entry_set, needed_slots);
+}
+
+int write_file(mount_t *vol, const char *path, const uint8_t *data, uint64_t size)
+{
+    char full[256];
+    build_path(path, full);
+
+    char parent_path[256];
+    char file_name[256];
+
+    split_path(full, parent_path, file_name);
+
 
     uint32_t parent_cluster = resolve_path(vol, parent_path);
     if (parent_cluster == 0) return -2;
@@ -730,10 +871,14 @@ int write_file(mount_t *vol, const char *path, const uint8_t* data, uint64_t siz
     return 0;
 }
 
-int read_file(mount_t *vol, const char *path, uint8_t* out_buf, uint64_t max_size, uint64_t *bytes_read_out) {
+int read_file(mount_t *vol, const char *path, uint8_t *out_buf, uint64_t max_size, uint64_t *bytes_read_out) {
+    char full[256];
+    build_path(path, full);
+
     char parent_path[256];
     char file_name[256];
-    split_path(path, parent_path, file_name);
+
+    split_path(full, parent_path, file_name);
 
     uint32_t parent_cluster = resolve_path(vol, parent_path);
     if (parent_cluster == 0) return -2;
@@ -771,12 +916,14 @@ int read_file(mount_t *vol, const char *path, uint8_t* out_buf, uint64_t max_siz
     return 0;
 }
 
-int append_file(mount_t *vol, const char *path, const uint8_t* data, uint64_t size) {
-    if (size == 0) return 0;
+int append_file(mount_t *vol, const char *path, const uint8_t *data, uint64_t size) {
+    char full[256];
+    build_path(path, full);
 
     char parent_path[256];
     char file_name[256];
-    split_path(path, parent_path, file_name);
+
+    split_path(full, parent_path, file_name);
 
     uint32_t parent_cluster = resolve_path(vol, parent_path);
     if (parent_cluster == 0) return -2;
@@ -884,56 +1031,116 @@ int append_file(mount_t *vol, const char *path, const uint8_t* data, uint64_t si
     return 0;
 }
 
-int list_dir(mount_t *vol, const char *path, fs_t *out_files, int max_files) {
-    if (!vol || !out_files || max_files <= 0) return -1;
+int list_dir(mount_t *vol,
+             const char *path,
+             fs_t *out_files,
+             int max_files)
+{
+    if (!vol || !out_files || max_files <= 0)
+        return -1;
 
-    uint32_t target_cluster = resolve_path(vol, path);
-    if (target_cluster == 0) return -2;
+    char full[256];
+
+    if (!path || path[0] == '\0')
+        strcpy(full, g_cwd);
+    else
+        build_path(path, full);
+
+    uint32_t target_cluster =
+        resolve_path(vol, full);
+
+    if (target_cluster == 0)
+        return -2;
 
     uint8_t window[WINDOW_SIZE];
     uint8_t fat_buf[SECTOR_SIZE];
+
     int count = 0;
     uint32_t curr_cluster = target_cluster;
 
-    while (curr_cluster >= 2 && curr_cluster < 0xFFFFFFF8) {
-        uint64_t dir_sector  = cluster_to_sectors(vol, curr_cluster);
-        uint32_t dir_sectors = vol->bytes_per_cluster / SECTOR_SIZE;
+    while (curr_cluster >= 2 &&
+           curr_cluster < 0xFFFFFFF8)
+    {
+        uint64_t dir_sector =
+            cluster_to_sectors(vol,
+                               curr_cluster);
 
-        for (uint32_t sec = 0; sec < dir_sectors; sec++) {
-            if (read_offset(vol, dir_sector + sec, window, 1) != 0) return -1;
+        uint32_t dir_sectors =
+            vol->bytes_per_cluster /
+            SECTOR_SIZE;
+
+        for (uint32_t sec = 0;
+             sec < dir_sectors;
+             sec++)
+        {
+            if (read_offset(vol,
+                            dir_sector + sec,
+                            window,
+                            1) != 0)
+                return -1;
+
             if (sec + 1 < dir_sectors) {
-                if (read_offset(vol, dir_sector + sec + 1, window + SECTOR_SIZE, 1) != 0) return -1;
+                if (read_offset(vol,
+                                dir_sector + sec + 1,
+                                window + SECTOR_SIZE,
+                                1) != 0)
+                    return -1;
             } else {
-                memset(window + SECTOR_SIZE, 0, SECTOR_SIZE);
+                memset(window + SECTOR_SIZE,
+                       0,
+                       SECTOR_SIZE);
             }
 
-            for (uint32_t slot = 0; slot < 16; slot++) {
-                uint8_t *ptr = window + (slot * 32);
-                if (*ptr == 0x00) return count;
-                if (*ptr != 0x85) continue;
+            for (uint32_t slot = 0;
+                 slot < 16;
+                 slot++)
+            {
+                uint8_t *ptr =
+                    window + (slot * 32);
 
-                file_entry   *fe = (file_entry *)ptr;
-                stream_entry *se = (stream_entry *)(ptr + 32);
-                if (se->entry_type != 0xC0) continue;
+                if (*ptr == 0x00)
+                    return count;
 
-                fs_t *item = out_files + count;
+                if (*ptr != 0x85)
+                    continue;
+
+                file_entry *fe =
+                    (file_entry *)ptr;
+
+                stream_entry *se =
+                    (stream_entry *)(ptr + 32);
+
+                if (se->entry_type != 0xC0)
+                    continue;
+
+                fs_t *item =
+                    &out_files[count];
+
                 memset(item, 0, sizeof(fs_t));
 
                 item->is_dir = (fe->attribute & 0x0010) ? true : false;
-                item->size   = (uint32_t)se->valid_data_length;
+
+                item->size = (uint32_t)se->valid_data_length;
 
                 size_t len = se->name_length;
-                if (len > 255) len = 255;
+
+                if (len > 255)
+                    len = 255;
 
                 for (size_t i = 0; i < len; i++) {
                     file_name_entry *fn = (file_name_entry *)(ptr + (2 + (i / 15)) * 32);
+
                     uint16_t *utf16 = (uint16_t *)fn->filename;
-                    *(item->name + i) = (char)(*(utf16 + (i % 15)) & 0xFF);
+
+                    item->name[i] = (char)(utf16[i % 15] & 0xFF);
                 }
-                *(item->name + len) = '\0';
+
+                item->name[len] = '\0';
 
                 count++;
-                if (count >= max_files) return count;
+
+                if (count >= max_files)
+                    return count;
             }
         }
 
@@ -944,9 +1151,13 @@ int list_dir(mount_t *vol, const char *path, fs_t *out_files, int max_files) {
 }
 
 int delete_file(mount_t *vol, const char *path) {
+    char full[256];
+    build_path(path, full);
+
     char parent_path[256];
     char file_name[256];
-    split_path(path, parent_path, file_name);
+
+    split_path(full, parent_path, file_name);
 
     uint32_t parent_cluster = resolve_path(vol, parent_path);
     if (parent_cluster == 0) return -2;

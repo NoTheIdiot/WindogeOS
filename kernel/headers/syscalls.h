@@ -5,13 +5,15 @@
 #define Process_Exit 0
 
 // file system operations
-#define WriteFile     11
-#define ReadFile      12
-#define CreateFile    13
-#define CreateDir     14
-#define DeleteThing   15
-#define Exists        16
-#define ListDirectory 17
+#define WriteFile        11
+#define ReadFile         12
+#define CreateFile       13
+#define CreateDir        14
+#define DeleteThing      15
+#define Exists           16
+#define ListDirectory    17
+#define ChangeDirectory  18
+#define CurrentDirectory 19
 
 // user input and output
 #define Print 20

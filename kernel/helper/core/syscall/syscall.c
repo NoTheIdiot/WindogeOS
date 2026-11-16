@@ -247,6 +247,47 @@ uint64_t syscall_handler(registers_t *regs) {
             break;
         }
 
+        case ChangeDirectory: {
+            const char *user_path = (const char *)regs->rdi;
+            char kpath[USER_PATH_LIMIT];
+
+            if (!copy_str_from_user(kpath, user_path, sizeof(kpath))) {
+                ret_val = (uint64_t)-1;
+                break;
+            }
+            ret_val = (uint64_t)fs_chdir(kpath);
+            break;
+        }
+
+        case CurrentDirectory: {
+            char *user_buf = (char *)regs->rdi;
+            size_t len     = (size_t)regs->rsi;
+
+            if (len == 0 || len > USER_PATH_LIMIT || !is_valid_user_ptr(user_buf, len)) {
+                ret_val = (uint64_t)-1;
+                break;
+            }
+
+            const char *cwd = fs_get_dir();
+            if (!cwd) {
+                ret_val = (uint64_t)-1;
+                break;
+            }
+
+            size_t cwd_len = strlen(cwd) + 1;
+            if (cwd_len > len) {
+                ret_val = (uint64_t)-1;
+                break;
+            }
+
+            if (!copy_to_user(user_buf, cwd, cwd_len)) {
+                ret_val = (uint64_t)-1;
+                break;
+            }
+
+            ret_val = (uint64_t)(cwd_len - 1);
+            break;
+        }
 
         case Print: {
             const char *user_str = (const char *)regs->rdi;

@@ -178,7 +178,9 @@ int execute(int argc, char **argv) {
         static fs_t files[MAX_DIR_ENTRIES];
         memset(files, 0, sizeof(files));
 
-        int count = fs_list("/", files, MAX_DIR_ENTRIES);
+        char buffer[64];
+        fs_get_cwd(buffer, 64);
+        int count = fs_list(buffer, files, MAX_DIR_ENTRIES);
 
         if (count < 0) {
             println("Filesystem error or not mounted.");
@@ -215,6 +217,15 @@ int execute(int argc, char **argv) {
         return 0;
     }
 
+    if (strcmp(argv[0], "cd") == 0) {
+        if (argv[1] == NULL) {
+            println("cd: cd <path>");
+            return -1;
+        }
+        fs_chdir(argv[1]);
+        return 0;
+    }
+
     if (strcmp(argv[0], "shutdown") == 0) {
         windoge_shutdown();
         return 0;
@@ -239,9 +250,12 @@ int execute(int argc, char **argv) {
 void _start(void) {
     char command[CMD_BUF_SIZE];
     char *argv[MAX_ARGS];
+    char buffer[32];
 
     while (1) {
-        if (input("doge> ", command, sizeof(command)) < 0) {
+        fs_get_cwd(buffer, 32);
+        print(buffer);
+        if (input("> ", command, sizeof(command)) < 0) {
             continue;
         }
 
