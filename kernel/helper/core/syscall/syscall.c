@@ -204,6 +204,50 @@ uint64_t syscall_handler(registers_t *regs) {
             break;
         }
 
+        case ListDirectory: {
+            const char *user_path = (const char *)regs->rdi;
+            fs_t *user_buf        = (fs_t *)regs->rsi;
+            int max               = (int)regs->rdx;
+
+            if (max <= 0 || (size_t)max > (USER_IO_LIMIT / sizeof(fs_t))) {
+                ret_val = (uint64_t)-1;
+                break;
+            }
+
+            size_t total_bytes = (size_t)max * sizeof(fs_t);
+            if (!is_valid_user_ptr(user_buf, total_bytes)) {
+                ret_val = (uint64_t)-1;
+                break;
+            }
+
+            char kpath[USER_PATH_LIMIT];
+            if (!copy_str_from_user(kpath, user_path, sizeof(kpath))) {
+                ret_val = (uint64_t)-1;
+                break;
+            }
+
+            static uint8_t io_bounce[USER_IO_LIMIT];
+            memset(io_bounce, 0, total_bytes);
+
+            int count = fs_list(kpath, (fs_t *)io_bounce, max);
+            if (count < 0) {
+                ret_val = (uint64_t)-1;
+                break;
+            }
+
+            if (count > max) count = max;
+            size_t copy_bytes = (size_t)count * sizeof(fs_t);
+
+            if (copy_bytes > 0 && !copy_to_user(user_buf, io_bounce, copy_bytes)) {
+                ret_val = (uint64_t)-1;
+                break;
+            }
+
+            ret_val = (uint64_t)count;
+            break;
+        }
+
+
         case Print: {
             const char *user_str = (const char *)regs->rdi;
             char kbuf[USER_STRING_LIMIT];
@@ -254,6 +298,24 @@ uint64_t syscall_handler(registers_t *regs) {
             }
 
             ret_val = (uint64_t)(out_len - 1);
+            break;
+        }
+
+        case Shutdown: {
+            shutdown();
+            ret_val = 0;
+            break; 
+        }
+
+        case Reboot: {
+            reboot();
+            ret_val = 0;
+            break;
+        }
+
+        case Username: {
+            char* username = "root";
+            ret_val = (uint64_t)username;
             break;
         }
 

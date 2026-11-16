@@ -1,11 +1,14 @@
 #include "../library/stddef.h"
 #include "../library/stdint.h"
 #include "../library/dogeio.h"
+#include "../library/dogelib.h"
 #include "../library/string.h"
 #include "../library/bool.h"
 
 #define CMD_BUF_SIZE 256
 #define MAX_ARGS     16
+#define MAX_DIR_ENTRIES 24
+#define NUM_BUF_SIZE 64
 #define READ_BUF_SIZE 8192
 
 int shell_tokenize(char *line, char **argv, int argc) {
@@ -108,7 +111,7 @@ int execute(int argc, char **argv) {
             println("Need a filename.");
             return -1;
         }
-        if ((bool)fs_exists(argv[1])) {
+        if (!(bool)fs_exists(argv[1])) {
             println("File already exists.");
             return -1;
         }
@@ -152,6 +155,73 @@ int execute(int argc, char **argv) {
             println("Failed to read file.");
             return -1;
         }
+        return 0;
+    }
+
+    if (strcmp(argv[0], "write") == 0) {
+        if (argv[1] == NULL || argv[2] == NULL) {
+            println("Need two arguments.");
+            return -1;
+        }
+        if (!fs_exists(argv[1])) {
+            println("File doesn't exist.");
+            return -1;
+        }
+        if (fs_write(argv[1], argv[2], strlen(argv[2])) != 0) {
+            println("Failed to write file.");
+            return -1;
+        }
+        return 0;
+    }
+
+    if (strcmp(argv[0], "dir") == 0) {
+        static fs_t files[MAX_DIR_ENTRIES];
+        memset(files, 0, sizeof(files));
+
+        int count = fs_list("/", files, MAX_DIR_ENTRIES);
+
+        if (count < 0) {
+            println("Filesystem error or not mounted.");
+            return -1;
+        }
+
+        if (count == 0) {
+            println("Directory is empty.");
+            return 0;
+        }
+
+        if (count > MAX_DIR_ENTRIES) {
+            count = MAX_DIR_ENTRIES;
+        }
+
+        char size_str[NUM_BUF_SIZE];
+        for (int i = 0; i < count; i++) {
+            if (files[i].name[0] == '\0') {
+                continue;
+            }
+
+            if (files[i].is_dir) {
+                print("[DIR]  ");
+            } else {
+                print("[FILE] ");
+            }
+
+            print(files[i].name);
+            print("  (");
+            itoa((int)files[i].size, size_str);
+            print(size_str);
+            println(" bytes)");
+        }
+        return 0;
+    }
+
+    if (strcmp(argv[0], "shutdown") == 0) {
+        windoge_shutdown();
+        return 0;
+    }
+
+    if (strcmp(argv[0], "reboot") == 0) {
+        windoge_reboot();
         return 0;
     }
 

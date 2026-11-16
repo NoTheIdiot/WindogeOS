@@ -4,6 +4,14 @@
 #include "stdint.h"
 #include "stddef.h"
 #include "root/syscalls.h"
+#include "bool.h"
+
+// types
+typedef struct {
+    char name[256];
+    uint32_t size;
+    bool is_dir;
+} fs_t;
 
 static inline void exit(void) {
     syscall_0(Process_Exit);
@@ -31,6 +39,10 @@ static inline int fs_delete(const char* path) {
 
 static inline int fs_exists(const char* path) {
     return (int)syscall_1(Exists, (uint64_t)path);
+}
+
+static inline int fs_list(char* path, fs_t* buffer, int max) {
+    return (int)syscall_3(ListDirectory, (uint64_t)path, (uint64_t)buffer, (uint64_t)max);
 }
 
 static inline int print(const char *str) {

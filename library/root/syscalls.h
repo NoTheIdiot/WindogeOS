@@ -70,15 +70,22 @@ static inline uint64_t syscall_5(uint64_t num, uint64_t arg1, uint64_t arg2, uin
 #define Process_Exit 0
 
 // file system operations
-#define WriteFile   11
-#define ReadFile    12
-#define CreateFile  13
-#define CreateDir   14
-#define DeleteThing 15
-#define Exists      16
+#define WriteFile     11
+#define ReadFile      12
+#define CreateFile    13
+#define CreateDir     14
+#define DeleteThing   15
+#define Exists        16
+#define ListDirectory 17
 
 // user input and output
 #define Print 20
 #define Input 21
+
+// system operations
+#define Shutdown    30
+#define Reboot      31
+#define Username    32
+#define Uname       33
 
 #endif
