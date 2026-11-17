@@ -48,18 +48,18 @@ to_userland_ring3_args:
 
     ; build the fake interrupt stack 
     push qword 0x1b         ; user SS (stack segment)
-    push r9                 ; user RSP (top of user stack)
+    push r9                 ; user RSP (top of user stack pointing to argc)
     push qword 0x202        ; user RFLAGS (0x200 = IF interrupts enabled, 0x002 = mandatory reserved bit)
     push qword 0x23         ; user CS (64-bit user code segment 0x20 | RPL 3 = 0x23)
     push r8                 ; user RIP (ELF entry point)
 
-    mov rdi, r10
-    mov rsi, r11
-    
+    ; Clear general purpose registers before entering userland (argc/argv are already on the stack via r9)
     xor rax, rax
     xor rbx, rbx
     xor rcx, rcx
     xor rdx, rdx
+    xor rdi, rdi
+    xor rsi, rsi
     xor rbp, rbp
     xor r8, r8
     xor r9, r9

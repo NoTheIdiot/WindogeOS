@@ -374,9 +374,10 @@ int run_elf(char *filename, uint64_t size, int argc, char **argv)
         __asm__ volatile ("invlpg (%0)" :: "r"(vaddr) : "memory");
     }
     sprintln("[ELF] User stack allocated and mapped successfully.");
+
     uint64_t stack_virt = USER_STACK_TOP;
     if (argc < 0) argc = 0;
-    if (argc > 16) argc = 16; // Safety limit
+    if (argc > 16) argc = 16; 
 
     uint64_t user_argv_vaddrs[16];
 
@@ -391,6 +392,7 @@ int run_elf(char *filename, uint64_t size, int argc, char **argv)
     }
 
     stack_virt &= ~0xFULL;
+
     stack_virt -= sizeof(uint64_t);
     void *null_dest = get_hhdm_ptr(stack_virt);
     if (null_dest) {
@@ -404,10 +406,15 @@ int run_elf(char *filename, uint64_t size, int argc, char **argv)
             *(uint64_t *)ptr_dest = user_argv_vaddrs[i];
         }
     }
-
-    uint64_t argv_ptr_array_vaddr = stack_virt;
+    stack_virt -= sizeof(uint64_t);
+    void *argc_dest = get_hhdm_ptr(stack_virt);
+    if (argc_dest) {
+        *(uint64_t *)argc_dest = (uint64_t)argc;
+    }
 
     stack_virt &= ~0xFULL;
+
+    uint64_t argv_ptr_array_vaddr = stack_virt + sizeof(uint64_t); // points to argv[0]
 
     bootstrap_cpu_gs.kernel_stack = (uint64_t)(bootstrap_kernel_stack_space + KERNEL_STACK_SIZE);
 

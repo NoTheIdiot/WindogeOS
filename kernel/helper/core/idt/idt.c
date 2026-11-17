@@ -91,12 +91,23 @@ interrupt_frame_t *isr_common_handler(interrupt_frame_t *frame) {
         return frame;
     }
 
+    char buf[64];
+    int idx;
+    char hex_str[19];
+
     if (frame->vector == 14) {
         uint64_t fault_addr = read_cr2();
+        bool is_user = (frame->cs & 3) != 0;
+
         if (try_demand_page(fault_addr, frame->error_code)) {
             return frame;
         }
-        sprintln("[Not Wow] Fatal Page Fault (Vector 14)");
+
+        sprintln("[Not Wow] Demand Paging Failed / Fatal Page Fault (Vector 14)");
+        
+        idx = 0;
+        append_str(buf, is_user ? "Mode: User (Ring 3)" : "Mode: Kernel (Ring 0)", &idx);
+        sprintln(buf);
     } else {
         switch (frame->vector) {
             case 0:  sprintln("[Not Wow] Divide-by-Zero (Vector 0)"); break;
@@ -105,10 +116,6 @@ interrupt_frame_t *isr_common_handler(interrupt_frame_t *frame) {
             default: sprintln("[Not Wow] Unhandled Interrupt / Fault"); break;
         }
     }
-
-    char buf[64];
-    int idx;
-    char hex_str[19];
 
     idx = 0;
     uint64_to_hex(frame->rip, hex_str);
@@ -128,6 +135,18 @@ interrupt_frame_t *isr_common_handler(interrupt_frame_t *frame) {
         append_str(buf, "  CR2: ", &idx);
         append_str(buf, hex_str, &idx);
         sprintln(buf);
+
+        sprintln("  [PF Flags]:");
+        if (!(frame->error_code & 1)) sprintln("    - Not-Present page");
+        else sprintln("    - Protection fault");
+        
+        if (frame->error_code & 2) sprintln("    - Caused by a Write");
+        else sprintln("    - Caused by a Read/Fetch");
+        
+        if (frame->error_code & 4) sprintln("    - Access was User-mode");
+        else sprintln("    - Access was Supervisor-mode");
+        
+        if (frame->error_code & 16) sprintln("    - Instruction Fetch");
     }
 
     idx = 0;

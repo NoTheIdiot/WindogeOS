@@ -288,7 +288,7 @@ int execute(int argc, char** argv) {
             return -1;
         }
 
-        run_elf(argv[1], 16384, argc - 1, &argv[1]);
+        run_args(argv[1], argc - 1, &argv[1]);
         return 0;
     }
 

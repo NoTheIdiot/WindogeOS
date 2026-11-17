@@ -526,16 +526,16 @@ static void editor_new_file(void) {
 }
 
 void _start(int argc, char **argv) {
-    if (argc == 1 && argv != NULL && argv[0] != NULL &&
-        (text_equal(argv[0], "--help") ||
-         text_equal(argv[0], "--version"))) {
-        println(text_equal(argv[0], "--help") ? "Usage: edit <file>"
+    if (argc == 2 && argv != NULL && argv[1] != NULL &&
+        (text_equal(argv[1], "--help") ||
+         text_equal(argv[1], "--version"))) {
+        println(text_equal(argv[1], "--help") ? "Usage: edit <file>"
                                             : "Dogeedit v2.3");
         exit();
     }
-    if (argc != 1 || argv == NULL || argv[0] == NULL ||
-        argv[0][0] == '\0' ||
-        copy_text(current_filename, sizeof(current_filename), argv[0]) != 0) {
+    if (argc != 2 || argv == NULL || argv[1] == NULL ||
+        argv[1][0] == '\0' ||
+        copy_text(current_filename, sizeof(current_filename), argv[1]) != 0) {
         println("Usage: edit <file>");
         exit();
     }
