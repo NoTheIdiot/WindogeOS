@@ -4,6 +4,9 @@
 #include <string.h>
 #include <dogeio.h>
 
+#define MAX_FILE_BUF 512
+#define MAX_CRED_LEN 64
+
 __attribute__((used, section(".limine_requests_start")))
 volatile uint64_t limine_request_start_marker[] = LIMINE_REQUESTS_START_MARKER;
 
@@ -55,7 +58,7 @@ void init_cpu_gs(uint64_t kernel_stack_top) {
     __asm__ volatile (
         "wrmsr"
         :
-        : "c" (0xC0000102), // IA32_KERNEL_GS_BASE
+        : "c" (0xC0000102),
           "a" ((uint32_t)(gs_base & 0xFFFFFFFF)),
           "d" ((uint32_t)(gs_base >> 32))
     );
@@ -142,8 +145,6 @@ void windoge_os(void) {
 
     clear();
     println("\033[96mWindogeOS Booted!\033[0m");
-    println("\033[96mUh, there is no longer nothing. There is an actual shell.\033[0m");
-    run_elf("system/dogeshell", 16384);
+    println("\033[96mUh, there is no longer nothing. There is something now.\033[0m");
     backup_shell();
-    halt();
 }

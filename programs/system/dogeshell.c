@@ -111,7 +111,7 @@ int execute(int argc, char **argv) {
             println("Need a filename.");
             return -1;
         }
-        if (!(bool)fs_exists(argv[1])) {
+        if (fs_exists(argv[1])) {
             println("File already exists.");
             return -1;
         }

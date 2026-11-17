@@ -200,7 +200,11 @@ uint64_t syscall_handler(registers_t *regs) {
                 ret_val = (uint64_t)-1;
                 break;
             }
-            ret_val = (uint64_t)fs_exists(kpath);
+            if (fs_exists(kpath)) {
+                ret_val = 1;
+            } else {
+                ret_val = 0;
+            }
             break;
         }
 

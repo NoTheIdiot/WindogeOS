@@ -26,15 +26,21 @@ int fs_write_force(char* filename, char* data, uint64_t size) {
 
 int fs_read(char* filename, char* data, uint64_t size) {
     if (!check_permission(filename)) return -1;
-    uint64_t buffer = 0;
-    read_file(&exfat_vol, filename, (uint8_t*)data, size, &buffer);
-    return buffer;
+    uint64_t bytes_read = 0;
+    if (read_file(&exfat_vol, filename, (uint8_t*)data, size, &bytes_read) != 0) {
+        return -1;
+    }
+    return (int)bytes_read;
 }
 
+
 bool fs_exists(char *filename) {
-    char dummy;
-    return fs_read(filename, &dummy, 0) == 0;
+    if (!check_permission(filename)) return false;
+    uint8_t dummy = 0;
+    uint64_t bytes_read = 0;
+    return read_file(&exfat_vol, filename, &dummy, 0, &bytes_read) == 0;
 }
+
 
 int fs_write(char* filename, char* data, uint64_t size) {
     if (!check_permission(filename)) return -1;
