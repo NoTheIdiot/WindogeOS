@@ -25,4 +25,7 @@
 #define Username    32
 #define Uname       33
 
+// other things that might be used
+#define Beep    50
+
 #endif

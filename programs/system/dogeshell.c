@@ -232,6 +232,16 @@ int execute(int argc, char **argv) {
         }
     }
 
+    if (strcmp(argv[0], "beep") == 0) {
+        if (argv[1] == NULL || argv[2] == NULL) {
+            println("Usage: beep <hz> <time>");
+            return 0;
+        }
+
+        beep((uint32_t)atoi(argv[1]), (uint32_t)atoi(argv[2]));
+        return 0;
+    }
+
     if (strcmp(argv[0], "cd") == 0) {
         if (argv[1] == NULL) {
             println("cd: cd <path>");

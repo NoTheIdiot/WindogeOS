@@ -8,7 +8,8 @@ syscall_entry:
     swapgs                                  
 
     mov qword [gs:8], rsp                 
-    mov rsp, qword [gs:0]                 
+    mov rsp, qword [gs:0]               
+    sti  
 
     push rcx
     push r11

@@ -277,7 +277,7 @@ int execute(int argc, char** argv) {
         fs_chdir(argv[1]);
         return 0;
     }
-
+    
     if (strcmp(argv[0], "run") == 0) {
         if (argv[1] == NULL) {
             println("run: run <path>");

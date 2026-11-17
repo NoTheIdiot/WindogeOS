@@ -90,4 +90,7 @@ static inline uint64_t syscall_5(uint64_t num, uint64_t arg1, uint64_t arg2, uin
 #define Username    32
 #define Uname       33
 
+// other things that might be used
+#define Beep    50
+
 #endif
