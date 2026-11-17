@@ -121,11 +121,22 @@ void windoge_os(void) {
     }
     println("[\033[32mWow\033[0m]     Mounted filesystem");
 
-    println("[\033[32mDogeing\033[0m] Trying some USB 1.1 bullshit...");
+        println("[\033[32mDogeing\033[0m] Trying some USB 1.1 bullshit...");
     uhci_init_driver();
     uhci_poll_ports();
-    init_usb_keyboard(1);
+    init_usb_keyboard(get_assigned_keyboard_address());
+
+    int fb_w = 1024;
+    int fb_h = 768;
+    if (framebuffer_request.response && framebuffer_request.response->framebuffer_count > 0) {
+        struct limine_framebuffer *fb = framebuffer_request.response->framebuffers[0];
+        fb_w = (int)fb->width;
+        fb_h = (int)fb->height;
+    }
+    init_usb_mouse(get_assigned_mouse_address(), fb_w, fb_h);
+
     println("[\033[32mWow\033[0m]     Holy shit it works (sucess)");
+
 
     println("[\033[32mDogeing\033[0m] Init RTC time..");
     init_rtc_time();

@@ -287,4 +287,12 @@ void pbkdf2_sha256(const uint8_t *password, size_t pass_len,
                    uint32_t iterations, uint8_t out_hash[32]);
 int verify_hash_const_time(const uint8_t a[32], const uint8_t b[32]);
 
+void init_usb_mouse(uint8_t dev_addr, int screen_w, int screen_h);
+void poll_usb_mouse(void);
+int32_t get_mouse_x(void);
+int32_t get_mouse_y(void);
+uint8_t get_mouse_buttons(void);
+uint8_t get_assigned_keyboard_address(void);
+uint8_t get_assigned_mouse_address(void);
+
 #endif

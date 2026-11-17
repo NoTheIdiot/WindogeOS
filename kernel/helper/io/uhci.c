@@ -37,6 +37,7 @@ static uint16_t g_uhci_io_base = 0;
 uint32_t *g_frame_list_virt = NULL;
 static uint32_t g_frame_list_phys = 0;
 static uint8_t g_assigned_kbd_addr = 1;
+static uint8_t g_assigned_mouse_addr = 2;
 
 bool uhci_find_controller(uint8_t *out_bus, uint8_t *out_slot, uint8_t *out_func, uint16_t *out_bar4) {
     for (uint16_t bus = 0; bus < 256; bus++) {
@@ -107,7 +108,9 @@ bool uhci_send_control(uint8_t dev_addr, uint8_t req_type, uint8_t request, uint
     qh->horizontal_link = 0x00000001;
     qh->element_link = (uint32_t)td1_phys;
 
+    uint32_t saved_frame_head = 0x00000001;
     if (g_frame_list_virt) {
+        saved_frame_head = *g_frame_list_virt;
         for (int i = 0; i < 1024; i++) {
             g_frame_list_virt[i] = (uint32_t)qh_phys | 0x2;
         }
@@ -120,14 +123,12 @@ bool uhci_send_control(uint8_t dev_addr, uint8_t req_type, uint8_t request, uint
 
     bool success = (timeout > 0 && !(td2->control & 0x7B0000));
 
-    // Unlink the temporary QH from the frame list before freeing its physical page
     if (g_frame_list_virt) {
         for (int i = 0; i < 1024; i++) {
-            g_frame_list_virt[i] = 0x00000001;
+            g_frame_list_virt[i] = saved_frame_head;
         }
     }
 
-    // Reclaim the 4 temporary pages used for this control transfer
     free_page(qh_phys);
     free_page(td2_phys);
     free_page(td1_phys);
@@ -178,6 +179,8 @@ void uhci_init_driver(void) {
 void uhci_poll_ports(void) {
     if (g_uhci_io_base == 0) return;
 
+    uint8_t next_addr = 1;
+
     for (int i = 0; i < 2; i++) {
         uint16_t port_reg = UHCI_PORTSC1 + (i * 2);
         uint16_t status = inw(g_uhci_io_base + port_reg);
@@ -197,14 +200,22 @@ void uhci_poll_ports(void) {
 
             for (volatile int j = 0; j < 200000; j++);
 
-            uhci_send_control(0, 0x00, 0x05, 1, 0, 0);
+            uint8_t addr = next_addr++;
+            uhci_send_control(0, 0x00, 0x05, addr, 0, 0);
             for (volatile int j = 0; j < 100000; j++);
 
-            uhci_send_control(1, 0x00, 0x09, 1, 0, 0);
+            uhci_send_control(addr, 0x00, 0x09, 1, 0, 0);
+
+            if (i == 0) g_assigned_kbd_addr = addr;
+            if (i == 1) g_assigned_mouse_addr = addr;
         }
     }
 }
 
 uint8_t get_assigned_keyboard_address(void) {
     return g_assigned_kbd_addr;
+}
+
+uint8_t get_assigned_mouse_address(void) {
+    return g_assigned_mouse_addr;
 }
