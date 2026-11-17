@@ -146,5 +146,6 @@ void windoge_os(void) {
     clear();
     println("\033[96mWindogeOS Booted!\033[0m");
     println("\033[96mUh, there is no longer nothing. There is something now.\033[0m");
+    run("/system/dogeshell");
     backup_shell();
 }

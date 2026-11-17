@@ -134,3 +134,18 @@ int fs_chdir(char* path) {
 void fs_get_dir(char* buffer, int size) {
     get_cwd(buffer, size);
 }
+
+uint32_t fs_get_size(char *filename) {
+    fs_t entries[128];
+    char buffer[64];
+    get_cwd(buffer, 64);
+    int count = fs_list(buffer, entries, 128);
+
+    for (int i = 0; i < count; i++) {
+        if (!strcmp(entries[i].name, filename)) {
+            return entries[i].size;
+        }
+    }
+
+    return 0; // not found
+}

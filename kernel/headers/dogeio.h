@@ -98,5 +98,7 @@ char* get_time(void);
 char* get_date(void);
 
 int run_elf(char *filename, uint64_t size);
+void run(char* file);
+uint32_t fs_get_size(char *filename);
 
 #endif
