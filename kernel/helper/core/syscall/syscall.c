@@ -272,12 +272,10 @@ uint64_t syscall_handler(registers_t *regs) {
                 break;
             }
 
-            char cwd[len];
-            fs_get_dir(cwd, len);
-            if (!cwd) {
-                ret_val = (uint64_t)-1;
-                break;
-            }
+            char cwd[USER_PATH_LIMIT];
+            memset(cwd, 0, sizeof(cwd));
+            
+            fs_get_dir(cwd, sizeof(cwd));
 
             size_t cwd_len = strlen(cwd) + 1;
             if (cwd_len > len) {
@@ -308,6 +306,11 @@ uint64_t syscall_handler(registers_t *regs) {
             break;
         }
 
+        case GetKey: {
+            ret_val = (uint64_t)get_key();
+            break;
+        }
+
         case Input: {
             const char *user_prompt = (const char *)regs->rdi;
             char *user_buf          = (char *)regs->rsi;
@@ -328,7 +331,6 @@ uint64_t syscall_handler(registers_t *regs) {
                 }
             }
 
-
             static char kinput[1024];
             memset(kinput, 0, sizeof(kinput));
 
@@ -347,6 +349,37 @@ uint64_t syscall_handler(registers_t *regs) {
             break;
         }
 
+        case PrintAt: {
+            char text[USER_STRING_LIMIT];
+            uint32_t x = (uint32_t)regs->rsi;
+            uint32_t y = (uint32_t)regs->rdx;
+            uint32_t color = (uint32_t)regs->r10;
+            
+            if (x >= TERMINAL_COLS || y >= TERMINAL_ROWS ||
+                !copy_str_from_user(text, (const char *)regs->rdi, sizeof(text))) {
+                ret_val = (uint64_t)-1;
+                break;
+            }
+
+            print_at(text, x, y, color);
+            ret_val = 1;
+            break;
+        }
+        
+        case BackgroundColor: {
+            uint32_t color = (uint32_t)regs->rdi;
+            text_color = color;
+            ret_val = 0;
+            break;
+        }
+
+        case TextColor: {
+            uint32_t color = (uint32_t)regs->rdi;
+            background_color = color;
+            ret_val = 0;
+            break;
+        }
+
         case Shutdown: {
             shutdown();
             ret_val = 0;
@@ -360,8 +393,22 @@ uint64_t syscall_handler(registers_t *regs) {
         }
 
         case Username: {
-            char* username = "root";
-            ret_val = (uint64_t)username;
+            char *user_buf = (char *)regs->rdi;
+            size_t len = (size_t)regs->rsi;
+            const char *username = "root";
+            size_t ulen = strlen(username) + 1;
+
+            if (len == 0 || !is_valid_user_ptr(user_buf, len) || ulen > len) {
+                ret_val = (uint64_t)-1;
+                break;
+            }
+
+            if (!copy_to_user(user_buf, username, ulen)) {
+                ret_val = (uint64_t)-1;
+                break;
+            }
+
+            ret_val = (uint64_t)(ulen - 1);
             break;
         }
 

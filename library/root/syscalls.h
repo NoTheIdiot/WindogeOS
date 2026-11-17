@@ -82,7 +82,11 @@ static inline uint64_t syscall_5(uint64_t num, uint64_t arg1, uint64_t arg2, uin
 
 // user input and output
 #define Print 20
-#define Input 21
+#define PrintAt 21
+#define Input 22
+#define GetKey 23 
+#define BackgroundColor 24
+#define TextColor 25 
 
 // system operations
 #define Shutdown    30

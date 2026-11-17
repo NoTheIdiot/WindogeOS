@@ -35,4 +35,11 @@ system_run_elf:
     call run_elf
     add rsp, 8
 
+    mov rbx, [rel saved_rbx]
+    mov rbp, [rel saved_rbp]
+    mov r12, [rel saved_r12]
+    mov r13, [rel saved_r13]
+    mov r14, [rel saved_r14]
+    mov r15, [rel saved_r15]
+
     ret

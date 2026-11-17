@@ -147,7 +147,7 @@ int execute(int argc, char** argv) {
             println("Need a filename.");
             return -1;
         }
-        if (!fs_exists(argv[1])) {
+        if (fs_exists(argv[1]) == true) {
             println("File already exists.");
             return -1;
         }
@@ -280,7 +280,7 @@ int execute(int argc, char** argv) {
     
     if (strcmp(argv[0], "run") == 0) {
         if (argv[1] == NULL) {
-            println("run: run <path>");
+            println("run: run <path> [args...]");
             return -1;
         }
         if (!fs_exists(argv[1])) {
@@ -288,7 +288,7 @@ int execute(int argc, char** argv) {
             return -1;
         }
 
-        run_elf(argv[1], 16384);
+        run_elf(argv[1], 16384, argc - 1, &argv[1]);
         return 0;
     }
 
@@ -320,7 +320,8 @@ int execute(int argc, char** argv) {
     }
 
     if (strcmp(argv[0], "start-shell") == 0) {
-        run_elf("dogeshell", 16384);
+        char *shell_argv[] = { "dogeshell", NULL };
+        run_elf("dogeshell", 16384, 1, shell_argv);
         return 0;
     }
 

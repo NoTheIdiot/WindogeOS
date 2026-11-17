@@ -217,6 +217,42 @@ static void scroll() {
     }
 }
 
+void print_at(const char *str, uint32_t x_pos, uint32_t y_pos, uint32_t text_color) {
+    if (framebuffer_request.response == NULL || framebuffer_request.response->framebuffer_count < 1) {
+        return;
+    }
+
+    uint32_t current_x = x_pos;
+    uint32_t current_y = y_pos;
+
+    uint32_t original_color = text_color;
+    text_color = original_color;
+
+    for (size_t i = 0; str[i] != '\0'; i++) {
+        char c = str[i];
+
+        if (c == '\n') {
+            current_x = x_pos;
+            current_y += 1;
+            continue;
+        }
+
+        if (current_x >= TERMINAL_COLS || current_y >= TERMINAL_ROWS) {
+            break; 
+        }
+
+        uint32_t idx = current_y * TERMINAL_COLS + current_x;
+        text_grid[idx] = c;
+        text_color_grid[idx] = text_color;
+        bg_color_grid[idx] = background_color;
+        putchar(c, current_x, current_y);
+        current_x += 1;
+    }
+
+    text_color = original_color;
+}
+
+
 void printchar(char c) {
     if (cursor_on && cursor_x < TERMINAL_COLS && cursor_y < TERMINAL_ROWS) {
         uint32_t current_idx = cursor_y * TERMINAL_COLS + cursor_x;

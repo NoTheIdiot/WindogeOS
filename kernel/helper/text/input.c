@@ -4,6 +4,13 @@
 
 #define USB_PID_IN 0x69
 #define HID_REPORT_SIZE 8
+#define KBD_QUEUE_SIZE 64
+
+#define KEY_UP    0x101
+#define KEY_DOWN  0x102
+#define KEY_LEFT  0x103
+#define KEY_RIGHT 0x104
+#define KEY_ESC   0x105
 
 extern uintptr_t hhdm_offset;
 
@@ -35,6 +42,88 @@ static uint32_t g_keystroke_counter = 0;
 static uint8_t g_last_key = 0;
 static bool g_caps_lock = false;
 static bool g_caps_pressed = false;
+
+static uint8_t g_data_toggle = 0;
+static uint8_t g_prev_keys[6] = {0};
+static uint16_t g_key_queue[KBD_QUEUE_SIZE];
+static volatile uint8_t g_q_head = 0;
+static volatile uint8_t g_q_tail = 0;
+
+static void kbd_enqueue(uint16_t key) {
+    uint8_t next = (g_q_head + 1) % KBD_QUEUE_SIZE;
+    if (next != g_q_tail) {
+        g_key_queue[g_q_head] = key;
+        g_q_head = next;
+    }
+}
+
+static char hid_to_ascii(uint8_t keycode, bool shift, bool caps) {
+    // is it shifted up, if shift holded or caps
+    // on, then yes.
+    bool upper = shift ^ caps;
+
+    if (keycode >= 0x04 && keycode <= 0x1D) {
+        return (upper ? 'A' : 'a') + (keycode - 0x04);
+    }
+    // numbers and it's shift counterpart
+    else if (keycode >= 0x1E && keycode <= 0x26) {
+        static const char normal[]  = "123456789";
+        static const char shifted[] = "!@#$%^&*(";
+
+        // is shift mate
+        return shift ? shifted[keycode - 0x1E]
+                     : normal[keycode - 0x1E];
+    }
+
+    // some keys that have a shift alternative
+    else if (keycode == 0x27) {
+        return shift ? ')' : '0';
+    }
+    else if (keycode == 0x2C) {
+        return ' ';
+    }
+    else if (keycode == 0x2D) {
+        return shift ? '_' : '-';
+    }
+    else if (keycode == 0x2E) {
+        return shift ? '+' : '=';
+    }
+    else if (keycode == 0x2F) {
+        return shift ? '{' : '[';
+    }
+    else if (keycode == 0x30) {
+        return shift ? '}' : ']';
+    }
+    else if (keycode == 0x31) {
+        return shift ? '|' : '\\';
+    }
+    else if (keycode == 0x33) {
+        return shift ? ':' : ';';
+    }
+    else if (keycode == 0x34) {
+        return shift ? '"' : '\'';
+    }
+    else if (keycode == 0x35) {
+        return shift ? '~' : '`';
+    }
+    else if (keycode == 0x36) {
+        return shift ? '<' : ',';
+    }
+    else if (keycode == 0x37) {
+        return shift ? '>' : '.';
+    }
+    else if (keycode == 0x38) {
+        return shift ? '?' : '/';
+    }
+    else if (keycode == 0x28) {
+        return '\n';
+    }
+    else if (keycode == 0x2A) {
+        return '\b';
+    }
+
+    return 0;
+}
 
 bool uhci_init_keyboard_endpoint(uint8_t device_address, uint8_t endpoint_num) {
    // replacment
@@ -68,6 +157,8 @@ bool uhci_init_keyboard_endpoint(uint8_t device_address, uint8_t endpoint_num) {
     g_kbd_td_phys = (uint32_t)td_phys;
     g_kbd_td = (uhci_td_t *)(td_phys + hhdm_offset);
 
+    g_data_toggle = 0;
+
     uint32_t max_len = HID_REPORT_SIZE;
     g_kbd_td->link_pointer = 0x00000001;
     g_kbd_td->control = (1 << 26) | (3 << 27);
@@ -95,19 +186,19 @@ void init_usb_keyboard(uint8_t device_address) {
     uhci_init_keyboard_endpoint(device_address, 1);
 }
 
-uint16_t get_key(void)
+void poll_usb_keyboard(void)
 {
     volatile uhci_td_t *td = g_kbd_td;
 
     if (!td || !g_kbd_buffer || !g_kbd_qh)
-        return 0;
+        return;
 
     uint32_t control = td->control;
 
     if (control & (1 << 23))
-        return 0;
+        return;
 
-    if (control & 0x007F0000)
+    if (control & 0x007E0000)
     {
         td->buffer_pointer = g_kbd_buffer_phys;
         g_kbd_qh->element_link = g_kbd_td_phys;
@@ -117,8 +208,11 @@ uint16_t get_key(void)
             (3 << 27) |
             (1 << 23);
 
-        return 0;
+        return;
     }
+
+    g_data_toggle ^= 1;
+    td->token = (td->token & ~(1U << 19)) | ((uint32_t)g_data_toggle << 19);
 
     hid_keyboard_report_t *report =
         (hid_keyboard_report_t *)g_kbd_buffer;
@@ -143,29 +237,41 @@ uint16_t get_key(void)
 
     g_caps_pressed = caps_key_down;
 
-    uint8_t current_key = 0;
-
     for (int i = 0; i < 6; i++) {
-        if (report->keycodes[i]) {
-            current_key = report->keycodes[i];
-            break;
+        uint8_t kc = report->keycodes[i];
+        if (kc == 0 || kc == 0x39)
+            continue;
+
+        bool was_pressed = false;
+        for (int j = 0; j < 6; j++) {
+            if (g_prev_keys[j] == kc) {
+                was_pressed = true;
+                break;
+            }
+        }
+
+        if (!was_pressed) {
+            g_last_key = kc;
+            g_keystroke_counter++;
+
+            char c = hid_to_ascii(kc, shift, g_caps_lock);
+            if (c) {
+                kbd_enqueue((uint8_t)c);
+            } else {
+                switch (kc) {
+                    case 0x29: kbd_enqueue(KEY_ESC);   break;
+                    case 0x4F: kbd_enqueue(KEY_RIGHT); break;
+                    case 0x50: kbd_enqueue(KEY_LEFT);  break;
+                    case 0x51: kbd_enqueue(KEY_DOWN);  break;
+                    case 0x52: kbd_enqueue(KEY_UP);    break;
+                }
+            }
         }
     }
 
-    uint16_t key = 0;
-
-    if (current_key && current_key != g_last_key)
-    {
-        key = current_key;
-
-        if (shift)
-            key |= 0x0100;
-
-        if (g_caps_lock)
-            key |= 0x0200;
+    for (int i = 0; i < 6; i++) {
+        g_prev_keys[i] = report->keycodes[i];
     }
-
-    g_last_key = current_key;
 
     td->buffer_pointer = g_kbd_buffer_phys;
     g_kbd_qh->element_link = g_kbd_td_phys;
@@ -174,7 +280,17 @@ uint16_t get_key(void)
         (1 << 26) |
         (3 << 27) |
         (1 << 23);
+}
 
+uint16_t get_key(void)
+{
+    poll_usb_keyboard();
+
+    if (g_q_head == g_q_tail)
+        return 0;
+
+    uint16_t key = g_key_queue[g_q_tail];
+    g_q_tail = (g_q_tail + 1) % KBD_QUEUE_SIZE;
     return key;
 }
 
@@ -192,77 +308,11 @@ void input(char* prompt, char* buffer)
         if (!key)
             continue;
 
-        uint8_t keycode = (uint8_t)key;
+        // ignore non-ascii special keys in line input
+        if (key >= 0x100)
+            continue;
 
-        // idk what is this
-        bool shift = (key & 0x0100) != 0;
-        bool caps  = (key & 0x0200) != 0;
-
-        // is it shifted up, if shift holded or caps
-        // on, then yes.
-        bool upper = shift ^ caps;
-
-        char c = 0;
-
-        if (keycode >= 0x04 && keycode <= 0x1D) {
-            c = (upper ? 'A' : 'a') + (keycode - 0x04);
-        }
-        // numbers and it's shift counterpart
-        else if (keycode >= 0x1E && keycode <= 0x26) {
-            static const char normal[]  = "123456789";
-            static const char shifted[] = "!@#$%^&*(";
-
-            // is shift mate
-            c = shift ? shifted[keycode - 0x1E]
-                : normal[keycode - 0x1E];
-        }
-
-        // some keys that have a shift alternative
-        else if (keycode == 0x27) {
-            c = shift ? ')' : '0';
-        }
-        else if (keycode == 0x2C) {
-            c = ' ';
-        }
-        else if (keycode == 0x2D) {
-            c = shift ? '_' : '-';
-        }
-        else if (keycode == 0x2E) {
-            c = shift ? '+' : '=';
-        }
-        else if (keycode == 0x2F) {
-            c = shift ? '{' : '[';
-        }
-        else if (keycode == 0x30) {
-            c = shift ? '}' : ']';
-        }
-        else if (keycode == 0x31) {
-            c = shift ? '|' : '\\';
-        }
-        else if (keycode == 0x33) {
-            c = shift ? ':' : ';';
-        }
-        else if (keycode == 0x34) {
-            c = shift ? '"' : '\'';
-        }
-        else if (keycode == 0x35) {
-            c = shift ? '~' : '`';
-        }
-        else if (keycode == 0x36) {
-            c = shift ? '<' : ',';
-        }
-        else if (keycode == 0x37) {
-            c = shift ? '>' : '.';
-        }
-        else if (keycode == 0x38) {
-            c = shift ? '?' : '/';
-        }
-        else if (keycode == 0x28) {
-            c = '\n';
-        }
-        else if (keycode == 0x2A) {
-            c = '\b';
-        }
+        char c = (char)key;
 
         if (!c)
             continue;

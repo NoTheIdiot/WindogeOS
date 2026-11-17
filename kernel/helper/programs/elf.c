@@ -123,6 +123,29 @@ static bool add_vma(const char *filename, uint64_t vaddr, uint64_t memsz,
     return false;
 }
 
+static void *get_hhdm_ptr(uint64_t vaddr) {
+    uint64_t cr3;
+    __asm__ volatile ("mov %%cr3, %0" : "=r"(cr3));
+    uint64_t *pml4 = (uint64_t *)((cr3 & ~0xFFFULL) + hhdm_offset);
+
+    size_t pml4_i = (vaddr >> 39) & 0x1FF;
+    size_t pdpt_i = (vaddr >> 30) & 0x1FF;
+    size_t pd_i   = (vaddr >> 21) & 0x1FF;
+    size_t pt_i   = (vaddr >> 12) & 0x1FF;
+
+    if (!(pml4[pml4_i] & 1)) return NULL;
+    uint64_t *pdpt = (uint64_t *)((pml4[pml4_i] & 0x000FFFFFFFFFF000ULL) + hhdm_offset);
+    if (!(pdpt[pdpt_i] & 1)) return NULL;
+    uint64_t *pd = (uint64_t *)((pdpt[pdpt_i] & 0x000FFFFFFFFFF000ULL) + hhdm_offset);
+    if (!(pd[pd_i] & 1)) return NULL;
+    uint64_t *pt = (uint64_t *)((pd[pd_i] & 0x000FFFFFFFFFF000ULL) + hhdm_offset);
+    if (!(pt[pt_i] & 1)) return NULL;
+
+    uint64_t paddr = pt[pt_i] & 0x000FFFFFFFFFF000ULL;
+    uint64_t offset = vaddr & 0xFFFULL;
+    return (void *)(paddr + hhdm_offset + offset);
+}
+
 bool try_demand_page(uint64_t fault_addr, uint64_t err_code)
 {
     struct vma_region *vma = NULL;
@@ -197,7 +220,7 @@ bool try_demand_page(uint64_t fault_addr, uint64_t err_code)
     return true;
 }
 
-int run_elf(char *filename, uint64_t size)
+int run_elf(char *filename, uint64_t size, int argc, char **argv)
 {
     (void)size;
     char buf[64];
@@ -351,6 +374,40 @@ int run_elf(char *filename, uint64_t size)
         __asm__ volatile ("invlpg (%0)" :: "r"(vaddr) : "memory");
     }
     sprintln("[ELF] User stack allocated and mapped successfully.");
+    uint64_t stack_virt = USER_STACK_TOP;
+    if (argc < 0) argc = 0;
+    if (argc > 16) argc = 16; // Safety limit
+
+    uint64_t user_argv_vaddrs[16];
+
+    for (int i = argc - 1; i >= 0; i--) {
+        size_t len = strlen(argv[i]) + 1;
+        stack_virt -= len;
+        void *dest = get_hhdm_ptr(stack_virt);
+        if (dest) {
+            memcpy(dest, argv[i], len);
+        }
+        user_argv_vaddrs[i] = stack_virt;
+    }
+
+    stack_virt &= ~0xFULL;
+    stack_virt -= sizeof(uint64_t);
+    void *null_dest = get_hhdm_ptr(stack_virt);
+    if (null_dest) {
+        *(uint64_t *)null_dest = 0;
+    }
+
+    for (int i = argc - 1; i >= 0; i--) {
+        stack_virt -= sizeof(uint64_t);
+        void *ptr_dest = get_hhdm_ptr(stack_virt);
+        if (ptr_dest) {
+            *(uint64_t *)ptr_dest = user_argv_vaddrs[i];
+        }
+    }
+
+    uint64_t argv_ptr_array_vaddr = stack_virt;
+
+    stack_virt &= ~0xFULL;
 
     bootstrap_cpu_gs.kernel_stack = (uint64_t)(bootstrap_kernel_stack_space + KERNEL_STACK_SIZE);
 
@@ -368,7 +425,8 @@ int run_elf(char *filename, uint64_t size)
     );
     sprintln("[ELF] IA32_KERNEL_GS_BASE MSR initialized successfully.");
     sprintln("[ELF] Jumping to ring 3 via to_userland_ring3_args...");
-    to_userland_ring3_args(ehdr.e_entry, USER_STACK_TOP, 0, 0);
+
+    to_userland_ring3_args(ehdr.e_entry, stack_virt, (uint64_t)argc, argv_ptr_array_vaddr);
     sprintln("[ELF] returned");
     sti();
     return 0;

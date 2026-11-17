@@ -262,6 +262,7 @@ def compile_userland_programs():
     clang_path = find_clang()
     clangxx_path = shutil.which("clang++") or "clang++"
     nasm_path = shutil.which("nasm") or "nasm"
+    lld_path = shutil.which("ld.lld") or "ld.lld"
 
     target_triples = {
         "x86_64": "x86_64-elf",
@@ -271,6 +272,50 @@ def compile_userland_programs():
     }
     target_triple = target_triples.get(architecture, f"{architecture}-elf")
 
+    lld_emulations = {
+        "x86_64": "elf_x86_64",
+        "aarch64": "aarch64elf",
+        "riscv64": "elf64lriscv",
+        "loongarch64": "elf64loongarch"
+    }
+    lld_emulation = lld_emulations.get(architecture)
+
+    def get_c_flags(compiler, include_dir=None):
+        cmd = [
+            compiler,
+            f"--target={target_triple}",
+            "-ffreestanding",
+            "-fno-pie",
+            "-fno-stack-protector",
+            "-fno-builtin"
+        ]
+        if include_dir:
+            cmd.append(f"-I{include_dir}")
+        if architecture == "x86_64":
+            cmd.extend([
+                "-mno-red-zone",
+                "-m64",
+                "-mno-sse",
+                "-mno-sse2",
+                "-mno-mmx",
+                "-mno-avx"
+            ])
+        return cmd
+
+    def make_lld_cmd(elf_path, obj_list):
+        cmd = [
+            lld_path,
+            "-nostdlib",
+            "-static",
+            "-z", "separate-code",
+            "-T", linker_script,
+            "-o", elf_path
+        ]
+        if lld_emulation:
+            cmd.extend(["-m", lld_emulation])
+        cmd.extend(obj_list)
+        return cmd
+
     user_binaries = []
     system_binaries = []
 
@@ -279,7 +324,7 @@ def compile_userland_programs():
     os.makedirs(out_dir, exist_ok=True)
     os.makedirs(sys_out_dir, exist_ok=True)
 
-    print(f"[BUILD] Compiling userland and system programs using linker {linker_script}...")
+    print(f"[BUILD] Compiling userland and system programs using {lld_path} and {linker_script}...")
 
     def compile_items_in(source_base, destination_dir, target_list, is_system_folder=False):
         if not os.path.exists(source_base):
@@ -296,29 +341,18 @@ def compile_userland_programs():
 
                 is_cpp = item.endswith((".cpp", ".cc"))
                 is_asm = item.endswith(".asm")
-                compiler_driver = clangxx_path if is_cpp else clang_path
 
                 if is_asm:
                     if architecture != "x86_64":
-                        print(f"Error: .asm programs require x86_64 architecture for NASM.")
+                        print("Error: .asm programs require x86_64 architecture for NASM.")
                         sys.exit(1)
                     run_command([nasm_path, "-felf64", item_path, "-o", obj_path])
-                    link_cmd = [clang_path, "-nostdlib", "-static", "-T", linker_script, "-o", elf_path, obj_path]
-                    if architecture == "x86_64":
-                        link_cmd.append("-m64")
                 else:
-                    if is_cpp:
-                        compile_cmd = [clangxx_path, f"--target={target_triple}", "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-c", item_path, "-o", obj_path]
-                    else:
-                        compile_cmd = [clang_path, f"--target={target_triple}", "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-c", item_path, "-o", obj_path]
-                    if architecture == "x86_64":
-                        compile_cmd.extend(["-mno-red-zone", "-m64"])
+                    compiler = clangxx_path if is_cpp else clang_path
+                    compile_cmd = get_c_flags(compiler) + ["-c", item_path, "-o", obj_path]
                     run_command(compile_cmd)
 
-                    link_cmd = [compiler_driver, f"--target={target_triple}", "-nostdlib", "-static", "-T", linker_script, "-o", elf_path, obj_path]
-                    if architecture == "x86_64":
-                        link_cmd.append("-m64")
-
+                link_cmd = make_lld_cmd(elf_path, [obj_path])
                 run_command(link_cmd)
                 target_list.append(elf_path)
                 print(f"[SUCCESS] Compiled program: {prog_name}")
@@ -335,7 +369,6 @@ def compile_userland_programs():
                     continue
 
                 obj_files = []
-                has_cpp_files = False
                 sub_out_dir = os.path.join(destination_dir, prog_name)
                 os.makedirs(sub_out_dir, exist_ok=True)
 
@@ -346,28 +379,19 @@ def compile_userland_programs():
 
                     if src.endswith(".asm"):
                         if architecture != "x86_64":
-                            print(f"Error: .asm packages require x86_64 architecture for NASM.")
+                            print("Error: .asm packages require x86_64 architecture for NASM.")
                             sys.exit(1)
                         c_cmd = [nasm_path, "-felf64", src, "-o", obj_p]
                     elif src.endswith((".cpp", ".cc")):
-                        has_cpp_files = True
-                        c_cmd = [clangxx_path, f"--target={target_triple}", f"-I{item_path}", "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-c", src, "-o", obj_p]
-                        if architecture == "x86_64":
-                            c_cmd.extend(["-mno-red-zone", "-m64"])
+                        c_cmd = get_c_flags(clangxx_path, item_path) + ["-c", src, "-o", obj_p]
                     else:
-                        c_cmd = [clang_path, f"--target={target_triple}", f"-I{item_path}", "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-c", src, "-o", obj_p]
-                        if architecture == "x86_64":
-                            c_cmd.extend(["-mno-red-zone", "-m64"])
+                        c_cmd = get_c_flags(clang_path, item_path) + ["-c", src, "-o", obj_p]
 
                     run_command(c_cmd)
                     obj_files.append(obj_p)
 
                 elf_path = os.path.join(destination_dir, prog_name)
-                package_driver = clangxx_path if has_cpp_files else clang_path
-
-                link_cmd = [package_driver, "-nostdlib", "-static", "-T", linker_script, "-o", elf_path] + obj_files
-                if architecture == "x86_64":
-                    link_cmd.append("-m64")
+                link_cmd = make_lld_cmd(elf_path, obj_files)
 
                 run_command(link_cmd)
                 target_list.append(elf_path)
@@ -381,6 +405,7 @@ def compile_userland_programs():
     compile_items_in(sys_dir, sys_out_dir, system_binaries, is_system_folder=True)
 
     return user_binaries, system_binaries
+
 
 def cleanup_kernel_elf():
     if os.path.exists("kernel.elf"):

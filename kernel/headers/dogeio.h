@@ -69,6 +69,7 @@ void print(char* text);
 void println(char* text);
 void clear();
 void cursor_show(void);
+void print_at(const char *str, uint32_t x_pos, uint32_t y_pos, uint32_t text_color);
 void cursor_hide(void);
 void color_change(uint32_t color);
 
@@ -98,8 +99,9 @@ uint64_t get_epoch_seconds(void);
 char* get_time(void);
 char* get_date(void);
 
-int run_elf(char *filename, uint64_t size);
+int run_elf(char *filename, uint64_t size, int argc, char **argv);
 void run(char* file);
+void run_args(char* file, int argc, char **argv);
 uint32_t fs_get_size(char *filename);
 
 #endif
