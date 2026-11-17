@@ -100,6 +100,7 @@ interrupt_frame_t *isr_common_handler(interrupt_frame_t *frame) {
         bool is_user = (frame->cs & 3) != 0;
 
         if (try_demand_page(fault_addr, frame->error_code)) {
+            sprintln("This demand paging thing works");
             return frame;
         }
 
