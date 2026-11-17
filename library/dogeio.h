@@ -25,6 +25,14 @@ static inline int fs_write(const char *path, const char *buf, size_t len) {
     return (int)syscall_3(WriteFile, (uint64_t)path, (uint64_t)buf, (uint64_t)len);
 }
 
+static inline int fs_read_raw(const char *path, uint8_t *buf, size_t len) {
+    return (int)syscall_3(ReadFile, (uint64_t)path, (uint64_t)buf, (uint64_t)len);
+}
+
+static inline int fs_write_raw(const char *path, uint8_t *buf, size_t len) {
+    return (int)syscall_3(WriteFile, (uint64_t)path, (uint64_t)buf, (uint64_t)len);
+}
+
 static inline int fs_create(const char *path) {
     return (int)syscall_1(CreateFile, (uint64_t)path);
 }
