@@ -432,3 +432,7 @@ void cursor_show(void) {
 void cursor_hide(void) {
     cursor_on = false;
 }
+
+void color_change(uint32_t color) {
+    text_color = color;
+}

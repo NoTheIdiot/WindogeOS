@@ -278,8 +278,11 @@ bool nvme_init(void);
 #define HELL_NO    0
 
 int current_permission(void);
-int switch_permission(int switched);
+void switch_permission(uint32_t permission);
 int check_permission(char* path);
+int system_can_access_path(const char* username, const char* target_path);
+int system_create_user(char* name, char* password, int permission_id);
+int system_verify_user(const char* name, char* password);
 
 bool try_demand_page(uint64_t fault_addr, uint64_t err_code);
 void pbkdf2_sha256(const uint8_t *password, size_t pass_len,
@@ -294,5 +297,10 @@ int32_t get_mouse_y(void);
 uint8_t get_mouse_buttons(void);
 uint8_t get_assigned_keyboard_address(void);
 uint8_t get_assigned_mouse_address(void);
+
+
+// ascii doge
+extern char* doge_ascii[22];
+extern char* doge_ascii_full[24];
 
 #endif

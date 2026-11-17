@@ -64,6 +64,120 @@ void init_cpu_gs(uint64_t kernel_stack_top) {
     );
 }
 
+void start_setup(void) {
+    fs_mount();
+    switch_permission(READ_WRITE);
+
+    char proceed[1];
+    color_change(0xE1B16C);
+    for (int i = 0; i < 24; i++) {
+        print(" ");
+        println(doge_ascii_full[i]);
+    }
+    color_change(COLOR_GRAY);
+    println(" Welcome to WindogeOS setup! Such doge, very OS.");
+    input(" Press enter to start setup.", proceed);
+
+    
+    if (!fs_exists("/system")) {
+        fs_mkdir("/system");
+    }
+    if (!fs_exists("/system/accounts")) {
+        fs_mkdir("/system/accounts");
+    }
+    if (!fs_exists("/users")) {
+        fs_mkdir("/users");
+    }
+    if (!fs_exists("/apps")) {
+        fs_mkdir("/apps");
+        fs_chdir("apps");
+        fs_mkdir("packages");
+        fs_chdir("/");
+    }
+
+    char username_new[64];
+    char password_new[64];
+    char root_new[64];
+
+    while (true) {
+        clear();
+        color_change(0xE1B16C);
+        for (int i = 0; i < 24; i++) {
+            print(" ");
+            println(doge_ascii_full[i]);
+        }
+        
+        color_change(COLOR_GRAY);
+        println(" ===== ACCOUNT CREATION ===== ");
+        println("\n Set the admin password. ");
+        input(" [admin]> ", root_new);
+        clean_input_string(root_new);
+        if (root_new[0] == '\0') {
+            println(" Password cannot be empty.");
+            get_key();
+            continue;
+        }
+        break;
+    }
+
+    system_create_user("admin", root_new, 0);
+
+    while (true) {
+        clear();
+        color_change(0xE1B16C);
+        for (int i = 0; i < 24; i++) {
+            print(" ");
+            println(doge_ascii_full[i]);
+        }
+        
+        color_change(COLOR_GRAY);
+        println(" ===== ACCOUNT CREATION ===== ");
+        println("\n Create system username and password.");
+        input(" [username]> ", username_new);
+        clean_input_string(username_new);
+
+        if (username_new[0] == '\0') {
+            println("Username cannot be empty.");
+            println(" Press Enter to continue...");
+            get_key();
+            continue;
+        }
+
+        if (strcmp(username_new, "admin") == 0) {
+            println(" Username cannot be 'admin'.");
+            println(" Press Enter to continue...");
+            get_key();
+            continue;
+        }
+        
+        input(" [password]> ", password_new);
+        clean_input_string(password_new);
+        if (password_new[0] == '\0') {
+            println(" Password cannot be empty.");
+            println(" Press Enter to continue...");
+            get_key();
+            continue;
+        }
+        break;
+    }
+    
+    system_create_user(username_new, password_new, 1);
+    
+    clear();
+
+    clear();
+    color_change(0xE1B16C);
+    for (int i = 0; i < 24; i++) {
+        print(" ");
+        println(doge_ascii_full[i]);
+    }
+    color_change(COLOR_GRAY);
+    switch_permission(HELL_NO);
+    char nothing[1];
+    input(" Press enter to reboot... ", nothing);
+    reboot();
+}
+
 void windoge_os(void) {
     if (LIMINE_BASE_REVISION_SUPPORTED(limine_base_revision) == false) {
         halt();

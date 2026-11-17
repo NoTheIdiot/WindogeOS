@@ -70,6 +70,7 @@ void println(char* text);
 void clear();
 void cursor_show(void);
 void cursor_hide(void);
+void color_change(uint32_t color);
 
 uint16_t get_key(void);
 void input(char* prompt, char* buffer);
