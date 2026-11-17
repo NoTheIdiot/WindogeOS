@@ -3,7 +3,7 @@
 #include <system.h>
 #include <string.h>
 
-static uint32_t active_perm = HELL_NO;
+static uint32_t active_perm = READ_WRITE;
 
 void set_system_perm(uint32_t perm) {
     active_perm = perm;
@@ -77,12 +77,13 @@ int check_permission(char *path) {
     fs_get_dir(cwd, sizeof(cwd));
     normalize_path(cwd, path, clean, sizeof(clean));
 
-    if (strcmp(clean, "/system/dogeshell") == 0) {
-        return 1;
-    }
+    if (active_perm == 0) {
+        if (strcmp(clean, "system/dogeshell") == 0) {
+            return 1;
+        }
 
-    if (strncmp(clean, "/system", 7) == 0 && (clean[7] == '\0' || clean[7] == '/')) {
-        if (active_perm != READ_WRITE) {
+        if (startswith(clean, "/system") || (startswith(clean, "system") && strcmp(cwd, "/") == 0)) {
+            sprintln("[PERM] nuh uh");
             return 0;
         }
     }

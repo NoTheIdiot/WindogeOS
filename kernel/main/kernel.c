@@ -65,7 +65,6 @@ void init_cpu_gs(uint64_t kernel_stack_top) {
 }
 
 void start_setup(void) {
-    fs_mount();
     switch_permission(READ_WRITE);
 
     char proceed[1];
@@ -79,20 +78,20 @@ void start_setup(void) {
     input(" Press enter to start setup.", proceed);
 
     
+    // creatingS
     if (!fs_exists("/system")) {
         fs_mkdir("/system");
     }
     if (!fs_exists("/system/accounts")) {
-        fs_mkdir("/system/accounts");
+        fs_chdir("/system");
+        fs_mkdir("accounts");
+        fs_chdir("..");
     }
     if (!fs_exists("/users")) {
         fs_mkdir("/users");
     }
-    if (!fs_exists("/apps")) {
-        fs_mkdir("/apps");
-        fs_chdir("apps");
-        fs_mkdir("packages");
-        fs_chdir("/");
+    if (!fs_exists("/programs")) {
+        fs_mkdir("/programs");
     }
 
     char username_new[64];
@@ -163,7 +162,8 @@ void start_setup(void) {
     
     system_create_user(username_new, password_new, 1);
     
-    clear();
+    fs_create(".windoge");
+    fs_write(".windoge", "hey it can skip setup", 22);
 
     clear();
     color_change(0xE1B16C);
@@ -235,7 +235,7 @@ void windoge_os(void) {
     }
     println("[\033[32mWow\033[0m]     Mounted filesystem");
 
-        println("[\033[32mDogeing\033[0m] Trying some USB 1.1 bullshit...");
+    println("[\033[32mDogeing\033[0m] Trying some USB 1.1 bullshit...");
     uhci_init_driver();
     uhci_poll_ports();
     init_usb_keyboard(get_assigned_keyboard_address());
@@ -267,8 +267,14 @@ void windoge_os(void) {
     println("[\033[32mDogeing\033[0m] Init system calls...");
     init_syscalls();
     println("[\033[32mWow\033[0m]     Init system calls done");
+    sprintln("\n\n== done ==");
 
     clear();
+    char dummy[2];
+    switch_permission(READ_WRITE);
+    if (fs_exists(".windoge") == false) {
+        start_setup();
+    }
     println("\033[96mWindogeOS Booted!\033[0m");
     println("\033[96mUh, there is no longer nothing. There is something now.\033[0m");
     run("/system/dogeshell");

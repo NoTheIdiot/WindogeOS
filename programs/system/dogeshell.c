@@ -150,7 +150,7 @@ int execute(int argc, char **argv) {
         int bytes = fs_read(argv[1], buffer, sizeof(buffer) - 1);
         if (bytes >= 0) {
             buffer[bytes] = '\0';
-            println(buffer);
+            println(buffer);\
         } else {
             println("Failed to read file.");
             return -1;
@@ -215,6 +215,21 @@ int execute(int argc, char **argv) {
             println(" bytes)");
         }
         return 0;
+    }
+
+    if (strcmp(argv[0], "exists") == 0) {
+        if (argv[1] == NULL) {
+            println("Usage: exists <thing>");
+            return -1;
+        }
+
+        if (!fs_exists(argv[1])) {
+            println("File doesn't exist.");
+            return 0;
+        } else {
+            println("File exists");
+            return 0;
+        }
     }
 
     if (strcmp(argv[0], "cd") == 0) {

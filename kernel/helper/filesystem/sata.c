@@ -243,15 +243,9 @@ uint64_t ata_drive_sector_count(uint8_t drive) {
 extern uintptr_t hhdm_offset;
 int ata_read_sector(uint8_t drive, uint64_t lba, uint8_t *buffer) {
     char dbg[32];
-    sprint("[AHCI Debug] ata_read_sector drive=");
     itoa(drive, dbg);
-    sprint(dbg);
-    sprint(" buffer=");
     kutoa((uintptr_t)buffer, dbg);
-    sprint(dbg);
-    sprint(" bounce=");
     kutoa((uintptr_t)g_dma_bounce_virt, dbg);
-    sprintln(dbg);
 
     if ((uintptr_t)g_dma_bounce_virt < hhdm_offset) {
         sprintln("[AHCI PANIC] g_dma_bounce_virt is in lower-half! Set it to g_dma_bounce_phys + hhdm_offset in ata_probe_devices().");
@@ -307,9 +301,7 @@ void ata_probe_devices(void) {
     bar5_phys &= ~0xFULL;
 
     char tmp[32];
-    sprint("[AHCI] BAR5=0x");
     kutoa(bar5_phys, tmp);
-    sprintln(tmp);
 
     uintptr_t ahci_virt_base = bar5_phys + hhdm_offset;
     map_kernel_mmio_page(ahci_virt_base, bar5_phys);
@@ -317,17 +309,9 @@ void ata_probe_devices(void) {
     g_hba = (ahci_hba_t *)ahci_virt_base;
     char val[32];
 
-    sprint("[AHCI] CAP=0x");
     kutoa(mmio_read32((uintptr_t)&g_hba->cap), val);
-    sprintln(val);
-
-    sprint("[AHCI] PI=0x");
     kutoa(mmio_read32((uintptr_t)&g_hba->pi), val);
-    sprintln(val);
-
-    sprint("[AHCI] VS=0x");
     kutoa(mmio_read32((uintptr_t)&g_hba->vs), val);
-    sprintln(val);
 
     uint32_t ghc = mmio_read32((uintptr_t)&g_hba->ghc);
     ghc |= AHCI_GHC_AE;
@@ -428,17 +412,6 @@ void ata_probe_devices(void) {
             uint32_t tfd = mmio_read32((uintptr_t)&port->tfd);
             if (!(tfd & (0x80U | 0x08U))) break;
         }
-
-        uint32_t sig = mmio_read32((uintptr_t)&port->sig);
-        char hex[32];
-        kutoa(sig, hex);
-
-        char num[32];
-        itoa(i, num);
-        sprint("[AHCI] Port ");
-        sprint(num);
-        sprint(" SIG=0x");
-        sprintln(hex);
 
         g_drive_present[i] = 1;
         g_drive_sector_counts[i] = 20971520ULL;
