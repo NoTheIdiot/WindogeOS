@@ -136,6 +136,15 @@ int execute(int argc, char **argv) {
         return 0;
     }
 
+    if (strcmp(argv[0], "sleep") == 0) {
+        if (argv[1] == NULL) {
+            println("usage: sleep <ms>");
+            return -1;
+        }
+        sleep((uint32_t)atoi(argv[1]));
+        return 0;
+    }
+
     if (strcmp(argv[0], "read") == 0) {
         if (argv[1] == NULL) {
             println("Need one argument.");

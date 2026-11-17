@@ -92,5 +92,6 @@ static inline uint64_t syscall_5(uint64_t num, uint64_t arg1, uint64_t arg2, uin
 
 // other things that might be used
 #define Beep    50
+#define Sleep   51
 
 #endif

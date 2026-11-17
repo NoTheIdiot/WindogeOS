@@ -27,5 +27,6 @@
 
 // other things that might be used
 #define Beep    50
+#define Sleep   51
 
 #endif
