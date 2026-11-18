@@ -180,6 +180,23 @@ void start_setup(void) {
     reboot();
 }
 
+void login(void) {
+    while (true) {
+        println("WindogeOS login v0.4");
+        char password[64];
+        char username[64];
+        input("[username]> ", username);
+        input("[password]> ", password);
+
+        if (system_verify_user(username, password)) {
+            println("Logged in");
+            break;
+        } else {
+            println("Wrong username or password");
+        }
+    }
+}
+
 void windoge_os(void) {
     if (LIMINE_BASE_REVISION_SUPPORTED(limine_base_revision) == false) {
         halt();
@@ -293,6 +310,9 @@ void windoge_os(void) {
     switch_permission(READ_WRITE);
     if (fs_exists(".windoge") == false) {
         start_setup();
+    } else {
+        login();
+        clear();
     }
     println("\033[96mWindogeOS Booted!\033[0m");
     println("\033[96mUh, there is no longer nothing. There is something now.\033[0m");

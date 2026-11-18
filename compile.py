@@ -583,7 +583,6 @@ def execute_qemu_hdd():
         "-device", "ide-hd,drive=disk,bus=ahci.0",
         "-serial", "stdio",
         "-d", "int,cpu_reset,mmu",
-        "-no-reboot",
         "-D", "qemu.log",
         "-device", "piix3-usb-uhci,id=uhci",
         "-device", "usb-kbd,bus=uhci.0"
