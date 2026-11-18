@@ -94,6 +94,9 @@ static inline uint64_t syscall_5(uint64_t num, uint64_t arg1, uint64_t arg2, uin
 #define Username    32
 #define Uname       33
 
+// memory
+#define AllocateMemory 40       // just sbrk but name doesn't suck
+
 // other things that might be used
 #define Beep    50
 #define Sleep   51

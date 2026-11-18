@@ -29,6 +29,9 @@
 #define Username    32
 #define Uname       33
 
+// memory operations
+#define AllocateMemory 40       // just sbrk but name doesn't suck
+
 // other things that might be used
 #define Beep    50
 #define Sleep   51

@@ -24,11 +24,14 @@
 #define USER_STACK_BASE          0x00007FFFF0000000ULL
 #define USER_ADDRESS_LIMIT       0x0000800000000000ULL
 #define USER_LIMIT               0x0000800000000000ULL
+#define USER_START               0x0000000010000000ULL
 
 #define USER_IO_LIMIT            65536
 #define USER_STRING_LIMIT        4096
 #define USER_PATH_LIMIT          256
 #define USER_INPUT_LIMIT         256
+
+uint64_t heap_pointer = 0x0000000010000000ULL;
 
 static bool is_valid_user_ptr(const void *ptr, size_t len) {
     uintptr_t addr = (uintptr_t)ptr;
@@ -82,6 +85,7 @@ uint64_t syscall_handler(registers_t *regs) {
         case Process_Exit: {
             sprintln("[SYSCALL] Peter. The horse doesn't have to be here.");
             cleanup_pages();
+            heap_pointer = USER_START;
             if (kernel_program_launcher_rsp == 0) {
                 sprintln("[SYSCALL] ERROR: kernel_program_launcher_rsp is NULL again...");
                 halt();
@@ -411,6 +415,55 @@ uint64_t syscall_handler(registers_t *regs) {
             ret_val = (uint64_t)(ulen - 1);
             break;
         }
+
+        case AllocateMemory: {
+            size_t size = (size_t)regs->rdi;
+
+            if (size == 0) {
+                ret_val = 0;
+                break;
+            }
+
+            uint64_t aligned_size = (size + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1ULL);
+            uint64_t start_addr = (heap_pointer + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1ULL);
+
+            if (start_addr < heap_pointer || aligned_size > (USER_STACK_BASE - 0x1000000ULL) - start_addr) {
+                ret_val = 0;
+                break;
+            }
+
+            uint64_t end_addr = start_addr + aligned_size;
+            bool failed = false;
+
+            for (uint64_t addr = start_addr; addr < end_addr; addr += PAGE_SIZE) {
+                uintptr_t phys = alloc_page();
+                if (!phys) {
+                    failed = true;
+                    break;
+                }
+                if (!map_page(addr, phys, PAGE_USER_FLAGS)) {
+                    free_page(phys);
+                    failed = true;
+                    break;
+                }
+            }
+
+            if (failed) {
+                for (uint64_t addr = start_addr; addr < end_addr; addr += PAGE_SIZE) {
+                    uintptr_t phys = unmap_page(addr);
+                    if (phys) {
+                        free_page(phys);
+                    }
+                }
+                ret_val = 0;
+                break;
+            }
+
+            heap_pointer = end_addr;
+            ret_val = start_addr;
+            break;
+        }
+
 
         case Beep: {
             uint32_t hz = (uint32_t)regs->rdi;
