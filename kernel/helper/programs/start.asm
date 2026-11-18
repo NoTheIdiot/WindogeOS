@@ -3,7 +3,7 @@ bits 64
 global system_run_elf
 global syscall_exit_to_launcher
 
-extern run_elf
+extern exec
 
 section .bss
 saved_rsp:    resq 1
@@ -32,7 +32,7 @@ system_run_elf:
     mov [rel saved_ret], rax
 
     sub rsp, 8
-    call run_elf
+    call exec
     add rsp, 8
 
     mov rbx, [rel saved_rbx]

@@ -10,6 +10,8 @@
 
 mount_t exfat_vol;
 
+extern int list_dir(mount_t *vol, const char* path, fs_t *out_files, int max_files);
+
 static const char *strrchr(const char *s, int c) {
     const char *last = NULL;
     while (*s) {

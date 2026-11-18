@@ -2,6 +2,7 @@
 #include <bool.h>
 #include <system.h>
 #include <string.h>
+#include <process.h>
 #include <dogeio.h>
 
 #define MAX_FILE_BUF 512
@@ -316,6 +317,11 @@ void windoge_os(void) {
     }
     println("\033[96mWindogeOS Booted!\033[0m");
     println("\033[96mUh, there is no longer nothing. There is something now.\033[0m");
-    run("/system/dogeshell");
+    sprintln("[BOOT] starting shell");
+    process* shell = exec("/system/dogeshell", 0, NULL);
+    if (!shell) {
+        sprintln("spawn failed");
+        return;
+    }
     backup_shell();
 }

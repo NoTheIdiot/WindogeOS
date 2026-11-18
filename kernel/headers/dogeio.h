@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <system.h>
 #include <bool.h>
 
 #define TERMINAL_COLS 160
@@ -99,9 +100,7 @@ uint64_t get_epoch_seconds(void);
 char* get_time(void);
 char* get_date(void);
 
-int run_elf(char *filename, uint64_t size, int argc, char **argv);
-void run(char* file);
-void run_args(char* file, int argc, char **argv);
+process *exec(char *filename, int argc, char **argv);
 uint32_t fs_get_size(char *filename);
 
 void *kmalloc(uint64_t size);

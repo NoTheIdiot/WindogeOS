@@ -5,8 +5,9 @@
 #include "../helper/io/asm.h"
 #include <stdint.h>
 #include <stddef.h>
-#include <dogeio.h>
 #include <bool.h>
+#include <process.h>
+#include <dogeio.h>
 
 #define PAGE_PRESENT  (1ULL << 0)
 #define PAGE_WRITABLE (1ULL << 1)
@@ -220,7 +221,6 @@ int create_file(mount_t *vol, const char *name);
 int write_file(mount_t *vol, const char *name, const uint8_t* data, uint64_t size);
 int read_file(mount_t *vol, const char *name, uint8_t* out_buf, uint64_t max_size, uint64_t *bytes_read_out);
 int append_file(mount_t *vol, const char *name, const uint8_t* data, uint64_t size);
-int list_dir(mount_t *vol, const char* path, fs_t *out_files, int max_files);
 int create_dir(mount_t *vol, const char *path);
 int delete_file(mount_t *vol, const char *name);
 int change_dir(mount_t *vol, const char *path);

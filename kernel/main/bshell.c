@@ -1,6 +1,7 @@
 #include <dogeio.h>
 #include <string.h>
 #include <stdint.h>
+#include <process.h>
 #include <stddef.h>
 #include <system.h>
 #include <bool.h>
@@ -288,7 +289,7 @@ int execute(int argc, char** argv) {
             return -1;
         }
 
-        run_args(argv[1], argc - 1, &argv[1]);
+        //run_args(argv[1], argc - 1, &argv[1]);
         return 0;
     }
 
@@ -320,8 +321,11 @@ int execute(int argc, char** argv) {
     }
 
     if (strcmp(argv[0], "start-shell") == 0) {
-        char *shell_argv[] = { "dogeshell", NULL };
-        run_elf("dogeshell", 16384, 1, shell_argv);
+        process* proc = exec("/system/dogeshell", 0, NULL);
+        if (!proc) {
+            sprintln("spawn failed");
+            return -1;
+        }
         return 0;
     }
 
