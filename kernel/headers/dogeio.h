@@ -104,4 +104,8 @@ void run(char* file);
 void run_args(char* file, int argc, char **argv);
 uint32_t fs_get_size(char *filename);
 
+void *kmalloc(uint64_t size);
+void *kmalloc_aligned(uint64_t size, uint64_t align);
+void  kfree(void* ptr);
+
 #endif

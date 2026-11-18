@@ -5,6 +5,8 @@
 #include <dogeio.h>
 
 #define MAX_FILE_BUF 512
+#define KHEAP_START 0xFFFFFF0000000000ULL
+#define KHEAP_SIZE  (1024 * 1024)
 #define MAX_CRED_LEN 64
 
 __attribute__((used, section(".limine_requests_start")))
@@ -197,6 +199,23 @@ void windoge_os(void) {
     sprintln("Testing serial");
     println("[\033[32mDogeing\033[0m] Init memory paging...");
     init_memory();
+
+    uint64_t page_count = KHEAP_SIZE / PAGE_SIZE;
+
+    for (uint64_t i = 0; i < page_count; i++) {
+        uintptr_t phys = alloc_page();
+        if (!phys) {
+            sprintln("[MEM] BAD: alloc_page returned 0");
+            halt();
+        }
+        if (!map_page(KHEAP_START + (i * PAGE_SIZE), phys, PAGE_PRESENT | PAGE_WRITABLE)) {
+            sprintln("[MEM] BAD: map_page failed");
+            halt();
+        }
+    }
+
+    init_kheap((void *)KHEAP_START, KHEAP_SIZE);
+
     println("[\033[32mWow\033[0m]     Init memory paging sucessful");
     println("[\033[32mDogeing\033[0m] Init APIC... (and timer)");
     init_apic();

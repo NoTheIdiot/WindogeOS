@@ -57,6 +57,7 @@
 // init functions
 void init_gdt_tss(void);
 void init_idt(void);
+void init_kheap(void *start_addr, uint64_t total_size);
 void disable_legacy_pic(void);
 void init_apic(void);
 void serial_init(void);
