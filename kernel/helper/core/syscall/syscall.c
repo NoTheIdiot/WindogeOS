@@ -417,53 +417,69 @@ uint64_t syscall_handler(registers_t *regs) {
         }
 
         case AllocateMemory: {
-            size_t size = (size_t)regs->rdi;
+            int64_t increment = (int64_t)regs->rdi;
+            uint64_t old_brk = heap_pointer;
 
-            if (size == 0) {
-                ret_val = 0;
+            if (increment == 0) {
+                ret_val = old_brk;
                 break;
             }
 
-            uint64_t aligned_size = (size + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1ULL);
-            uint64_t start_addr = (heap_pointer + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1ULL);
-
-            if (start_addr < heap_pointer || aligned_size > (USER_STACK_BASE - 0x1000000ULL) - start_addr) {
-                ret_val = 0;
-                break;
-            }
-
-            uint64_t end_addr = start_addr + aligned_size;
-            bool failed = false;
-
-            for (uint64_t addr = start_addr; addr < end_addr; addr += PAGE_SIZE) {
-                uintptr_t phys = alloc_page();
-                if (!phys) {
-                    failed = true;
+            if (increment < 0) {
+                uint64_t dec = (uint64_t)(-increment);
+                if (dec > old_brk - USER_START) {
+                    ret_val = (uint64_t)-1;
                     break;
                 }
-                if (!map_page(addr, phys, PAGE_USER_FLAGS)) {
-                    free_page(phys);
-                    failed = true;
-                    break;
-                }
-            }
+                uint64_t new_brk = old_brk - dec;
+                uint64_t old_page_end = (old_brk + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1ULL);
+                uint64_t new_page_end = (new_brk + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1ULL);
 
-            if (failed) {
-                for (uint64_t addr = start_addr; addr < end_addr; addr += PAGE_SIZE) {
+                for (uint64_t addr = new_page_end; addr < old_page_end; addr += PAGE_SIZE) {
                     uintptr_t phys = unmap_page(addr);
                     if (phys) {
                         free_page(phys);
                     }
                 }
-                ret_val = 0;
+
+                heap_pointer = new_brk;
+                ret_val = old_brk;
                 break;
             }
 
-            heap_pointer = end_addr;
-            ret_val = start_addr;
+            uint64_t inc = (uint64_t)increment;
+            if (inc > (USER_STACK_BASE - 0x1000000ULL) - old_brk) {
+                ret_val = (uint64_t)-1;
+                break;
+            }
+
+            uint64_t new_brk = old_brk + inc;
+            uint64_t old_page_end = (old_brk + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1ULL);
+            uint64_t new_page_end = (new_brk + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1ULL);
+
+            bool oom = false;
+            for (uint64_t addr = old_page_end; addr < new_page_end; addr += PAGE_SIZE) {
+                uintptr_t phys = alloc_page();
+                if (!phys) {
+                    oom = true;
+                    break;
+                }
+                if (!map_page(addr, phys, PAGE_USER_FLAGS)) {
+                    free_page(phys);
+                    oom = true;
+                    break;
+                }
+            }
+
+            if (oom) {
+                ret_val = (uint64_t)-1;
+                break;
+            }
+
+            heap_pointer = new_brk;
+            ret_val = old_brk;
             break;
         }
-
 
         case Beep: {
             uint32_t hz = (uint32_t)regs->rdi;
