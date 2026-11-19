@@ -321,11 +321,7 @@ int execute(int argc, char** argv) {
     }
 
     if (strcmp(argv[0], "start-shell") == 0) {
-        process* proc = exec("/system/dogeshell", 0, NULL);
-        if (!proc) {
-            sprintln("spawn failed");
-            return -1;
-        }
+        exec("/system/dogeshell", 0, NULL);
         return 0;
     }
 

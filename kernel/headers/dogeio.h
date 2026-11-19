@@ -100,7 +100,7 @@ uint64_t get_epoch_seconds(void);
 char* get_time(void);
 char* get_date(void);
 
-process *exec(char *filename, int argc, char **argv);
+void exec(char *filename, int argc, char **argv);
 uint32_t fs_get_size(char *filename);
 
 void *kmalloc(uint64_t size);

@@ -76,7 +76,7 @@ extern process *current_proc;
 
 bool proc_create_stack(process* proc);
 
-void proc_push64(
+bool proc_push64(
     process* proc,
     uint64_t value);
 

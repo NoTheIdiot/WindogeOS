@@ -318,10 +318,6 @@ void windoge_os(void) {
     println("\033[96mWindogeOS Booted!\033[0m");
     println("\033[96mUh, there is no longer nothing. There is something now.\033[0m");
     sprintln("[BOOT] starting shell");
-    process* shell = exec("/system/dogeshell", 0, NULL);
-    if (!shell) {
-        sprintln("spawn failed");
-        return;
-    }
+    exec("/system/dogeshell", 0, NULL);
     backup_shell();
 }

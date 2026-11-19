@@ -169,11 +169,13 @@ bool try_demand_page(
     uint64_t fault_addr,
     uint64_t err_code)
 {
+    sprintln("[MEM] demand paging enter");
     if (!current_proc)
         return false;
 
     vma_region_t *vma = NULL;
 
+    sprintln("[MEM] enter loop");
     for (size_t i = 0;
          i < current_proc->vma_count;
          i++)
@@ -184,34 +186,53 @@ bool try_demand_page(
         if (!candidate->active)
             continue;
 
-        if (fault_addr >= align_down_page(candidate->p_vaddr) &&
-            fault_addr < align_up_page(
+        uint64_t start =
+            align_down_page(
+                candidate->p_vaddr);
+
+        uint64_t end =
+            align_up_page(
                 candidate->p_vaddr +
-                candidate->p_memsz))
+                candidate->p_memsz);
+
+        if (fault_addr >= start &&
+            fault_addr < end)
         {
             vma = candidate;
             break;
         }
     }
 
-    if (!vma)
+    sprintln("[MEM] checkin vma");
+    if (!vma) {
+        sprintln("[MEM] hell naw");
         return false;
+    }
 
-    if ((err_code & (1ULL << 1)) &&
+    sprintln("[MEM] pte_writeable");
+    if ((err_code & 2) &&
         !(vma->pte_flags & PTE_WRITABLE))
     {
+        sprintln("[MEM] helll nah");
         return false;
     }
 
     uint64_t page_vaddr =
         align_down_page(fault_addr);
 
+    //if (get_hhdm_ptr(page_vaddr))
+    //    return true;
+
+    sprintln("[MEM] allocating page");
     uintptr_t page_phys =
         alloc_page();
 
-    if (!page_phys)
+    if (!page_phys) {
+        sprintln("[MEM] hell naw");
         return false;
+    }
 
+    sprintln("[MEM] zeroing out page_phys + hhdm_offset");
     memset(
         (void *)(page_phys + hhdm_offset),
         0,
@@ -242,18 +263,19 @@ bool try_demand_page(
     {
         uint64_t file_offset =
             vma->p_offset +
-            (copy_start - file_start);
+            (copy_start -
+             file_start);
 
         uint64_t copy_size =
-            copy_end - copy_start;
+            copy_end -
+            copy_start;
 
         uint8_t *dest =
             (uint8_t *)
             (page_phys +
              hhdm_offset +
-             (copy_start - page_vaddr));
-
-        __asm__ volatile("sti");
+             (copy_start -
+              page_vaddr));
 
         int bytes_read =
             fs_read_raw_at(
@@ -262,9 +284,8 @@ bool try_demand_page(
                 file_offset,
                 copy_size);
 
-        __asm__ volatile("cli");
-
-        if (bytes_read != (int)copy_size)
+        if (bytes_read !=
+            (int)copy_size)
         {
             free_page(page_phys);
             return false;
@@ -276,6 +297,7 @@ bool try_demand_page(
             page_phys,
             vma->pte_flags))
     {
+        sprintln("[MEM] hell naw i cant map this");
         free_page(page_phys);
         return false;
     }
@@ -289,12 +311,14 @@ bool try_demand_page(
     return true;
 }
 
-process *exec(char *filename, int argc, char **argv) {
+void exec(char *filename, int argc, char **argv) {
+    sprintln("[ELF] Start");
     elf64_ehdr ehdr;
 
     if (!filename)
-        return NULL;
+        return;
 
+    sprintln("[ELF] reading file");
     if (fs_read_raw_at(
             filename,
             (uint8_t *)&ehdr,
@@ -302,51 +326,58 @@ process *exec(char *filename, int argc, char **argv) {
             sizeof(ehdr))
         != (int)sizeof(ehdr))
     {
-        return NULL;
+        return;
     }
 
+    sprintln("[ELF] checking magic");
     if (ehdr.e_ident[0] != 0x7F ||
         ehdr.e_ident[1] != 'E'  ||
         ehdr.e_ident[2] != 'L'  ||
         ehdr.e_ident[3] != 'F')
     {
-        return NULL;
+        sprintln("[ELF] IT'S NOT FUCKING ELF");
+        return;
     }
 
     if (ehdr.e_ident[4] != ELF_CLASS_64)
-        return NULL;
+        return;
 
     if (ehdr.e_ident[5] != ELF_DATA_LSB)
-        return NULL;
+        return;
 
     if (ehdr.e_version != ELF_VERSION_CURRENT)
-        return NULL;
+        return;
 
     if (ehdr.e_type != ELF_TYPE_EXEC)
-        return NULL;
+        return;
 
     if (ehdr.e_machine != ELF_MACHINE_X86_64)
-        return NULL;
+        return;
 
     if (ehdr.e_phentsize != sizeof(elf64_phdr))
-        return NULL;
+        return;
 
     if (ehdr.e_phnum == 0)
-        return NULL;
+        return;
 
+    sprintln("[ELF] passes all checks. allocating memory (kmalloc ye idiot)");
     process *proc =
         (process *)kmalloc(sizeof(process));
 
     if (!proc)
-        return NULL;
+        return;
 
+    sprintln("[ELF] zeroing it out");
     memset(proc, 0, sizeof(process));
 
+    sprintln("[ELF] Allocating PID");
     proc->pid   = allocate_pid();
     proc->state = PROC_WAITING;
 
+    sprintln("[ELF] clearing vmas");
     clear_vmas(proc);
 
+    sprintln("[ELF] header loop");
     for (uint16_t i = 0; i < ehdr.e_phnum; i++)
     {
         elf64_phdr phdr;
@@ -363,7 +394,7 @@ process *exec(char *filename, int argc, char **argv) {
             != (int)sizeof(phdr))
         {
             kfree(proc);
-            return NULL;
+            return;
         }
 
         if (phdr.p_type != PT_LOAD)
@@ -375,25 +406,25 @@ process *exec(char *filename, int argc, char **argv) {
         if (phdr.p_memsz < phdr.p_filesz)
         {
             kfree(proc);
-            return NULL;
+            return;
         }
 
         if (phdr.p_memsz > UINT64_MAX - phdr.p_vaddr)
         {
             kfree(proc);
-            return NULL;
+            return;
         }
 
         if (phdr.p_vaddr >= USER_STACK_BASE)
         {
             kfree(proc);
-            return NULL;
+            return;
         }
 
         if ((phdr.p_vaddr + phdr.p_memsz) > USER_STACK_BASE)
         {
             kfree(proc);
-            return NULL;
+            return;
         }
 
         uint64_t flags = PTE_USER;
@@ -413,14 +444,15 @@ process *exec(char *filename, int argc, char **argv) {
                 phdr.p_filesz,
                 flags))
         {
+            sprintln("[ELF] something went worng");
             kfree(proc);
-            return NULL;
+            return;
         }
 
         if (proc->region_count >= MAX_PROC_REGIONS)
         {
             kfree(proc);
-            return NULL;
+            return;
         }
 
         vm_region_t *region =
@@ -443,12 +475,14 @@ process *exec(char *filename, int argc, char **argv) {
     if (argc > 64)
         argc = 64;
 
+    sprintln("[ELF] Building stack");
     if (!proc_create_stack(proc))
     {
         kfree(proc);
-        return NULL;
+        return;
     }
 
+    sprintln("[ELF] Building args");
     uint64_t argv_ptr =
         proc_build_argv(
             proc,
@@ -468,15 +502,17 @@ process *exec(char *filename, int argc, char **argv) {
         proc->stack_top;
 
     proc->kernel_stack_base =
-        (uint64_t)kmalloc(
-            KERNEL_STACK_SIZE);
+    (uint64_t)kmalloc(
+        KERNEL_STACK_SIZE);
 
     if (!proc->kernel_stack_base)
     {
+        sprintln("[ELF] kernel stack alloc failed");
         kfree(proc);
-        return NULL;
+        return;
     }
 
+    sprintln("[ELF] zeroing out kernel_stack_base");
     memset(
         (void *)proc->kernel_stack_base,
         0,
@@ -486,5 +522,12 @@ process *exec(char *filename, int argc, char **argv) {
         proc->kernel_stack_base +
         KERNEL_STACK_SIZE;
 
-    return proc;
+    sprintln("[ELF] return");
+
+    current_proc = proc;
+    to_userland_ring3_args(
+        proc->entry_point,
+        proc->saved_rsp,
+        proc->argc,
+        proc->argv);
 }
