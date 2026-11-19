@@ -30,6 +30,8 @@
 #define USER_STRING_LIMIT        4096
 #define USER_PATH_LIMIT          256
 #define USER_INPUT_LIMIT         256
+#define MAX_EXEC_ARGS 32
+#define MAX_ARG_LEN   256
 
 uint64_t heap_pointer = 0x0000000010000000ULL;
 
@@ -91,6 +93,53 @@ uint64_t syscall_handler(registers_t *regs) {
                 halt();
             }
             syscall_exit_to_launcher();
+            ret_val = 0;
+            break;
+        }
+
+        case ProcessExec: {
+            const char *user_path = (const char *)regs->rdi;
+            int argc = (int)regs->rsi;
+            const char * const *user_argv = (const char * const *)regs->rdx;
+
+            if (argc < 0 || argc > MAX_EXEC_ARGS) {
+                ret_val = (uint64_t)-1;
+                break;
+            }
+
+            char kpath[USER_PATH_LIMIT];
+            if (!copy_str_from_user(kpath, user_path, sizeof(kpath))) {
+                ret_val = (uint64_t)-1;
+                break;
+            }
+
+            const char *user_arg_ptrs[MAX_EXEC_ARGS];
+            if (argc > 0) {
+                if (!copy_from_user(user_arg_ptrs, user_argv, (size_t)argc * sizeof(char *))) {
+                    ret_val = (uint64_t)-1;
+                    break;
+                }
+            }
+
+            char karg_bufs[MAX_EXEC_ARGS][MAX_ARG_LEN];
+            char *kargv[MAX_EXEC_ARGS + 1];
+
+            bool copy_ok = true;
+            for (int i = 0; i < argc; i++) {
+                if (!copy_str_from_user(karg_bufs[i], user_arg_ptrs[i], MAX_ARG_LEN)) {
+                    copy_ok = false;
+                    break;
+                }
+                kargv[i] = karg_bufs[i];
+            }
+            kargv[argc] = NULL;
+
+            if (!copy_ok) {
+                ret_val = (uint64_t)-1;
+                break;
+            }
+
+            exec(kpath, argc, kargv);
             ret_val = 0;
             break;
         }

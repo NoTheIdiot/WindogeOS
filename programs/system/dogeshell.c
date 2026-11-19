@@ -145,6 +145,20 @@ int execute(int argc, char **argv) {
         return 0;
     }
 
+    if (strcmp(argv[0], "run") == 0) {
+        if (argv[1] == NULL) {
+            println("run: run <path> [args...]");
+            return -1;
+        }
+        if (!fs_exists(argv[1])) {
+            println("Program/file doesn't exist.");
+            return -1;
+        }
+
+        exec(argv[1], argc - 1, &argv[1]);
+        return 0;
+    }
+
     if (strcmp(argv[0], "read") == 0) {
         if (argv[1] == NULL) {
             println("Need one argument.");

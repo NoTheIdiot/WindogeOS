@@ -19,4 +19,8 @@ static inline int sleep(uint32_t hz) {
     return (int)syscall_1(Sleep, (uint64_t)hz);
 }
 
+static inline int exec(char* program, int argc, char** argv) {
+    return (int)syscall_3(ProcessExec, (uint64_t)program, (uint64_t)argc, (uint64_t)argv);
+}
+
 #endif

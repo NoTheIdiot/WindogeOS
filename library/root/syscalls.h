@@ -68,6 +68,7 @@ static inline uint64_t syscall_5(uint64_t num, uint64_t arg1, uint64_t arg2, uin
 
 // process management
 #define Process_Exit 0
+#define ProcessExec  1
 
 // file system operations
 #define WriteFile        11

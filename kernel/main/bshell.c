@@ -289,7 +289,7 @@ int execute(int argc, char** argv) {
             return -1;
         }
 
-        //run_args(argv[1], argc - 1, &argv[1]);
+        exec(argv[1], argc - 1, &argv[1]);
         return 0;
     }
 
