@@ -503,6 +503,7 @@ static void print_prompt(void) {
 void _start(void) {
     char command[CMD_BUF_SIZE];
     char *argv[MAX_ARGS];
+    printf("\033[096mWindogeOS Dogeshell v0.4\033[0m\n");
 
     while (1) {
         print_prompt();

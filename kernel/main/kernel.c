@@ -6,6 +6,10 @@
 #include <string.h>
 #include <dogeio.h>
 
+#define WINDOGE_CONFIG_PATH ".windoge"
+#define DEFAULT_SHELL_PATH "/programs/sh"
+#define MAX_SHELL_PATH 128
+
 __attribute__((used, section(".limine_requests_start")))
 volatile uint64_t limine_request_start_marker[] = LIMINE_REQUESTS_START_MARKER;
 
@@ -60,6 +64,100 @@ void init_cpu_gs(uint64_t kernel_stack_top) {
     );
 }
 
+static int save_default_shell_config(const char *shell_path) {
+    char buf[MAX_SHELL_PATH + 16];
+    const char *prefix = "shell=";
+    size_t p_len = strlen(prefix);
+    size_t s_len = strlen(shell_path);
+
+    if (p_len + s_len + 2 >= sizeof(buf)) {
+        return -1;
+    }
+
+    memcpy(buf, prefix, p_len);
+    memcpy(buf + p_len, shell_path, s_len);
+    buf[p_len + s_len] = '\n';
+    buf[p_len + s_len + 1] = '\0';
+
+    if (!fs_exists(WINDOGE_CONFIG_PATH)) {
+        if (fs_create(WINDOGE_CONFIG_PATH) < 0) {
+            return -1;
+        }
+    }
+
+    /* Replace with your fs write call if your API takes different arguments */
+    return fs_write(WINDOGE_CONFIG_PATH, buf, strlen(buf));
+}
+
+static void load_default_shell_config(char *out_shell, size_t out_size) {
+    char buf[512];
+    int bytes_read = 0;
+
+    strncpy(out_shell, DEFAULT_SHELL_PATH, out_size - 1);
+    out_shell[out_size - 1] = '\0';
+
+    if (!fs_exists(WINDOGE_CONFIG_PATH)) {
+        return;
+    }
+
+    /* Replace with your fs read call if your API takes different arguments */
+    bytes_read = fs_read(WINDOGE_CONFIG_PATH, buf, sizeof(buf) - 1);
+    if (bytes_read <= 0) {
+        return;
+    }
+    buf[bytes_read] = '\0';
+
+    char *line = buf;
+    while (*line != '\0') {
+        char *next_line = line;
+        while (*next_line != '\0' && *next_line != '\n' && *next_line != '\r') {
+            next_line++;
+        }
+        if (*next_line != '\0') {
+            *next_line = '\0';
+            next_line++;
+            while (*next_line == '\n' || *next_line == '\r') {
+                next_line++;
+            }
+        }
+
+        if (strncmp(line, "shell=", 6) == 0) {
+            const char *val = line + 6;
+            while (*val == ' ' || *val == '\t') {
+                val++;
+            }
+            if (*val != '\0') {
+                strncpy(out_shell, val, out_size - 1);
+                out_shell[out_size - 1] = '\0';
+                return;
+            }
+        }
+
+        line = next_line;
+    }
+}
+
+static void prompt_default_shell(char *out_shell, size_t out_size) {
+    char choice[MAX_SHELL_PATH];
+
+    printf("\nDefault Shell Setup:\n");
+    printf("  1) /system/dogeshell (default)\n");
+    printf("  2) /programs/sh \n");
+    printf("  Or enter a custom path (e.g. /programs/sh)\n");
+    input("Default shell [1]: ", choice, sizeof(choice));
+
+    if (strcmp(choice, "2") == 0) {
+        strncpy(out_shell, "/programs/sh", out_size - 1);
+        out_shell[out_size - 1] = '\0';
+    } else if (choice[0] == '\0' || strcmp(choice, "1") == 0) {
+        strncpy(out_shell, "/system/dogeshell", out_size - 1);
+        out_shell[out_size - 1] = '\0';
+    } else {
+        strncpy(out_shell, choice, out_size - 1);
+        out_shell[out_size - 1] = '\0';
+    }
+}
+
 static void login_screen(void) {
     char username[MAX_USERNAME];
     char password[64];
@@ -87,6 +185,7 @@ static void create_account_setup(void) {
     char username[MAX_USERNAME];
     char password[64];
     char confirm[64];
+    char selected_shell[MAX_SHELL_PATH];
 
     while (1) {
         clear();
@@ -108,6 +207,8 @@ static void create_account_setup(void) {
             continue;
         }
 
+        prompt_default_shell(selected_shell, sizeof(selected_shell));
+
         int rc = user_add(username, password, 1);
         if (rc < 0) {
             printf("\n[\033[91m bad \033[0m] Could not create account (rc=%d). Press any key...\n", rc);
@@ -121,17 +222,21 @@ static void create_account_setup(void) {
             continue;
         }
 
-        fs_create(".windoge");
-        printf("\n[\033[92m wow \033[0m] Account '%s' ready.\n\n", user_current_name());
+        if (save_default_shell_config(selected_shell) < 0) {
+            printf("\n[\033[91m bad \033[0m] Warning: failed to save %s\n", WINDOGE_CONFIG_PATH);
+        } else {
+            printf("\n[\033[92m wow \033[0m] Saved default shell (%s) to %s\n",
+                   selected_shell, WINDOGE_CONFIG_PATH);
+        }
+
+        printf("[\033[92m wow \033[0m] Account '%s' ready.\n\n", user_current_name());
         return;
     }
 }
 
 // temporal start
 static void temp(void) {
-    printf("\"wow\" is the username and password for login.\n");
-    printf("press any key to continue\n");
-    wait_for_next();
+
 }
 
 void windoge(void) {
@@ -193,15 +298,22 @@ void windoge(void) {
     users_init();
     temp();
     user_add("wow", "wow", 1);
-    if (!fs_exists(".windoge")) {
+    if (!fs_exists(WINDOGE_CONFIG_PATH)) {
         create_account_setup();
     } else {
         login_screen();
     }
 
+    char default_shell[MAX_SHELL_PATH];
+    load_default_shell_config(default_shell, sizeof(default_shell));
+
     clear();
     run("/programs/test", 32768);
-    run("/programs/sh", 32768);
-    run("/system/dogeshell", 32768);
+    run(default_shell, 32768);
+    if (strcmp(default_shell, DEFAULT_SHELL_PATH) != 0) {
+        printf("[\033[91m bad \033[0m] Failed to run %s, falling back to %s\n",
+               default_shell, DEFAULT_SHELL_PATH);
+        run(DEFAULT_SHELL_PATH, 32768);
+    }
     halt();
 }
