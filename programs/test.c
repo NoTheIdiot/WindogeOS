@@ -159,7 +159,6 @@ static int test_doge_misc(void) {
     uint32_t r10 = rand_range(1, 10);
     printf("  rand64(rc=%d)=0x%llx, rand_range[1..10]=%u\n", rr, (unsigned long long)r, r10);
 
-    beep(880, 80);
     wait(100);
     printf("  PASS: doge helpers OK\n");
     return 0;
