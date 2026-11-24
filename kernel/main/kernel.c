@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <io.h>
 #include <fonts.h>
+#include <string.h>
 #include <dogeio.h>
 
 __attribute__((used, section(".limine_requests_start")))
@@ -82,6 +83,50 @@ static void login_screen(void) {
     }
 }
 
+static void create_account_setup(void) {
+    char username[MAX_USERNAME];
+    char password[64];
+    char confirm[64];
+
+    while (1) {
+        clear();
+        printf("WindogeOS Account Setup\n\n");
+
+        input("Username: ", username, sizeof(username));
+        if (username[0] == '\0') {
+            printf("\n[\033[91m bad \033[0m] Username cannot be empty. Press any key...\n");
+            wait_for_next();
+            continue;
+        }
+
+        input_masked("Password: ", password, sizeof(password), true);
+        input_masked("Confirm password: ", confirm, sizeof(confirm), true);
+
+        if (strcmp(password, confirm) != 0) {
+            printf("\n[\033[91m bad \033[0m] Passwords do not match. Press any key...\n");
+            wait_for_next();
+            continue;
+        }
+
+        int rc = user_add(username, password, 1);
+        if (rc < 0) {
+            printf("\n[\033[91m bad \033[0m] Could not create account (rc=%d). Press any key...\n", rc);
+            wait_for_next();
+            continue;
+        }
+
+        if (user_login(username, password) < 0) {
+            printf("\n[\033[91m bad \033[0m] Account created, but login failed. Press any key...\n");
+            wait_for_next();
+            continue;
+        }
+
+        fs_create(".windoge");
+        printf("\n[\033[92m wow \033[0m] Account '%s' ready.\n\n", user_current_name());
+        return;
+    }
+}
+
 // temporal start
 static void temp(void) {
     printf("\"wow\" is the username and password for login.\n");
@@ -148,7 +193,11 @@ void windoge(void) {
     users_init();
     temp();
     user_add("wow", "wow", 1);
-    login_screen();
+    if (!fs_exists(".windoge")) {
+        create_account_setup();
+    } else {
+        login_screen();
+    }
 
     clear();
     run("/programs/test", 32768);

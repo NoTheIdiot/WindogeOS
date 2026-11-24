@@ -1,13 +1,15 @@
 #include <dogeio.h>
 #include <string.h>
 
-#define USERS_DB_PATH "/system/users.dat"
+#define SYSTEM_DIR_PATH "/system"
+#define USERS_DB_PATH   "/system/accounts"
 
 static user_t user_table[MAX_USERS];
-static uint8_t current_uid = 0;
+static uint8_t current_uid = USER_INVALID;
 
 static uint64_t hash_password(const char *pw) {
     uint64_t h = 14695981039346656037ULL;
+    if (!pw) return h;
     while (*pw) {
         h ^= (uint8_t)(*pw++);
         h *= 1099511628211ULL;
@@ -15,19 +17,34 @@ static uint64_t hash_password(const char *pw) {
     return h;
 }
 
-static void save_users_db(void) {
-    fs_write_raw(USERS_DB_PATH, (uint8_t *)user_table, sizeof(user_table));
+static bool has_any_admin(void) {
+    for (int i = 0; i < MAX_USERS; i++) {
+        if (user_table[i].active && user_table[i].is_admin) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static int save_users_db(void) {
+    fs_mkdir(SYSTEM_DIR_PATH);
+    fs_create(USERS_DB_PATH);
+    int written = fs_write_raw(USERS_DB_PATH, (uint8_t *)user_table, sizeof(user_table));
+    if (written < 0) {
+        printf("\n[dbg] fs_write_raw failed: %d\n", written);
+        return -1;
+    }
+    return 0;
 }
 
 void users_init(void) {
     memset(user_table, 0, sizeof(user_table));
-    current_uid = 0;
+    current_uid = USER_INVALID;
 
-    if (!fs_exists("/system")) {
-        fs_mkdir("/system");
-    }
+    fs_mkdir(SYSTEM_DIR_PATH);
 
-    if (fs_read_raw(USERS_DB_PATH, (uint8_t *)user_table, sizeof(user_table)) != sizeof(user_table)) {
+    int read_bytes = fs_read_raw(USERS_DB_PATH, (uint8_t *)user_table, sizeof(user_table));
+    if (read_bytes != (int)sizeof(user_table)) {
         memset(user_table, 0, sizeof(user_table));
         user_table[0].active    = 1;
         user_table[0].uid       = 0;
@@ -83,11 +100,14 @@ const char *user_current_name(void) {
 }
 
 int user_add(const char *username, const char *password, uint8_t is_admin) {
-    if (!user_is_admin()) return -1;
-    if (!username || !password || username[0] == '\0') return -1;
+    if (!username || !password || username[0] == '\0') {
+        printf("\n[dbg] user_add: bad args\n");
+        return -1;
+    }
 
     for (int i = 0; i < MAX_USERS; i++) {
         if (user_table[i].active && strcmp(user_table[i].username, username) == 0) {
+            printf("\n[dbg] user_add: duplicate user '%s'\n", username);
             return -2;
         }
     }
@@ -100,10 +120,14 @@ int user_add(const char *username, const char *password, uint8_t is_admin) {
             strncpy(user_table[i].username, username, MAX_USERNAME - 1);
             user_table[i].username[MAX_USERNAME - 1] = '\0';
             user_table[i].pass_hash = hash_password(password);
-            save_users_db();
+
+            int w = save_users_db();
+            printf("\n[dbg] user_add: slot=%d save_users_db=%d\n", i, w);
             return i;
         }
     }
+
+    printf("\n[dbg] user_add: table full\n");
     return -3;
 }
 
@@ -113,8 +137,12 @@ int user_remove(const char *username) {
     for (int i = 0; i < MAX_USERS; i++) {
         if (user_table[i].active && strcmp(user_table[i].username, username) == 0) {
             if (user_table[i].uid == 0) return -2;
+            user_t backup = user_table[i];
             memset(&user_table[i], 0, sizeof(user_t));
-            save_users_db();
+            if (save_users_db() != 0) {
+                user_table[i] = backup;
+                return -4;
+            }
             return 0;
         }
     }
@@ -127,8 +155,12 @@ int user_passwd(const char *username, const char *new_password) {
     for (int i = 0; i < MAX_USERS; i++) {
         if (user_table[i].active && strcmp(user_table[i].username, username) == 0) {
             if (!user_is_admin() && user_table[i].uid != current_uid) return -1;
+            uint64_t old_hash = user_table[i].pass_hash;
             user_table[i].pass_hash = hash_password(new_password);
-            save_users_db();
+            if (save_users_db() != 0) {
+                user_table[i].pass_hash = old_hash;
+                return -4;
+            }
             return 0;
         }
     }
