@@ -152,6 +152,7 @@ void windoge(void) {
 
     clear();
     run("/programs/test", 32768);
+    run("/programs/sh", 32768);
     run("/system/dogeshell", 32768);
     halt();
 }
