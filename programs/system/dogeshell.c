@@ -1,15 +1,60 @@
-#include "../../library/stddef.h"
-#include "../../library/stdint.h"
-#include "../../library/dogeio.h"
-#include "../../library/dogelib.h"
-#include "../../library/string.h"
-#include "../../library/bool.h"
+#include "../../dogec/stddef.h"
+#include "../../dogec/stdint.h"
+#include "../../dogec/dogeio.h"
+#include "../../dogec/string.h"
+#include "../../dogec/bool.h"
 
-#define CMD_BUF_SIZE 256
-#define MAX_ARGS     16
-#define MAX_DIR_ENTRIES 24
-#define NUM_BUF_SIZE 64
-#define READ_BUF_SIZE 8192
+#define CMD_BUF_SIZE     256
+#define MAX_ARGS         16
+#define MAX_DIR_ENTRIES  24
+#define NUM_BUF_SIZE     64
+#define READ_BUF_SIZE    8192
+
+static void clean_input_string(char *s) {
+    if (!s) return;
+    size_t len = strlen(s);
+    while (len > 0 && (s[len - 1] == '\n' || s[len - 1] == '\r' ||
+                       s[len - 1] == ' '  || s[len - 1] == '\t')) {
+        s[--len] = '\0';
+    }
+}
+
+static uint64_t parse_u64(const char *s) {
+    uint64_t val = 0;
+    if (!s) return 0;
+    while (*s == ' ' || *s == '\t') s++;
+    while (*s >= '0' && *s <= '9') {
+        val = val * 10ULL + (uint64_t)(*s - '0');
+        s++;
+    }
+    return val;
+}
+
+static void fmt_u64(uint64_t val, char *buf, size_t cap) {
+    if (!buf || cap == 0) return;
+    if (val == 0) {
+        if (cap >= 2) {
+            buf[0] = '0';
+            buf[1] = '\0';
+        } else {
+            buf[0] = '\0';
+        }
+        return;
+    }
+
+    char tmp[32];
+    int idx = 0;
+    while (val > 0 && idx < (int)sizeof(tmp)) {
+        tmp[idx++] = (char)('0' + (val % 10ULL));
+        val /= 10ULL;
+    }
+
+    size_t out = 0;
+    while (idx > 0 && out + 1 < cap) {
+        buf[out++] = tmp[--idx];
+    }
+    buf[out] = '\0';
+}
 
 int shell_tokenize(char *line, char **argv, int argc) {
     int count = 0;
@@ -82,21 +127,21 @@ int shell_tokenize(char *line, char **argv, int argc) {
 }
 
 int execute(int argc, char **argv) {
-    if (argc <= 0 || argv == NULL) {
+    if (argc <= 0 || argv == NULL || argv[0] == NULL) {
         return -1;
     }
 
     if (strcmp(argv[0], "print") == 0 || strcmp(argv[0], "echo") == 0) {
         if (argc == 1) {
-            println("");
+            printf("\n");
         } else {
             for (int i = 1; i < argc; i++) {
-                print(argv[i]);
+                print_str(argv[i]);
                 if (i + 1 < argc) {
-                    print(" ");
+                    print_str(" ");
                 }
             }
-            println("");
+            printf("\n");
         }
         return 0;
     }
@@ -106,17 +151,74 @@ int execute(int argc, char **argv) {
         return 0;
     }
 
-    if (strcmp(argv[0], "create") == 0) {
-        if (argv[1] == NULL) {
-            println("Need a filename.");
+    if (strcmp(argv[0], "dir") == 0 || strcmp(argv[0], "ls") == 0) {
+        const char *path = ".";
+
+        if (argc > 1) {
+            path = argv[1];
+        }
+
+        fs_t entries[MAX_DIR_ENTRIES];
+
+        int count = fs_list((char *)path, entries, MAX_DIR_ENTRIES);
+
+        if (count < 0) {
+            printf("Failed to list directory.\n");
             return -1;
         }
-        if (!fs_exists(argv[1])) {
-            println("File already exists.");
+
+        for (int i = 0; i < count; i++) {
+
+            char size_buf[NUM_BUF_SIZE];
+            fmt_u64(entries[i].size, size_buf, sizeof(size_buf));
+
+            if (entries[i].is_dir) {
+                printf("<DIR> %s\n", entries[i].name);
+            } else {
+                printf("%s bytes %s\n", size_buf, entries[i].name);
+            }
+        }
+
+        return 0;
+    }
+
+    if (strcmp(argv[0], "cd") == 0) {
+        if (argc < 2) {
+            printf("Usage: cd <path>\n");
+            return -1;
+        }
+
+        if (fs_chdir(argv[1]) != 0) {
+            printf("Directory does not exist.\n");
+            return -1;
+        }
+
+        return 0;
+    }
+
+    if (strcmp(argv[0], "whereami") == 0) {
+        char cwd[256];
+
+        memset(cwd, 0, sizeof(cwd));
+
+        fs_get_dir(cwd, sizeof(cwd));
+
+        printf("%s\n", cwd);
+
+        return 0;
+    }
+
+    if (strcmp(argv[0], "create") == 0) {
+        if (argv[1] == NULL) {
+            printf("Need a filename.\n");
+            return -1;
+        }
+        if (fs_exists(argv[1])) {
+            printf("File already exists.\n");
             return -1;
         }
         if (fs_create(argv[1]) != 0) {
-            println("Failed to create file.");
+            printf("Failed to create file.\n");
             return -1;
         }
         return 0;
@@ -124,58 +226,63 @@ int execute(int argc, char **argv) {
 
     if (strcmp(argv[0], "del") == 0) {
         if (argv[1] == NULL) {
-            println("Need one argument.");
+            printf("Need one argument.\n");
             return -1;
         }
-
         if (!fs_exists(argv[1])) {
-            println("File doesn't exist");
+            printf("File doesn't exist.\n");
             return -1;
         }
-        fs_delete(argv[1]);
+        if (fs_delete(argv[1]) != 0) {
+            printf("Failed to delete file.\n");
+            return -1;
+        }
         return 0;
     }
 
     if (strcmp(argv[0], "sleep") == 0) {
         if (argv[1] == NULL) {
-            println("usage: sleep <ms>");
+            printf("usage: sleep <ms>\n");
             return -1;
         }
-        sleep((uint32_t)atoi(argv[1]));
+        wait(parse_u64(argv[1]));
         return 0;
     }
 
     if (strcmp(argv[0], "run") == 0) {
         if (argv[1] == NULL) {
-            println("run: run <path> [args...]");
+            printf("run: run <path> [args...]\n");
             return -1;
         }
-        if (!fs_exists(argv[1])) {
-            println("Program/file doesn't exist.");
+        int64_t size = fs_size(argv[1]);
+        if (size < 0) {
+            printf("Program/file doesn't exist.\n");
             return -1;
         }
-
-        exec(argv[1], argc - 1, &argv[1]);
+        if (exec_prog(argv[1], (uint64_t)size) < 0) {
+            printf("Failed to run program.\n");
+            return -1;
+        }
         return 0;
     }
 
     if (strcmp(argv[0], "read") == 0) {
         if (argv[1] == NULL) {
-            println("Need one argument.");
+            printf("Need one argument.\n");
             return -1;
         }
         if (!fs_exists(argv[1])) {
-            println("File doesn't exist.");
+            printf("File doesn't exist.\n");
             return -1;
         }
         static char buffer[READ_BUF_SIZE];
         memset(buffer, 0, sizeof(buffer));
-        int bytes = fs_read(argv[1], buffer, sizeof(buffer) - 1);
+        int64_t bytes = fs_read(argv[1], buffer, sizeof(buffer) - 1);
         if (bytes >= 0) {
             buffer[bytes] = '\0';
-            println(buffer);\
+            printf("%s\n", buffer);
         } else {
-            println("Failed to read file.");
+            printf("Failed to read file.\n");
             return -1;
         }
         return 0;
@@ -183,129 +290,80 @@ int execute(int argc, char **argv) {
 
     if (strcmp(argv[0], "write") == 0) {
         if (argv[1] == NULL || argv[2] == NULL) {
-            println("Need two arguments.");
+            printf("Need two arguments.\n");
             return -1;
         }
         if (!fs_exists(argv[1])) {
-            println("File doesn't exist.");
+            printf("File doesn't exist.\n");
             return -1;
         }
-        if (fs_write(argv[1], argv[2], strlen(argv[2])) != 0) {
-            println("Failed to write file.");
+        size_t len = strlen(argv[2]);
+        int64_t written = fs_write(argv[1], argv[2], (uint64_t)len);
+        if (written < 0 || (size_t)written != len) {
+            printf("Failed to write file.\n");
             return -1;
         }
         return 0;
     }
 
-    if (strcmp(argv[0], "dir") == 0) {
-        static fs_t files[MAX_DIR_ENTRIES];
-        memset(files, 0, sizeof(files));
-
-        char buffer[64];
-        fs_get_cwd(buffer, 64);
-        int count = fs_list(buffer, files, MAX_DIR_ENTRIES);
-
-        if (count < 0) {
-            println("Filesystem error or not mounted.");
+    if (strcmp(argv[0], "stat") == 0) {
+        if (argv[1] == NULL) {
+            printf("Usage: stat <path>\n");
             return -1;
         }
-
-        if (count == 0) {
-            println("Directory is empty.");
-            return 0;
+        doge_fs_stat_t st = {0};
+        if (fs_stat(argv[1], &st) != 0) {
+            printf("File doesn't exist.\n");
+            return -1;
         }
-
-        if (count > MAX_DIR_ENTRIES) {
-            count = MAX_DIR_ENTRIES;
-        }
-
         char size_str[NUM_BUF_SIZE];
-        for (int i = 0; i < count; i++) {
-            if (files[i].name[0] == '\0') {
-                continue;
-            }
-
-            if (files[i].is_dir) {
-                print("[DIR]  ");
-            } else {
-                print("[FILE] ");
-            }
-
-            print(files[i].name);
-            print("  (");
-            itoa((int)files[i].size, size_str);
-            print(size_str);
-            println(" bytes)");
-        }
+        fmt_u64(st.size, size_str, sizeof(size_str));
+        print_str(argv[1]);
+        printf("  (%s bytes)\n", size_str);
         return 0;
     }
 
     if (strcmp(argv[0], "exists") == 0) {
         if (argv[1] == NULL) {
-            println("Usage: exists <thing>");
+            printf("Usage: exists <thing>\n");
             return -1;
         }
-
         if (!fs_exists(argv[1])) {
-            println("File doesn't exist.");
-            return 0;
+            printf("File doesn't exist.\n");
         } else {
-            println("File exists");
-            return 0;
+            printf("File exists.\n");
         }
+        return 0;
     }
 
     if (strcmp(argv[0], "beep") == 0) {
         if (argv[1] == NULL || argv[2] == NULL) {
-            println("Usage: beep <hz> <time>");
+            printf("Usage: beep <hz> <time>\n");
             return 0;
         }
-
-        beep((uint32_t)atoi(argv[1]), (uint32_t)atoi(argv[2]));
-        return 0;
-    }
-
-    if (strcmp(argv[0], "cd") == 0) {
-        if (argv[1] == NULL) {
-            println("cd: cd <path>");
-            return -1;
-        }
-        if (fs_chdir(argv[1]) == -1) {
-            println("Not Wow: Permission denied :(");
-        }
-        return 0;
-    }
-
-    if (strcmp(argv[0], "shutdown") == 0) {
-        windoge_shutdown();
-        return 0;
-    }
-
-    if (strcmp(argv[0], "reboot") == 0) {
-        windoge_reboot();
+        beep(parse_u64(argv[1]), parse_u64(argv[2]));
         return 0;
     }
 
     if (strcmp(argv[0], "exit") == 0) {
-        println("exiting");
+        printf("exiting\n");
         exit();
         return 0;
     }
 
-    print(argv[0]);
-    println(": command does not exist.");
+    print_str(argv[0]);
+    printf(": command does not exist.\n");
     return -128;
 }
 
 void _start(void) {
     char command[CMD_BUF_SIZE];
     char *argv[MAX_ARGS];
-    char buffer[32];
 
     while (1) {
-        fs_get_cwd(buffer, 32);
-        print(buffer);
-        if (input("> ", command, sizeof(command)) < 0) {
+        print_str("/");
+        print_str("> ");
+        if (input(command, sizeof(command)) < 0) {
             continue;
         }
 
@@ -316,7 +374,7 @@ void _start(void) {
 
         int argc = shell_tokenize(command, argv, MAX_ARGS);
         if (argc < 0) {
-            println("Syntax error: unclosed quote.");
+            printf("Syntax error: unclosed quote.\n");
             continue;
         }
 

@@ -1,51 +1,33 @@
 #ifndef STRING_H
 #define STRING_H
 
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
-#ifndef restrict
-#define restrict __restrict
-#endif
+void  *memcpy(void *__restrict__ dst, const void *__restrict__ src, size_t n);
+void  *memmove(void *dst, const void *src, size_t n);
+void  *memset(void *dst, int c, size_t n);
+int    memcmp(const void *s1, const void *s2, size_t n);
+void  *memchr(const void *s, int c, size_t n);
 
-// memory stuff
-void *memcpy(void *restrict dest, const void *restrict src, size_t n);
-void *memset(void *s, int c, size_t n);
-void *memmove(void *dest, const void *src, size_t n);
-int memcmp(const void *s1, const void *s2, size_t n);
+size_t strlen(const char *s);
+size_t strnlen(const char *s, size_t maxlen);
+int    strcmp(const char *s1, const char *s2);
+int    strncmp(const char *s1, const char *s2, size_t n);
+int    strcasecmp(const char *s1, const char *s2);
+int    strncasecmp(const char *s1, const char *s2, size_t n);
 
-// regular str stuff
-int strcmp(const char *str1, const char *str2);
-char* uint64_to_str(uint64_t value, char* buf);
-void clean_input_string(char* str);
-size_t strlen(const char* str);
-void pad(char *dest, const char *src, int target_len, char pad_char);
-void itoa(int n, char* str);
-uint8_t to_u8(char *str);
-void ltoa(uint64_t num, char* str);
-void kutoa(uint64_t value, char *str);
-int strncmp(const char *str1, const char *str2, size_t n);
-int startswith(const char *str, const char *prefix);
-int atoi(char* s);
-void strcpy(char *dest, const char *src);
-int strncpy(char* dest, const char* src, size_t n);
-void u16_to_str(uint16_t value, char *out);
-uint16_t to_u16(const char *s);
-float atof(const char *str);
-char* strcat(char* dest, const char* src);
-void split_filename(const char *input, char *name, char *ext);
-char u8tochar(uint8_t input);
-uint8_t chartou8(char input);
-// regular str stuff
-int strcmp(const char *str1, const char *str2);
-size_t strlen(const char* str);
-void itoa(int n, char* str);
-int strncmp(const char *str1, const char *str2, size_t n);
-int startswith(const char *str, const char *prefix);
-int atoi(char* s);
-void strcpy(char *dest, const char *src);
-float atof(const char *str);
-char* strcat(char* dest, const char* src);
-void split_filename(const char *input, char *name, char *ext);
+char  *strcpy(char *__restrict__ dst, const char *__restrict__ src);
+char  *strncpy(char *__restrict__ dst, const char *__restrict__ src, size_t n);
+char  *strcat(char *__restrict__ dst, const char *__restrict__ src);
+char  *strncat(char *__restrict__ dst, const char *__restrict__ src, size_t n);
+
+char  *strchr(const char *s, int c);
+char  *strrchr(const char *s, int c);
+char  *strstr(const char *haystack, const char *needle);
+size_t strspn(const char *s, const char *accept);
+size_t strcspn(const char *s, const char *reject);
+char  *strpbrk(const char *s, const char *accept);
+char  *strtok(char *__restrict__ str, const char *__restrict__ delim);
 
 #endif

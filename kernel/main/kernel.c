@@ -1,14 +1,9 @@
 #include <limine.h>
-#include <bool.h>
-#include <system.h>
-#include <string.h>
-#include <process.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <io.h>
+#include <fonts.h>
 #include <dogeio.h>
-
-#define MAX_FILE_BUF 512
-#define KHEAP_START 0xFFFFFF0000000000ULL
-#define KHEAP_SIZE  (1024 * 1024)
-#define MAX_CRED_LEN 64
 
 __attribute__((used, section(".limine_requests_start")))
 volatile uint64_t limine_request_start_marker[] = LIMINE_REQUESTS_START_MARKER;
@@ -43,15 +38,12 @@ volatile struct limine_memmap_request memmap_request = {
 __attribute__((used, section(".limine_requests_end")))
 volatile uint64_t limine_request_end_marker[] = LIMINE_REQUESTS_END_MARKER;
 
-extern void backup_shell(void);
-
 typedef struct __attribute__((packed)) {
     uint64_t kernel_stack;
     uint64_t user_stack_scratch;
 } cpu_gs_t;
 
 static cpu_gs_t bootstrap_cpu_gs;
-volatile uint32_t ticks;
 
 void init_cpu_gs(uint64_t kernel_stack_top) {
     bootstrap_cpu_gs.kernel_stack = kernel_stack_top;
@@ -67,257 +59,99 @@ void init_cpu_gs(uint64_t kernel_stack_top) {
     );
 }
 
-void start_setup(void) {
-    switch_permission(READ_WRITE);
+static void login_screen(void) {
+    char username[MAX_USERNAME];
+    char password[64];
 
-    char proceed[1];
-    color_change(0xE1B16C);
-    for (int i = 0; i < 24; i++) {
-        print(" ");
-        println(doge_ascii_full[i]);
-    }
-    color_change(COLOR_GRAY);
-    println(" Welcome to WindogeOS setup! Such doge, very OS.");
-    input(" Press enter to start setup.", proceed);
+    user_logout();
 
-    
-    // creatingS
-    if (!fs_exists("/system")) {
-        fs_mkdir("/system");
-    }
-    if (!fs_exists("/system/accounts")) {
-        fs_chdir("/system");
-        fs_mkdir("accounts");
-        fs_chdir("..");
-    }
-    if (!fs_exists("/users")) {
-        fs_mkdir("/users");
-    }
-    if (!fs_exists("/programs")) {
-        fs_mkdir("/programs");
-    }
-
-    char username_new[64];
-    char password_new[64];
-    char root_new[64];
-
-    while (true) {
+    while (1) {
         clear();
-        color_change(0xE1B16C);
-        for (int i = 0; i < 24; i++) {
-            print(" ");
-            println(doge_ascii_full[i]);
+        printf("WindogeOS login\n");
+
+        input("Username: ", username, sizeof(username));
+        input_masked("Password: ", password, sizeof(password), true);
+
+        if (user_login(username, password) >= 0) {
+            printf("\n[\033[92m wow \033[0m] Logged in as %s\n\n", user_current_name());
+            return;
         }
-        
-        color_change(COLOR_GRAY);
-        println(" ===== ACCOUNT CREATION ===== ");
-        println("\n Set the admin password. ");
-        input(" [admin]> ", root_new);
-        clean_input_string(root_new);
-        if (root_new[0] == '\0') {
-            println(" Password cannot be empty.");
-            get_key();
-            continue;
-        }
-        break;
+
+        printf("\n[\033[91m bad \033[0m] Invalid username or password. Press any key...\n");
+        wait_for_next();
     }
+}
 
-    system_create_user("admin", root_new, 0);
+// temporal start
+static void temp(void) {
+    printf("\"wow\" is the username and password for login.\n");
+    printf("press any key to continue\n");
+    wait_for_next();
+}
 
-    while (true) {
-        clear();
-        color_change(0xE1B16C);
-        for (int i = 0; i < 24; i++) {
-            print(" ");
-            println(doge_ascii_full[i]);
-        }
-        
-        color_change(COLOR_GRAY);
-        println(" ===== ACCOUNT CREATION ===== ");
-        println("\n Create system username and password.");
-        input(" [username]> ", username_new);
-        clean_input_string(username_new);
-
-        if (username_new[0] == '\0') {
-            println("Username cannot be empty.");
-            println(" Press Enter to continue...");
-            get_key();
-            continue;
-        }
-
-        if (strcmp(username_new, "admin") == 0) {
-            println(" Username cannot be 'admin'.");
-            println(" Press Enter to continue...");
-            get_key();
-            continue;
-        }
-        
-        input(" [password]> ", password_new);
-        clean_input_string(password_new);
-        if (password_new[0] == '\0') {
-            println(" Password cannot be empty.");
-            println(" Press Enter to continue...");
-            get_key();
-            continue;
-        }
-        break;
-    }
-    
-    system_create_user(username_new, password_new, 1);
-    
-    fs_create(".windoge");
-    fs_write(".windoge", "hey it can skip setup", 22);
-
+void windoge(void) {
     clear();
-    color_change(0xE1B16C);
-    for (int i = 0; i < 24; i++) {
-        print(" ");
-        println(doge_ascii_full[i]);
-    }
-    color_change(COLOR_GRAY);
-    switch_permission(HELL_NO);
-    char nothing[1];
-    input(" Press enter to reboot... ", nothing);
-    reboot();
-}
-
-void login(void) {
-    while (true) {
-        println("WindogeOS login v0.4");
-        char password[64];
-        char username[64];
-        input("[username]> ", username);
-        input("[password]> ", password);
-
-        if (system_verify_user(username, password)) {
-            println("Logged in");
-            break;
-        } else {
-            println("Wrong username or password");
-        }
-    }
-}
-
-void windoge_os(void) {
-    if (LIMINE_BASE_REVISION_SUPPORTED(limine_base_revision) == false) {
+    printf("Welcome to WindogeOS\n");
+    init_serial();
+    printf("[\033[96m ... \033[0m] Init GDT and TSS\n");
+    init_gdt_tss();
+    printf("[\033[92m wow \033[0m] GDT loaded\n");
+    printf("[\033[96m ... \033[0m] Init IDT\n");
+    init_idt();
+    printf("[\033[92m wow \033[0m] IDT loaded\n");
+    printf("[\033[96m ... \033[0m] Init FPU\n");
+    init_fpu();
+    printf("[\033[92m wow \033[0m] FPU done\n");
+    printf("[\033[96m ... \033[0m] Init VMM and PMM\n");
+    init_memory();
+    printf("[\033[92m wow \033[0m] VMM and PMM done\n");
+    printf("[\033[96m ... \033[0m] Init APIC\n");
+    if (!init_apic() || !init_apic_timer(32, 1)) {
+        printf("[\033[91m bad \033[0m] APIC init failed\n");
         halt();
     }
-    cursor_show();
-    clear();
-    println("[\033[32mDoge\033[0m]    WindogeOS started booting");
-    println("[\033[32mDogeing\033[0m] Init GDT and TSS...");
-    init_gdt_tss();
-    println("[\033[32mWow\033[0m]     Init GDT and TSS sucessful");
-    println("[\033[32mDogeing\033[0m] Init IDT...");
-    init_idt();
-    println("[\033[32mWow\033[0m]     Init IDT sucessful");
-    println("[\033[32mDogeing\033[0m] Init serial...");
-    serial_init();
-    println("[\033[32mWow\033[0m]     Init serial sucess");
-    sprintln("Testing serial");
-    println("[\033[32mDogeing\033[0m] Init memory paging...");
-    init_memory();
-
-    uint64_t page_count = KHEAP_SIZE / PAGE_SIZE;
-
-    for (uint64_t i = 0; i < page_count; i++) {
-        uintptr_t phys = alloc_page();
-        if (!phys) {
-            sprintln("[MEM] BAD: alloc_page returned 0");
-            halt();
-        }
-        if (!map_page(KHEAP_START + (i * PAGE_SIZE), phys, PAGE_PRESENT | PAGE_WRITABLE)) {
-            sprintln("[MEM] BAD: map_page failed");
-            halt();
-        }
-    }
-
-    init_kheap((void *)KHEAP_START, KHEAP_SIZE);
-
-    println("[\033[32mWow\033[0m]     Init memory paging sucessful");
-    println("[\033[32mDogeing\033[0m] Init APIC... (and timer)");
-    init_apic();
-    init_apic_timer(0x20, 1000);
-    ticks = 1000;
-    sti();
-    println("[\033[32mWow\033[0m]     Init APIC sucessful");
-
-    println("[\033[32mDogeing\033[0m] Init CPU GS");
+    printf("[\033[92m wow \033[0m] APIC done\n");
+    printf("[\033[96m ... \033[0m] Init CPU GS\n");
     
     uint64_t current_rsp;
     __asm__ volatile ("movq %%rsp, %0" : "=r"(current_rsp));
     init_cpu_gs(current_rsp);
     
-    println("[\033[32mWow\033[0m]     Init CPU GS sucessful");
+    printf("[\033[92m wow \033[0m] Init CPU GS sucessful\n");
 
-    println("[\033[32mDogeing\033[0m] Init PCIE...");
+    printf("[\033[96m ... \033[0m] Init PCIE...\n");
     init_pcie();
-    println("[\033[32mWow\033[0m]     Init PCIE done (still didnt crash nice)");
-
-    println("[\033[32mDogeing\033[0m] Probing AHCI SATA... (if have)");
+    printf("[\033[92m wow \033[0m] PCIE done\n");
+    printf("[\033[96m ... \033[0m] Init AHCI (and SATA)...\n");
     ata_probe_devices();
-    println("[\033[32mWow\033[0m]     AHCI SATA probed");
-
-    println("[\033[32mDogeing\033[0m] Checking NVME and INIT if have");
-    if (nvme_init()) {
-        println("[\033[32mWow\033[0m]     Nvme init");
-    } else {
-        println("[\033[32midk\033[0m]     No NVME found or error.");
-    }
-
-    println("[\033[32mDogeing\033[0m] Mounting exFAT filesystem...");
+    printf("[\033[92m wow \033[0m] AHCI and SATA done\n");
+    printf("[\033[96m ... \033[0m] Init USB\n");
+    init_keyboard();
+    printf("[\033[92m wow \033[0m] USB done\n");
+    printf("[\033[96m ... \033[0m] Init RTC (time)\n");
+    init_rtc_time();
+    printf("[\033[92m wow \033[0m] RTC done\n");
+    printf("[\033[96m ... \033[0m] Mounting ExFAT\n");
     if (fs_mount()) {
-        println("[\033[91mNot Wow\033[0m] didn't mount, god damn it.");
+        printf("[\033[91m bad \033[0m] Mount failed\n");
         halt();
     }
-    println("[\033[32mWow\033[0m]     Mounted filesystem");
-
-    println("[\033[32mDogeing\033[0m] Trying some USB 1.1 bullshit...");
-    uhci_init_driver();
-    uhci_poll_ports();
-    init_usb_keyboard(get_assigned_keyboard_address());
-
-    int fb_w = 1024;
-    int fb_h = 768;
-    if (framebuffer_request.response && framebuffer_request.response->framebuffer_count > 0) {
-        struct limine_framebuffer *fb = framebuffer_request.response->framebuffers[0];
-        fb_w = (int)fb->width;
-        fb_h = (int)fb->height;
-    }
-    init_usb_mouse(get_assigned_mouse_address(), fb_w, fb_h);
-
-    println("[\033[32mWow\033[0m]     Holy shit it works (sucess)");
-
-
-    println("[\033[32mDogeing\033[0m] Init RTC time..");
-    init_rtc_time();
-    println("[\033[32mWow\033[0m]     Init RTC sucess");
-    println("[\033[32mDogeing\033[0m] Updating RTC time..");
-    update_time();
-    println("[\033[32mWow\033[0m]     Updated RTC time");
-
-    print("[\033[32mDoge\033[0m]    Current Date: ");
-    println(get_date());
-    print("[\033[32mDoge\033[0m]    Current Time: ");
-    println(get_time());
-
-    println("[\033[32mDogeing\033[0m] Init system calls...");
+    printf("[\033[92m wow \033[0m] Mount done\n");
+    printf("[\033[96m ... \033[0m] Init System Calls\n");
     init_syscalls();
-    println("[\033[32mWow\033[0m]     Init system calls done");
-    sprintln("\n\n== done ==");
+    printf("[\033[92m wow \033[0m] System Calls done\n");
+
+    printf("\033[96mWindogeOS has booted. \033[0m\n");
+    printf("\033[96mUh, now what?\n\033[0m");
+    sti();
+
+    users_init();
+    temp();
+    user_add("wow", "wow", 1);
+    login_screen();
 
     clear();
-    char dummy[2];
-    switch_permission(READ_WRITE);
-    if (fs_exists(".windoge") == false) {
-        start_setup();
-    } else {
-        login();
-        clear();
-    }
-    println("\033[96mWindogeOS Booted!\033[0m");
-    println("\033[96mUh, there is no longer nothing. There is something now.\033[0m");
-    sprintln("[BOOT] starting shell");
-    exec("/system/dogeshell", 0, NULL);
-    backup_shell();
+    run("/programs/test", 32768);
+    run("/system/dogeshell", 32768);
+    halt();
 }

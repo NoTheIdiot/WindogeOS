@@ -24,9 +24,8 @@ qemu_config = {
     "machine": [],
     "cpu": [],
     "devices": [
-        "-device", "ich9-usb-uhci1",
-        "-device", "usb-kbd",
-        "-device", "usb-mouse"
+        "-device", "qemu-xhci,id=xhci",
+        "-device", "usb-kbd,bus=xhci.0"
     ],
     "firmware": []
 }
@@ -68,30 +67,28 @@ def run_command(cmd, env=None, cwd=None):
 if architecture == "x86_64":
     if firmware_mode == "UEFI":
         qemu_config["machine"] = ["-M", "q35"]
-    else:
-        qemu_config["machine"] = ["-M", "pc"] 
-        
-    qemu_config["devices"] = ["-device", "qemu-xhci", "-device", "usb-kbd", "-device", "usb-mouse"]
-    
-    if firmware_mode == "UEFI":
         qemu_config["firmware"] = [
             "-drive",
             f"if=pflash,unit=0,format=raw,file={OVMF},readonly=on"
         ]
-        boot_image_config["efi_binary"] = "BOOTX64.EFI"
+    elif firmware_mode == "BIOS":
+        qemu_config["machine"] = ["-M", "pc"]
+        boot_image_config["sgdisk_mbr_flags"] = ["-m", "1"]
     else:
-        boot_image_config["efi_binary"] = "BOOTX64.EFI"
-        
-    boot_image_config["sgdisk_mbr_flags"] = ["-m", "1"]
+        sys.exit(f"Error: Unsupported firmware mode '{firmware_mode}'.")
 
+    qemu_config["devices"] = ["-device", "qemu-xhci,id=xhci", "-device", "usb-kbd,bus=xhci.0"]
+    boot_image_config["efi_binary"] = "BOOTX64.EFI"
 else:
     if firmware_mode == "BIOS":
         sys.exit(f"Error: BIOS boot is not supported on target architecture {architecture}.")
-        
+    if firmware_mode != "UEFI":
+        sys.exit(f"Error: Unsupported firmware mode '{firmware_mode}'.")
+
     qemu_config["machine"] = ["-M", "virt"]
-    qemu_config["devices"] = ["-device", "ramfb", "-device", "qemu-xhci", "-device", "usb-kbd", "-device", "usb-mouse"]
-    qemu_config["firmware"] = ["-drive", f"if=pflash,unit=0,format=raw,file=binaries/ovmf-code-{architecture}.fd,readonly=on"]
-    
+    qemu_config["devices"] = ["-device", "ramfb", "-device", "qemu-xhci,id=xhci", "-device", "usb-kbd,bus=xhci.0"]
+    qemu_config["firmware"] = ["-drive", f"if=pflash,unit=0,format=raw,file={OVMF},readonly=on"]
+
     if architecture == "aarch64":
         qemu_config["cpu"] = ["-cpu", "cortex-a72"]
         boot_image_config["efi_binary"] = "BOOTAA64.EFI"
@@ -101,6 +98,8 @@ else:
     elif architecture == "loongarch64":
         qemu_config["cpu"] = ["-cpu", "la464"]
         boot_image_config["efi_binary"] = "BOOTLOONGARCH64.EFI"
+    else:
+        sys.exit(f"Error: Unsupported architecture '{architecture}'.")
 
 def verify_build_dependencies():
     required = [LIMINE, LIMINE_UEFI_CD]
@@ -316,6 +315,13 @@ def compile_userland_programs():
         cmd.extend(obj_list)
         return cmd
 
+    def stamp_windoge_abi(elf_path):
+        with open(elf_path, "r+b") as f:
+            if f.read(4) != b"\x7fELF":
+                raise RuntimeError(f"Output file is not a valid ELF binary: {elf_path}")
+            f.seek(7)
+            f.write(b"\x44")
+
     user_binaries = []
     system_binaries = []
 
@@ -335,7 +341,7 @@ def compile_userland_programs():
                 continue
 
             if os.path.isfile(item_path) and item.endswith((".c", ".cpp", ".cc", ".s", ".S", ".asm")):
-                prog_name = os.path.splitext(item)[0]
+                prog_name, _ = os.path.splitext(item)
                 obj_path = os.path.join(destination_dir, f"{prog_name}.o")
                 elf_path = os.path.join(destination_dir, prog_name)
 
@@ -354,6 +360,7 @@ def compile_userland_programs():
 
                 link_cmd = make_lld_cmd(elf_path, [obj_path])
                 run_command(link_cmd)
+                stamp_windoge_abi(elf_path)
                 target_list.append(elf_path)
                 print(f"[SUCCESS] Compiled program: {prog_name}")
 
@@ -394,18 +401,16 @@ def compile_userland_programs():
                 link_cmd = make_lld_cmd(elf_path, obj_files)
 
                 run_command(link_cmd)
+                stamp_windoge_abi(elf_path)
                 target_list.append(elf_path)
                 print(f"[SUCCESS] Compiled package: {prog_name}")
 
-    # Compile regular programs
     compile_items_in(programs_dir, out_dir, user_binaries, is_system_folder=False)
 
-    # Compile system programs from programs/system/
     sys_dir = os.path.join(programs_dir, "system")
     compile_items_in(sys_dir, sys_out_dir, system_binaries, is_system_folder=True)
 
     return user_binaries, system_binaries
-
 
 def cleanup_kernel_elf():
     if os.path.exists("kernel.elf"):
@@ -414,17 +419,18 @@ def cleanup_kernel_elf():
 def generate_hdd_image():
     obj_dir = compile_kernel_binary()
     user_binaries, system_binaries = compile_userland_programs()
-    
+
     img_target = f"{boot_image_config['name']}.img"
     print(f"Compiling structured dual-partition disk ({firmware_mode} mode): {img_target}")
-    
-    if os.path.exists(img_target): 
+
+    if os.path.exists(img_target):
         os.remove(img_target)
 
-    subprocess.run(["dd", "if=/dev/zero", "bs=1M", f"count={hdd_size_mib}", f"of={img_target}"], stdout=subprocess.DEVNULL, check=True)
-        
+    with open(img_target, "wb") as f:
+        f.truncate(hdd_size_mib * 1024 * 1024)
+
     system_environment = os.environ.copy()
-    system_environment["PATH"] = system_environment["PATH"] + ":/usr/sbin:/sbin"
+    system_environment["PATH"] = system_environment.get("PATH", "") + ":/usr/sbin:/sbin"
 
     partition_type_p1 = "ef00" if firmware_mode == "UEFI" else "8300"
     p2_start = 4096
@@ -439,51 +445,53 @@ def generate_hdd_image():
         "-n", f"2:{p2_start}:{p2_end}",
         "-t", "2:8300"
     ]
-    if firmware_mode == "BIOS":
-        sgdisk_command.extend(["-m", "1"])
+    sgdisk_command.extend(boot_image_config["sgdisk_mbr_flags"])
 
-    subprocess.run(sgdisk_command, env=system_environment, check=True)
-    
+    run_command(sgdisk_command, env=system_environment)
+
     if firmware_mode == "BIOS" and architecture == "x86_64" and os.path.exists(LIMINE):
-        subprocess.run([LIMINE, "bios-install", img_target], stdout=subprocess.DEVNULL, check=True)
+        run_command([LIMINE, "bios-install", img_target], env=system_environment)
 
-    boot_offset = 1048576
+    boot_offset = 2048 * 512
+    boot_size = (4095 - 2048 + 1) * 512
     esp_image = None
     if firmware_mode == "UEFI":
         esp_fd, esp_image = tempfile.mkstemp(prefix="windoge-esp-", suffix=".img")
         os.close(esp_fd)
         with open(esp_image, "wb") as esp_file:
-            esp_file.truncate(boot_offset)
+            esp_file.truncate(boot_size)
         boot_volume = esp_image
     else:
         boot_volume = f"{img_target}@@{boot_offset}"
 
     try:
-        subprocess.run(["mformat", "-i", boot_volume, "-v", "BOOT"], check=True)
-        subprocess.run(["mmd", "-i", boot_volume, "::/boot"], check=True)
-        subprocess.run(["mmd", "-i", boot_volume, "::/boot/limine"], check=True)
-        
-        if firmware_mode == "UEFI":
-            subprocess.run(["mmd", "-i", boot_volume, "::/EFI"], check=True)
-            subprocess.run(["mmd", "-i", boot_volume, "::/EFI/BOOT"], check=True)
+        run_command(["mformat", "-i", boot_volume, "-v", "BOOT"], env=system_environment)
+        run_command(["mmd", "-i", boot_volume, "::/boot"], env=system_environment)
+        run_command(["mmd", "-i", boot_volume, "::/boot/limine"], env=system_environment)
 
-        subprocess.run(["mcopy", "-i", boot_volume, "kernel.elf", "::/boot/kernel.elf"], check=True)
+        if firmware_mode == "UEFI":
+            run_command(["mmd", "-i", boot_volume, "::/EFI"], env=system_environment)
+            run_command(["mmd", "-i", boot_volume, "::/EFI/BOOT"], env=system_environment)
+
+        run_command(["mcopy", "-i", boot_volume, "kernel.elf", "::/boot/kernel.elf"], env=system_environment)
 
         if os.path.exists("limine.conf"):
-            subprocess.run(["mcopy", "-i", boot_volume, "limine.conf", "::/limine.conf"], check=True)
-            subprocess.run(["mcopy", "-i", boot_volume, "limine.conf", "::/boot/limine/limine.conf"], check=True)
+            run_command(["mcopy", "-i", boot_volume, "limine.conf", "::/limine.conf"], env=system_environment)
+            run_command(["mcopy", "-i", boot_volume, "limine.conf", "::/boot/limine/limine.conf"], env=system_environment)
 
         if firmware_mode == "BIOS" and architecture == "x86_64":
             if os.path.exists(LIMINE_BIOS_SYS):
-                subprocess.run(["mcopy", "-i", boot_volume, LIMINE_BIOS_SYS, "::/boot/limine/limine-bios.sys"], check=True)
+                run_command(["mcopy", "-i", boot_volume, LIMINE_BIOS_SYS, "::/boot/limine/limine-bios.sys"], env=system_environment)
         else:
-            uefi_bootloader = os.path.join("binaries", boot_image_config["efi_binary"]) if boot_image_config.get("efi_binary") else ""
+            efi_filename = boot_image_config.get("efi_binary")
+            uefi_bootloader = os.path.join(BIN_DIR, efi_filename) if efi_filename else ""
             if uefi_bootloader and os.path.exists(uefi_bootloader):
-                efi_filename = boot_image_config["efi_binary"]
-                subprocess.run(["mcopy", "-i", boot_volume, uefi_bootloader, f"::/EFI/BOOT/{efi_filename}"], check=True)
-            
-        if firmware_mode == "UEFI":
-            subprocess.run(["dd", f"if={esp_image}", f"of={img_target}", "bs=512", "seek=2048", "conv=notrunc"], stdout=subprocess.DEVNULL, check=True)
+                run_command(["mcopy", "-i", boot_volume, uefi_bootloader, f"::/EFI/BOOT/{efi_filename}"], env=system_environment)
+
+        if firmware_mode == "UEFI" and esp_image:
+            with open(esp_image, "rb") as src_f, open(img_target, "r+b") as dst_f:
+                dst_f.seek(boot_offset)
+                shutil.copyfileobj(src_f, dst_f)
     finally:
         if esp_image is not None and os.path.exists(esp_image):
             os.remove(esp_image)
@@ -491,66 +499,49 @@ def generate_hdd_image():
     p2_offset_bytes = p2_start * 512
     p2_bytes_count = (p2_end - p2_start + 1) * 512
 
-    mnt_dir = "/tmp/windoge_p2_mnt"
-    os.makedirs(mnt_dir, exist_ok=True)
+    mnt_dir = tempfile.mkdtemp(prefix="windoge_p2_mnt_")
 
     injected_programs = []
     injected_systems = []
-    
+
     loop_dev = subprocess.check_output(
-        f"sudo losetup -f --show -o {p2_offset_bytes} --sizelimit {p2_bytes_count} {img_target}", 
-        shell=True
-    ).decode().strip()
+        ["sudo", "losetup", "-f", "--show", "-o", str(p2_offset_bytes), "--sizelimit", str(p2_bytes_count), img_target],
+        text=True
+    ).strip()
 
     try:
-        subprocess.run(
-            [
-                "sudo",
-                "mkfs.exfat",
-                "-L",
-                "WINDOGEOS",
-                loop_dev
-            ],
-            check=True
-        )
-        subprocess.run(f"sudo mount {loop_dev} {mnt_dir}", shell=True, check=True)
+        run_command(["sudo", "mkfs.exfat", "-L", "WINDOGEOS", loop_dev], env=system_environment)
+        run_command(["sudo", "mount", loop_dev, mnt_dir], env=system_environment)
 
-        subprocess.run(["sudo", "mkdir", "-p", f"{mnt_dir}/programs"], check=True)
-        subprocess.run(["sudo", "mkdir", "-p", f"{mnt_dir}/system"], check=True)
-        subprocess.run(["sudo", "mkdir", "-p", f"{mnt_dir}/users"], check=True)
+        run_command(["sudo", "mkdir", "-p", f"{mnt_dir}/programs"], env=system_environment)
+        run_command(["sudo", "mkdir", "-p", f"{mnt_dir}/system"], env=system_environment)
+        run_command(["sudo", "mkdir", "-p", f"{mnt_dir}/users"], env=system_environment)
 
         for bin_path in user_binaries:
             if os.path.exists(bin_path):
                 prog_basename = os.path.basename(bin_path)
-                subprocess.run(["sudo", "cp", bin_path, f"{mnt_dir}/programs/"], check=True)
+                run_command(["sudo", "cp", bin_path, f"{mnt_dir}/programs/"], env=system_environment)
                 injected_programs.append(prog_basename)
 
         for bin_path in system_binaries:
             if os.path.exists(bin_path):
                 sys_basename = os.path.basename(bin_path)
-                subprocess.run(["sudo", "cp", bin_path, f"{mnt_dir}/system/"], check=True)
+                run_command(["sudo", "cp", bin_path, f"{mnt_dir}/system/"], env=system_environment)
                 injected_systems.append(sys_basename)
-                
+
         print("[Partition 2 /programs Contents]:")
-        subprocess.run(["sudo", "ls", "-la", f"{mnt_dir}/programs"], check=True)
+        run_command(["sudo", "ls", "-la", f"{mnt_dir}/programs"], env=system_environment)
         print("[Partition 2 /system Contents]:")
-        subprocess.run(["sudo", "ls", "-la", f"{mnt_dir}/system"], check=True)
+        run_command(["sudo", "ls", "-la", f"{mnt_dir}/system"], env=system_environment)
 
-        subprocess.run("sudo sync", shell=True, check=True)
+        run_command(["sudo", "sync"], env=system_environment)
     finally:
-        subprocess.run(f"sudo umount {mnt_dir}", shell=True, check=True)
-        subprocess.run(f"sudo losetup -d {loop_dev}", shell=True, check=True)
-
-    if os.path.exists(mnt_dir):
-        try:
-            os.rmdir(mnt_dir)
-        except OSError:
-            pass
+        subprocess.run(["sudo", "umount", mnt_dir], check=False)
+        subprocess.run(["sudo", "losetup", "-d", loop_dev], check=False)
+        if os.path.exists(mnt_dir):
+            shutil.rmtree(mnt_dir, ignore_errors=True)
 
     shutil.rmtree(obj_dir, ignore_errors=True)
-
-    cmd = "objdump -d kernel.elf | grep -C 5 \"7bb1\""
-    subprocess.run(cmd, shell=True)
 
     print("Things injected to /programs:")
     if injected_programs:
@@ -573,7 +564,7 @@ def execute_qemu_hdd():
     if not os.path.exists(img_target):
         print(f"Error: Disk image '{img_target}' not found. Build it first using: python compile.py all-img")
         sys.exit(1)
-        
+
     qemu_arguments = [
         f"qemu-system-{architecture}",
         "-audiodev", "pa,id=snd0",
@@ -584,32 +575,32 @@ def execute_qemu_hdd():
         "-serial", "stdio",
         "-d", "int,cpu_reset,mmu",
         "-D", "qemu.log",
-        "-device", "piix3-usb-uhci,id=uhci",
-        "-device", "usb-kbd,bus=uhci.0"
+        "-device", "qemu-xhci,id=xhci",
+        "-device", "usb-kbd,bus=xhci.0"
     ]
 
     if qemu_config.get("cpu"):
         qemu_arguments += qemu_config["cpu"]
-        
+
     config_devices = qemu_config.get("devices", [])
     i = 0
     while i < len(config_devices):
         item = config_devices[i]
         if item == "-device" and i + 1 < len(config_devices):
-            dev_val = config_devices[i+1]
+            dev_val = config_devices[i + 1]
             if any(x in dev_val for x in ["xhci", "uhci", "usb-kbd", "usb-mouse"]):
                 i += 2
                 continue
         qemu_arguments.append(item)
         i += 1
-        
+
     qemu_arguments += ["-m", qemu_config["memory"]]
-    
+
     if qemu_config.get("firmware"):
         qemu_arguments += qemu_config["firmware"]
-        
+
     print(f"[QEMU] Running command: {' '.join(qemu_arguments)}")
-    
+
     with open("windoge.log", "w") as log_file:
         process = subprocess.Popen(
             qemu_arguments,
@@ -618,7 +609,7 @@ def execute_qemu_hdd():
             bufsize=0
         )
         for line in process.stdout:
-            decoded_line = line.decode('utf-8', errors='replace')
+            decoded_line = line.decode("utf-8", errors="replace")
             sys.stdout.write(decoded_line)
             sys.stdout.flush()
             log_file.write(decoded_line)
@@ -635,3 +626,5 @@ if __name__ == "__main__":
         generate_hdd_image()
     elif requested_action in ["run", "run-img"]:
         execute_qemu_hdd()
+    else:
+        sys.exit(f"Error: Unknown action '{requested_action}'.")
