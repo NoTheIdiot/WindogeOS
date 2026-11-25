@@ -327,4 +327,12 @@ static inline int run(char* path) {
     return root_proc(PROC_RUN, path);
 }
 
+static inline void reboot(void) {
+    root_doge(DOGE_REBOOT);
+}
+
+static inline void shutdown(void) {
+    root_doge(DOGE_SHUTDOWN);
+}
+
 #endif

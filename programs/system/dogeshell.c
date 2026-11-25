@@ -429,6 +429,16 @@ int execute(int argc, char **argv) {
         return 0;
     }
 
+    if (strcmp(argv[0], "reboot") == 0) {
+        reboot();
+        return 0;
+    }
+
+    if (strcmp(argv[0], "shutdown") == 0) {
+        shutdown();
+        return 0;
+    }
+
     if (strcmp(argv[0], "beep") == 0) {
         if (argv[1] == NULL || argv[2] == NULL) {
             printf("Usage: beep <hz> <ms>\n");

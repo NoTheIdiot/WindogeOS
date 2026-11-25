@@ -486,4 +486,8 @@ int     user_add(const char *username, const char *password, uint8_t is_admin);
 int     user_remove(const char *username);
 int     user_passwd(const char *username, const char *new_password);
 
+// power acpi
+void reboot(void);
+void shutdown(void);
+
 #endif

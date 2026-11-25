@@ -300,6 +300,7 @@ void windoge(void) {
     user_add("wow", "wow", 1);
     if (!fs_exists(WINDOGE_CONFIG_PATH)) {
         create_account_setup();
+        reboot();
     } else {
         login_screen();
     }
@@ -308,8 +309,6 @@ void windoge(void) {
     load_default_shell_config(default_shell, sizeof(default_shell));
 
     clear();
-    fs_create("file");
-    run("/programs/test", 32768, 0, NULL);
     while (true) {
         run(default_shell, 32768, 0, NULL);
     }

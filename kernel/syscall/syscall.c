@@ -362,6 +362,16 @@ static inline uint64_t handle_doge(registers_t *regs) {
             return 0;
         }
 
+        case DOGE_REBOOT: {
+            reboot();
+            return 0;
+        }
+
+        case DOGE_SHUTDOWN: {
+            shutdown();
+            return 0;
+        }
+
         default: {
             return ERR_UNKNOWN_OPCODE;
         }

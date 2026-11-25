@@ -31,7 +31,9 @@ enum {
     DOGE_UPTIME   = 0x03,
     DOGE_GET_TIME = 0x04,
     DOGE_BEEP     = 0x05,
-    DOGE_RAND     = 0x06
+    DOGE_RAND     = 0x06,
+    DOGE_REBOOT   = 0x07,
+    DOGE_SHUTDOWN = 0x08
 };
 
 enum {
@@ -368,6 +370,17 @@ static inline uint64_t root_doge(uint32_t opcode, ...) {
             ret = syscall_2(DOGE, DOGE_RAND, (uint64_t)out);
             break;
         }
+
+        case DOGE_REBOOT: {
+            ret = syscall_1(DOGE, DOGE_REBOOT);
+            break;
+        }
+
+        case DOGE_SHUTDOWN: {
+            ret = syscall_1(DOGE, DOGE_SHUTDOWN);
+            break;
+        }
+
         default:
             break;
     }

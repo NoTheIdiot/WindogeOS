@@ -440,6 +440,10 @@ static void eval_line(char *line) {
     } else if (strcmp(argv[0], "help") == 0) {
         out_str(out, "Commands: ls, cd, pwd, mkdir, cat, head, tail, wc, echo, cp, mv, touch, rm, sh, clear, uptime, exit\n");
         out_str(out, "Supports quoted strings and '>' / '>>' output redirection.\n");
+    } else if (strcmp(argv[0], "reboot") == 0) {
+        reboot();
+    } else if (strcmp(argv[0], "shutdown") == 0) {
+        shutdown();
     } else {
         int64_t fsize = fs_size(argv[0]);
         if (fsize <= 0) {
