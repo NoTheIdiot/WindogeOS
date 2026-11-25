@@ -1,48 +1,66 @@
 #include <stdint.h>
 #include <stddef.h>
+#include <stdbool.h>
 #include <string.h>
 #include <dogeio.h>
 
-#define XHCI_MAX_SLOTS        32
-#define XHCI_RING_TRBS        64
-#define XHCI_MAX_PORTS        128
+#define XHCI_MAX_SLOTS          32
+#define XHCI_RING_TRBS          64
+#define XHCI_MAX_PORTS          128
+#define XHCI_SPIN_TIMEOUT       5000000U
 
-#define PCI_CLASS_SERIAL      0x0C
-#define PCI_SUBCLASS_USB      0x03
-#define PCI_PROGIF_XHCI       0x30
+#define PCI_CLASS_SERIAL        0x0C
+#define PCI_SUBCLASS_USB        0x03
+#define PCI_PROGIF_XHCI         0x30
 
 // USBCMD bits
-#define XHCI_CMD_RUN          (1U << 0)
-#define XHCI_CMD_HCRST        (1U << 1)
-#define XHCI_CMD_INTE         (1U << 2)
+#define XHCI_CMD_RUN            (1U << 0)
+#define XHCI_CMD_HCRST          (1U << 1)
+#define XHCI_CMD_INTE           (1U << 2)
 
 // USBSTS bits
-#define XHCI_STS_HCH          (1U << 0)
-#define XHCI_STS_CNR          (1U << 11)
-#define XHCI_STS_EINT         (1U << 3)
+#define XHCI_STS_HCH            (1U << 0)
+#define XHCI_STS_EINT           (1U << 3)
+#define XHCI_STS_CNR            (1U << 11)
 
 // PORTSC bits
-#define XHCI_PORTSC_CCS       (1U << 0)
-#define XHCI_PORTSC_PED       (1U << 1)
-#define XHCI_PORTSC_PR        (1U << 4)
-#define XHCI_PORTSC_PP        (1U << 9)
-#define XHCI_PORTSC_CSC       (1U << 17)
-#define XHCI_PORTSC_PRC       (1U << 21)
-#define XHCI_PORTSC_W1C_MASK  ((0x7FU << 17) | XHCI_PORTSC_PED)
+#define XHCI_PORTSC_CCS         (1U << 0)
+#define XHCI_PORTSC_PED         (1U << 1)
+#define XHCI_PORTSC_PR          (1U << 4)
+#define XHCI_PORTSC_PP          (1U << 9)
+#define XHCI_PORTSC_CSC         (1U << 17)
+#define XHCI_PORTSC_PEC         (1U << 18)
+#define XHCI_PORTSC_PRC         (1U << 21)
+#define XHCI_PORTSC_W1C_MASK    ((0x7FU << 17) | XHCI_PORTSC_PED)
 
 // TRB types
-#define TRB_TYPE_NORMAL           1
-#define TRB_TYPE_LINK             6
-#define TRB_TYPE_ENABLE_SLOT      9
-#define TRB_TYPE_ADDRESS_DEVICE   11
-#define TRB_TYPE_CONFIGURE_EP     12
-#define TRB_TYPE_TRANSFER_EVENT   32
-#define TRB_TYPE_CMD_COMPLETION   33
-#define TRB_TYPE_PORT_STATUS      34
+#define TRB_TYPE_NORMAL         1
+#define TRB_TYPE_LINK           6
+#define TRB_TYPE_ENABLE_SLOT    9
+#define TRB_TYPE_ADDRESS_DEVICE 11
+#define TRB_TYPE_CONFIGURE_EP   12
+#define TRB_TYPE_TRANSFER_EVENT 32
+#define TRB_TYPE_CMD_COMPLETION 33
+#define TRB_TYPE_PORT_STATUS    34
+
+#define TRB_LINK_TC             (1U << 1)
+#define TRB_TR_IOC              (1U << 5)
 
 // Completion codes
-#define TRB_CC_SUCCESS            1
-#define TRB_CC_SHORT_PACKET       13
+#define TRB_CC_SUCCESS          1
+#define TRB_CC_SHORT_PACKET     13
+
+#define USB_SPEED_FULL          1
+#define USB_SPEED_LOW           2
+#define USB_SPEED_HIGH          3
+#define USB_SPEED_SUPER         4
+
+#define HID_MOD_LCTRL           (1U << 0)
+#define HID_MOD_LSHIFT          (1U << 1)
+#define HID_MOD_LALT            (1U << 2)
+#define HID_MOD_RCTRL           (1U << 4)
+#define HID_MOD_RSHIFT          (1U << 5)
+#define HID_MOD_RALT            (1U << 6)
 
 // more DAMN TYPEDEF STRUCTS
 typedef struct __attribute__((packed)) {
@@ -68,8 +86,8 @@ typedef struct __attribute__((packed)) {
     uint32_t rsv1[4];
     uint64_t dcbaap;
     uint32_t config;
-    uint8_t  rsv2[0x3C4];
-    uint32_t portsc[XHCI_MAX_PORTS * 4];
+    uint8_t  rsv2[0x3F4];
+    uint32_t portsc[XHCI_MAX_PORTS];
 } xhci_op_regs_t;
 
 typedef struct __attribute__((packed)) {
@@ -148,7 +166,8 @@ static uint64_t *g_dcbaa_phys_tbl = NULL;
 static uint64_t  g_dcbaa_phys = 0;
 
 static xhci_ring_t g_cmd_ring;
-static xhci_ring_t g_ep1_ring;
+static xhci_ring_t g_ep0_ring;
+static xhci_ring_t g_ep1_in_ring;
 
 static xhci_trb_t *g_ev_ring = NULL;
 static uint64_t    g_ev_ring_phys = 0;
@@ -162,6 +181,7 @@ static uint8_t   g_kbd_slot = 0;
 static uint8_t  *g_kbd_report_virt = NULL;
 static uint64_t  g_kbd_report_phys = 0;
 static uint8_t   g_prev_keys[6];
+static bool      g_caps_lock = false;
 
 // read and write xhci controller
 static inline uint32_t xhci_r32(uintptr_t addr) {
@@ -177,57 +197,61 @@ static inline void xhci_w64(uintptr_t addr, uint64_t val) {
     *(volatile uint32_t *)(addr + 4) = (uint32_t)(val >> 32);
 }
 
+static inline uintptr_t xhci_portsc_addr(uint8_t port_idx) {
+    uintptr_t op_base = (uintptr_t)g_op;
+    return op_base + 0x400U + ((uintptr_t)port_idx * 0x10U);
+}
+
 static void *alloc_zero_page(uint64_t *out_phys) {
     uint64_t phys = alloc_page();
+    if (!phys) return NULL;
+
     void *virt = map_kernel_mmio(phys, PAGE_SIZE);
-    if (!virt) {
-        return NULL;
-    }
+    if (!virt) return NULL;
+
     memset(virt, 0, PAGE_SIZE);
-    if (out_phys) {
-        *out_phys = phys;
-    }
+    if (out_phys) *out_phys = phys;
     return virt;
 }
 
-static int ring_init(xhci_ring_t *ring, uint8_t is_cmd_ring) {
+static int ring_init(xhci_ring_t *ring) {
     ring->trbs = (xhci_trb_t *)alloc_zero_page(&ring->phys);
-    if (!ring->trbs) {
-        return -1;
-    }
+    if (!ring->trbs) return -1;
+
     ring->enqueue = 0;
     ring->cycle = 1;
 
     xhci_trb_t *link = &ring->trbs[XHCI_RING_TRBS - 1];
     link->param = ring->phys;
     link->status = 0;
-    link->control = (TRB_TYPE_LINK << 10) | (1U << 1);
-    (void)is_cmd_ring;
+    link->control = (TRB_TYPE_LINK << 10) | TRB_LINK_TC;
     return 0;
 }
 
-static void ring_enqueue(xhci_ring_t *ring, uint64_t param, uint32_t status, uint32_t trb_type, uint32_t extra_ctrl) {
+static void ring_wrap_if_needed(xhci_ring_t *ring) {
     if (ring->enqueue == XHCI_RING_TRBS - 1) {
         xhci_trb_t *link = &ring->trbs[XHCI_RING_TRBS - 1];
-        uint32_t lctrl = (TRB_TYPE_LINK << 10) | (1U << 1) | (ring->cycle & 1U);
-        link->control = lctrl;
+        link->param = ring->phys;
+        link->status = 0;
+        link->control = (TRB_TYPE_LINK << 10) | TRB_LINK_TC | (ring->cycle & 1U);
         ring->enqueue = 0;
         ring->cycle ^= 1U;
     }
+}
+
+static void ring_enqueue(xhci_ring_t *ring, uint64_t param, uint32_t status, uint32_t trb_type, uint32_t extra_ctrl) {
+    ring_wrap_if_needed(ring);
 
     xhci_trb_t *trb = &ring->trbs[ring->enqueue];
     trb->param = param;
     trb->status = status;
-    trb->control = (trb_type << 10) | extra_ctrl | (ring->cycle & 1U);
+    uint32_t ctrl = (trb_type << 10) | (extra_ctrl & ~1U);
+    trb->control = ctrl;
+    __asm__ volatile("" ::: "memory");
+    trb->control = ctrl | (ring->cycle & 1U);
 
     ring->enqueue++;
-    if (ring->enqueue == XHCI_RING_TRBS - 1) {
-        xhci_trb_t *link = &ring->trbs[XHCI_RING_TRBS - 1];
-        uint32_t lctrl = (TRB_TYPE_LINK << 10) | (1U << 1) | (ring->cycle & 1U);
-        link->control = lctrl;
-        ring->enqueue = 0;
-        ring->cycle ^= 1U;
-    }
+    ring_wrap_if_needed(ring);
 }
 
 static void ring_cmd(uint64_t param, uint32_t status, uint32_t trb_type, uint32_t extra_ctrl) {
@@ -235,11 +259,15 @@ static void ring_cmd(uint64_t param, uint32_t status, uint32_t trb_type, uint32_
     xhci_w32((uintptr_t)&g_db[0], 0);
 }
 
+static void update_erdp(void) {
+    uint64_t deq_phys = g_ev_ring_phys + ((uint64_t)g_ev_dequeue * sizeof(xhci_trb_t));
+    xhci_w64((uintptr_t)&g_rt->ir[0].erdp, deq_phys | (1ULL << 3));
+}
+
 static int wait_cmd_completion(uint8_t *out_slot, uint8_t *out_cc) {
-    for (uint32_t spin = 0; spin < 5000000U; spin++) {
+    for (uint32_t spin = 0; spin < XHCI_SPIN_TIMEOUT; spin++) {
         xhci_trb_t *ev = &g_ev_ring[g_ev_dequeue];
-        uint8_t cycle = ev->control & 1U;
-        if (cycle != g_ev_cycle) {
+        if ((ev->control & 1U) != g_ev_cycle) {
             continue;
         }
 
@@ -252,7 +280,7 @@ static int wait_cmd_completion(uint8_t *out_slot, uint8_t *out_cc) {
             g_ev_dequeue = 0;
             g_ev_cycle ^= 1U;
         }
-        xhci_w64((uintptr_t)&g_rt->ir[0].erdp, (g_ev_ring_phys + (g_ev_dequeue * sizeof(xhci_trb_t))) | (1ULL << 3));
+        update_erdp();
 
         if (type == TRB_TYPE_CMD_COMPLETION) {
             if (out_slot) *out_slot = slot_id;
@@ -265,24 +293,30 @@ static int wait_cmd_completion(uint8_t *out_slot, uint8_t *out_cc) {
 
 static uint32_t usb_speed_to_mps(uint32_t speed) {
     switch (speed) {
-        case 1: return 8;   // Full-speed
-        case 2: return 8;   // Low-speed
-        case 3: return 64;  // High-speed
-        case 4: return 512; // SuperSpeed
-        default: return 8;
+        case USB_SPEED_LOW:   return 8;
+        case USB_SPEED_FULL:  return 8;
+        case USB_SPEED_HIGH:  return 64;
+        case USB_SPEED_SUPER: return 512;
+        default:              return 8;
     }
 }
 
+static void queue_kbd_interrupt_in(void) {
+    memset(g_kbd_report_virt, 0, 8);
+    ring_enqueue(&g_ep1_in_ring, g_kbd_report_phys, 8U, TRB_TYPE_NORMAL, TRB_TR_IOC);
+    xhci_w32((uintptr_t)&g_db[g_kbd_slot], 3U);
+}
+
 static int setup_usb_keyboard(uint8_t port_idx) {
-    uintptr_t portsc_addr = (uintptr_t)&g_op->portsc[port_idx * 4];
-    uint32_t portsc = xhci_r32(portsc_addr);
+    uint32_t portsc = xhci_r32(xhci_portsc_addr(port_idx));
     uint32_t speed = (portsc >> 10) & 0x0FU;
+    if (speed == 0) speed = USB_SPEED_FULL;
     uint32_t mps = usb_speed_to_mps(speed);
 
     uint8_t slot_id = 0, cc = 0;
     ring_cmd(0, 0, TRB_TYPE_ENABLE_SLOT, 0);
-    if (wait_cmd_completion(&slot_id, &cc) != 0 || slot_id == 0) {
-        sprintf("[xHCI] Enable Slot failed (cc=%u)\n", cc);
+    if (wait_cmd_completion(&slot_id, &cc) != 0 || slot_id == 0 || slot_id > g_max_slots) {
+        sprintf("[xHCI] Enable Slot failed (slot=%u, cc=%u)\n", slot_id, cc);
         return -1;
     }
 
@@ -291,9 +325,7 @@ static int setup_usb_keyboard(uint8_t port_idx) {
     if (!dev_ctx) return -1;
     g_dcbaa_phys_tbl[slot_id] = dev_ctx_phys;
 
-    uint64_t ep0_ring_phys = 0;
-    xhci_trb_t *ep0_ring = (xhci_trb_t *)alloc_zero_page(&ep0_ring_phys);
-    if (!ep0_ring) return -1;
+    if (ring_init(&g_ep0_ring) != 0) return -1;
 
     uint64_t in_ctx_phys = 0;
     xhci_input_ctx_t *in_ctx = (xhci_input_ctx_t *)alloc_zero_page(&in_ctx_phys);
@@ -303,8 +335,9 @@ static int setup_usb_keyboard(uint8_t port_idx) {
     in_ctx->ctrl.add_flags = (1U << 0) | (1U << 1);
     in_ctx->slot.info1 = (1U << 27) | (speed << 20);
     in_ctx->slot.info2 = ((uint32_t)(port_idx + 1) << 16);
-    in_ctx->ep[0].ep_info = (3U << 1) | (mps << 16);
-    in_ctx->ep[0].tr_dequeue = ep0_ring_phys | 1ULL;
+    in_ctx->ep[0].ep_info = (mps << 16) | (4U << 3) | (3U << 1);
+    in_ctx->ep[0].tr_dequeue = g_ep0_ring.phys | 1ULL;
+    in_ctx->ep[0].tx_len = mps;
 
     ring_cmd(in_ctx_phys, 0, TRB_TYPE_ADDRESS_DEVICE, (uint32_t)slot_id << 24);
     if (wait_cmd_completion(NULL, &cc) != 0) {
@@ -312,17 +345,17 @@ static int setup_usb_keyboard(uint8_t port_idx) {
         return -1;
     }
 
-    if (ring_init(&g_ep1_ring, 0) != 0) {
-        return -1;
-    }
+    if (ring_init(&g_ep1_in_ring) != 0) return -1;
 
     memset(in_ctx, 0, sizeof(*in_ctx));
     in_ctx->ctrl.add_flags = (1U << 0) | (1U << 3);
     in_ctx->slot.info1 = (3U << 27) | (speed << 20);
     in_ctx->slot.info2 = ((uint32_t)(port_idx + 1) << 16);
-    in_ctx->ep[2].ep_info = (10U << 16) | (6U << 3) | (3U << 1);
-    in_ctx->ep[2].tr_dequeue = g_ep1_ring.phys | 1ULL;
-    in_ctx->ep[2].tx_len = 8;
+
+    uint32_t interval = (speed == USB_SPEED_HIGH || speed == USB_SPEED_SUPER) ? 6U : 3U;
+    in_ctx->ep[2].ep_info = (interval << 16) | (8U << 16) | (7U << 3) | (3U << 1);
+    in_ctx->ep[2].tr_dequeue = g_ep1_in_ring.phys | 1ULL;
+    in_ctx->ep[2].tx_len = 8U;
 
     ring_cmd(in_ctx_phys, 0, TRB_TYPE_CONFIGURE_EP, (uint32_t)slot_id << 24);
     if (wait_cmd_completion(NULL, &cc) != 0) {
@@ -333,13 +366,15 @@ static int setup_usb_keyboard(uint8_t port_idx) {
     g_kbd_report_virt = (uint8_t *)alloc_zero_page(&g_kbd_report_phys);
     if (!g_kbd_report_virt) return -1;
 
+    memset(g_prev_keys, 0, sizeof(g_prev_keys));
+    g_caps_lock = false;
     g_kbd_slot = slot_id;
-    ring_enqueue(&g_ep1_ring, g_kbd_report_phys, 8, TRB_TYPE_NORMAL, (1U << 5));
-    xhci_w32((uintptr_t)&g_db[slot_id], 3);
+
+    queue_kbd_interrupt_in();
     return 0;
 }
 
-static char hid_usage_to_ascii(uint8_t usage, uint8_t shift) {
+static char hid_usage_to_ascii(uint8_t usage, bool shift, bool caps) {
     static const char lower[128] = {
         [0x04] = 'a', [0x05] = 'b', [0x06] = 'c', [0x07] = 'd', [0x08] = 'e', [0x09] = 'f',
         [0x0A] = 'g', [0x0B] = 'h', [0x0C] = 'i', [0x0D] = 'j', [0x0E] = 'k', [0x0F] = 'l',
@@ -364,7 +399,14 @@ static char hid_usage_to_ascii(uint8_t usage, uint8_t shift) {
         [0x2D] = '_', [0x2E] = '+', [0x2F] = '{', [0x30] = '}', [0x31] = '|',
         [0x33] = ':', [0x34] = '"', [0x35] = '~', [0x36] = '<', [0x37] = '>', [0x38] = '?'
     };
+
     if (usage >= 128) return 0;
+
+    bool is_alpha = (usage >= 0x04 && usage <= 0x1D);
+    if (is_alpha) {
+        bool effective_upper = shift ^ caps;
+        return effective_upper ? upper[usage] : lower[usage];
+    }
     return shift ? upper[usage] : lower[usage];
 }
 
@@ -388,32 +430,36 @@ char get_key(void) {
             g_ev_dequeue = 0;
             g_ev_cycle ^= 1U;
         }
-        xhci_w64((uintptr_t)&g_rt->ir[0].erdp, (g_ev_ring_phys + (g_ev_dequeue * sizeof(xhci_trb_t))) | (1ULL << 3));
+        update_erdp();
 
-        if (type == TRB_TYPE_TRANSFER_EVENT && slot_id == g_kbd_slot && out_char == 0) {
+        if (type == TRB_TYPE_TRANSFER_EVENT && slot_id == g_kbd_slot) {
             uint8_t mods = g_kbd_report_virt[0];
-            uint8_t shift = (mods & ((1U << 1) | (1U << 5))) ? 1 : 0;
+            bool shift = (mods & (HID_MOD_LSHIFT | HID_MOD_RSHIFT)) != 0;
 
             for (int i = 2; i < 8; i++) {
                 uint8_t key = g_kbd_report_virt[i];
                 if (key == 0 || key == 1) continue;
 
-                uint8_t was_pressed = 0;
+                bool was_pressed = false;
                 for (int p = 0; p < 6; p++) {
                     if (g_prev_keys[p] == key) {
-                        was_pressed = 1;
+                        was_pressed = true;
                         break;
                     }
                 }
+
                 if (!was_pressed) {
-                    char c = hid_usage_to_ascii(key, shift);
-                    if (c) out_char = c;
+                    if (key == 0x39) {
+                        g_caps_lock = !g_caps_lock;
+                    } else if (out_char == 0) {
+                        char c = hid_usage_to_ascii(key, shift, g_caps_lock);
+                        if (c) out_char = c;
+                    }
                 }
             }
             memcpy(g_prev_keys, &g_kbd_report_virt[2], 6);
 
-            ring_enqueue(&g_ep1_ring, g_kbd_report_phys, 8, TRB_TYPE_NORMAL, (1U << 5));
-            xhci_w32((uintptr_t)&g_db[g_kbd_slot], 3);
+            queue_kbd_interrupt_in();
         }
     }
 
@@ -430,6 +476,8 @@ size_t input_masked(const char *prompt, char *buf, size_t len, bool mask) {
     size_t idx = 0;
     while (1) {
         char c = get_key();
+        if (!c) continue;
+
         if (c == '\r' || c == '\n') {
             putchar('\n');
             buf[idx] = '\0';
@@ -453,12 +501,11 @@ size_t input(const char *prompt, char *buf, size_t len) {
 
 void wait_for_next(void) {
     while (true) {
-        if (get_key() != NULL) {
+        if (get_key() != 0) {
             break;
         }
     }
 }
-
 
 static bool find_xhci_pci(uint8_t *out_bus, uint8_t *out_slot, uint8_t *out_func, uint64_t *out_bar0) {
     for (uint16_t bus = 0; bus < 256; bus++) {
@@ -496,6 +543,20 @@ static bool find_xhci_pci(uint8_t *out_bus, uint8_t *out_slot, uint8_t *out_func
     return false;
 }
 
+static int wait_mmio_clear(uintptr_t addr, uint32_t mask) {
+    for (uint32_t i = 0; i < XHCI_SPIN_TIMEOUT; i++) {
+        if (!(xhci_r32(addr) & mask)) return 0;
+    }
+    return -1;
+}
+
+static int wait_mmio_set(uintptr_t addr, uint32_t mask) {
+    for (uint32_t i = 0; i < XHCI_SPIN_TIMEOUT; i++) {
+        if (xhci_r32(addr) & mask) return 0;
+    }
+    return -1;
+}
+
 int init_keyboard(void) {
     uint8_t bus = 0, slot = 0, func = 0;
     uint64_t bar0_phys = 0;
@@ -512,12 +573,24 @@ int init_keyboard(void) {
         return -1;
     }
 
-    xhci_cap_regs_t *cap = (xhci_cap_regs_t *)mmio_base;
-    uintptr_t cap_base = (uintptr_t)cap;
+    uintptr_t cap_base = (uintptr_t)mmio_base;
     uint8_t caplen = *(volatile uint8_t *)cap_base;
     uint32_t hcs1 = xhci_r32(cap_base + offsetof(xhci_cap_regs_t, hcsparams1));
     uint32_t dboff = xhci_r32(cap_base + offsetof(xhci_cap_regs_t, dboff)) & ~0x3U;
     uint32_t rtsoff = xhci_r32(cap_base + offsetof(xhci_cap_regs_t, rtsoff)) & ~0x1FU;
+
+    size_t needed_end = (size_t)rtsoff + sizeof(xhci_rt_regs_t);
+    size_t db_end = (size_t)dboff + (XHCI_MAX_SLOTS * sizeof(uint32_t));
+    if (db_end > needed_end) needed_end = db_end;
+    if (needed_end > PAGE_SIZE * 4) {
+        size_t pages = (needed_end + PAGE_SIZE - 1) / PAGE_SIZE;
+        void *remap = map_kernel_mmio(bar0_phys, PAGE_SIZE * pages);
+        if (!remap) {
+            sprintf("[xHCI] Failed to map full MMIO range.\n");
+            return -1;
+        }
+        cap_base = (uintptr_t)remap;
+    }
 
     g_max_slots = (uint8_t)(hcs1 & 0xFFU);
     if (g_max_slots > XHCI_MAX_SLOTS) g_max_slots = XHCI_MAX_SLOTS;
@@ -534,16 +607,22 @@ int init_keyboard(void) {
     // Halt and reset controller
     xhci_w32(op_base + offsetof(xhci_op_regs_t, usbcmd),
              xhci_r32(op_base + offsetof(xhci_op_regs_t, usbcmd)) & ~XHCI_CMD_RUN);
-    while (!(xhci_r32(op_base + offsetof(xhci_op_regs_t, usbsts)) & XHCI_STS_HCH)) {}
+    if (wait_mmio_set(op_base + offsetof(xhci_op_regs_t, usbsts), XHCI_STS_HCH) != 0) {
+        sprintf("[xHCI] Timeout halting controller.\n");
+        return -1;
+    }
 
     xhci_w32(op_base + offsetof(xhci_op_regs_t, usbcmd),
              xhci_r32(op_base + offsetof(xhci_op_regs_t, usbcmd)) | XHCI_CMD_HCRST);
-    while (xhci_r32(op_base + offsetof(xhci_op_regs_t, usbcmd)) & XHCI_CMD_HCRST) {}
-    while (xhci_r32(op_base + offsetof(xhci_op_regs_t, usbsts)) & XHCI_STS_CNR) {}
+    if (wait_mmio_clear(op_base + offsetof(xhci_op_regs_t, usbcmd), XHCI_CMD_HCRST) != 0 ||
+        wait_mmio_clear(op_base + offsetof(xhci_op_regs_t, usbsts), XHCI_STS_CNR) != 0) {
+        sprintf("[xHCI] Timeout resetting controller.\n");
+        return -1;
+    }
 
     // configure controller
     g_dcbaa_phys_tbl = (uint64_t *)alloc_zero_page(&g_dcbaa_phys);
-    if (!g_dcbaa_phys_tbl || ring_init(&g_cmd_ring, 1) != 0) {
+    if (!g_dcbaa_phys_tbl || ring_init(&g_cmd_ring) != 0) {
         return -1;
     }
 
@@ -564,28 +643,34 @@ int init_keyboard(void) {
 
     xhci_w32(rt_base + offsetof(xhci_rt_regs_t, ir[0].erstsz), 1);
     xhci_w64(rt_base + offsetof(xhci_rt_regs_t, ir[0].erstba), g_erst_phys);
-    xhci_w64(rt_base + offsetof(xhci_rt_regs_t, ir[0].erdp), g_ev_ring_phys | (1ULL << 3));
+    update_erdp();
     xhci_w32(rt_base + offsetof(xhci_rt_regs_t, ir[0].iman),
              xhci_r32(rt_base + offsetof(xhci_rt_regs_t, ir[0].iman)) | (1U << 1));
 
     xhci_w32(op_base + offsetof(xhci_op_regs_t, usbcmd),
              xhci_r32(op_base + offsetof(xhci_op_regs_t, usbcmd)) | XHCI_CMD_RUN | XHCI_CMD_INTE);
-    while (xhci_r32(op_base + offsetof(xhci_op_regs_t, usbsts)) & XHCI_STS_HCH) {}
+    if (wait_mmio_clear(op_base + offsetof(xhci_op_regs_t, usbsts), XHCI_STS_HCH) != 0) {
+        sprintf("[xHCI] Timeout starting controller.\n");
+        return -1;
+    }
 
     // Reset connected ports and bind the first USB keyboard found
     for (uint8_t p = 0; p < g_max_ports; p++) {
-        uintptr_t portsc_addr = (uintptr_t)&g_op->portsc[p * 4];
-        uint32_t val = xhci_r32(portsc_addr);
+        uintptr_t p_addr = xhci_portsc_addr(p);
+        uint32_t val = xhci_r32(p_addr);
+
         if (!(val & XHCI_PORTSC_PP)) {
-            xhci_w32(portsc_addr, (val & ~XHCI_PORTSC_W1C_MASK) | XHCI_PORTSC_PP);
-            val = xhci_r32(portsc_addr);
+            xhci_w32(p_addr, (val & ~XHCI_PORTSC_W1C_MASK) | XHCI_PORTSC_PP);
+            val = xhci_r32(p_addr);
         }
+
         if (val & XHCI_PORTSC_CCS) {
-            xhci_w32(portsc_addr, (val & ~XHCI_PORTSC_W1C_MASK) | XHCI_PORTSC_PR);
-            for (volatile uint32_t d = 0; d < 2000000U; d++) {
-                if (xhci_r32(portsc_addr) & XHCI_PORTSC_PED) break;
-            }
-            if ((xhci_r32(portsc_addr) & XHCI_PORTSC_PED) && setup_usb_keyboard(p) == 0) {
+            xhci_w32(p_addr, (val & ~XHCI_PORTSC_W1C_MASK) | XHCI_PORTSC_PR);
+            wait_mmio_set(p_addr, XHCI_PORTSC_PRC);
+            val = xhci_r32(p_addr);
+            xhci_w32(p_addr, (val & ~XHCI_PORTSC_W1C_MASK) | XHCI_PORTSC_PRC | XHCI_PORTSC_CSC | XHCI_PORTSC_PEC);
+
+            if ((xhci_r32(p_addr) & XHCI_PORTSC_PED) && setup_usb_keyboard(p) == 0) {
                 sprintf("[xHCI] Keyboard active on port %u (slot %u).\n", p + 1, g_kbd_slot);
                 return 0;
             }
