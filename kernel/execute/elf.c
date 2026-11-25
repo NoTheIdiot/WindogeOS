@@ -6,6 +6,16 @@
 
 extern void to_userland_ring3(uint64_t entry, uint64_t stack_top);
 #define ELF_SCRATCH_VBASE 0xFFFF900000000000ULL
+#define MAX_SAVED_PAGES   256
+
+typedef struct {
+    uint64_t vaddr;
+    uint64_t phys;
+    uint8_t  data[PAGE_SIZE];
+} saved_page_t;
+
+static saved_page_t g_saved_pages[MAX_SAVED_PAGES];
+static size_t g_saved_page_count = 0;
 
 const char *elf_error_messages[] = {
     "ELF_OK",
@@ -36,7 +46,10 @@ static void copy_mem(void* dst, const void* src, size_t n) {
     for (size_t i = 0; i < n; i++) d[i] = s[i];
 }
 
-// validate if it's even good enough for running
+static inline void flush_tlb_page(uint64_t vaddr) {
+    __asm__ volatile ("invlpg (%0)" : : "r"(vaddr) : "memory");
+}
+
 #ifndef USER_ADDR_MAX
 #define USER_ADDR_MAX 0x0000800000000000ULL
 #endif
@@ -49,9 +62,59 @@ static int add_overflow_u64(uint64_t a, uint64_t b, uint64_t* out) {
     return 0;
 }
 
+static void backup_range(uint64_t start, uint64_t end) {
+    for (uint64_t vaddr = start; vaddr < end; vaddr += PAGE_SIZE) {
+        if (g_saved_page_count >= MAX_SAVED_PAGES) {
+            sprintf("[ELF] WARNING: backup page limit (%d) reached at 0x%llx\n",
+                    MAX_SAVED_PAGES, vaddr);
+            break;
+        }
+
+        uintptr_t phys = unmap_page(vaddr);
+        flush_tlb_page(vaddr);
+        if (!phys) {
+            continue;
+        }
+
+        saved_page_t* slot = &g_saved_pages[g_saved_page_count++];
+        slot->vaddr = vaddr;
+        slot->phys = (uint64_t)phys;
+
+        uintptr_t tmp_va = ELF_SCRATCH_VBASE + ((MAX_SAVED_PAGES + 16ULL) * PAGE_SIZE);
+        if (map_page(tmp_va, phys, PAGE_PRESENT | PAGE_WRITABLE)) {
+            flush_tlb_page(tmp_va);
+            copy_mem(slot->data, (const void*)tmp_va, PAGE_SIZE);
+            unmap_page(tmp_va);
+            flush_tlb_page(tmp_va);
+        } else {
+            zero_mem(slot->data, PAGE_SIZE);
+        }
+    }
+}
+
+static void restore_backed_up_pages(void) {
+    for (size_t i = 0; i < g_saved_page_count; i++) {
+        saved_page_t* slot = &g_saved_pages[i];
+        uintptr_t existing = unmap_page(slot->vaddr);
+        if (existing) {
+            free_page(existing);
+        }
+
+        uint64_t flags = PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
+        if (map_page(slot->vaddr, slot->phys, flags)) {
+            flush_tlb_page(slot->vaddr);
+            copy_mem((void*)slot->vaddr, slot->data, PAGE_SIZE);
+        } else {
+            free_page(slot->phys);
+        }
+    }
+    g_saved_page_count = 0;
+}
+
 static void unmap_range(uint64_t start, uint64_t end) {
     for (uint64_t vaddr = start; vaddr < end; vaddr += PAGE_SIZE) {
         uintptr_t phys = unmap_page(vaddr);
+        flush_tlb_page(vaddr);
         if (phys) {
             free_page(phys);
         }
@@ -69,6 +132,8 @@ void program_unload(elf_process_t* proc) {
         uint64_t stack_bottom = proc->stack_top - (USER_STACK_PAGES * PAGE_SIZE);
         unmap_range(stack_bottom, proc->stack_top);
     }
+
+    restore_backed_up_pages();
 }
 
 status validate(const uint8_t* file_buf, size_t file_size, uint8_t* out) {
@@ -137,6 +202,7 @@ status program_load(const uint8_t* file_buf, size_t file_size, elf_process_t* ou
     out_proc->entry = ehdr->e_entry;
     out_proc->min_vaddr = ~0ULL;
     out_proc->max_vaddr = 0;
+    g_saved_page_count = 0;
 
     for (uint16_t i = 0; i < ehdr->e_phnum; i++) {
         const Elf64_Phdr* phdr = &phdrs[i];
@@ -162,6 +228,8 @@ status program_load(const uint8_t* file_buf, size_t file_size, elf_process_t* ou
         if (seg_start < out_proc->min_vaddr) out_proc->min_vaddr = seg_start;
         if (seg_end   > out_proc->max_vaddr) out_proc->max_vaddr = seg_end;
 
+        backup_range(seg_start, seg_end);
+
         for (uint64_t vaddr = seg_start; vaddr < seg_end; vaddr += PAGE_SIZE) {
             uint64_t phys = alloc_page();
             if (!phys) {
@@ -174,6 +242,7 @@ status program_load(const uint8_t* file_buf, size_t file_size, elf_process_t* ou
                 program_unload(out_proc);
                 return ELF_INVALID_PROGRAM_HEADER_OFFSET;
             }
+            flush_tlb_page(vaddr);
         }
 
         zero_mem((void*)seg_start, (size_t)(seg_end - seg_start));
@@ -188,15 +257,19 @@ status program_load(const uint8_t* file_buf, size_t file_size, elf_process_t* ou
 
         for (uint64_t vaddr = seg_start; vaddr < seg_end; vaddr += PAGE_SIZE) {
             uintptr_t phys = unmap_page(vaddr);
+            flush_tlb_page(vaddr);
             if (!phys || !map_page(vaddr, phys, final_flags)) {
                 if (phys) free_page(phys);
                 program_unload(out_proc);
                 return ELF_INVALID_PROGRAM_HEADER_OFFSET;
             }
+            flush_tlb_page(vaddr);
         }
     }
 
     uint64_t stack_bottom = USER_STACK_TOP - (USER_STACK_PAGES * PAGE_SIZE);
+    backup_range(stack_bottom, USER_STACK_TOP);
+
     for (uint64_t vaddr = stack_bottom; vaddr < USER_STACK_TOP; vaddr += PAGE_SIZE) {
         uint64_t phys = alloc_page();
         if (!phys) {
@@ -209,6 +282,7 @@ status program_load(const uint8_t* file_buf, size_t file_size, elf_process_t* ou
             program_unload(out_proc);
             return ELF_INVALID_PROGRAM_HEADER_OFFSET;
         }
+        flush_tlb_page(vaddr);
     }
 
     zero_mem((void*)stack_bottom, USER_STACK_PAGES * PAGE_SIZE);
@@ -221,7 +295,9 @@ status program_load(const uint8_t* file_buf, size_t file_size, elf_process_t* ou
 
 static void free_scratch_buffer(uintptr_t vbase, size_t num_pages) {
     for (size_t i = 0; i < num_pages; i++) {
-        uintptr_t phys = unmap_page(vbase + (i * PAGE_SIZE));
+        uint64_t va = vbase + (i * PAGE_SIZE);
+        uintptr_t phys = unmap_page(va);
+        flush_tlb_page(va);
         if (phys) {
             free_page(phys);
         }
@@ -248,12 +324,14 @@ static status load_file_to_scratch(char* filename, size_t file_size, uint8_t** o
             return ELF_INVALID_PROGRAM_HEADER_OFFSET;
         }
 
-        if (!map_page(ELF_SCRATCH_VBASE + (i * PAGE_SIZE), phys, PAGE_PRESENT | PAGE_WRITABLE)) {
+        uint64_t va = ELF_SCRATCH_VBASE + (i * PAGE_SIZE);
+        if (!map_page(va, phys, PAGE_PRESENT | PAGE_WRITABLE)) {
             free_page(phys);
             sprintf("[ELF] Failed to map scratch page\n");
             free_scratch_buffer(ELF_SCRATCH_VBASE, i);
             return ELF_INVALID_PROGRAM_HEADER_OFFSET;
         }
+        flush_tlb_page(va);
     }
 
     uint8_t* file_buf = (uint8_t*)ELF_SCRATCH_VBASE;

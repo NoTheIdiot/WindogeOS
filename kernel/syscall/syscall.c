@@ -87,8 +87,6 @@ typedef struct {
 
 static uint8_t syscall_stack[65536] __attribute__((aligned(16)));
 per_cpu_data_t bsp_cpu_data;
-uint64_t kernel_program_launcher_rsp = 0;
-uint64_t kernel_program_launcher_rflags = 0;
 static bool cpu_supports_nx;
 static bool cpu_supports_rdrand;
 

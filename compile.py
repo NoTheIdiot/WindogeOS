@@ -20,7 +20,7 @@ hdd_size_mib = 6
 BOOT_PARTITION_SIZE_MIB = 1
 
 qemu_config = {
-    "memory": "4M",
+    "memory": "5M",
     "machine": [],
     "cpu": [],
     "devices": [
