@@ -65,6 +65,197 @@ static void free_user_table_level(uintptr_t table_phys, int level) {
     free_page(table_phys);
 }
 
+uintptr_t create_pml4(void)
+{
+    uintptr_t phys = alloc_page();
+
+    if (!phys)
+        return 0;
+
+    uint64_t *new_pml4 =
+        (uint64_t *)(phys + hhdm_offset);
+
+    uint64_t *kernel_pml4 =
+        (uint64_t *)(kernel_pml4_phys + hhdm_offset);
+
+    zero_page_4k(new_pml4);
+
+    for (size_t i = 256; i < 512; i++)
+    {
+        new_pml4[i] = kernel_pml4[i];
+    }
+
+    return phys;
+}
+
+static uint64_t *get_next_level_for_pml4(
+    uint64_t *table,
+    size_t index,
+    bool allocate,
+    uint64_t flags)
+{
+    if (table[index] & PAGE_PRESENT)
+    {
+        if (table[index] & PAGE_HUGE)
+            return NULL;
+
+        uintptr_t next_phys =
+            table[index] & PAGE_ADDRESS_MASK;
+
+        return (uint64_t *)
+            (next_phys + hhdm_offset);
+    }
+
+    if (!allocate)
+        return NULL;
+
+    uintptr_t phys = alloc_page();
+
+    if (!phys)
+        return NULL;
+
+    uint64_t *next =
+        (uint64_t *)(phys + hhdm_offset);
+
+    zero_page_4k(next);
+
+    table[index] =
+        phys |
+        PAGE_PRESENT |
+        PAGE_WRITABLE |
+        (flags & PAGE_USER);
+
+    return next;
+}
+
+bool map_page_pml4(
+    uintptr_t pml4_phys,
+    uintptr_t virt_addr,
+    uintptr_t phys_addr,
+    uint64_t flags)
+{
+    uint64_t *pml4 =
+        (uint64_t *)(pml4_phys + hhdm_offset);
+
+    size_t pml4_idx = (virt_addr >> 39) & 0x1FF;
+    size_t pdpt_idx = (virt_addr >> 30) & 0x1FF;
+    size_t pd_idx   = (virt_addr >> 21) & 0x1FF;
+    size_t pt_idx   = (virt_addr >> 12) & 0x1FF;
+
+    uint64_t *pdpt =
+        get_next_level_for_pml4(
+            pml4,
+            pml4_idx,
+            true,
+            flags);
+
+    if (!pdpt)
+        return false;
+
+    uint64_t *pd =
+        get_next_level_for_pml4(
+            pdpt,
+            pdpt_idx,
+            true,
+            flags);
+
+    if (!pd)
+        return false;
+
+    uint64_t *pt =
+        get_next_level_for_pml4(
+            pd,
+            pd_idx,
+            true,
+            flags);
+
+    if (!pt)
+        return false;
+
+    pt[pt_idx] =
+        (phys_addr & PAGE_ADDRESS_MASK) |
+        flags |
+        PAGE_PRESENT;
+
+    return true;
+}
+
+uintptr_t unmap_page_pml4(
+    uintptr_t pml4_phys,
+    uintptr_t virt_addr)
+{
+    uint64_t *pml4 =
+        (uint64_t *)(pml4_phys + hhdm_offset);
+
+    size_t pml4_idx = (virt_addr >> 39) & 0x1FF;
+    size_t pdpt_idx = (virt_addr >> 30) & 0x1FF;
+    size_t pd_idx   = (virt_addr >> 21) & 0x1FF;
+    size_t pt_idx   = (virt_addr >> 12) & 0x1FF;
+
+    uint64_t *pdpt =
+        get_next_level_for_pml4(
+            pml4,
+            pml4_idx,
+            false,
+            0);
+
+    if (!pdpt)
+        return 0;
+
+    uint64_t *pd =
+        get_next_level_for_pml4(
+            pdpt,
+            pdpt_idx,
+            false,
+            0);
+
+    if (!pd)
+        return 0;
+
+    uint64_t *pt =
+        get_next_level_for_pml4(
+            pd,
+            pd_idx,
+            false,
+            0);
+
+    if (!pt)
+        return 0;
+
+    if (!(pt[pt_idx] & PAGE_PRESENT))
+        return 0;
+
+    uintptr_t phys =
+        pt[pt_idx] & PAGE_ADDRESS_MASK;
+
+    pt[pt_idx] = 0;
+
+    return phys;
+}
+
+void destroy_pml4(uintptr_t pml4_phys)
+{
+    if (!pml4_phys)
+        return;
+
+    uint64_t *pml4 =
+        (uint64_t *)(pml4_phys + hhdm_offset);
+
+    for (size_t i = 0; i < 256; i++)
+    {
+        if (!(pml4[i] & PAGE_PRESENT))
+            continue;
+
+        uintptr_t pdpt =
+            pml4[i] & PAGE_ADDRESS_MASK;
+
+        free_user_table_level(pdpt, 3);
+    }
+
+    free_page(pml4_phys);
+}
+
+
 void cleanup_pages(void) {
     if (!kernel_pml4_phys || !hhdm_offset) return;
 
@@ -85,7 +276,7 @@ void cleanup_pages(void) {
     set_cr3(kernel_pml4_phys);
 }
 
-static void zero_page_4k(void *virt_addr) {
+void zero_page_4k(void *virt_addr) {
     uint64_t *p = (uint64_t *)virt_addr;
     for (size_t i = 0; i < 512; i++) {
         p[i] = 0;

@@ -308,6 +308,7 @@ void windoge(void) {
     load_default_shell_config(default_shell, sizeof(default_shell));
 
     clear();
+    fs_create("file");
     run("/programs/test", 32768);
     while (true) {
         run(default_shell, 32768);

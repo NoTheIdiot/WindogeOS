@@ -282,6 +282,11 @@ void      free_page(uintptr_t phys_addr);
 bool      map_page(uintptr_t virt_addr, uintptr_t phys_addr, uint64_t flags);
 uintptr_t unmap_page(uintptr_t virt_addr);
 void      setup_ring3_memory(uint64_t user_code_virt, uint64_t user_stack_virt, const uint8_t *user_code, size_t code_size);
+uintptr_t create_pml4(void);
+bool map_page_pml4(uintptr_t pml4_phys, uintptr_t virt_addr, uintptr_t phys_addr, uint64_t flags);
+uintptr_t unmap_page_pml4(uintptr_t pml4_phys, uintptr_t virt_addr);
+void destroy_pml4(uintptr_t pml4_phys);
+void zero_page_4k(void *virt_addr);
 
 // pcie, sata, usb or some io shit
 void pcie_init_system(uint64_t v_addr, uint8_t start_bus, uint8_t end_bus);

@@ -199,15 +199,15 @@ static void free_scratch_buffer(uintptr_t vbase, size_t num_pages) {
     }
 }
 
-void run(char* filename, size_t file_size) {
+static status load_file_to_scratch(char* filename, size_t file_size, uint8_t** out_buf, size_t* out_pages) {
     if (!filename || file_size == 0) {
         sprintf("[ELF] Invalid filename or zero file size\n");
-        return;
+        return ELF_INVALID_PROGRAM_HEADER_OFFSET;
     }
 
     if (!fs_exists(filename)) {
         sprintf("[ELF] File not found: %s\n", filename);
-        return;
+        return ELF_INVALID_PROGRAM_HEADER_OFFSET;
     }
 
     size_t num_pages = ALIGN_UP(file_size, PAGE_SIZE) / PAGE_SIZE;
@@ -216,32 +216,59 @@ void run(char* filename, size_t file_size) {
         if (!phys) {
             sprintf("[ELF] Out of physical pages for ELF buffer\n");
             free_scratch_buffer(ELF_SCRATCH_VBASE, i);
-            return;
+            return ELF_INVALID_PROGRAM_HEADER_OFFSET;
         }
 
         if (!map_page(ELF_SCRATCH_VBASE + (i * PAGE_SIZE), phys, PAGE_PRESENT | PAGE_WRITABLE)) {
             free_page(phys);
             sprintf("[ELF] Failed to map scratch page\n");
             free_scratch_buffer(ELF_SCRATCH_VBASE, i);
-            return;
+            return ELF_INVALID_PROGRAM_HEADER_OFFSET;
         }
     }
 
     uint8_t* file_buf = (uint8_t*)ELF_SCRATCH_VBASE;
-
     if (fs_read_raw(filename, file_buf, file_size) < 0) {
         sprintf("[ELF] Failed to read file: %s\n", filename);
         free_scratch_buffer(ELF_SCRATCH_VBASE, num_pages);
-        return;
+        return ELF_INVALID_PROGRAM_HEADER_OFFSET;
     }
 
-    elf_process_t proc;
-    status st = program_load(file_buf, file_size, &proc);
+    *out_buf = file_buf;
+    *out_pages = num_pages;
+    return ELF_OK;
+}
 
+status spawn(char* filename, size_t file_size, elf_process_t* out_proc) {
+    if (!out_proc) {
+        return ELF_INVALID_MAGIC;
+    }
+
+    uint8_t* file_buf = NULL;
+    size_t num_pages = 0;
+    status read_st = load_file_to_scratch(filename, file_size, &file_buf, &num_pages);
+    if (read_st != ELF_OK) {
+        return read_st;
+    }
+
+    status st = program_load(file_buf, file_size, out_proc);
     free_scratch_buffer(ELF_SCRATCH_VBASE, num_pages);
 
     if (st != ELF_OK) {
-        sprintf("[ELF] Load failed for %s: %s\n", filename, elf_error_messages[st]);
+        sprintf("[ELF] Spawn failed for %s: %s\n", filename, elf_error_messages[st]);
+        return st;
+    }
+
+    sprintf("[ELF] Spawned %s (entry=0x%llx, stack=0x%llx, osabi=0x%x)\n",
+            filename, out_proc->entry, out_proc->stack_top, out_proc->osabi);
+
+    return ELF_OK;
+}
+
+void run(char* filename, size_t file_size) {
+    elf_process_t proc;
+    status st = spawn(filename, file_size, &proc);
+    if (st != ELF_OK) {
         return;
     }
 

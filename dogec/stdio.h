@@ -5,6 +5,7 @@
 #include "bool.h"
 #include "stddef.h"
 #include "root.h"
+#include "string.h"
 #include <stdarg.h>
 
 #define EOF (-1)
@@ -87,7 +88,7 @@ static inline bool _stdio_is_err(uint64_t res) {
 }
 
 static inline uint64_t _stdio_file_size(const char *path) {
-    doge_fs_stat_t st = {0};
+    doge_fs_stat_t st; memset(&st, 0, sizeof(st));
     if (!_stdio_is_err(root_fs(FS_STAT, path, &st))) {
         return st.size;
     }
@@ -189,7 +190,7 @@ static inline FILE *fopen(const char *filename, const char *mode) {
         root_fs(FS_CREATE, fp->path);
         initial_offset = _stdio_file_size(fp->path);
     } else if (read) {
-        doge_fs_stat_t st = {0};
+        doge_fs_stat_t st; memset(&st, 0, sizeof(st));
         if (_stdio_is_err(root_fs(FS_STAT, fp->path, &st))) {
             return NULL;
         }
@@ -440,7 +441,7 @@ static inline int remove(const char *filename) {
 
 static inline int rename(const char *oldpath, const char *newpath) {
     if (!oldpath || !newpath) return -1;
-    doge_fs_stat_t st = {0};
+    doge_fs_stat_t st; memset(&st, 0, sizeof(st));
     if (_stdio_is_err(root_fs(FS_STAT, oldpath, &st))) return -1;
     if (st.size > _STDIO_SCRATCH_MAX) return -1;
 
