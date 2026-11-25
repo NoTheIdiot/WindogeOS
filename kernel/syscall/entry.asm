@@ -5,20 +5,23 @@ extern syscall_handler
 
 section .text
 syscall_entry:
-    swapgs                                  
+    swapgs
 
-    mov qword [gs:8], rsp                 
-    mov rsp, qword [gs:0]               
-    sti  
+    ; Save user RSP in GS scratch and switch to kernel stack
+    mov qword [gs:8], rsp
+    mov rsp, qword [gs:0]
 
-    push rcx
-    push r11
+    ; preserve user RSP on the kernel stack so [gs:8] can't be  C R A C K E D  later
+    push qword [gs:8]
+
+    push rcx                ; user RIP (saved by SYSCALL)
+    push r11                ; user RFLAGS (saved by SYSCALL)
 
     push r15
     push r14
     push r13
     push r12
-    push r10                              
+    push r10
     push r9
     push r8
     push rbp
@@ -26,16 +29,17 @@ syscall_entry:
     push rsi
     push rdx
     push rbx
-    push rax 
+    push rax                ; syscall number
 
-    mov rdi, rsp 
-    
+    sti                     ; safe once kernel stack & frame are set up
+
+    mov rdi, rsp            ; pointer to saved register frame
     call syscall_handler
-    
-    mov [rsp], rax 
-    
-    ; pop in reverse
-    pop rax                               
+
+    cli
+    mov [rsp], rax          ; store syscall return value in saved RAX slot
+
+    pop rax
     pop rbx
     pop rdx
     pop rsi
@@ -48,12 +52,11 @@ syscall_entry:
     pop r13
     pop r14
     pop r15
-    
-    ; restore r flags
-    pop r11                               
-    pop rcx                               
-    
-    mov rsp, qword [gs:8]                 
-    swapgs                                  
+
+    pop r11                 ; restore user RFLAGS
+    pop rcx                 ; restore user RIP
+
+    pop rsp                 ; restore user RSP from kernel stack
+    swapgs
 
     o64 sysret

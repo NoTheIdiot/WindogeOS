@@ -25,7 +25,52 @@ const char *elf_error_messages[] = {
     "ELF_UNSUPPORTED_OSABI"
 };
 
+static void zero_mem(void* dst, size_t n) {
+    uint8_t* d = (uint8_t*)dst;
+    for (size_t i = 0; i < n; i++) d[i] = 0;
+}
+
+static void copy_mem(void* dst, const void* src, size_t n) {
+    uint8_t* d = (uint8_t*)dst;
+    const uint8_t* s = (const uint8_t*)src;
+    for (size_t i = 0; i < n; i++) d[i] = s[i];
+}
+
 // validate if it's even good enough for running
+#ifndef USER_ADDR_MAX
+#define USER_ADDR_MAX 0x0000800000000000ULL
+#endif
+
+static int add_overflow_u64(uint64_t a, uint64_t b, uint64_t* out) {
+    if (UINT64_MAX - a < b) {
+        return 1;
+    }
+    *out = a + b;
+    return 0;
+}
+
+static void unmap_range(uint64_t start, uint64_t end) {
+    for (uint64_t vaddr = start; vaddr < end; vaddr += PAGE_SIZE) {
+        uintptr_t phys = unmap_page(vaddr);
+        if (phys) {
+            free_page(phys);
+        }
+    }
+}
+
+void program_unload(elf_process_t* proc) {
+    if (!proc) return;
+
+    if (proc->max_vaddr > proc->min_vaddr) {
+        unmap_range(proc->min_vaddr, proc->max_vaddr);
+    }
+
+    if (proc->stack_top != 0) {
+        uint64_t stack_bottom = proc->stack_top - (USER_STACK_PAGES * PAGE_SIZE);
+        unmap_range(stack_bottom, proc->stack_top);
+    }
+}
+
 status validate(const uint8_t* file_buf, size_t file_size, uint8_t* out) {
     if (!file_buf || file_size < sizeof(Elf64_Ehdr)) {
         return ELF_INVALID_MAGIC;
@@ -61,49 +106,20 @@ status validate(const uint8_t* file_buf, size_t file_size, uint8_t* out) {
     if (ehdr->e_phentsize != sizeof(Elf64_Phdr)) {
         return ELF_INVALID_PROGRAM_HEADER_SIZE;
     }
-    if (ehdr->e_phnum == 0 || (ehdr->e_phoff + (uint64_t)ehdr->e_phnum * sizeof(Elf64_Phdr)) > file_size) {
+
+    uint64_t ph_table_bytes = (uint64_t)ehdr->e_phnum * sizeof(Elf64_Phdr);
+    uint64_t ph_table_end = 0;
+    if (ehdr->e_phnum == 0 ||
+        add_overflow_u64(ehdr->e_phoff, ph_table_bytes, &ph_table_end) ||
+        ph_table_end > file_size) {
         return ELF_INVALID_PROGRAM_HEADER_COUNT;
     }
 
-    if (ehdr->e_entry == 0 || ehdr->e_entry >= 0x0000800000000000ULL) {
+    if (ehdr->e_entry == 0 || ehdr->e_entry >= USER_ADDR_MAX) {
         return ELF_UNSUPPORTED_TYPE;
     }
 
     return ELF_OK;
-}
-
-static void zero_mem(void* dst, size_t n) {
-    uint8_t* d = (uint8_t*)dst;
-    for (size_t i = 0; i < n; i++) d[i] = 0;
-}
-
-static void copy_mem(void* dst, const void* src, size_t n) {
-    uint8_t* d = (uint8_t*)dst;
-    const uint8_t* s = (const uint8_t*)src;
-    for (size_t i = 0; i < n; i++) d[i] = s[i];
-}
-
-void program_unload(elf_process_t* proc) {
-    if (!proc) return;
-
-    if (proc->max_vaddr > proc->min_vaddr) {
-        for (uint64_t vaddr = proc->min_vaddr; vaddr < proc->max_vaddr; vaddr += PAGE_SIZE) {
-            uintptr_t phys = unmap_page(vaddr);
-            if (phys) {
-                free_page(phys);
-            }
-        }
-    }
-
-    if (proc->stack_top != 0) {
-        uint64_t stack_bottom = proc->stack_top - (USER_STACK_PAGES * PAGE_SIZE);
-        for (uint64_t vaddr = stack_bottom; vaddr < proc->stack_top; vaddr += PAGE_SIZE) {
-            uintptr_t phys = unmap_page(vaddr);
-            if (phys) {
-                free_page(phys);
-            }
-        }
-    }
 }
 
 status program_load(const uint8_t* file_buf, size_t file_size, elf_process_t* out_proc) {
@@ -129,15 +145,19 @@ status program_load(const uint8_t* file_buf, size_t file_size, elf_process_t* ou
             continue;
         }
 
+        uint64_t file_end = 0;
+        uint64_t mem_end = 0;
         if (phdr->p_memsz < phdr->p_filesz ||
-            phdr->p_offset + phdr->p_filesz > file_size ||
-            phdr->p_vaddr + phdr->p_memsz >= 0x0000800000000000ULL) {
+            add_overflow_u64(phdr->p_offset, phdr->p_filesz, &file_end) ||
+            file_end > file_size ||
+            add_overflow_u64(phdr->p_vaddr, phdr->p_memsz, &mem_end) ||
+            mem_end >= USER_ADDR_MAX) {
             program_unload(out_proc);
             return ELF_INVALID_PROGRAM_HEADER_OFFSET;
         }
 
         uint64_t seg_start = ALIGN_DOWN(phdr->p_vaddr, PAGE_SIZE);
-        uint64_t seg_end   = ALIGN_UP(phdr->p_vaddr + phdr->p_memsz, PAGE_SIZE);
+        uint64_t seg_end   = ALIGN_UP(mem_end, PAGE_SIZE);
 
         if (seg_start < out_proc->min_vaddr) out_proc->min_vaddr = seg_start;
         if (seg_end   > out_proc->max_vaddr) out_proc->max_vaddr = seg_end;
@@ -156,10 +176,10 @@ status program_load(const uint8_t* file_buf, size_t file_size, elf_process_t* ou
             }
         }
 
-        zero_mem((void*)seg_start, seg_end - seg_start);
+        zero_mem((void*)seg_start, (size_t)(seg_end - seg_start));
 
         if (phdr->p_filesz > 0) {
-            copy_mem((void*)phdr->p_vaddr, file_buf + phdr->p_offset, phdr->p_filesz);
+            copy_mem((void*)phdr->p_vaddr, file_buf + phdr->p_offset, (size_t)phdr->p_filesz);
         }
 
         uint64_t final_flags = PAGE_PRESENT | PAGE_USER;
@@ -168,15 +188,24 @@ status program_load(const uint8_t* file_buf, size_t file_size, elf_process_t* ou
 
         for (uint64_t vaddr = seg_start; vaddr < seg_end; vaddr += PAGE_SIZE) {
             uintptr_t phys = unmap_page(vaddr);
-            map_page(vaddr, phys, final_flags);
+            if (!phys || !map_page(vaddr, phys, final_flags)) {
+                if (phys) free_page(phys);
+                program_unload(out_proc);
+                return ELF_INVALID_PROGRAM_HEADER_OFFSET;
+            }
         }
     }
 
     uint64_t stack_bottom = USER_STACK_TOP - (USER_STACK_PAGES * PAGE_SIZE);
     for (uint64_t vaddr = stack_bottom; vaddr < USER_STACK_TOP; vaddr += PAGE_SIZE) {
         uint64_t phys = alloc_page();
-        if (!phys || !map_page(vaddr, phys, PAGE_USER_FLAGS | PTE_NX)) {
-            if (phys) free_page(phys);
+        if (!phys) {
+            program_unload(out_proc);
+            return ELF_INVALID_PROGRAM_HEADER_OFFSET;
+        }
+
+        if (!map_page(vaddr, phys, PAGE_USER_FLAGS | PTE_NX)) {
+            free_page(phys);
             program_unload(out_proc);
             return ELF_INVALID_PROGRAM_HEADER_OFFSET;
         }
@@ -185,7 +214,7 @@ status program_load(const uint8_t* file_buf, size_t file_size, elf_process_t* ou
     zero_mem((void*)stack_bottom, USER_STACK_PAGES * PAGE_SIZE);
     out_proc->stack_top = USER_STACK_TOP;
     sprintf("[ELF] Stack mapped: [0x%llx, 0x%llx) (%d pages)\n",
-        stack_bottom, USER_STACK_TOP, USER_STACK_PAGES);
+            stack_bottom, USER_STACK_TOP, USER_STACK_PAGES);
 
     return ELF_OK;
 }

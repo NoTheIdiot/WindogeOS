@@ -479,6 +479,14 @@ int execute(int argc, char **argv) {
         return 0;
     }
 
+    if (strcmp(argv[0], "run") == 0) {
+        if (argv[1] == NULL) {
+            printf("Usage: run <program>");
+            return -1;
+        }
+        return run(argv[1]);
+    }
+
     if (strcmp(argv[0], "exit") == 0) {
         printf("exiting\n");
         exit();

@@ -32,6 +32,7 @@
 #define USER_INPUT_LIMIT         256
 #define MAX_EXEC_ARGS            32
 #define MAX_ARG_LEN              256
+#define NESTED_SYSCALL_SLICE     16384ULL
 
 #ifndef ERR_UNKNOWN_SYSCALL
 #define ERR_UNKNOWN_SYSCALL      ((uint64_t)-1)
@@ -101,6 +102,17 @@ typedef struct {
 
 static ipc_slot_t g_ipc_slot = {0};
 
+static inline uint64_t current_rsp_u64(void) {
+    uint64_t sp = 0;
+    __asm__ volatile ("mov %%rsp, %0" : "=r"(sp));
+    return sp;
+}
+
+static inline void refresh_kernel_gs_base(void) {
+    uint64_t gs_base = (uint64_t)&bsp_cpu_data;
+    wrmsr(MSR_IA32_KERNEL_GS_BASE, gs_base);
+}
+
 static bool is_valid_user_ptr(const void *ptr, size_t len) {
     uintptr_t addr = (uintptr_t)ptr;
     if (addr == 0 || addr >= USER_LIMIT) return false;
@@ -137,6 +149,15 @@ static bool copy_to_user(void *user_dst, const void *src, size_t len) {
     return true;
 }
 
+static void unmap_and_free_range(uint64_t start, uint64_t end) {
+    for (uint64_t va = start; va < end; va += PAGE_SIZE) {
+        uintptr_t phys = unmap_page((uintptr_t)va);
+        if (phys) {
+            free_page(phys);
+        }
+    }
+}
+
 static inline bool arch_rdrand64(uint64_t *out) {
     uint64_t val = 0;
     uint8_t ok = 0;
@@ -153,6 +174,7 @@ static inline void reset_syscall_run_state(void) {
     heap_pointer = USER_START;
     bsp_cpu_data.kernel_rsp = (uint64_t)&syscall_stack[sizeof(syscall_stack)];
     bsp_cpu_data.user_rsp_scratch = 0;
+    refresh_kernel_gs_base();
 }
 
 static inline uint64_t handle_text(registers_t *regs) {
@@ -571,16 +593,12 @@ static inline uint64_t handle_mem(registers_t *regs) {
             for (uint64_t va = page_start; va < page_end; va += PAGE_SIZE) {
                 uint64_t phys = alloc_page();
                 if (!phys) {
-                    for (uint64_t roll = page_start; roll < va; roll += PAGE_SIZE) {
-                        free_page((uintptr_t)roll);
-                    }
+                    unmap_and_free_range(page_start, va);
                     return ERR_INVAL;
                 }
                 if (!map_page((uintptr_t)va, (uintptr_t)phys, flags)) {
                     free_page((uintptr_t)phys);
-                    for (uint64_t roll = page_start; roll < va; roll += PAGE_SIZE) {
-                        free_page((uintptr_t)roll);
-                    }
+                    unmap_and_free_range(page_start, va);
                     return ERR_INVAL;
                 }
                 memset((void *)(uintptr_t)va, 0, PAGE_SIZE);
@@ -591,7 +609,6 @@ static inline uint64_t handle_mem(registers_t *regs) {
         }
 
         case MEM_MAP: {
-            // rsi = virt_addr (0 for auto), rdx = size, r10 = flags
             uint64_t virt = regs->rsi;
             uint64_t size = regs->rdx;
             uint64_t user_flags = regs->r10;
@@ -625,10 +642,12 @@ static inline uint64_t handle_mem(registers_t *regs) {
             for (size_t off = 0; off < aligned_size; off += PAGE_SIZE) {
                 uint64_t phys = alloc_page();
                 if (!phys) {
+                    unmap_and_free_range(virt, virt + off);
                     return ERR_INVAL;
                 }
                 if (!map_page((uintptr_t)(virt + off), (uintptr_t)phys, pte_flags)) {
                     free_page((uintptr_t)phys);
+                    unmap_and_free_range(virt, virt + off);
                     return ERR_INVAL;
                 }
                 memset((void *)(uintptr_t)(virt + off), 0, PAGE_SIZE);
@@ -644,7 +663,6 @@ static inline uint64_t handle_mem(registers_t *regs) {
 }
 
 static inline uint64_t handle_ipc(registers_t *regs) {
-    // op in rdi: 1 = send (rsi = buf, rdx = len), 2 = recv (rsi = buf, rdx = max_len)
     uint64_t op = regs->rdi;
 
     switch (op) {
@@ -689,7 +707,6 @@ static inline uint64_t handle_ipc(registers_t *regs) {
 }
 
 static inline uint64_t handle_proc(registers_t *regs) {
-    // op in rdi: 1 = exec/run file (rsi = filename, rdx = file_size), 2 = exit
     uint64_t op = regs->rdi;
 
     switch (op) {
@@ -699,8 +716,30 @@ static inline uint64_t handle_proc(registers_t *regs) {
                 return ERR_BAD_PTR;
             }
             size_t file_size = (size_t)regs->rdx;
+
+            uint64_t saved_kernel_rsp = bsp_cpu_data.kernel_rsp;
+            uint64_t saved_user_scratch = bsp_cpu_data.user_rsp_scratch;
+            uint64_t saved_heap = heap_pointer;
+
+            uint64_t stack_bottom = (uint64_t)&syscall_stack[0];
+            uint64_t sp_now = current_rsp_u64();
+            uint64_t child_rsp = (sp_now - 256ULL) & ~0xFULL;
+
+            if (child_rsp > stack_bottom + 4096ULL && child_rsp <= saved_kernel_rsp) {
+                bsp_cpu_data.kernel_rsp = child_rsp;
+            } else if (saved_kernel_rsp > stack_bottom + NESTED_SYSCALL_SLICE) {
+                bsp_cpu_data.kernel_rsp = (saved_kernel_rsp - NESTED_SYSCALL_SLICE) & ~0xFULL;
+            }
+
             heap_pointer = USER_START;
+            refresh_kernel_gs_base();
+
             run(kfilename, file_size);
+
+            bsp_cpu_data.kernel_rsp = saved_kernel_rsp;
+            bsp_cpu_data.user_rsp_scratch = saved_user_scratch;
+            heap_pointer = saved_heap;
+            refresh_kernel_gs_base();
             return 0;
         }
 
@@ -799,15 +838,14 @@ void init_syscalls(void) {
             : "a"(0x80000001U), "c"(0)
         );
         (void)extended_features;
-        (void)cpuid_ebx;
-        (void)cpuid_ecx;
         cpu_supports_nx = (cpuid_edx & (1U << 20)) != 0;
     }
-    if (cpu_supports_nx) {
-        wrmsr(MSR_IA32_EFER, rdmsr(MSR_IA32_EFER) | EFER_NXE);
-    }
 
-    wrmsr(MSR_IA32_EFER, rdmsr(MSR_IA32_EFER) | EFER_SCE);
+    uint64_t efer = rdmsr(MSR_IA32_EFER) | EFER_SCE;
+    if (cpu_supports_nx) {
+        efer |= EFER_NXE;
+    }
+    wrmsr(MSR_IA32_EFER, efer);
 
     uint64_t kernel_cs = 0x08;
     uint64_t user_base = 0x10;
@@ -821,5 +859,15 @@ void init_syscalls(void) {
     bsp_cpu_data.kernel_rsp = (uint64_t)&syscall_stack[sizeof(syscall_stack)];
     bsp_cpu_data.user_rsp_scratch = 0;
 
-    wrmsr(MSR_IA32_KERNEL_GS_BASE, (uint64_t)&bsp_cpu_data);
+    refresh_kernel_gs_base();
+
+    uint64_t gs_base = (uint64_t)&bsp_cpu_data;
+    uint64_t readback_gs = rdmsr(MSR_IA32_KERNEL_GS_BASE);
+    sprintf("[SYSCALL] init: lstar=0x%llx kernel_rsp=0x%llx gs_base=0x%llx readback=0x%llx nx=%d rdrand=%d\n",
+            (uint64_t)syscall_entry,
+            bsp_cpu_data.kernel_rsp,
+            gs_base,
+            readback_gs,
+            cpu_supports_nx ? 1 : 0,
+            cpu_supports_rdrand ? 1 : 0);
 }
