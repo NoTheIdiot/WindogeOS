@@ -323,4 +323,8 @@ static inline int fs_mkdir(const char *path) {
     return fs_create(path);
 }
 
+static inline int run(char* path) {
+    return root_proc(PROC_RUN, path);
+}
+
 #endif
