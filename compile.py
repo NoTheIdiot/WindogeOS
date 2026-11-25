@@ -1,6 +1,7 @@
 import os
 import sys
 import shutil
+import struct
 import subprocess
 import tempfile
 
@@ -36,6 +37,7 @@ boot_image_config = {
     "sgdisk_mbr_flags": []
 }
 
+
 def run_command(cmd, env=None, cwd=None):
     try:
         result = subprocess.run(
@@ -63,6 +65,7 @@ def run_command(cmd, env=None, cwd=None):
             print(e.stderr)
         print(f"\nExit code: {e.returncode}")
         sys.exit(e.returncode)
+
 
 if architecture == "x86_64":
     if firmware_mode == "UEFI":
@@ -101,6 +104,7 @@ else:
     else:
         sys.exit(f"Error: Unsupported architecture '{architecture}'.")
 
+
 def verify_build_dependencies():
     required = [LIMINE, LIMINE_UEFI_CD]
 
@@ -118,12 +122,14 @@ def verify_build_dependencies():
             print(f"  {f}")
         sys.exit(1)
 
+
 def find_clang():
     for name in ["clang", "clang-18", "clang-17", "clang-16", "clang-15", "clang-14", "clang-13", "clang-12"]:
         path = shutil.which(name)
         if path:
             return path
     return "clang"
+
 
 def compile_kernel_binary():
     verify_build_dependencies()
@@ -146,6 +152,8 @@ def compile_kernel_binary():
         sys.exit(1)
 
     obj_dir = os.path.abspath(f"kernel/bin-{architecture}")
+    if os.path.exists(obj_dir):
+        shutil.rmtree(obj_dir, ignore_errors=True)
     os.makedirs(obj_dir, exist_ok=True)
     kernel_output = os.path.abspath("kernel.elf")
 
@@ -247,6 +255,59 @@ def compile_kernel_binary():
     print(f"[SUCCESS] Kernel compiled successfully at {kernel_output}")
     return obj_dir
 
+
+def inspect_and_stamp_elf(elf_path):
+    with open(elf_path, "r+b") as f:
+        header = f.read(64)
+        if len(header) < 64 or header[:4] != b"\x7fELF":
+            raise RuntimeError(f"Output file is not a valid ELF binary: {elf_path}")
+
+        ei_class = header[4]
+        ei_data = header[5]
+        endian = "<" if ei_data == 1 else ">"
+
+        if ei_class == 2:
+            # ELF64 header fields starting at offset 16:
+            # e_type (H @ 16), e_machine (H @ 18), e_version (I @ 20), e_entry (Q @ 24), e_phoff (Q @ 32)
+            e_type, e_machine, _, e_entry, e_phoff = struct.unpack_from(endian + "HHIQQ", header, 16)
+            # e_phentsize (H @ 54), e_phnum (H @ 56)
+            e_phentsize, e_phnum = struct.unpack_from(endian + "HH", header, 54)
+        else:
+            e_type, e_machine = struct.unpack_from(endian + "HH", header, 16)
+            e_entry = 0
+            e_phoff = 0
+            e_phentsize = 0
+            e_phnum = 0
+
+        # Stamp WindogeOS ABI byte (EI_OSABI at offset 7)
+        f.seek(7)
+        f.write(b"\x44")
+
+        print(
+            f"  [ELF] {os.path.basename(elf_path)}: "
+            f"type={e_type} mach={e_machine} entry=0x{e_entry:x} "
+            f"phoff=0x{e_phoff:x} phnum={e_phnum} phentsize={e_phentsize}"
+        )
+
+        if ei_class == 2 and e_phoff > 0 and e_phentsize >= 56 and e_phnum > 0:
+            f.seek(e_phoff)
+            ph_table = f.read(e_phnum * e_phentsize)
+            for idx in range(e_phnum):
+                entry = ph_table[idx * e_phentsize:(idx + 1) * e_phentsize]
+                if len(entry) < 56:
+                    break
+                # Elf64_Phdr: p_type (I @ 0), p_flags (I @ 4), p_offset (Q @ 8),
+                #             p_vaddr (Q @ 16), p_paddr (Q @ 24), p_filesz (Q @ 32), p_memsz (Q @ 40)
+                p_type, p_flags, p_offset, p_vaddr, _, p_filesz, p_memsz = struct.unpack_from(
+                    endian + "IIQQQQQ", entry, 0
+                )
+                if p_type == 1:  # PT_LOAD
+                    print(
+                        f"    PT_LOAD[{idx}] flags=0x{p_flags:x} off=0x{p_offset:x} "
+                        f"vaddr=0x{p_vaddr:x} filesz=0x{p_filesz:x} memsz=0x{p_memsz:x}"
+                    )
+
+
 def compile_userland_programs():
     programs_dir = os.path.abspath("programs")
     if not os.path.exists(programs_dir):
@@ -306,7 +367,6 @@ def compile_userland_programs():
             lld_path,
             "-nostdlib",
             "-static",
-            "-z", "separate-code",
             "-T", linker_script,
             "-o", elf_path
         ]
@@ -315,17 +375,12 @@ def compile_userland_programs():
         cmd.extend(obj_list)
         return cmd
 
-    def stamp_windoge_abi(elf_path):
-        with open(elf_path, "r+b") as f:
-            if f.read(4) != b"\x7fELF":
-                raise RuntimeError(f"Output file is not a valid ELF binary: {elf_path}")
-            f.seek(7)
-            f.write(b"\x44")
-
     user_binaries = []
     system_binaries = []
 
     out_dir = os.path.abspath(f"programs/bin-{architecture}")
+    if os.path.exists(out_dir):
+        shutil.rmtree(out_dir, ignore_errors=True)
     sys_out_dir = os.path.join(out_dir, "system")
     os.makedirs(out_dir, exist_ok=True)
     os.makedirs(sys_out_dir, exist_ok=True)
@@ -335,7 +390,7 @@ def compile_userland_programs():
     def compile_items_in(source_base, destination_dir, target_list, is_system_folder=False):
         if not os.path.exists(source_base):
             return
-        for item in os.listdir(source_base):
+        for item in sorted(os.listdir(source_base)):
             item_path = os.path.join(source_base, item)
             if item.startswith("bin-") or (not is_system_folder and item == "system"):
                 continue
@@ -360,7 +415,7 @@ def compile_userland_programs():
 
                 link_cmd = make_lld_cmd(elf_path, [obj_path])
                 run_command(link_cmd)
-                stamp_windoge_abi(elf_path)
+                inspect_and_stamp_elf(elf_path)
                 target_list.append(elf_path)
                 print(f"[SUCCESS] Compiled program: {prog_name}")
 
@@ -368,7 +423,7 @@ def compile_userland_programs():
                 prog_name = item
                 sub_sources = []
                 for root, dirs, files in os.walk(item_path):
-                    for f in files:
+                    for f in sorted(files):
                         if f.endswith((".c", ".cpp", ".cc", ".s", ".S", ".asm")):
                             sub_sources.append(os.path.join(root, f))
 
@@ -401,7 +456,7 @@ def compile_userland_programs():
                 link_cmd = make_lld_cmd(elf_path, obj_files)
 
                 run_command(link_cmd)
-                stamp_windoge_abi(elf_path)
+                inspect_and_stamp_elf(elf_path)
                 target_list.append(elf_path)
                 print(f"[SUCCESS] Compiled package: {prog_name}")
 
@@ -412,9 +467,11 @@ def compile_userland_programs():
 
     return user_binaries, system_binaries
 
+
 def cleanup_kernel_elf():
     if os.path.exists("kernel.elf"):
         os.remove("kernel.elf")
+
 
 def generate_hdd_image():
     obj_dir = compile_kernel_binary()
@@ -559,41 +616,34 @@ def generate_hdd_image():
 
     print(f"[SUCCESS] Disk image generated successfully: {img_target}")
 
+
 def execute_qemu_hdd():
     img_target = f"{boot_image_config['name']}.img"
     if not os.path.exists(img_target):
         print(f"Error: Disk image '{img_target}' not found. Build it first using: python compile.py all-img")
         sys.exit(1)
 
+    machine_args = list(qemu_config.get("machine") or ["-M", "q35"])
+    if architecture == "x86_64" and len(machine_args) == 2 and machine_args[0] == "-M":
+        machine_args[1] = f"{machine_args[1]},pcspk-audiodev=snd0"
+
     qemu_arguments = [
         f"qemu-system-{architecture}",
         "-audiodev", "pa,id=snd0",
-        "-M", "q35,pcspk-audiodev=snd0",
+    ] + machine_args + [
         "-device", "ahci,id=ahci",
         "-drive", f"id=disk,file={img_target},format=raw,if=none",
         "-device", "ide-hd,drive=disk,bus=ahci.0",
         "-serial", "stdio",
         "-d", "int,cpu_reset,mmu",
         "-D", "qemu.log",
-        "-device", "qemu-xhci,id=xhci",
-        "-device", "usb-kbd,bus=xhci.0"
     ]
 
     if qemu_config.get("cpu"):
         qemu_arguments += qemu_config["cpu"]
 
     config_devices = qemu_config.get("devices", [])
-    i = 0
-    while i < len(config_devices):
-        item = config_devices[i]
-        if item == "-device" and i + 1 < len(config_devices):
-            dev_val = config_devices[i + 1]
-            if any(x in dev_val for x in ["xhci", "uhci", "usb-kbd", "usb-mouse"]):
-                i += 2
-                continue
-        qemu_arguments.append(item)
-        i += 1
-
+    qemu_arguments += config_devices
     qemu_arguments += ["-m", qemu_config["memory"]]
 
     if qemu_config.get("firmware"):
@@ -615,6 +665,7 @@ def execute_qemu_hdd():
             log_file.write(decoded_line)
             log_file.flush()
         process.wait()
+
 
 if __name__ == "__main__":
     requested_action = (

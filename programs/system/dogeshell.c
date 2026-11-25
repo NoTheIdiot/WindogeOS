@@ -10,6 +10,7 @@
 #define NUM_BUF_SIZE     64
 #define READ_BUF_SIZE    8192
 #define HISTORY_SIZE     12
+#define PROGRAMS_DIR     "/programs"
 
 typedef struct {
     char entries[HISTORY_SIZE][CMD_BUF_SIZE];
@@ -40,6 +41,31 @@ static void copy_str_bounded(char *dst, const char *src, size_t cap) {
         i++;
     }
     dst[i] = '\0';
+}
+
+static bool has_path_prefix(const char *name) {
+    if (!name) return false;
+    for (size_t i = 0; name[i] != '\0'; i++) {
+        if (name[i] == '/') {
+            return true;
+        }
+    }
+    return false;
+}
+
+static int run_program_file(const char *path) {
+    if (!path || path[0] == '\0') {
+        return -1;
+    }
+    int64_t size = fs_size(path);
+    if (size < 0) {
+        return -1;
+    }
+    if (exec_prog(path, (uint64_t)size) < 0) {
+        printf("Failed to run program: %s\n", path);
+        return -1;
+    }
+    return 0;
 }
 
 static void history_push(const char *line) {
@@ -200,6 +226,7 @@ static void print_help(void) {
     printf("  rand [min] [max]    Generate a random number\n");
     printf("  history             Show command history\n");
     printf("  exit                Exit shell\n");
+    printf("External programs in %s are also executed automatically.\n", PROGRAMS_DIR);
 }
 
 int execute(int argc, char **argv) {
@@ -340,16 +367,11 @@ int execute(int argc, char **argv) {
             printf("Usage: run <path>\n");
             return -1;
         }
-        int64_t size = fs_size(argv[1]);
-        if (size < 0) {
+        if (fs_size(argv[1]) < 0) {
             printf("Program/file doesn't exist.\n");
             return -1;
         }
-        if (exec_prog(argv[1], (uint64_t)size) < 0) {
-            printf("Failed to run program.\n");
-            return -1;
-        }
-        return 0;
+        return run_program_file(argv[1]);
     }
 
     if (strcmp(argv[0], "read") == 0 || strcmp(argv[0], "cat") == 0) {
@@ -489,18 +511,29 @@ int execute(int argc, char **argv) {
         return 0;
     }
 
-    if (strcmp(argv[0], "run") == 0) {
-        if (argv[1] == NULL) {
-            printf("Usage: run <program>");
-            return -1;
-        }
-        return run(argv[1]);
-    }
-
     if (strcmp(argv[0], "exit") == 0) {
         printf("exiting\n");
         exit();
         return 0;
+    }
+
+    char prog_path[CMD_BUF_SIZE];
+    if (has_path_prefix(argv[0])) {
+        copy_str_bounded(prog_path, argv[0], sizeof(prog_path));
+        if (fs_size(prog_path) >= 0) {
+            return run_program_file(prog_path);
+        }
+    } else {
+        size_t dir_len = strlen(PROGRAMS_DIR);
+        size_t name_len = strlen(argv[0]);
+        if (dir_len + 1 + name_len + 1 <= sizeof(prog_path)) {
+            copy_str_bounded(prog_path, PROGRAMS_DIR, sizeof(prog_path));
+            prog_path[dir_len] = '/';
+            copy_str_bounded(prog_path + dir_len + 1, argv[0], sizeof(prog_path) - dir_len - 1);
+            if (fs_size(prog_path) >= 0) {
+                return run_program_file(prog_path);
+            }
+        }
     }
 
     printf("%s: command does not exist. Type 'help' for commands.\n", argv[0]);
