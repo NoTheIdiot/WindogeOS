@@ -456,7 +456,7 @@ typedef struct {
     uint64_t p_align;      // segment alignment in memory/file
 } __attribute__((packed)) Elf64_Phdr;
 
-void run(char* filename, size_t file_size);
+void run(char* filename, size_t file_size, int argc, char** argv);
 
 // sound
 void speaker_beep(uint32_t hz, uint32_t duration_ms);

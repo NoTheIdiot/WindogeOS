@@ -732,7 +732,7 @@ static inline uint64_t handle_proc(registers_t *regs) {
             heap_pointer = USER_START;
             refresh_kernel_gs_base();
 
-            run(kfilename, file_size);
+            run(kfilename, file_size, 0, NULL);
 
             bsp_cpu_data.kernel_rsp = saved_kernel_rsp;
             bsp_cpu_data.user_rsp_scratch = saved_user_scratch;

@@ -7,6 +7,13 @@
 extern volatile struct limine_hhdm_request hhdm_request;
 extern volatile struct limine_memmap_request memmap_request;
 
+typedef struct free {
+    struct free *next;
+} free;
+
+extern free *free_head;
+extern uintptr_t hhdm_offset;
+
 #define PTE_PRESENT  (1ULL << 0)
 #define PTE_WRITABLE (1ULL << 1)
 #define PTE_PWT      (1ULL << 3)
@@ -14,20 +21,40 @@ extern volatile struct limine_memmap_request memmap_request;
 #define PTE_HUGE     (1ULL << 7)
 #define PTE_ADDR_MASK 0x000FFFFFFFFFF000ULL
 
+static void zero_4k(uint8_t *virt) {
+    for (size_t i = 0; i < 4096; i++) {
+        virt[i] = 0;
+    }
+}
+
 uint64_t alloc_page(void) {
+    uint64_t hhdm = hhdm_offset ? hhdm_offset
+                               : (hhdm_request.response ? hhdm_request.response->offset : 0);
+
+    /* 1. Reuse freed physical pages first so RAM doesn't exhaust on -m 5M */
+    if (free_head && hhdm) {
+        free *node = free_head;
+        free_head = node->next;
+        node->next = NULL;
+
+        uint64_t phys = ((uint64_t)(uintptr_t)node - hhdm) & PTE_ADDR_MASK;
+        zero_4k((uint8_t *)(uintptr_t)(phys + hhdm));
+        return phys;
+    }
+
+    /* 2. Fallback bump allocator across usable Limine memory regions */
     static size_t entry_idx = 0;
     static uint64_t offset = 0;
 
     struct limine_memmap_response *mmap = memmap_request.response;
-    if (!mmap) return 0;
+    if (!mmap || !hhdm) return 0;
 
     while (entry_idx < mmap->entry_count) {
         struct limine_memmap_entry *e = mmap->entries[entry_idx];
         if (e->type == LIMINE_MEMMAP_USABLE && offset + 4096 <= e->length) {
             uint64_t phys = e->base + offset;
             offset += 4096;
-            uint8_t *virt = (uint8_t *)(phys + hhdm_request.response->offset);
-            for (size_t i = 0; i < 4096; i++) virt[i] = 0;
+            zero_4k((uint8_t *)(uintptr_t)(phys + hhdm));
             return phys;
         }
         entry_idx++;
@@ -37,7 +64,7 @@ uint64_t alloc_page(void) {
 }
 
 static uint64_t *get_or_alloc_table(uint64_t *table, size_t idx) {
-    uint64_t hhdm = hhdm_request.response->offset;
+    uint64_t hhdm = hhdm_offset ? hhdm_offset : hhdm_request.response->offset;
     if (!(table[idx] & PTE_PRESENT)) {
         uint64_t new_phys = alloc_page();
         if (!new_phys) return NULL;
@@ -47,7 +74,7 @@ static uint64_t *get_or_alloc_table(uint64_t *table, size_t idx) {
 }
 
 void *map_kernel_mmio(uint64_t phys_addr, size_t size) {
-    uint64_t hhdm = hhdm_request.response->offset;
+    uint64_t hhdm = hhdm_offset ? hhdm_offset : hhdm_request.response->offset;
     uint64_t cr3;
     __asm__ volatile ("mov %%cr3, %0" : "=r"(cr3));
 

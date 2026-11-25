@@ -309,9 +309,9 @@ void windoge(void) {
 
     clear();
     fs_create("file");
-    run("/programs/test", 32768);
+    run("/programs/test", 32768, 0, NULL);
     while (true) {
-        run(default_shell, 32768);
+        run(default_shell, 32768, 0, NULL);
     }
     halt();
 }

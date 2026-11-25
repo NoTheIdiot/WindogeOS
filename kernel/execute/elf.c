@@ -4,9 +4,15 @@
 #include <bool.h>
 #include <io.h>
 
-extern void to_userland_ring3(uint64_t entry, uint64_t stack_top);
+extern void to_userland_ring3(uint64_t entry, uint64_t stack_top, int argc, uint64_t argv_user);
+
 #define ELF_SCRATCH_VBASE 0xFFFF900000000000ULL
 #define MAX_SAVED_PAGES   256
+#define MAX_ARGS          64
+
+#ifndef USER_STACK_PAGES
+#define USER_STACK_PAGES  8
+#endif
 
 typedef struct {
     uint64_t vaddr;
@@ -44,6 +50,13 @@ static void copy_mem(void* dst, const void* src, size_t n) {
     uint8_t* d = (uint8_t*)dst;
     const uint8_t* s = (const uint8_t*)src;
     for (size_t i = 0; i < n; i++) d[i] = s[i];
+}
+
+static size_t str_len(const char* s) {
+    size_t len = 0;
+    if (!s) return 0;
+    while (s[len] != '\0') len++;
+    return len;
 }
 
 static inline void flush_tlb_page(uint64_t vaddr) {
@@ -96,6 +109,7 @@ static void restore_backed_up_pages(void) {
     for (size_t i = 0; i < g_saved_page_count; i++) {
         saved_page_t* slot = &g_saved_pages[i];
         uintptr_t existing = unmap_page(slot->vaddr);
+        flush_tlb_page(slot->vaddr);
         if (existing) {
             free_page(existing);
         }
@@ -105,6 +119,7 @@ static void restore_backed_up_pages(void) {
             flush_tlb_page(slot->vaddr);
             copy_mem((void*)slot->vaddr, slot->data, PAGE_SIZE);
         } else {
+            sprintf("[ELF] ERROR: failed to restore backed-up page at 0x%llx\n", slot->vaddr);
             free_page(slot->phys);
         }
     }
@@ -129,11 +144,76 @@ void program_unload(elf_process_t* proc) {
     }
 
     if (proc->stack_top != 0) {
-        uint64_t stack_bottom = proc->stack_top - (USER_STACK_PAGES * PAGE_SIZE);
-        unmap_range(stack_bottom, proc->stack_top);
+        uint64_t stack_bottom = USER_STACK_TOP - (USER_STACK_PAGES * PAGE_SIZE);
+        unmap_range(stack_bottom, USER_STACK_TOP);
     }
 
     restore_backed_up_pages();
+    zero_mem(proc, sizeof(elf_process_t));
+}
+
+static int setup_user_stack_args(uint64_t stack_bottom,
+                                 uint64_t stack_top,
+                                 int argc,
+                                 char** argv,
+                                 uint64_t* out_sp,
+                                 uint64_t* out_argv) {
+    if (argc < 0 || argc > MAX_ARGS) {
+        return -1;
+    }
+    if (argc > 0 && !argv) {
+        return -1;
+    }
+
+    uint64_t sp = stack_top;
+    uint64_t arg_ptrs[MAX_ARGS + 1];
+    zero_mem(arg_ptrs, sizeof(arg_ptrs));
+
+    /* Leave a small top margin and copy strings downward */
+    if (sp < stack_bottom + 16) {
+        return -1;
+    }
+    sp -= 16;
+
+    for (int i = argc - 1; i >= 0; i--) {
+        const char* s = argv[i] ? argv[i] : "";
+        size_t len = str_len(s) + 1;
+
+        if (sp < stack_bottom + len) {
+            return -1;
+        }
+        sp -= len;
+        copy_mem((void*)(uintptr_t)sp, s, len);
+        arg_ptrs[i] = sp;
+    }
+
+    sp &= ~0x7ULL;
+
+    size_t ptr_count = (size_t)argc + 1;
+    size_t ptr_bytes = ptr_count * sizeof(uint64_t);
+
+    /* Layout: [argc] [argv[0]..argv[argc-1]] [NULL] */
+    size_t total_frame_bytes = ptr_bytes + sizeof(uint64_t);
+    if (sp < stack_bottom + total_frame_bytes + 16) {
+        return -1;
+    }
+
+    uint64_t candidate_sp = (sp - total_frame_bytes) & ~0xFULL;
+    if (candidate_sp < stack_bottom) {
+        return -1;
+    }
+    sp = candidate_sp;
+
+    uint64_t* frame = (uint64_t*)(uintptr_t)sp;
+    frame[0] = (uint64_t)argc;
+    for (int i = 0; i < argc; i++) {
+        frame[1 + i] = arg_ptrs[i];
+    }
+    frame[1 + argc] = 0;
+
+    *out_sp = sp;
+    *out_argv = sp + sizeof(uint64_t);
+    return 0;
 }
 
 status validate(const uint8_t* file_buf, size_t file_size, uint8_t* out) {
@@ -187,7 +267,12 @@ status validate(const uint8_t* file_buf, size_t file_size, uint8_t* out) {
     return ELF_OK;
 }
 
-status program_load(const uint8_t* file_buf, size_t file_size, elf_process_t* out_proc) {
+status program_load(const uint8_t* file_buf,
+                    size_t file_size,
+                    int argc,
+                    char** argv,
+                    elf_process_t* out_proc,
+                    uint64_t* out_argv_user) {
     if (!out_proc) return ELF_INVALID_MAGIC;
     zero_mem(out_proc, sizeof(elf_process_t));
 
@@ -233,11 +318,13 @@ status program_load(const uint8_t* file_buf, size_t file_size, elf_process_t* ou
         for (uint64_t vaddr = seg_start; vaddr < seg_end; vaddr += PAGE_SIZE) {
             uint64_t phys = alloc_page();
             if (!phys) {
+                sprintf("[ELF] ERROR: alloc_page failed for segment at 0x%llx\n", vaddr);
                 program_unload(out_proc);
                 return ELF_INVALID_PROGRAM_HEADER_OFFSET;
             }
 
             if (!map_page(vaddr, phys, PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER)) {
+                sprintf("[ELF] ERROR: map_page failed for segment at 0x%llx\n", vaddr);
                 free_page(phys);
                 program_unload(out_proc);
                 return ELF_INVALID_PROGRAM_HEADER_OFFSET;
@@ -259,6 +346,7 @@ status program_load(const uint8_t* file_buf, size_t file_size, elf_process_t* ou
             uintptr_t phys = unmap_page(vaddr);
             flush_tlb_page(vaddr);
             if (!phys || !map_page(vaddr, phys, final_flags)) {
+                sprintf("[ELF] ERROR: remap failed for segment at 0x%llx\n", vaddr);
                 if (phys) free_page(phys);
                 program_unload(out_proc);
                 return ELF_INVALID_PROGRAM_HEADER_OFFSET;
@@ -273,11 +361,13 @@ status program_load(const uint8_t* file_buf, size_t file_size, elf_process_t* ou
     for (uint64_t vaddr = stack_bottom; vaddr < USER_STACK_TOP; vaddr += PAGE_SIZE) {
         uint64_t phys = alloc_page();
         if (!phys) {
+            sprintf("[ELF] ERROR: alloc_page failed for stack at 0x%llx\n", vaddr);
             program_unload(out_proc);
             return ELF_INVALID_PROGRAM_HEADER_OFFSET;
         }
 
         if (!map_page(vaddr, phys, PAGE_USER_FLAGS | PTE_NX)) {
+            sprintf("[ELF] ERROR: map_page failed for stack at 0x%llx\n", vaddr);
             free_page(phys);
             program_unload(out_proc);
             return ELF_INVALID_PROGRAM_HEADER_OFFSET;
@@ -286,9 +376,24 @@ status program_load(const uint8_t* file_buf, size_t file_size, elf_process_t* ou
     }
 
     zero_mem((void*)stack_bottom, USER_STACK_PAGES * PAGE_SIZE);
-    out_proc->stack_top = USER_STACK_TOP;
-    sprintf("[ELF] Stack mapped: [0x%llx, 0x%llx) (%d pages)\n",
-            stack_bottom, USER_STACK_TOP, USER_STACK_PAGES);
+
+    uint64_t adjusted_sp = USER_STACK_TOP;
+    uint64_t user_argv_ptr = 0;
+
+    if (setup_user_stack_args(stack_bottom, USER_STACK_TOP, argc, argv,
+                              &adjusted_sp, &user_argv_ptr) != 0) {
+        sprintf("[ELF] ERROR: failed to place argc/argv on user stack\n");
+        program_unload(out_proc);
+        return ELF_INVALID_PROGRAM_HEADER_OFFSET;
+    }
+
+    out_proc->stack_top = adjusted_sp;
+    if (out_argv_user) {
+        *out_argv_user = user_argv_ptr;
+    }
+
+    sprintf("[ELF] Stack mapped: [0x%llx, 0x%llx) (%d pages), sp=0x%llx, argc=%d, argv=0x%llx\n",
+            stack_bottom, USER_STACK_TOP, USER_STACK_PAGES, adjusted_sp, argc, user_argv_ptr);
 
     return ELF_OK;
 }
@@ -346,7 +451,12 @@ static status load_file_to_scratch(char* filename, size_t file_size, uint8_t** o
     return ELF_OK;
 }
 
-status spawn(char* filename, size_t file_size, elf_process_t* out_proc) {
+status spawn(char* filename,
+             size_t file_size,
+             int argc,
+             char** argv,
+             elf_process_t* out_proc,
+             uint64_t* out_argv_user) {
     if (!out_proc) {
         return ELF_INVALID_MAGIC;
     }
@@ -358,7 +468,7 @@ status spawn(char* filename, size_t file_size, elf_process_t* out_proc) {
         return read_st;
     }
 
-    status st = program_load(file_buf, file_size, out_proc);
+    status st = program_load(file_buf, file_size, argc, argv, out_proc, out_argv_user);
     free_scratch_buffer(ELF_SCRATCH_VBASE, num_pages);
 
     if (st != ELF_OK) {
@@ -366,23 +476,32 @@ status spawn(char* filename, size_t file_size, elf_process_t* out_proc) {
         return st;
     }
 
-    sprintf("[ELF] Spawned %s (entry=0x%llx, stack=0x%llx, osabi=0x%x)\n",
-            filename, out_proc->entry, out_proc->stack_top, out_proc->osabi);
+    sprintf("[ELF] Spawned %s (entry=0x%llx, stack=0x%llx, argc=%d, osabi=0x%x)\n",
+            filename, out_proc->entry, out_proc->stack_top, argc, out_proc->osabi);
 
     return ELF_OK;
 }
 
-void run(char* filename, size_t file_size) {
+void run(char* filename, size_t file_size, int argc, char** argv) {
     elf_process_t proc;
-    status st = spawn(filename, file_size, &proc);
+    uint64_t user_argv_ptr = 0;
+
+    char* default_argv[1];
+    if (argc == 0 && argv == NULL && filename != NULL) {
+        default_argv[0] = filename;
+        argc = 1;
+        argv = default_argv;
+    }
+
+    status st = spawn(filename, file_size, argc, argv, &proc, &user_argv_ptr);
     if (st != ELF_OK) {
         return;
     }
 
-    sprintf("[ELF] Running %s (entry=0x%llx, stack=0x%llx, osabi=0x%x)\n",
-            filename, proc.entry, proc.stack_top, proc.osabi);
+    sprintf("[ELF] Running %s (entry=0x%llx, stack=0x%llx, argc=%d, argv=0x%llx, osabi=0x%x)\n",
+            filename, proc.entry, proc.stack_top, argc, user_argv_ptr, proc.osabi);
 
-    to_userland_ring3(proc.entry, proc.stack_top & ~0xFULL);
+    to_userland_ring3(proc.entry, proc.stack_top & ~0xFULL, argc, user_argv_ptr);
 
     program_unload(&proc);
     sprintf("[ELF] Process %s exited and unloaded\n", filename);
