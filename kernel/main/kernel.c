@@ -309,11 +309,8 @@ void windoge(void) {
 
     clear();
     run("/programs/test", 32768);
-    run(default_shell, 32768);
-    if (strcmp(default_shell, DEFAULT_SHELL_PATH) != 0) {
-        printf("[\033[91m bad \033[0m] Failed to run %s, falling back to %s\n",
-               default_shell, DEFAULT_SHELL_PATH);
-        run(DEFAULT_SHELL_PATH, 32768);
+    while (true) {
+        run(default_shell, 32768);
     }
     halt();
 }
