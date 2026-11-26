@@ -123,15 +123,15 @@ static void save_file(const char *path) {
 void _start(int argc, char** argv) {
     for (int i = 0; i < MAX_LINES; i++) lines[i][0] = '\0';
     char buf[MAX_LEN];
-    if (argc <= 0) {
+    if (argc <= 1) {
         char buf[MAX_LEN];
         prompt("File: ", buf, sizeof(buf));
         if (buf[0] != '\0') {
             load_file(buf);
         }
     } else {
-        printf(argv[0]);
-        load_file(argv[0]);
+        printf(argv[1]);
+        load_file(argv[1]);
     }
 
     while (1) {
@@ -184,5 +184,6 @@ void _start(int argc, char** argv) {
     }
 
     clear();
+    exit();
     return;
 }
