@@ -322,7 +322,7 @@ int execute(int argc, char **argv) {
     }
 
     if (strcmp(argv[0], "create") == 0) {
-        if (argv[1] == NULL) {
+        if (argc < 2) {
             printf("Usage: create <filename>\n");
             return -1;
         }
@@ -338,7 +338,7 @@ int execute(int argc, char **argv) {
     }
 
     if (strcmp(argv[0], "del") == 0 || strcmp(argv[0], "rm") == 0) {
-        if (argv[1] == NULL) {
+        if (argc < 2) {
             printf("Usage: %s <path>\n", argv[0]);
             return -1;
         }
@@ -354,7 +354,7 @@ int execute(int argc, char **argv) {
     }
 
     if (strcmp(argv[0], "sleep") == 0) {
-        if (argv[1] == NULL) {
+        if (argc < 2) {
             printf("Usage: sleep <ms>\n");
             return -1;
         }
@@ -363,7 +363,7 @@ int execute(int argc, char **argv) {
     }
 
     if (strcmp(argv[0], "run") == 0) {
-        if (argv[1] == NULL) {
+        if (argc < 2) {
             printf("Usage: run <path>\n");
             return -1;
         }
@@ -375,7 +375,7 @@ int execute(int argc, char **argv) {
     }
 
     if (strcmp(argv[0], "read") == 0 || strcmp(argv[0], "cat") == 0) {
-        if (argv[1] == NULL) {
+        if (argc < 2) {
             printf("Usage: %s <filename>\n", argv[0]);
             return -1;
         }
@@ -387,6 +387,9 @@ int execute(int argc, char **argv) {
         memset(buffer, 0, sizeof(buffer));
         int64_t bytes = fs_read_all(argv[1], buffer, sizeof(buffer) - 1);
         if (bytes >= 0) {
+            if (bytes >= (int64_t)sizeof(buffer)) {
+                bytes = (int64_t)sizeof(buffer) - 1;
+            }
             buffer[bytes] = '\0';
             printf("%s\n", buffer);
         } else {
@@ -397,7 +400,7 @@ int execute(int argc, char **argv) {
     }
 
     if (strcmp(argv[0], "write") == 0) {
-        if (argv[1] == NULL || argv[2] == NULL) {
+        if (argc < 3) {
             printf("Usage: write <filename> <text>\n");
             return -1;
         }
@@ -410,7 +413,7 @@ int execute(int argc, char **argv) {
     }
 
     if (strcmp(argv[0], "append") == 0) {
-        if (argv[1] == NULL || argv[2] == NULL) {
+        if (argc < 3) {
             printf("Usage: append <filename> <text>\n");
             return -1;
         }
@@ -423,7 +426,7 @@ int execute(int argc, char **argv) {
     }
 
     if (strcmp(argv[0], "stat") == 0) {
-        if (argv[1] == NULL) {
+        if (argc < 2) {
             printf("Usage: stat <path>\n");
             return -1;
         }
@@ -439,7 +442,7 @@ int execute(int argc, char **argv) {
     }
 
     if (strcmp(argv[0], "exists") == 0) {
-        if (argv[1] == NULL) {
+        if (argc < 2) {
             printf("Usage: exists <path>\n");
             return -1;
         }
@@ -462,7 +465,7 @@ int execute(int argc, char **argv) {
     }
 
     if (strcmp(argv[0], "beep") == 0) {
-        if (argv[1] == NULL || argv[2] == NULL) {
+        if (argc < 3) {
             printf("Usage: beep <hz> <ms>\n");
             return -1;
         }
@@ -493,11 +496,14 @@ int execute(int argc, char **argv) {
         if (argc == 1) {
             val = rand_u64();
         } else if (argc == 2) {
-            uint32_t max_v = (uint32_t)parse_u64(argv[1]);
+            uint64_t raw_max = parse_u64(argv[1]);
+            uint32_t max_v = (raw_max > UINT32_MAX) ? UINT32_MAX : (uint32_t)raw_max;
             val = rand_range(0, max_v);
         } else {
-            uint32_t min_v = (uint32_t)parse_u64(argv[1]);
-            uint32_t max_v = (uint32_t)parse_u64(argv[2]);
+            uint64_t raw_min = parse_u64(argv[1]);
+            uint64_t raw_max = parse_u64(argv[2]);
+            uint32_t min_v = (raw_min > UINT32_MAX) ? UINT32_MAX : (uint32_t)raw_min;
+            uint32_t max_v = (raw_max > UINT32_MAX) ? UINT32_MAX : (uint32_t)raw_max;
             val = rand_range(min_v, max_v);
         }
         char rbuf[NUM_BUF_SIZE];
@@ -530,8 +536,9 @@ int execute(int argc, char **argv) {
             copy_str_bounded(prog_path, PROGRAMS_DIR, sizeof(prog_path));
             prog_path[dir_len] = '/';
             copy_str_bounded(prog_path + dir_len + 1, argv[0], sizeof(prog_path) - dir_len - 1);
-            if (fs_size(prog_path) >= 0) {
-                return run_program_file(prog_path);
+            int64_t prog_size = fs_size(prog_path);
+            if (prog_size >= 0) {
+                return run(prog_path, (size_t)prog_size, argc, argv);
             }
         }
     }

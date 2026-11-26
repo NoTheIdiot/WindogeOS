@@ -723,7 +723,42 @@ static inline uint64_t handle_proc(registers_t *regs) {
             if (!copy_str_from_user(kfilename, (const char *)regs->rsi, sizeof(kfilename))) {
                 return ERR_BAD_PTR;
             }
+
             size_t file_size = (size_t)regs->rdx;
+            /* x86_64 `syscall` clobbers RCX with return RIP; read argc from r10/r9 if passed there */
+            int argc = (int)regs->r10;
+            const char *const *user_argv = (const char *const *)regs->r8;
+
+            static char kargv_storage[MAX_EXEC_ARGS][MAX_ARG_LEN];
+            static char *kargv_ptrs[MAX_EXEC_ARGS + 1];
+
+            if (argc < 0 || argc > MAX_EXEC_ARGS) {
+                return ERR_INVAL;
+            }
+
+            if (argc > 0) {
+                if (!user_argv || !is_valid_user_ptr(user_argv, (size_t)argc * sizeof(char *))) {
+                    return ERR_BAD_PTR;
+                }
+                for (int i = 0; i < argc; i++) {
+                    const char *uarg = NULL;
+                    if (!copy_from_user(&uarg, &user_argv[i], sizeof(uarg))) {
+                        return ERR_BAD_PTR;
+                    }
+                    if (!uarg) {
+                        argc = i;
+                        break;
+                    }
+                    if (!copy_str_from_user(kargv_storage[i], uarg, MAX_ARG_LEN)) {
+                        return ERR_BAD_PTR;
+                    }
+                    kargv_ptrs[i] = kargv_storage[i];
+                }
+            }
+            kargv_ptrs[argc] = NULL;
+
+            sprintf("[SYSCALL] PROC spawn: file=%s size=%llu argc=%d argv=%p\n",
+                    kfilename, (unsigned long long)file_size, argc, (void *)user_argv);
 
             uint64_t saved_kernel_rsp = bsp_cpu_data.kernel_rsp;
             uint64_t saved_user_scratch = bsp_cpu_data.user_rsp_scratch;
@@ -742,7 +777,7 @@ static inline uint64_t handle_proc(registers_t *regs) {
             heap_pointer = USER_START;
             refresh_kernel_gs_base();
 
-            run(kfilename, file_size, 0, NULL);
+            run(kfilename, file_size, argc, (argc > 0) ? kargv_ptrs : NULL);
 
             bsp_cpu_data.kernel_rsp = saved_kernel_rsp;
             bsp_cpu_data.user_rsp_scratch = saved_user_scratch;

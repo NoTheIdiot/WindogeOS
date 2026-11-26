@@ -129,6 +129,22 @@ static inline uint64_t syscall_5(uint64_t num, uint64_t arg1, uint64_t arg2, uin
     return num;
 }
 
+static inline uint64_t syscall_6(uint64_t num, uint64_t arg1, uint64_t arg2,
+                                 uint64_t arg3, uint64_t arg4, uint64_t arg5,
+                                 uint64_t arg6) {
+    register uint64_t r10_arg __asm__("r10") = arg4;
+    register uint64_t r8_arg  __asm__("r8")  = arg5;
+    register uint64_t r9_arg  __asm__("r9")  = arg6;
+    __asm__ volatile (
+        "syscall"
+        : "+a"(num)
+        : "D"(arg1), "S"(arg2), "d"(arg3), "r"(r10_arg), "r"(r8_arg), "r"(r9_arg)
+        : "rcx", "r11", "memory"
+    );
+    return num;
+}
+
+
 typedef struct {
     char name[256];
     uint32_t size;
@@ -450,7 +466,9 @@ static inline uint64_t root_proc(uint32_t opcode, ...) {
         case PROC_RUN: {
             const char *filename = va_arg(args, const char *);
             uint64_t file_size = va_arg(args, uint64_t);
-            ret = syscall_3(PROC, PROC_RUN, (uint64_t)filename, file_size);
+            int argc = va_arg(args, int);
+            char** argv = va_arg(args, char**);
+            ret = syscall_5(PROC, PROC_RUN, (uint64_t)filename, file_size, (uint64_t)argc, (uint64_t)argv);
             break;
         }
         case PROC_EXIT: {
