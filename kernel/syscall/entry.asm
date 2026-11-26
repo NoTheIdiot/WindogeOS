@@ -28,21 +28,16 @@ kernel_program_launcher_rflags:
 
 section .text
 to_userland_ring3:
-    ; zero out arg0 and arg1 when calling with no args
-    xor edx, edx
-    xor ecx, ecx
-
+    ; Keep rdx (argc) and rcx (argv_user) intact!
 to_userland_ring3_args:
-    ; hey, hoard these damn arguments
+    ; rdi = entry, rsi = stack_top, rdx = argc, rcx = argv_user
     mov r8, rdi
     mov r9, rsi
     mov r10, rdx
     mov r11, rcx
 
-    ; NO ARGUMENTS
     cli
 
-    ; save C callee-saved registers on kernel stack
     push rbp
     push rbx
     push r12
@@ -50,7 +45,6 @@ to_userland_ring3_args:
     push r14
     push r15
 
-    ; push current launcher RSP and RFLAGS onto the nesting stack
     mov rax, [rel launcher_depth]
     cmp rax, MAX_LAUNCH_DEPTH
     jae .launch_stack_full
@@ -68,27 +62,25 @@ to_userland_ring3_args:
     inc rax
     mov [rel launcher_depth], rax
 
-    ; load Ring 3 user data segment selector (0x18 | RPL 3 = 0x1B) into data segment registers
     mov ax, 0x1b
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov gs, ax
 
-    ; build the fake interrupt stack
-    push qword 0x1b         ; user SS (stack segment)
-    push r9                 ; user RSP (top of user stack pointing to argc)
-    push qword 0x202        ; user RFLAGS (0x200 = IF interrupts enabled, 0x002 = mandatory reserved bit)
-    push qword 0x23         ; user CS (64-bit user code segment 0x20 | RPL 3 = 0x23)
-    push r8                 ; user RIP (ELF entry point)
+    push qword 0x1b         ; user SS
+    push r9                 ; user RSP
+    push qword 0x202        ; user RFLAGS
+    push qword 0x23         ; user CS
+    push r8                 ; user RIP
 
-    ; Clear general purpose registers before entering userland (argc/argv are already on the stack via r9)
+    mov rdi, r10            ; argc -> RDI
+    mov rsi, r11            ; argv_user -> RSI
+
     xor rax, rax
     xor rbx, rbx
     xor rcx, rcx
     xor rdx, rdx
-    xor rdi, rdi
-    xor rsi, rsi
     xor rbp, rbp
     xor r8, r8
     xor r9, r9
@@ -99,7 +91,6 @@ to_userland_ring3_args:
     xor r14, r14
     xor r15, r15
 
-    ; pop RIP, CS, RFLAGS, RSP, SS and drop into Ring 3 userland
     iretq
 
 .launch_stack_full:
@@ -109,14 +100,12 @@ to_userland_ring3_args:
 syscall_exit_to_launcher:
     cli
 
-    ; restore kernel data segment selectors (0x10)
     mov ax, 0x10
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov gs, ax
 
-    ; point IA32_KERNEL_GS_BASE at bsp_cpu_data
     lea rax, [rel bsp_cpu_data]
     mov rdx, rax
     shr rdx, 32
@@ -124,7 +113,6 @@ syscall_exit_to_launcher:
     mov ecx, MSR_IA32_KERNEL_GS_BASE
     wrmsr
 
-    ; pop one launcher frame from the nesting stack
     mov rax, [rel launcher_depth]
     test rax, rax
     jz .no_launcher_frame
@@ -135,7 +123,6 @@ syscall_exit_to_launcher:
     lea rdx, [rel launcher_rsp_stack]
     mov rsp, [rdx + rax*8]
 
-    ; update exported kernel_program_launcher_rsp to the remaining outer frame (or 0)
     test rax, rax
     jz .clear_exported_rsp
     mov rcx, [rdx + rax*8 - 8]
@@ -146,14 +133,12 @@ syscall_exit_to_launcher:
     mov qword [rel kernel_program_launcher_rsp], 0
 
 .restore_rflags:
-    ; restore launcher RFLAGS and update exported copy
     lea rdx, [rel launcher_rflags_stack]
     mov rcx, [rdx + rax*8]
     mov [rel kernel_program_launcher_rflags], rcx
     push rcx
     popfq
 
-    ; restore callee-saved registers in reverse order
     pop r15
     pop r14
     pop r13
@@ -170,31 +155,15 @@ syscall_exit_to_launcher:
     jmp .no_launcher_frame
 
 syscall_entry:
-    ; ensure IA32_KERNEL_GS_BASE points to bsp_cpu_data before swapping
-    push rax
-    push rcx
-    push rdx
-    lea rax, [rel bsp_cpu_data]
-    mov rdx, rax
-    shr rdx, 32
-    mov eax, eax
-    mov ecx, MSR_IA32_KERNEL_GS_BASE
-    wrmsr
-    pop rdx
-    pop rcx
-    pop rax
+    ; Save user RSP in [rel bsp_cpu_data + 8] via rax without touching user stack
+    mov [rel bsp_cpu_data + 8], rsp
+    mov rsp, [rel bsp_cpu_data + 0]
 
     swapgs
 
-    ; Save user RSP in GS scratch and switch to kernel stack
-    mov qword [gs:8], rsp
-    mov rsp, qword [gs:0]
-
-    ; preserve user RSP on the kernel stack so [gs:8] can't be  C R A C K E D  later
-    push qword [gs:8]
-
-    push rcx                ; user RIP (saved by SYSCALL)
-    push r11                ; user RFLAGS (saved by SYSCALL)
+    push qword [rel bsp_cpu_data + 8]
+    push rcx
+    push r11
 
     push r15
     push r14
@@ -208,15 +177,15 @@ syscall_entry:
     push rsi
     push rdx
     push rbx
-    push rax                ; syscall number
+    push rax
 
-    sti                     ; safe once kernel stack & frame are set up
+    sti
 
-    mov rdi, rsp            ; pointer to saved register frame
+    mov rdi, rsp
     call syscall_handler
 
     cli
-    mov [rsp], rax          ; store syscall return value in saved RAX slot
+    mov [rsp], rax
 
     pop rax
     pop rbx
@@ -232,10 +201,10 @@ syscall_entry:
     pop r14
     pop r15
 
-    pop r11                 ; restore user RFLAGS
-    pop rcx                 ; restore user RIP
+    pop r11
+    pop rcx
+    pop rsp
 
-    pop rsp                 ; restore user RSP from kernel stack
     swapgs
 
     o64 sysret

@@ -120,13 +120,18 @@ static void save_file(const char *path) {
     printf("Saved %s\n", fname);
 }
 
-void _start(void) {
+void _start(int argc, char** argv) {
     for (int i = 0; i < MAX_LINES; i++) lines[i][0] = '\0';
-
     char buf[MAX_LEN];
-    prompt("File: ", buf, sizeof(buf));
-    if (buf[0] != '\0') {
-        load_file(buf);
+    if (argc <= 0) {
+        char buf[MAX_LEN];
+        prompt("File: ", buf, sizeof(buf));
+        if (buf[0] != '\0') {
+            load_file(buf);
+        }
+    } else {
+        printf(argv[0]);
+        load_file(argv[0]);
     }
 
     while (1) {

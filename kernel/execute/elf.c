@@ -14,6 +14,14 @@ extern void to_userland_ring3(uint64_t entry, uint64_t stack_top, int argc, uint
 #define USER_STACK_PAGES  8
 #endif
 
+#ifndef USER_STACK_TOP
+#define USER_STACK_TOP    0x00007FFFFFF00000ULL
+#endif
+
+#ifndef USER_ADDR_MAX
+#define USER_ADDR_MAX     0x0000800000000000ULL
+#endif
+
 typedef struct {
     uint64_t vaddr;
     uint64_t phys;
@@ -22,6 +30,7 @@ typedef struct {
 
 static saved_page_t g_saved_pages[MAX_SAVED_PAGES];
 static size_t g_saved_page_count = 0;
+static size_t g_current_scratch_pages = 0;
 
 const char *elf_error_messages[] = {
     "ELF_OK",
@@ -63,10 +72,6 @@ static inline void flush_tlb_page(uint64_t vaddr) {
     __asm__ volatile ("invlpg (%0)" : : "r"(vaddr) : "memory");
 }
 
-#ifndef USER_ADDR_MAX
-#define USER_ADDR_MAX 0x0000800000000000ULL
-#endif
-
 static int add_overflow_u64(uint64_t a, uint64_t b, uint64_t* out) {
     if (UINT64_MAX - a < b) {
         return 1;
@@ -76,10 +81,12 @@ static int add_overflow_u64(uint64_t a, uint64_t b, uint64_t* out) {
 }
 
 static void backup_range(uint64_t start, uint64_t end) {
+    uintptr_t tmp_va = ELF_SCRATCH_VBASE + ((g_current_scratch_pages + 16ULL) * PAGE_SIZE);
+
     for (uint64_t vaddr = start; vaddr < end; vaddr += PAGE_SIZE) {
         if (g_saved_page_count >= MAX_SAVED_PAGES) {
             sprintf("[ELF] WARNING: backup page limit (%d) reached at 0x%llx\n",
-                    MAX_SAVED_PAGES, vaddr);
+                    MAX_SAVED_PAGES, (unsigned long long)vaddr);
             break;
         }
 
@@ -93,7 +100,6 @@ static void backup_range(uint64_t start, uint64_t end) {
         slot->vaddr = vaddr;
         slot->phys = (uint64_t)phys;
 
-        uintptr_t tmp_va = ELF_SCRATCH_VBASE + ((MAX_SAVED_PAGES + 16ULL) * PAGE_SIZE);
         if (map_page(tmp_va, phys, PAGE_PRESENT | PAGE_WRITABLE)) {
             flush_tlb_page(tmp_va);
             copy_mem(slot->data, (const void*)tmp_va, PAGE_SIZE);
@@ -119,7 +125,8 @@ static void restore_backed_up_pages(void) {
             flush_tlb_page(slot->vaddr);
             copy_mem((void*)slot->vaddr, slot->data, PAGE_SIZE);
         } else {
-            sprintf("[ELF] ERROR: failed to restore backed-up page at 0x%llx\n", slot->vaddr);
+            sprintf("[ELF] ERROR: failed to restore backed-up page at 0x%llx\n",
+                    (unsigned long long)slot->vaddr);
             free_page(slot->phys);
         }
     }
@@ -169,7 +176,6 @@ static int setup_user_stack_args(uint64_t stack_bottom,
     uint64_t arg_ptrs[MAX_ARGS + 1];
     zero_mem(arg_ptrs, sizeof(arg_ptrs));
 
-    /* Leave a small top margin and copy strings downward */
     if (sp < stack_bottom + 16) {
         return -1;
     }
@@ -185,6 +191,7 @@ static int setup_user_stack_args(uint64_t stack_bottom,
         sp -= len;
         copy_mem((void*)(uintptr_t)sp, s, len);
         arg_ptrs[i] = sp;
+        sprintf("[ELF]   argv[%d] -> 0x%llx \"%s\"\n", i, (unsigned long long)sp, s);
     }
 
     sp &= ~0x7ULL;
@@ -281,13 +288,16 @@ status program_load(const uint8_t* file_buf,
         return st;
     }
 
+    if (g_saved_page_count > 0) {
+        restore_backed_up_pages();
+    }
+
     const Elf64_Ehdr* ehdr = (const Elf64_Ehdr*)file_buf;
     const Elf64_Phdr* phdrs = (const Elf64_Phdr*)(file_buf + ehdr->e_phoff);
 
     out_proc->entry = ehdr->e_entry;
     out_proc->min_vaddr = ~0ULL;
     out_proc->max_vaddr = 0;
-    g_saved_page_count = 0;
 
     for (uint16_t i = 0; i < ehdr->e_phnum; i++) {
         const Elf64_Phdr* phdr = &phdrs[i];
@@ -313,18 +323,28 @@ status program_load(const uint8_t* file_buf,
         if (seg_start < out_proc->min_vaddr) out_proc->min_vaddr = seg_start;
         if (seg_end   > out_proc->max_vaddr) out_proc->max_vaddr = seg_end;
 
+        sprintf("[ELF] seg[%u]: vaddr=0x%llx memsz=0x%llx mapped=[0x%llx, 0x%llx) flags=0x%x\n",
+                i,
+                (unsigned long long)phdr->p_vaddr,
+                (unsigned long long)phdr->p_memsz,
+                (unsigned long long)seg_start,
+                (unsigned long long)seg_end,
+                phdr->p_flags);
+
         backup_range(seg_start, seg_end);
 
         for (uint64_t vaddr = seg_start; vaddr < seg_end; vaddr += PAGE_SIZE) {
             uint64_t phys = alloc_page();
             if (!phys) {
-                sprintf("[ELF] ERROR: alloc_page failed for segment at 0x%llx\n", vaddr);
+                sprintf("[ELF] ERROR: alloc_page failed for segment at 0x%llx\n",
+                        (unsigned long long)vaddr);
                 program_unload(out_proc);
                 return ELF_INVALID_PROGRAM_HEADER_OFFSET;
             }
 
             if (!map_page(vaddr, phys, PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER)) {
-                sprintf("[ELF] ERROR: map_page failed for segment at 0x%llx\n", vaddr);
+                sprintf("[ELF] ERROR: map_page failed for segment at 0x%llx\n",
+                        (unsigned long long)vaddr);
                 free_page(phys);
                 program_unload(out_proc);
                 return ELF_INVALID_PROGRAM_HEADER_OFFSET;
@@ -346,7 +366,8 @@ status program_load(const uint8_t* file_buf,
             uintptr_t phys = unmap_page(vaddr);
             flush_tlb_page(vaddr);
             if (!phys || !map_page(vaddr, phys, final_flags)) {
-                sprintf("[ELF] ERROR: remap failed for segment at 0x%llx\n", vaddr);
+                sprintf("[ELF] ERROR: remap failed for segment at 0x%llx\n",
+                        (unsigned long long)vaddr);
                 if (phys) free_page(phys);
                 program_unload(out_proc);
                 return ELF_INVALID_PROGRAM_HEADER_OFFSET;
@@ -361,13 +382,15 @@ status program_load(const uint8_t* file_buf,
     for (uint64_t vaddr = stack_bottom; vaddr < USER_STACK_TOP; vaddr += PAGE_SIZE) {
         uint64_t phys = alloc_page();
         if (!phys) {
-            sprintf("[ELF] ERROR: alloc_page failed for stack at 0x%llx\n", vaddr);
+            sprintf("[ELF] ERROR: alloc_page failed for stack at 0x%llx\n",
+                    (unsigned long long)vaddr);
             program_unload(out_proc);
             return ELF_INVALID_PROGRAM_HEADER_OFFSET;
         }
 
         if (!map_page(vaddr, phys, PAGE_USER_FLAGS | PTE_NX)) {
-            sprintf("[ELF] ERROR: map_page failed for stack at 0x%llx\n", vaddr);
+            sprintf("[ELF] ERROR: map_page failed for stack at 0x%llx\n",
+                    (unsigned long long)vaddr);
             free_page(phys);
             program_unload(out_proc);
             return ELF_INVALID_PROGRAM_HEADER_OFFSET;
@@ -393,7 +416,12 @@ status program_load(const uint8_t* file_buf,
     }
 
     sprintf("[ELF] Stack mapped: [0x%llx, 0x%llx) (%d pages), sp=0x%llx, argc=%d, argv=0x%llx\n",
-            stack_bottom, USER_STACK_TOP, USER_STACK_PAGES, adjusted_sp, argc, user_argv_ptr);
+            (unsigned long long)stack_bottom,
+            (unsigned long long)USER_STACK_TOP,
+            USER_STACK_PAGES,
+            (unsigned long long)adjusted_sp,
+            argc,
+            (unsigned long long)user_argv_ptr);
 
     return ELF_OK;
 }
@@ -407,6 +435,7 @@ static void free_scratch_buffer(uintptr_t vbase, size_t num_pages) {
             free_page(phys);
         }
     }
+    g_current_scratch_pages = 0;
 }
 
 static status load_file_to_scratch(char* filename, size_t file_size, uint8_t** out_buf, size_t* out_pages) {
@@ -421,6 +450,8 @@ static status load_file_to_scratch(char* filename, size_t file_size, uint8_t** o
     }
 
     size_t num_pages = ALIGN_UP(file_size, PAGE_SIZE) / PAGE_SIZE;
+    g_current_scratch_pages = num_pages;
+
     for (size_t i = 0; i < num_pages; i++) {
         uint64_t phys = alloc_page();
         if (!phys) {
@@ -477,7 +508,11 @@ status spawn(char* filename,
     }
 
     sprintf("[ELF] Spawned %s (entry=0x%llx, stack=0x%llx, argc=%d, osabi=0x%x)\n",
-            filename, out_proc->entry, out_proc->stack_top, argc, out_proc->osabi);
+            filename,
+            (unsigned long long)out_proc->entry,
+            (unsigned long long)out_proc->stack_top,
+            argc,
+            out_proc->osabi);
 
     return ELF_OK;
 }
@@ -499,7 +534,12 @@ void run(char* filename, size_t file_size, int argc, char** argv) {
     }
 
     sprintf("[ELF] Running %s (entry=0x%llx, stack=0x%llx, argc=%d, argv=0x%llx, osabi=0x%x)\n",
-            filename, proc.entry, proc.stack_top, argc, user_argv_ptr, proc.osabi);
+            filename,
+            (unsigned long long)proc.entry,
+            (unsigned long long)proc.stack_top,
+            argc,
+            (unsigned long long)user_argv_ptr,
+            proc.osabi);
 
     to_userland_ring3(proc.entry, proc.stack_top & ~0xFULL, argc, user_argv_ptr);
 
