@@ -12,6 +12,10 @@
 #define HISTORY_SIZE     12
 #define PROGRAMS_DIR     "/programs"
 
+#define HISTORY_SIZE     12
+#define HISTORY_FILE     ".history"
+#define HISTORY_BUF_SIZE (HISTORY_SIZE * CMD_BUF_SIZE)
+
 typedef struct {
     char entries[HISTORY_SIZE][CMD_BUF_SIZE];
     int count;
@@ -68,29 +72,92 @@ static int run_program_file(const char *path) {
     return 0;
 }
 
-static void history_push(const char *line) {
-    if (!line || line[0] == '\0') return;
-    if (g_history.count > 0) {
-        int prev = (g_history.head - 1 + HISTORY_SIZE) % HISTORY_SIZE;
-        if (strcmp(g_history.entries[prev], line) == 0) {
-            return;
+static int history_load_lines(char entries[HISTORY_SIZE][CMD_BUF_SIZE]) {
+    int64_t size = fs_size(HISTORY_FILE);
+    if (size <= 0) {
+        return 0;
+    }
+
+    char raw[HISTORY_BUF_SIZE];
+    size_t to_read = (size >= HISTORY_BUF_SIZE) ? (HISTORY_BUF_SIZE - 1) : (size_t)size;
+    int64_t n = fs_read(HISTORY_FILE, raw, to_read);
+    if (n <= 0) {
+        return 0;
+    }
+    raw[n] = '\0';
+
+    int count = 0;
+    size_t pos = 0;
+    while (pos < (size_t)n && count < HISTORY_SIZE) {
+        size_t out = 0;
+        while (pos < (size_t)n && raw[pos] != '\n' && raw[pos] != '\r') {
+            if (out + 1 < CMD_BUF_SIZE) {
+                entries[count][out++] = raw[pos];
+            }
+            pos++;
+        }
+        entries[count][out] = '\0';
+        if (out > 0) {
+            count++;
+        }
+        while (pos < (size_t)n && (raw[pos] == '\n' || raw[pos] == '\r')) {
+            pos++;
         }
     }
-    copy_str_bounded(g_history.entries[g_history.head], line, CMD_BUF_SIZE);
-    g_history.head = (g_history.head + 1) % HISTORY_SIZE;
-    if (g_history.count < HISTORY_SIZE) {
-        g_history.count++;
+
+    return count;
+}
+
+static void history_save_lines(char entries[HISTORY_SIZE][CMD_BUF_SIZE], int start, int count) {
+    char raw[HISTORY_BUF_SIZE];
+    size_t pos = 0;
+
+    for (int i = 0; i < count; i++) {
+        const char *line = entries[start + i];
+        for (size_t j = 0; line[j] != '\0' && pos + 2 < HISTORY_BUF_SIZE; j++) {
+            raw[pos++] = line[j];
+        }
+        if (pos + 1 < HISTORY_BUF_SIZE) {
+            raw[pos++] = '\n';
+        }
+    }
+    raw[pos] = '\0';
+
+    if (fs_size(HISTORY_FILE) < 0) {
+        fs_create(HISTORY_FILE);
+    }
+    fs_write(HISTORY_FILE, raw, pos);
+}
+
+static void history_push(const char *line) {
+    if (!line || line[0] == '\0') return;
+
+    char entries[HISTORY_SIZE][CMD_BUF_SIZE];
+    int count = history_load_lines(entries);
+
+    if (count > 0 && strcmp(entries[count - 1], line) == 0) {
+        return;
+    }
+
+    if (count < HISTORY_SIZE) {
+        copy_str_bounded(entries[count], line, CMD_BUF_SIZE);
+        count++;
+        history_save_lines(entries, 0, count);
+    } else {
+        for (int i = 1; i < HISTORY_SIZE; i++) {
+            copy_str_bounded(entries[i - 1], entries[i], CMD_BUF_SIZE);
+        }
+        copy_str_bounded(entries[HISTORY_SIZE - 1], line, CMD_BUF_SIZE);
+        history_save_lines(entries, 0, HISTORY_SIZE);
     }
 }
 
 static void history_print(void) {
-    int start = (g_history.count < HISTORY_SIZE)
-        ? 0
-        : g_history.head;
+    char entries[HISTORY_SIZE][CMD_BUF_SIZE];
+    int count = history_load_lines(entries);
 
-    for (int i = 0; i < g_history.count; i++) {
-        int idx = (start + i) % HISTORY_SIZE;
-        printf("%d  %s\n", i + 1, g_history.entries[idx]);
+    for (int i = 0; i < count; i++) {
+        printf("%d  %s\n", i + 1, entries[i]);
     }
 }
 
