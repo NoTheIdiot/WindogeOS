@@ -486,6 +486,11 @@ int     user_add(const char *username, const char *password, uint8_t is_admin);
 int     user_remove(const char *username);
 int     user_passwd(const char *username, const char *new_password);
 
+#define KEY_RIGHT 0x80
+#define KEY_LEFT  0x81
+#define KEY_DOWN  0x82
+#define KEY_UP    0x83
+
 // power acpi
 void reboot(void);
 void shutdown(void);

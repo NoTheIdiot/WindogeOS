@@ -140,16 +140,16 @@ void _start(int argc, char** argv) {
         for (int i = 0; i < nlines; i++) {
             printf("%c%d: %s\n", (i == cur) ? '>' : ' ', i + 1, lines[i]);
         }
-        printf("(j/k e:edit i:ins d:del :w/:q)\n");
+        printf("(Down/Up Arrow | [E] edit | [I] ins | [D] del | > cmd \n");
 
         int k = -1;
         while ((k = getkey()) < 0) {
             wait(10);
         }
 
-        if (k == 'k' && cur > 0) {
+        if (k == KEY_UP && cur > 0) {
             cur--;
-        } else if (k == 'j' && cur < nlines - 1) {
+        } else if (k == KEY_DOWN && cur < nlines - 1) {
             cur++;
         } else if (k == 'e') {
             prompt("Edit: ", buf, sizeof(buf));
@@ -173,11 +173,13 @@ void _start(int argc, char** argv) {
                 nlines--;
                 if (cur >= nlines) cur = nlines - 1;
             }
-        } else if (k == ':') {
+        } else if (k == '>') {
+            printf(">q | quit\n");
+            printf(">s | save\n");
             prompt(":", buf, sizeof(buf));
             if (str_eq(buf, "q")) break;
-            if (str_eq(buf, "w")) save_file(0);
-            else if (starts_with(buf, "w ")) save_file(buf + 2);
+            if (str_eq(buf, "s")) save_file(0);
+            else if (starts_with(buf, "s ")) save_file(buf + 2);
         } else if (k == 'q') {
             exit();
         }

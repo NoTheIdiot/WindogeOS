@@ -6,6 +6,11 @@
 #include "stddef.h"
 #include "root.h"
 
+#define KEY_RIGHT 0x80
+#define KEY_LEFT  0x81
+#define KEY_DOWN  0x82
+#define KEY_UP    0x83
+
 #ifndef __DOGE_HAVE_PRINTF
 #define __DOGE_HAVE_PRINTF
 
