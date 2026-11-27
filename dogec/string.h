@@ -15,6 +15,31 @@ static inline void *memcpy(void *__restrict__ dst, const void *__restrict__ src,
     return dst;
 }
 
+static inline int atoi(const char *str) {
+    int res = 0;
+    int sign = 1;
+    int i = 0;
+
+    while (str[i] == ' ' || (str[i] >= '\t' && str[i] <= '\r')) {
+        i++;
+    }
+
+    if (str[i] == '-' || str[i] == '+') {
+        if (str[i] == '-') {
+            sign = -1;
+        }
+        i++;
+    }
+
+    while (str[i] >= '0' && str[i] <= '9') {
+        res = res * 10 + (str[i] - '0');
+        i++;
+    }
+
+    return res * sign;
+}
+
+
 static inline void *memmove(void *dst, const void *src, size_t n) {
     uint8_t *d = (uint8_t *)dst;
     const uint8_t *s = (const uint8_t *)src;

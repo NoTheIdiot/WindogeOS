@@ -11,6 +11,14 @@
 #define KEY_DOWN  0x82
 #define KEY_UP    0x83
 
+#define KEY_CTRL_S 19
+#define KEY_CTRL_Q 17
+#define KEY_CTRL_F 6
+#define KEY_CTRL_G 7
+#define KEY_CTRL_K 11
+#define KEY_CTRL_U 21
+#define KEY_CTRL_Z 26
+
 #ifndef __DOGE_HAVE_PRINTF
 #define __DOGE_HAVE_PRINTF
 

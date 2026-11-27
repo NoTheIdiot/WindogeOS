@@ -2,190 +2,479 @@
 #include "../dogec/dogeio.h"
 #include "../dogec/string.h"
 
-#define MAX_LINES 24
-#define MAX_LEN   80
+#define MAX_LINES      1024
+#define MAX_LINE_LEN   256
+#define VIEW_LINES     20
 
-static char lines[MAX_LINES][MAX_LEN];
+static char lines[MAX_LINES][MAX_LINE_LEN];
+static char fname[64];
+
 static int nlines = 1;
-static int cur = 0;
-static char fname[32] = "";
 
-static void copy_str(char *dst, const char *src, int cap) {
-    if (!dst || cap <= 0) return;
+static int cur_line = 0;
+static int cur_col  = 0;
+
+static int top_line = 0;
+static int left_col = 0;
+
+static int dirty = 0;
+
+static char clipboard[MAX_LINE_LEN];
+
+static int str_len(const char *s)
+{
+    int n = 0;
+    while (s && s[n])
+        n++;
+    return n;
+}
+
+static void copy_str(char *dst, const char *src, int cap)
+{
     int i = 0;
-    if (src) {
-        while (i < cap - 1 && src[i] != '\0') {
+
+    if (!dst || cap <= 0)
+        return;
+
+    if (src)
+    {
+        while (i < cap - 1 && src[i])
+        {
             dst[i] = src[i];
             i++;
         }
     }
-    dst[i] = '\0';
+
+    dst[i] = 0;
 }
 
-static int str_len(const char *s) {
-    int n = 0;
-    if (!s) return 0;
-    while (s[n] != '\0') n++;
-    return n;
-}
-
-static int str_eq(const char *a, const char *b) {
-    if (!a || !b) return 0;
+static int str_eq(const char *a, const char *b)
+{
     int i = 0;
-    while (a[i] != '\0' && b[i] != '\0') {
-        if (a[i] != b[i]) return 0;
+
+    while (a[i] && b[i])
+    {
+        if (a[i] != b[i])
+            return 0;
+
         i++;
     }
+
     return a[i] == b[i];
 }
 
-static int starts_with(const char *s, const char *prefix) {
-    if (!s || !prefix) return 0;
-    int i = 0;
-    while (prefix[i] != '\0') {
-        if (s[i] != prefix[i]) return 0;
-        i++;
-    }
-    return 1;
-}
-
-static void prompt(const char *p, char *out, int cap) {
+static int prompt(const char *msg, char *out, int cap)
+{
     int pos = 0;
-    out[0] = '\0';
-    printf("\n%s", p);
-    while (pos < cap - 1) {
+
+    out[0] = 0;
+
+    printf("\n%s", msg);
+
+    while (1)
+    {
         int k = getkey();
-        if (k < 0) {
+
+        if (k < 0)
+        {
             wait(10);
             continue;
         }
-        if (k == '\r' || k == '\n') break;
-        if ((k == 8 || k == 127) && pos > 0) {
+
+        if (k == 27)
+        {
+            putchar('\n');
+            return 0;
+        }
+
+        if (k == '\r' || k == '\n')
+            break;
+
+        if ((k == 8 || k == 127) && pos > 0)
+        {
             pos--;
-            out[pos] = '\0';
+            out[pos] = 0;
             printf("\b \b");
-        } else if (k >= 32 && k < 127) {
-            out[pos++] = (char)k;
-            out[pos] = '\0';
+        }
+        else if (k >= 32 && k < 127 && pos < cap - 1)
+        {
+            out[pos++] = k;
+            out[pos] = 0;
             putchar(k);
         }
     }
-    out[pos] = '\0';
+
     putchar('\n');
+
+    return 1;
 }
 
-static void load_file(const char *path) {
-    if (!path || path[0] == '\0') return;
-    FILE *fp = fopen(path, "r");
-    if (!fp) return;
+static void adjust_scroll(void)
+{
+    if (cur_line < top_line)
+        top_line = cur_line;
 
-    nlines = 0;
-    char b[MAX_LEN];
-    while (nlines < MAX_LINES && fgets(b, sizeof(b), fp) != NULL) {
-        int l = str_len(b);
-        while (l > 0 && (b[l - 1] == '\n' || b[l - 1] == '\r')) {
-            b[--l] = '\0';
-        }
-        copy_str(lines[nlines], b, MAX_LEN);
-        nlines++;
-    }
-    fclose(fp);
+    if (cur_line >= top_line + VIEW_LINES)
+        top_line = cur_line - VIEW_LINES + 1;
 
-    if (nlines == 0) {
-        lines[0][0] = '\0';
-        nlines = 1;
-    }
-    copy_str(fname, path, sizeof(fname));
-    cur = 0;
+    if (cur_col < left_col)
+        left_col = cur_col;
+
+    if (cur_col >= left_col + 70)
+        left_col = cur_col - 69;
 }
 
-static void save_file(const char *path) {
-    const char *t = (path && path[0] != '\0') ? path : fname;
-    if (!t || t[0] == '\0') {
-        printf("No filename\n");
+static void insert_char(char c)
+{
+    char *line = lines[cur_line];
+
+    int len = str_len(line);
+
+    if (len >= MAX_LINE_LEN - 1)
+        return;
+
+    for (int i = len; i >= cur_col; i--)
+        line[i + 1] = line[i];
+
+    line[cur_col] = c;
+
+    cur_col++;
+
+    dirty = 1;
+}
+
+static void insert_newline(void)
+{
+    if (nlines >= MAX_LINES)
+        return;
+
+    char right[MAX_LINE_LEN];
+
+    copy_str(right,
+             lines[cur_line] + cur_col,
+             MAX_LINE_LEN);
+
+    lines[cur_line][cur_col] = 0;
+
+    for (int i = nlines; i > cur_line + 1; i--)
+        copy_str(lines[i], lines[i - 1], MAX_LINE_LEN);
+
+    copy_str(lines[cur_line + 1], right, MAX_LINE_LEN);
+
+    nlines++;
+
+    cur_line++;
+    cur_col = 0;
+
+    dirty = 1;
+}
+
+static void backspace(void)
+{
+    char *line = lines[cur_line];
+
+    if (cur_col > 0)
+    {
+        int len = str_len(line);
+
+        for (int i = cur_col - 1; i < len; i++)
+            line[i] = line[i + 1];
+
+        cur_col--;
+        dirty = 1;
         return;
     }
-    FILE *fp = fopen(t, "w");
-    if (!fp) {
-        printf("Write error\n");
+
+    if (cur_line == 0)
+        return;
+
+    int prev_len = str_len(lines[cur_line - 1]);
+    int cur_len  = str_len(line);
+
+    if (prev_len + cur_len >= MAX_LINE_LEN)
+        return;
+
+    copy_str(
+        lines[cur_line - 1] + prev_len,
+        line,
+        MAX_LINE_LEN - prev_len
+    );
+
+    for (int i = cur_line; i < nlines - 1; i++)
+        copy_str(lines[i], lines[i + 1], MAX_LINE_LEN);
+
+    nlines--;
+
+    cur_line--;
+    cur_col = prev_len;
+
+    dirty = 1;
+}
+
+static void delete_forward(void)
+{
+    char *line = lines[cur_line];
+
+    int len = str_len(line);
+
+    if (cur_col < len)
+    {
+        for (int i = cur_col; i < len; i++)
+            line[i] = line[i + 1];
+
+        dirty = 1;
         return;
     }
-    for (int i = 0; i < nlines; i++) {
-        int l = str_len(lines[i]);
-        if (l > 0) fwrite(lines[i], 1, (size_t)l, fp);
+
+    if (cur_line >= nlines - 1)
+        return;
+
+    int next_len = str_len(lines[cur_line + 1]);
+
+    if (len + next_len >= MAX_LINE_LEN)
+        return;
+
+    copy_str(
+        line + len,
+        lines[cur_line + 1],
+        MAX_LINE_LEN - len
+    );
+
+    for (int i = cur_line + 1; i < nlines - 1; i++)
+        copy_str(lines[i], lines[i + 1], MAX_LINE_LEN);
+
+    nlines--;
+
+    dirty = 1;
+}
+
+static void move_left(void)
+{
+    if (cur_col > 0)
+    {
+        cur_col--;
+        return;
+    }
+
+    if (cur_line > 0)
+    {
+        cur_line--;
+        cur_col = str_len(lines[cur_line]);
+    }
+}
+
+static void move_right(void)
+{
+    int len = str_len(lines[cur_line]);
+
+    if (cur_col < len)
+    {
+        cur_col++;
+        return;
+    }
+
+    if (cur_line < nlines - 1)
+    {
+        cur_line++;
+        cur_col = 0;
+    }
+}
+
+static void move_up(void)
+{
+    if (cur_line > 0)
+    {
+        cur_line--;
+
+        int len = str_len(lines[cur_line]);
+
+        if (cur_col > len)
+            cur_col = len;
+    }
+}
+
+static void move_down(void)
+{
+    if (cur_line < nlines - 1)
+    {
+        cur_line++;
+
+        int len = str_len(lines[cur_line]);
+
+        if (cur_col > len)
+            cur_col = len;
+    }
+}
+
+static void save_file(void)
+{
+    if (!fname[0])
+        return;
+
+    FILE *fp = fopen(fname, "w");
+
+    if (!fp)
+        return;
+
+    for (int i = 0; i < nlines; i++)
+    {
+        fwrite(lines[i], 1, str_len(lines[i]), fp);
         fputc('\n', fp);
     }
+
     fclose(fp);
-    copy_str(fname, t, sizeof(fname));
-    printf("Saved %s\n", fname);
+
+    dirty = 0;
 }
 
-void _start(int argc, char** argv) {
-    for (int i = 0; i < MAX_LINES; i++) lines[i][0] = '\0';
-    char buf[MAX_LEN];
-    if (argc <= 1) {
-        char buf[MAX_LEN];
-        prompt("File: ", buf, sizeof(buf));
-        if (buf[0] != '\0') {
-            load_file(buf);
-        }
-    } else {
-        printf(argv[1]);
-        load_file(argv[1]);
+static int find_line(const char *s)
+{
+    for (int i = 0; i < nlines; i++)
+    {
+        if (strstr(lines[i], s))
+            return i;
     }
 
-    while (1) {
-        clear();
-        printf("[%s] L:%d/%d\n", fname[0] ? fname : "new", cur + 1, nlines);
-        for (int i = 0; i < nlines; i++) {
-            printf("%c%d: %s\n", (i == cur) ? '>' : ' ', i + 1, lines[i]);
-        }
-        printf("(Down/Up Arrow | [E] edit | [I] ins | [D] del | > cmd \n");
+    return -1;
+}
 
-        int k = -1;
-        while ((k = getkey()) < 0) {
-            wait(10);
+static void draw_editor(void)
+{
+    clear();
+
+    printf(
+        "[%s%s] Ln:%d Col:%d\n",
+        fname[0] ? fname : "Untitled",
+        dirty ? "*" : "",
+        cur_line + 1,
+        cur_col + 1
+    );
+
+    printf("------------------------------------------------------------\n");
+
+    int end = top_line + VIEW_LINES;
+
+    if (end > nlines)
+        end = nlines;
+
+    for (int y = top_line; y < end; y++)
+    {
+        printf("%c ",
+               y == cur_line ? '>' : ' ');
+
+        int len = str_len(lines[y]);
+
+        for (int x = left_col; x <= len; x++)
+        {
+            if (y == cur_line && x == cur_col)
+                putchar('|');
+
+            if (x < len)
+                putchar(lines[y][x]);
         }
 
-        if (k == KEY_UP && cur > 0) {
-            cur--;
-        } else if (k == KEY_DOWN && cur < nlines - 1) {
-            cur++;
-        } else if (k == 'e') {
-            prompt("Edit: ", buf, sizeof(buf));
-            copy_str(lines[cur], buf, MAX_LEN);
-        } else if (k == 'i' && nlines < MAX_LINES) {
-            for (int i = nlines; i > cur; i--) {
-                copy_str(lines[i], lines[i - 1], MAX_LEN);
-            }
-            lines[cur][0] = '\0';
-            nlines++;
-            prompt("Ins: ", buf, sizeof(buf));
-            copy_str(lines[cur], buf, MAX_LEN);
-        } else if (k == 'd') {
-            if (nlines == 1) {
-                lines[0][0] = '\0';
-            } else {
-                for (int i = cur; i < nlines - 1; i++) {
-                    copy_str(lines[i], lines[i + 1], MAX_LEN);
+        putchar('\n');
+    }
+
+    printf("------------------------------------------------------------\n");
+    printf("^S Save  ^Q Quit  ^F Find  ^G Goto  ^K CutLine  ^U Paste\n");
+}
+
+void _start(int argc, char **argv)
+{
+    fname[0] = 0;
+
+    for (int i = 0; i < MAX_LINES; i++)
+        lines[i][0] = 0;
+
+    clipboard[0] = 0;
+
+    if (argc > 1)
+        copy_str(fname, argv[1], sizeof(fname));
+
+    while (1)
+    {
+        adjust_scroll();
+        draw_editor();
+
+        int k;
+
+        do {
+            k = getkey();
+
+            if (k < 0)
+                wait(10);
+
+        } while (k < 0);
+
+        switch (k)
+        {
+            case KEY_LEFT:  move_left();  break;
+            case KEY_RIGHT: move_right(); break;
+            case KEY_UP:    move_up();    break;
+            case KEY_DOWN:  move_down();  break;
+
+            case '\r':
+            case '\n':
+                insert_newline();
+                break;
+
+            case 8:
+            case 127:
+                backspace();
+                break;
+
+            case 19: /* Ctrl+S */
+                save_file();
+                break;
+
+            case 17: /* Ctrl+Q */
+                if (!dirty)
+                    goto quit;
+                break;
+
+            case 6: /* Ctrl+F */
+            {
+                char search[64];
+
+                if (prompt("Find: ", search, sizeof(search)))
+                {
+                    int line = find_line(search);
+
+                    if (line >= 0)
+                    {
+                        cur_line = line;
+                        cur_col = 0;
+                    }
                 }
-                lines[nlines - 1][0] = '\0';
-                nlines--;
-                if (cur >= nlines) cur = nlines - 1;
+                break;
             }
-        } else if (k == '>') {
-            printf(">q | quit\n");
-            printf(">s | save\n");
-            prompt(":", buf, sizeof(buf));
-            if (str_eq(buf, "q")) break;
-            if (str_eq(buf, "s")) save_file(0);
-            else if (starts_with(buf, "s ")) save_file(buf + 2);
-        } else if (k == 'q') {
-            exit();
+
+            case 7: /* Ctrl+G */
+            {
+                char num[16];
+
+                if (prompt("Goto line: ", num, sizeof(num)))
+                {
+                    int line = atoi(num);
+
+                    if (line > 0 && line <= nlines)
+                    {
+                        cur_line = line - 1;
+                        cur_col = 0;
+                    }
+                }
+                break;
+            }
+
+            default:
+                if (k >= 32 && k < 127)
+                    insert_char((char)k);
+                break;
         }
     }
 
+quit:
     clear();
     exit();
-    return;
 }

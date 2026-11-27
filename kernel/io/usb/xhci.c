@@ -455,6 +455,20 @@ char get_key(void) {
                         g_caps_lock = !g_caps_lock;
                     } else if (out_char == 0) {
                         char c = hid_usage_to_ascii(key, shift, g_caps_lock);
+                        bool ctrl = (mods & (HID_MOD_LCTRL | HID_MOD_RCTRL)) != 0;
+                        if (ctrl &&
+                            c >= 'a' &&
+                            c <= 'z')
+                        {
+                            c = c - 'a' + 1;
+                        }
+                        else if (
+                            ctrl &&
+                            c >= 'A' &&
+                            c <= 'Z')
+                        {
+                            c = c - 'A' + 1;
+                        }
                         if (c) out_char = c;
                     }
                 }
