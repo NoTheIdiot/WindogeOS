@@ -330,6 +330,10 @@ void putchar(char c) {
         }
         return;
     }
+    if (c == '\a') {
+        speaker_beep(500, 250);
+        return;
+    }
     if (c == '\t') {
         uint32_t next = (cursor_x + 4) & ~3U;
         if (next >= term_cols) newline();

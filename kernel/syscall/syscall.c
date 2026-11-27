@@ -430,6 +430,8 @@ static inline uint64_t handle_fs(registers_t *regs) {
                 return ERR_BAD_PTR;
             }
 
+            sprintf("[FS_WRITE] fname=%s user_buf=0x%llx size=%llu\n", kfilename, (unsigned long long)user_buffer, (unsigned long long)size);
+
             int res = write_file(&exfat_vol, kfilename, kbuf, size);
             return (res == 0) ? size : ERR_INVAL;
         }

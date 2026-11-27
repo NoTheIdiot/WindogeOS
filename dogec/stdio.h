@@ -15,7 +15,7 @@
 
 #define FOPEN_MAX 16
 #define FILENAME_MAX 256
-#define _STDIO_SCRATCH_MAX 65536
+#define _STDIO_SCRATCH_MAX 16384
 #define _STDIO_LINE_BUF_MAX 256
 
 typedef enum {

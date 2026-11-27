@@ -3,567 +3,532 @@
 #include "../dogec/string.h"
 #include "../dogec/math.h"
 
-#define SCI_PI 3.14159265358979323846
-#define SCI_E  2.71828182845904523536
+#define FX_SCALE     1000000LL
+#define FX_HALF      500000LL
+#define FX_PI        3141593LL
+#define FX_E         2718282LL
+#define FX_TWO_PI    6283185LL
+#define FX_HALF_PI   1570796LL
+#define FX_TRIG_LIM  10LL
 
-static void sci_abs(double x, double* out) {
-    *out = (x < 0.0) ? -x : x;
+static int64_t c_abs_i64(int64_t x) {
+    return (x < 0) ? -x : x;
 }
 
-static void sci_pow(double base, double exp, double* out) {
-    if (exp == 0.0) {
-        *out = 1.0;
-        return;
+static uint64_t c_to_u64_mag(int64_t x, int *neg) {
+    if (x < 0) {
+        if (neg) *neg = !(*neg);
+        return (uint64_t)(-(x + 1)) + 1ULL;
     }
-
-    long long iexp = (long long)exp;
-    if ((double)iexp == exp) {
-        int neg = 0;
-        unsigned long long uexp;
-        if (iexp < 0) {
-            neg = 1;
-            uexp = (unsigned long long)(-(iexp + 1)) + 1ULL;
-        } else {
-            uexp = (unsigned long long)iexp;
-        }
-
-        double result = 1.0;
-        double cur = base;
-        while (uexp > 0ULL) {
-            if (uexp & 1ULL) {
-                result *= cur;
-            }
-            uexp >>= 1ULL;
-            if (uexp > 0ULL) {
-                cur *= cur;
-            }
-        }
-        *out = neg ? (1.0 / result) : result;
-        return;
-    }
-
-    if (base < 0.0) {
-        *out = 0.0 / 0.0;
-        return;
-    }
-    if (base == 0.0) {
-        *out = (exp > 0.0) ? 0.0 : (1.0 / 0.0);
-        return;
-    }
-
-    *out = (double)math_power((uint64_t)base, (int)exp);
+    return (uint64_t)x;
 }
 
-static void sci_sqrt(double x, double* out) {
-    if (x < 0.0) {
-        *out = 0.0 / 0.0;
-        return;
-    }
-    if (x == 0.0) {
-        *out = 0.0;
-        return;
+static int64_t c_from_u64_mag(uint64_t mag, int neg) {
+    return neg ? -(int64_t)mag : (int64_t)mag;
+}
+
+static int64_t c_mul(int64_t a, int64_t b) {
+    int neg = 0;
+    uint64_t ua = c_to_u64_mag(a, &neg);
+    uint64_t ub = c_to_u64_mag(b, &neg);
+
+    uint64_t a_hi = ua / 1000000ULL;
+    uint64_t a_lo = ua % 1000000ULL;
+    uint64_t b_hi = ub / 1000000ULL;
+    uint64_t b_lo = ub % 1000000ULL;
+
+    uint64_t lo_prod = a_lo * b_lo + 500000ULL;
+    uint64_t res = (a_hi * b_hi) * 1000000ULL
+                 + a_hi * b_lo
+                 + a_lo * b_hi
+                 + lo_prod / 1000000ULL;
+
+    return c_from_u64_mag(res, neg);
+}
+
+static int c_div(int64_t a, int64_t b, int64_t *out) {
+    if (!out || b == 0) return 0;
+
+    int neg = 0;
+    uint64_t ua = c_to_u64_mag(a, &neg);
+    uint64_t ub = c_to_u64_mag(b, &neg);
+
+    uint64_t q = ua / ub;
+    uint64_t rem = ua % ub;
+    uint64_t frac = 0;
+
+    for (int i = 0; i < 6; i++) {
+        rem *= 10ULL;
+        frac = frac * 10ULL + (rem / ub);
+        rem %= ub;
     }
 
-    double guess = x;
-    if (x > 1.0) {
-        guess = x * 0.5;
+    if (rem * 2ULL >= ub) {
+        frac++;
+        if (frac >= 1000000ULL) {
+            frac -= 1000000ULL;
+            q++;
+        }
     }
-    for (int i = 0; i < 40; i++) {
-        guess = 0.5 * (guess + x / guess);
+
+    *out = c_from_u64_mag(q * 1000000ULL + frac, neg);
+    return 1;
+}
+
+static int c_pow(int64_t base, int64_t exp_fx, int64_t *out) {
+    if (!out) return 0;
+    if (exp_fx % FX_SCALE != 0 || exp_fx < 0) return 0;
+
+    uint64_t uexp = (uint64_t)(exp_fx / FX_SCALE);
+    if (uexp == 0ULL) {
+        *out = FX_SCALE;
+        return 1;
     }
+
+    int64_t acc = FX_SCALE;
+    int64_t cur = base;
+
+    while (uexp > 0ULL) {
+        if (uexp & 1ULL) {
+            acc = c_mul(acc, cur);
+        }
+        uexp >>= 1ULL;
+        if (uexp > 0ULL) {
+            cur = c_mul(cur, cur);
+        }
+    }
+
+    *out = acc;
+    return 1;
+}
+
+static int c_sqrt(int64_t x, int64_t *out) {
+    if (!out || x < 0) return 0;
+    if (x == 0) {
+        *out = 0;
+        return 1;
+    }
+
+    int64_t guess = (x > FX_SCALE) ? (x / 2) : x;
+    if (guess <= 0) guess = 1;
+
+    for (int iter = 0; iter < 32; iter++) {
+        int64_t quot = 0;
+        if (!c_div(x, guess, &quot)) return 0;
+        int64_t next = (guess + quot) / 2;
+        if (c_abs_i64(next - guess) <= 1) {
+            guess = next;
+            break;
+        }
+        guess = next;
+    }
+
     *out = guess;
+    return 1;
 }
 
-static void sci_exp(double x, double* out) {
-    if (x > 709.0) {
-        *out = 1.0 / 0.0;
-        return;
-    }
-    if (x < -745.0) {
-        *out = 0.0;
-        return;
-    }
+static int64_t c_wrap_pi(int64_t x) {
+    int64_t r = x % FX_TWO_PI;
+    if (r > FX_PI) r -= FX_TWO_PI;
+    if (r < -FX_PI) r += FX_TWO_PI;
+    return r;
+}
 
-    const double LN2 = 0.69314718055994530942;
-    long long k = (long long)((x >= 0.0) ? (x / LN2 + 0.5) : (x / LN2 - 0.5));
-    double r = x - (double)k * LN2;
+static int c_sin(int64_t x, int64_t *out) {
+    if (!out) return 0;
+    int64_t r = c_wrap_pi(x);
+    int64_t r2 = c_mul(r, r);
+    int64_t term = r;
+    int64_t sum = r;
 
-    double term = 1.0;
-    double sum = 1.0;
-    for (int n = 1; n <= 25; n++) {
-        term *= r / (double)n;
+    for (int n = 1; n <= 4; n++) {
+        int64_t denom = (int64_t)((2 * n) * (2 * n + 1));
+        term = -(c_mul(term, r2) / denom);
         sum += term;
     }
 
-    double p2 = 1.0;
-    sci_pow(2.0, (double)k, &p2);
-    *out = sum * p2;
-}
-
-static void sci_ln(double x, double* out) {
-    if (x <= 0.0) {
-        *out = 0.0 / 0.0;
-        return;
-    }
-
-    int k = 0;
-    while (x > 1.5) {
-        x *= 0.5;
-        k++;
-    }
-    while (x < 0.75) {
-        x *= 2.0;
-        k--;
-    }
-
-    double u = (x - 1.0) / (x + 1.0);
-    double u2 = u * u;
-    double term = u;
-    double sum = u;
-    for (int n = 3; n <= 35; n += 2) {
-        term *= u2;
-        sum += term / (double)n;
-    }
-
-    const double LN2 = 0.69314718055994530942;
-    *out = (2.0 * sum) + ((double)k * LN2);
-}
-
-static void sci_log10(double x, double* out) {
-    const double LN10 = 2.30258509299404568402;
-    double ln_x = 0.0;
-    sci_ln(x, &ln_x);
-    *out = ln_x / LN10;
-}
-
-static void wrap_angle_rad(double x, double* out) {
-    const double TWO_PI = 2.0 * SCI_PI;
-    long long cycles = (long long)(x / TWO_PI);
-    double r = x - (double)cycles * TWO_PI;
-    if (r > SCI_PI) r -= TWO_PI;
-    if (r < -SCI_PI) r += TWO_PI;
-    *out = r;
-}
-
-static void sci_sin(double x, double* out) {
-    double r = 0.0;
-    wrap_angle_rad(x, &r);
-    double r2 = r * r;
-    double term = r;
-    double sum = r;
-    for (int n = 1; n <= 12; n++) {
-        term *= -r2 / (double)((2 * n) * (2 * n + 1));
-        sum += term;
-    }
     *out = sum;
+    return 1;
 }
 
-static void sci_cos(double x, double* out) {
-    double r = 0.0;
-    wrap_angle_rad(x, &r);
-    double r2 = r * r;
-    double term = 1.0;
-    double sum = 1.0;
-    for (int n = 1; n <= 12; n++) {
-        term *= -r2 / (double)((2 * n - 1) * (2 * n));
+static int c_cos(int64_t x, int64_t *out) {
+    if (!out) return 0;
+    int64_t r = c_wrap_pi(x);
+    int64_t r2 = c_mul(r, r);
+    int64_t term = FX_SCALE;
+    int64_t sum = FX_SCALE;
+
+    for (int n = 1; n <= 4; n++) {
+        int64_t denom = (int64_t)((2 * n - 1) * (2 * n));
+        term = -(c_mul(term, r2) / denom);
         sum += term;
     }
+
     *out = sum;
+    return 1;
 }
 
-static void sci_tan(double x, double* out) {
-    double c = 0.0;
-    double s = 0.0;
-    double abs_c = 0.0;
-    sci_cos(x, &c);
-    sci_abs(c, &abs_c);
-    if (abs_c < 1e-15) {
-        *out = 0.0 / 0.0;
-        return;
-    }
-    sci_sin(x, &s);
-    *out = s / c;
+static int c_tan(int64_t x, int64_t *out) {
+    if (!out) return 0;
+    int64_t s = 0;
+    int64_t c = 0;
+    if (!c_sin(x, &s) || !c_cos(x, &c)) return 0;
+    if (c_abs_i64(c) < FX_TRIG_LIM) return 0;
+    return c_div(s, c, out);
 }
 
-static int sci_isnan(double x) {
-    return x != x;
-}
-
-static int sci_isinf(double x) {
-    return !sci_isnan(x) && (x > 1e308 || x < -1e308);
-}
-
-static void print_unsigned_ll(unsigned long long val) {
-    char buf[32];
+static void c_print_digits(uint64_t val) {
+    char digits[24];
     int idx = 0;
+
     if (val == 0ULL) {
-        printf("0");
+        printf("%s", "0");
         return;
     }
-    while (val > 0ULL) {
-        buf[idx++] = (char)('0' + (val % 10ULL));
+
+    while (val > 0ULL && idx < (int)sizeof(digits)) {
+        digits[idx++] = (char)('0' + (val % 10ULL));
         val /= 10ULL;
     }
+
     for (int i = idx - 1; i >= 0; i--) {
-        char ch[2] = { buf[i], '\0' };
-        printf(ch);
+        char out[2] = { digits[i], '\0' };
+        printf("%s", out);
     }
 }
 
-void print_double(double val) {
-    if (sci_isnan(val)) {
-        printf("NaN\n");
-        return;
-    }
-    if (sci_isinf(val)) {
-        printf(val < 0.0 ? "-inf\n" : "inf\n");
-        return;
-    }
-    if (val < 0.0) {
-        printf("-");
+static void c_print_val(int64_t val) {
+    if (val < 0) {
+        printf("%s", "-");
         val = -val;
     }
 
-    double scaled = val * 1000000.0 + 0.5;
-    unsigned long long total_micro = (unsigned long long)scaled;
-    unsigned long long whole = total_micro / 1000000ULL;
-    unsigned long long frac = total_micro % 1000000ULL;
+    uint64_t u = (uint64_t)val;
+    uint64_t whole = u / 1000000ULL;
+    uint64_t frac = u % 1000000ULL;
 
-    print_unsigned_ll(whole);
-    printf(".");
+    c_print_digits(whole);
+    printf("%s", ".");
 
-    unsigned long long div = 100000ULL;
-    while (div > 0ULL) {
-        unsigned long long digit = frac / div;
-        char ch[2] = { (char)('0' + digit), '\0' };
-        printf(ch);
-        frac %= div;
-        div /= 10ULL;
+    uint64_t place = 100000ULL;
+    while (place > 0ULL) {
+        uint64_t d = frac / place;
+        char out[2] = { (char)('0' + d), '\0' };
+        printf("%s", out);
+        frac %= place;
+        place /= 10ULL;
     }
     printf("\n");
 }
 
 typedef struct {
-    const char* src;
-    int pos;
-    int error;
-} Parser;
+    const char *text;
+    int idx;
+    int err;
+} ExprReader;
 
-static void skip_ws(Parser* p) {
-    while (p->src[p->pos] == ' ' || p->src[p->pos] == '\t' ||
-           p->src[p->pos] == '\n' || p->src[p->pos] == '\r') {
-        p->pos++;
+static void skip_spaces(ExprReader *r) {
+    if (!r || !r->text) return;
+    while (r->text[r->idx] == ' ' || r->text[r->idx] == '\t' ||
+           r->text[r->idx] == '\n' || r->text[r->idx] == '\r') {
+        r->idx++;
     }
 }
 
-static int str_ieq(const char* a, const char* b, int len) {
-    for (int i = 0; i < len; i++) {
-        char ca = a[i];
-        char cb = b[i];
-        if (ca >= 'A' && ca <= 'Z') ca = (char)(ca + ('a' - 'A'));
-        if (cb >= 'A' && cb <= 'Z') cb = (char)(cb + ('a' - 'A'));
-        if (ca != cb || ca == '\0') return 0;
+static int name_eq(const char *s, const char *lit, int n) {
+    if (!s || !lit || n < 0) return 0;
+    for (int i = 0; i < n; i++) {
+        char a = s[i];
+        char b = lit[i];
+        if (a >= 'A' && a <= 'Z') a = (char)(a + ('a' - 'A'));
+        if (b >= 'A' && b <= 'Z') b = (char)(b + ('a' - 'A'));
+        if (a != b || a == '\0') return 0;
     }
-    return b[len] == '\0';
+    return lit[n] == '\0';
 }
 
-static void parse_expr(Parser* p, double* out);
+static int read_sum(ExprReader *r, int64_t *out);
 
-static void apply_func(const char* name, int len, double arg, double* out) {
-    if (str_ieq(name, "sin", len))  { sci_sin(arg, out);   return; }
-    if (str_ieq(name, "cos", len))  { sci_cos(arg, out);   return; }
-    if (str_ieq(name, "tan", len))  { sci_tan(arg, out);   return; }
-    if (str_ieq(name, "sqrt", len)) { sci_sqrt(arg, out);  return; }
-    if (str_ieq(name, "exp", len))  { sci_exp(arg, out);   return; }
-    if (str_ieq(name, "ln", len))   { sci_ln(arg, out);    return; }
-    if (str_ieq(name, "log", len))  { sci_log10(arg, out); return; }
-    if (str_ieq(name, "abs", len))  { sci_abs(arg, out);   return; }
-    *out = 0.0 / 0.0;
+static int call_builtin(const char *name, int len, int64_t arg, int64_t *out) {
+    if (!out) return 0;
+    if (name_eq(name, "sin", len))  return c_sin(arg, out);
+    if (name_eq(name, "cos", len))  return c_cos(arg, out);
+    if (name_eq(name, "tan", len))  return c_tan(arg, out);
+    if (name_eq(name, "sqrt", len)) return c_sqrt(arg, out);
+    if (name_eq(name, "abs", len))  { *out = c_abs_i64(arg); return 1; }
+    return 0;
 }
 
-static void parse_primary(Parser* p, double* out) {
-    *out = 0.0;
-    skip_ws(p);
-    char c = p->src[p->pos];
+static int read_atom(ExprReader *r, int64_t *out) {
+    if (!r || !r->text || !out) return 0;
+    *out = 0;
+    skip_spaces(r);
+    char ch = r->text[r->idx];
 
-    if (c == '(') {
-        p->pos++;
-        double val = 0.0;
-        parse_expr(p, &val);
-        skip_ws(p);
-        if (p->src[p->pos] != ')') {
+    if (ch == '(') {
+        r->idx++;
+        int64_t inside = 0;
+        if (!read_sum(r, &inside)) return 0;
+        skip_spaces(r);
+        if (r->text[r->idx] != ')') {
             printf("Error: Missing ')'\n");
-            p->error = 1;
-            return;
+            r->err = 1;
+            return 0;
         }
-        p->pos++;
-        *out = val;
-        return;
+        r->idx++;
+        *out = inside;
+        return 1;
     }
 
-    if ((c >= '0' && c <= '9') || c == '.') {
-        double val = 0.0;
-        int has_digit = 0;
-        while (p->src[p->pos] >= '0' && p->src[p->pos] <= '9') {
-            val = val * 10.0 + (double)(p->src[p->pos] - '0');
-            p->pos++;
-            has_digit = 1;
+    if ((ch >= '0' && ch <= '9') || ch == '.') {
+        int64_t ipart = 0;
+        int64_t fpart = 0;
+        int64_t fmult = 100000;
+        int seen = 0;
+
+        while (r->text[r->idx] >= '0' && r->text[r->idx] <= '9') {
+            ipart = ipart * 10 + (int64_t)(r->text[r->idx] - '0');
+            r->idx++;
+            seen = 1;
         }
-        if (p->src[p->pos] == '.') {
-            p->pos++;
-            double place = 0.1;
-            while (p->src[p->pos] >= '0' && p->src[p->pos] <= '9') {
-                val += (double)(p->src[p->pos] - '0') * place;
-                place *= 0.1;
-                p->pos++;
-                has_digit = 1;
-            }
-        }
-        if (!has_digit) {
-            printf("Error: Invalid number\n");
-            p->error = 1;
-            return;
-        }
-        if (p->src[p->pos] == 'e' || p->src[p->pos] == 'E') {
-            int save_pos = p->pos;
-            p->pos++;
-            int exp_sign = 1;
-            if (p->src[p->pos] == '+') {
-                p->pos++;
-            } else if (p->src[p->pos] == '-') {
-                exp_sign = -1;
-                p->pos++;
-            }
-            if (p->src[p->pos] >= '0' && p->src[p->pos] <= '9') {
-                int exp_val = 0;
-                while (p->src[p->pos] >= '0' && p->src[p->pos] <= '9') {
-                    exp_val = exp_val * 10 + (p->src[p->pos] - '0');
-                    p->pos++;
+
+        if (r->text[r->idx] == '.') {
+            r->idx++;
+            while (r->text[r->idx] >= '0' && r->text[r->idx] <= '9') {
+                int d = r->text[r->idx] - '0';
+                if (fmult > 0) {
+                    fpart += (int64_t)d * fmult;
+                    fmult /= 10;
                 }
-                double scale = 1.0;
-                sci_pow(10.0, (double)(exp_sign * exp_val), &scale);
-                val *= scale;
-            } else {
-                p->pos = save_pos;
+                r->idx++;
+                seen = 1;
             }
         }
-        *out = val;
-        return;
+
+        if (!seen) {
+            printf("Error: Invalid number\n");
+            r->err = 1;
+            return 0;
+        }
+
+        *out = ipart * FX_SCALE + fpart;
+        return 1;
     }
 
-    if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
-        int start = p->pos;
-        while ((p->src[p->pos] >= 'a' && p->src[p->pos] <= 'z') ||
-               (p->src[p->pos] >= 'A' && p->src[p->pos] <= 'Z') ||
-               (p->src[p->pos] >= '0' && p->src[p->pos] <= '9') ||
-               p->src[p->pos] == '_') {
-            p->pos++;
-        }
-        int len = p->pos - start;
-        const char* ident = p->src + start;
-
-        if (str_ieq(ident, "pi", len)) { *out = SCI_PI; return; }
-        if (str_ieq(ident, "e", len))  { *out = SCI_E;  return; }
-
-        skip_ws(p);
-        if (p->src[p->pos] == '(') {
-            p->pos++;
-            double arg = 0.0;
-            parse_expr(p, &arg);
-            skip_ws(p);
-            if (p->src[p->pos] != ')') {
-                printf("Error: Missing ')' in function call\n");
-                p->error = 1;
-                return;
-            }
-            p->pos++;
-            double res = 0.0;
-            apply_func(ident, len, arg, &res);
-            if (sci_isnan(res)) {
-                printf("Error: Math domain error\n");
-                p->error = 1;
-                return;
-            }
-            *out = res;
-            return;
+    if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')) {
+        int start = r->idx;
+        while ((r->text[r->idx] >= 'a' && r->text[r->idx] <= 'z') ||
+               (r->text[r->idx] >= 'A' && r->text[r->idx] <= 'Z') ||
+               (r->text[r->idx] >= '0' && r->text[r->idx] <= '9') ||
+               r->text[r->idx] == '_') {
+            r->idx++;
         }
 
-        printf("Error: Unknown identifier\n");
-        p->error = 1;
-        return;
+        int len = r->idx - start;
+        const char *ident = r->text + start;
+
+        if (name_eq(ident, "pi", len)) { *out = FX_PI; return 1; }
+        if (name_eq(ident, "e", len))  { *out = FX_E;  return 1; }
+
+        skip_spaces(r);
+        if (r->text[r->idx] == '(') {
+            r->idx++;
+            int64_t arg = 0;
+            if (!read_sum(r, &arg)) return 0;
+            skip_spaces(r);
+            if (r->text[r->idx] != ')') {
+                printf("Error: Missing ')' in call\n");
+                r->err = 1;
+                return 0;
+            }
+            r->idx++;
+
+            int64_t ans = 0;
+            if (!call_builtin(ident, len, arg, &ans)) {
+                printf("Error: Bad function or domain\n");
+                r->err = 1;
+                return 0;
+            }
+            *out = ans;
+            return 1;
+        }
+
+        printf("Error: Unknown symbol\n");
+        r->err = 1;
+        return 0;
     }
 
-    printf("Error: Unexpected character\n");
-    p->error = 1;
+    printf("Error: Unexpected token\n");
+    r->err = 1;
+    return 0;
 }
 
-static void parse_unary(Parser* p, double* out) {
-    *out = 0.0;
-    skip_ws(p);
-    if (p->src[p->pos] == '+') {
-        p->pos++;
-        parse_unary(p, out);
-        return;
+static int read_sign(ExprReader *r, int64_t *out) {
+    if (!r || !r->text || !out) return 0;
+    skip_spaces(r);
+
+    if (r->text[r->idx] == '+') {
+        r->idx++;
+        return read_sign(r, out);
     }
-    if (p->src[p->pos] == '-') {
-        p->pos++;
-        double val = 0.0;
-        parse_unary(p, &val);
-        *out = -val;
-        return;
+
+    if (r->text[r->idx] == '-') {
+        r->idx++;
+        int64_t v = 0;
+        if (!read_sign(r, &v)) return 0;
+        *out = -v;
+        return 1;
     }
-    parse_primary(p, out);
+
+    return read_atom(r, out);
 }
 
-static void parse_power(Parser* p, double* out) {
-    *out = 0.0;
-    double base = 0.0;
-    parse_unary(p, &base);
-    if (p->error) return;
+static int read_exp(ExprReader *r, int64_t *out) {
+    if (!r || !r->text || !out) return 0;
+    int64_t base = 0;
+    if (!read_sign(r, &base)) return 0;
 
-    skip_ws(p);
-    if (p->src[p->pos] == '^') {
-        p->pos++;
-        double exp = 0.0;
-        parse_power(p, &exp);
-        if (p->error) return;
-        double res = 0.0;
-        sci_pow(base, exp, &res);
-        if (sci_isnan(res)) {
-            printf("Error: Math domain error\n");
-            p->error = 1;
-            return;
+    skip_spaces(r);
+    if (r->text[r->idx] == '^') {
+        r->idx++;
+        int64_t exp_fx = 0;
+        if (!read_exp(r, &exp_fx)) return 0;
+
+        int64_t res = 0;
+        if (!c_pow(base, exp_fx, &res)) {
+            printf("Error: Invalid exponent\n");
+            r->err = 1;
+            return 0;
         }
         *out = res;
-        return;
+        return 1;
     }
+
     *out = base;
-}
-
-static void parse_term(Parser* p, double* out) {
-    *out = 0.0;
-    double val = 0.0;
-    parse_power(p, &val);
-    if (p->error) return;
-
-    while (1) {
-        skip_ws(p);
-        char op = p->src[p->pos];
-        if (op == '*') {
-            p->pos++;
-            double rhs = 0.0;
-            parse_power(p, &rhs);
-            if (p->error) return;
-            val *= rhs;
-        } else if (op == '/') {
-            p->pos++;
-            double rhs = 0.0;
-            parse_power(p, &rhs);
-            if (p->error) return;
-            if (rhs == 0.0) {
-                printf("Error: Division by zero\n");
-                p->error = 1;
-                return;
-            }
-            val /= rhs;
-        } else {
-            break;
-        }
-    }
-    *out = val;
-}
-
-static void parse_expr(Parser* p, double* out) {
-    *out = 0.0;
-    double val = 0.0;
-    parse_term(p, &val);
-    if (p->error) return;
-
-    while (1) {
-        skip_ws(p);
-        char op = p->src[p->pos];
-        if (op == '+') {
-            p->pos++;
-            double rhs = 0.0;
-            parse_term(p, &rhs);
-            if (p->error) return;
-            val += rhs;
-        } else if (op == '-') {
-            p->pos++;
-            double rhs = 0.0;
-            parse_term(p, &rhs);
-            if (p->error) return;
-            val -= rhs;
-        } else {
-            break;
-        }
-    }
-    *out = val;
-}
-
-int evaluate(char* string, double* result) {
-    if (string == (void*)0 || result == (void*)0) {
-        return 0;
-    }
-    Parser p;
-    p.src = string;
-    p.pos = 0;
-    p.error = 0;
-
-    double val = 0.0;
-    parse_expr(&p, &val);
-    skip_ws(&p);
-    if (!p.error && p.src[p.pos] != '\0') {
-        printf("Error: Unexpected trailing input\n");
-        p.error = 1;
-    }
-    if (p.error) {
-        return 0;
-    }
-
-    *result = val;
     return 1;
 }
 
-void strip_newline(char* str) {
-    for (int i = 0; str[i] != '\0'; i++) {
-        if (str[i] == '\n' || str[i] == '\r') {
-            str[i] = '\0';
+static int read_prod(ExprReader *r, int64_t *out) {
+    if (!r || !r->text || !out) return 0;
+    int64_t cur = 0;
+    if (!read_exp(r, &cur)) return 0;
+
+    while (1) {
+        skip_spaces(r);
+        char op = r->text[r->idx];
+        if (op == '*') {
+            r->idx++;
+            int64_t rhs = 0;
+            if (!read_exp(r, &rhs)) return 0;
+            cur = c_mul(cur, rhs);
+        } else if (op == '/') {
+            r->idx++;
+            int64_t rhs = 0;
+            if (!read_exp(r, &rhs)) return 0;
+            int64_t q = 0;
+            if (!c_div(cur, rhs, &q)) {
+                printf("Error: Division by zero\n");
+                r->err = 1;
+                return 0;
+            }
+            cur = q;
+        } else {
+            break;
+        }
+    }
+
+    *out = cur;
+    return 1;
+}
+
+static int read_sum(ExprReader *r, int64_t *out) {
+    if (!r || !r->text || !out) return 0;
+    int64_t cur = 0;
+    if (!read_prod(r, &cur)) return 0;
+
+    while (1) {
+        skip_spaces(r);
+        char op = r->text[r->idx];
+        if (op == '+') {
+            r->idx++;
+            int64_t rhs = 0;
+            if (!read_prod(r, &rhs)) return 0;
+            cur += rhs;
+        } else if (op == '-') {
+            r->idx++;
+            int64_t rhs = 0;
+            if (!read_prod(r, &rhs)) return 0;
+            cur -= rhs;
+        } else {
+            break;
+        }
+    }
+
+    *out = cur;
+    return 1;
+}
+
+static int eval_line(char *line, int64_t *ans) {
+    if (!line || !ans) return 0;
+    ExprReader r;
+    r.text = line;
+    r.idx = 0;
+    r.err = 0;
+
+    int64_t val = 0;
+    if (!read_sum(&r, &val)) return 0;
+    skip_spaces(&r);
+
+    if (!r.err && r.text[r.idx] != '\0') {
+        printf("Error: Extra input\n");
+        r.err = 1;
+        return 0;
+    }
+
+    *ans = val;
+    return 1;
+}
+
+static void trim_eol(char *s) {
+    if (!s) return;
+    for (int i = 0; s[i] != '\0'; i++) {
+        if (s[i] == '\n' || s[i] == '\r') {
+            s[i] = '\0';
             break;
         }
     }
 }
 
-void _start(int argc, char** argv) {
-    char* expr = (void*)0;
+void _start(int argc, char **argv) {
+    char *expr = (void *)0;
 
-    if (argv != (void*)0) {
-        if (argc >= 2 && argv[1] != (void*)0 && argv[1][0] != '\0') {
+    if (argv != (void *)0) {
+        if (argc >= 2 && argv[1] != (void *)0 && argv[1][0] != '\0') {
             expr = argv[1];
-        } else if (argc == 1 && argv[0] != (void*)0 && argv[0][0] != '\0' && strcmp(argv[0], "calc") != 0) {
+        } else if (argc == 1 && argv[0] != (void *)0 && argv[0][0] != '\0' && strcmp(argv[0], "calc") != 0) {
             expr = argv[0];
         }
     }
 
-    if (expr == (void*)0) {
-        printf("Scientific Calculator (type 'exit' to quit)\n");
-        char input[256];
+    if (expr == (void *)0) {
+        printf("Calculator (type 'exit' to quit)\n");
+        char buf[256];
         while (1) {
             printf("> ");
-            if (fgets(input, sizeof(input), stdin) == (void*)0) {
+            if (fgets(buf, sizeof(buf), stdin) == (void *)0) {
                 break;
             }
-            strip_newline(input);
-            if (strcmp(input, "exit") == 0 || strcmp(input, "quit") == 0) {
+            trim_eol(buf);
+            if (strcmp(buf, "exit") == 0 || strcmp(buf, "quit") == 0) {
                 break;
             }
-            if (input[0] == '\0') {
+            if (buf[0] == '\0') {
                 continue;
             }
-            double res = 0.0;
-            if (evaluate(input, &res)) {
+            int64_t ans = 0;
+            if (eval_line(buf, &ans)) {
                 printf("= ");
-                print_double(res);
+                c_print_val(ans);
             }
         }
         exit();
@@ -571,19 +536,17 @@ void _start(int argc, char** argv) {
     }
 
     if (strcmp(expr, "--help") == 0) {
-        printf("Scientific Calculator\n");
         printf("Usage: calc [expression]\n");
-        printf("Functions: sin, cos, tan, sqrt, exp, ln, log, abs\n");
-        printf("Constants: pi, e\n");
-        printf("Example: calc \"sin(pi / 2) + 2 ^ 3 * sqrt(16)\"\n");
+        printf("Funcs: sin, cos, tan, sqrt, abs\n");
+        printf("Consts: pi, e\n");
         exit();
         return;
     }
 
-    double res = 0.0;
-    if (evaluate(expr, &res)) {
+    int64_t ans = 0;
+    if (eval_line(expr, &ans)) {
         printf("Result: ");
-        print_double(res);
+        c_print_val(ans);
     }
 
     exit();

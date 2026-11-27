@@ -143,7 +143,6 @@ static void prompt_default_shell(char *out_shell, size_t out_size) {
     printf("\nDefault Shell Setup:\n");
     printf("  1) /system/dogeshell (default)\n");
     printf("  2) /programs/sh \n");
-    printf("  Or enter a custom path (e.g. /programs/sh)\n");
     input("Default shell [1]: ", choice, sizeof(choice));
 
     if (strcmp(choice, "2") == 0) {
@@ -153,7 +152,7 @@ static void prompt_default_shell(char *out_shell, size_t out_size) {
         strncpy(out_shell, "/system/dogeshell", out_size - 1);
         out_shell[out_size - 1] = '\0';
     } else {
-        strncpy(out_shell, choice, out_size - 1);
+        strncpy(out_shell, "/system/dogeshell", out_size - 1);
         out_shell[out_size - 1] = '\0';
     }
 }
@@ -167,6 +166,7 @@ static void login_screen(void) {
     while (1) {
         clear();
         printf("WindogeOS login\n");
+        printf("Welcome back. Time: %s\n", get_time());
 
         input("Username: ", username, sizeof(username));
         input_masked("Password: ", password, sizeof(password), true);
@@ -189,7 +189,7 @@ static void create_account_setup(void) {
 
     while (1) {
         clear();
-        printf("WindogeOS Account Setup\n\n");
+        printf("WindogeOS Account Setup\nWelcome to WindogeOS setup. Create an account, select shell and thats it.\n\n");
 
         input("Username: ", username, sizeof(username));
         if (username[0] == '\0') {
@@ -310,7 +310,7 @@ void windoge(void) {
 
     clear();
     while (true) {
-        run(default_shell, 32768, 0, NULL);
+        run(default_shell, 131072, 0, NULL);
     }
     halt();
 }
