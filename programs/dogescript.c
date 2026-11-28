@@ -219,5 +219,5 @@ void _start(int argc, char **argv) {
 
     execute_script(script);
 
-    proc_exit_now();
+    exit();
 }

@@ -779,11 +779,23 @@ static inline uint64_t handle_proc(registers_t *regs) {
             heap_pointer = USER_START;
             refresh_kernel_gs_base();
 
+            sprintf("[PROC] Before");
             run(kfilename, file_size, argc, (argc > 0) ? kargv_ptrs : NULL);
+            sprintf("[PROC] After");
 
             bsp_cpu_data.kernel_rsp = saved_kernel_rsp;
             bsp_cpu_data.user_rsp_scratch = saved_user_scratch;
             heap_pointer = saved_heap;
+
+            sprintf("[PROC] restore:\n");
+            sprintf("  saved_kernel_rsp=0x%llx\n", saved_kernel_rsp);
+            sprintf("  current_kernel_rsp=0x%llx\n", bsp_cpu_data.kernel_rsp);
+            sprintf("  saved_user_scratch=0x%llx\n", saved_user_scratch);
+            sprintf("  current_user_scratch=0x%llx\n",
+                    bsp_cpu_data.user_rsp_scratch);
+            sprintf("  saved_heap=0x%llx\n", saved_heap);
+            sprintf("  current_heap=0x%llx\n", heap_pointer);
+
             refresh_kernel_gs_base();
             return 0;
         }
