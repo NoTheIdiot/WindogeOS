@@ -391,6 +391,51 @@ void _start(int argc, char **argv)
 
     if (argc > 1)
         copy_str(fname, argv[1], sizeof(fname));
+        if (fname[0]) {
+            FILE *fp = fopen(fname, "r");
+
+            if (fp)
+            {
+                int line = 0;
+                int pos = 0;
+                int ch;
+
+                lines[0][0] = 0;
+
+                while ((ch = fgetc(fp)) >= 0)
+                {
+                    if (ch == '\r')
+                        continue;
+
+                    if (ch == '\n')
+                    {
+                        lines[line][pos] = 0;
+
+                        if (line < MAX_LINES - 1)
+                        {
+                            line++;
+                            pos = 0;
+                            lines[line][0] = 0;
+                        }
+
+                        continue;
+                    }
+
+                    if (pos < MAX_LINE_LEN - 1)
+                    {
+                        lines[line][pos++] = (char)ch;
+                        lines[line][pos] = 0;
+                    }
+                }
+
+                nlines = line + 1;
+
+                if (nlines < 1)
+                    nlines = 1;
+
+                fclose(fp);
+            }
+        }
 
     while (1)
     {
